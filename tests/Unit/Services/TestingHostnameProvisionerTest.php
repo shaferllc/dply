@@ -163,3 +163,38 @@ test('the platform failure names the platform, not the customer account', functi
     expect(fn () => $method->invoke(app(\App\Services\Sites\TestingHostnameProvisioner::class), $site))
         ->toThrow(\RuntimeException::class, 'CLOUDFLARE_DNS_API_TOKEN');
 });
+
+/**
+ * The gate has three independent failure conditions. They used to collapse into
+ * one 'disabled' reason, which is how an installation with no DigitalOcean at
+ * all ended up being told to "enable DigitalOcean testing hostnames".
+ */
+test('each disabled condition reports itself distinctly', function () {
+    $provisioner = app(TestingHostnameProvisioner::class);
+    $site = new Site(['name' => 'x', 'slug' => 'x']);
+
+    config([
+        'services.cloudflare.testing_hostnames_enabled' => false,
+        'services.cloudflare.key' => 'tok',
+        'services.cloudflare.vm' => ['on-dply.cc'],
+    ]);
+    expect($provisioner->disabledReason($site))->toBe('disabled_by_flag');
+
+    config(['services.cloudflare.testing_hostnames_enabled' => true, 'services.cloudflare.key' => '']);
+    expect($provisioner->disabledReason($site))->toBe('missing_cloudflare_token');
+
+    config(['services.cloudflare.key' => 'tok', 'services.cloudflare.vm' => []]);
+    expect($provisioner->disabledReason($site))->toBe('no_zones_configured');
+
+    config(['services.cloudflare.vm' => ['on-dply.cc']]);
+    expect($provisioner->disabledReason($site))->toBeNull()
+        ->and($provisioner->isEnabledForSite($site))->toBeTrue();
+});
+
+test('the gate no longer reads a digitalocean-namespaced flag', function () {
+    $source = file_get_contents(
+        (string) (new \ReflectionClass(TestingHostnameProvisioner::class))->getFileName()
+    );
+
+    expect($source)->not->toContain('services.digitalocean.auto_testing_hostname_enabled');
+});

@@ -70,6 +70,20 @@ return [
          * carries full access to the whole account, including billing.
          */
         'email' => env('CLOUDFLARE_EMAIL'),
+
+        /*
+         * Kill switch for managed testing hostnames.
+         *
+         * Lived at services.digitalocean.auto_testing_hostname_enabled until
+         * testing hostnames became Cloudflare-only — a DigitalOcean-namespaced
+         * flag gating a Cloudflare feature, which made the "disabled" failure
+         * read as "enable DigitalOcean testing hostnames" on a setup with no
+         * DigitalOcean involvement at all.
+         */
+        'testing_hostnames_enabled' => filter_var(
+            env('CLOUDFLARE_TESTING_HOSTNAMES_ENABLED', true),
+            FILTER_VALIDATE_BOOL,
+        ),
         'provider' => 'cloudflare',
         'vm_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_VM_APEX', 'on-dply.cc'),
         'edge_apex' => $testing ? 'edge.test' : env('CLOUDFLARE_EDGE_APEX', 'on-dply.site'),
@@ -230,7 +244,6 @@ return [
          * the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
-        'auto_testing_hostname_enabled' => true,
     ],
 
     /*

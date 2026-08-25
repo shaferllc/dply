@@ -27,10 +27,11 @@ class TestingHostnameProvisioner
     {
         $site->loadMissing(['server', 'previewDomains', 'organization', 'dnsProviderCredential']);
 
-        if (! $this->isEnabledForSite($site)) {
+        $disabledReason = $this->disabledReason($site);
+        if ($disabledReason !== null) {
             $this->storeResult($site, [
                 'status' => 'skipped',
-                'reason' => 'disabled',
+                'reason' => $disabledReason,
             ]);
 
             return null;
@@ -420,20 +421,32 @@ class TestingHostnameProvisioner
 
     public function isEnabledForSite(Site $site): bool
     {
-        if (! (bool) config('services.digitalocean.auto_testing_hostname_enabled')) {
-            return false;
+        return $this->disabledReason($site) === null;
+    }
+
+    /**
+     * WHY testing hostnames are unavailable, or null when they are available.
+     *
+     * Three separate conditions used to collapse into one 'disabled' reason,
+     * so the provisioning failure told the operator to fix whichever one the
+     * message happened to name — historically DigitalOcean, on installations
+     * with no DigitalOcean at all. Each condition now reports itself.
+     */
+    public function disabledReason(Site $site): ?string
+    {
+        if (! (bool) config('services.cloudflare.testing_hostnames_enabled', true)) {
+            return 'disabled_by_flag';
         }
 
         if (! $this->hasAvailableToken()) {
-            return false;
+            return 'missing_cloudflare_token';
         }
 
         if ($this->normalizedSiteDnsZone($site) !== null) {
-            return true;
+            return null;
         }
 
-        // True if any provider pool has at least one zone configured.
-        return TestingDomains::vm() !== [];
+        return TestingDomains::vm() !== [] ? null : 'no_zones_configured';
     }
 
     public function delete(Site $site): void

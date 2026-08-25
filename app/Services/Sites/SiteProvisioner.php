@@ -195,7 +195,11 @@ class SiteProvisioner
             $detail = (string) ($testingHostnameMeta['error'] ?? '');
 
             throw new \RuntimeException(match ($reason) {
-                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable testing hostnames and configure Cloudflare plus at least one zone in config/services.php.',
+                'disabled_by_flag' => 'Testing hostname creation is turned off (CLOUDFLARE_TESTING_HOSTNAMES_ENABLED=false), but provisioning requires it.',
+                'missing_cloudflare_token' => 'Testing hostname creation requires CLOUDFLARE_DNS_API_TOKEN. Testing hostnames are Cloudflare-only — set a token whose Zone Resources include the testing zones, then: php artisan config:clear',
+                'no_zones_configured' => 'No testing zones are configured. Add at least one to services.cloudflare.vm in config/services.php.',
+                // Legacy rows written before the reasons were split.
+                'disabled' => 'Testing hostname creation is required before provisioning can continue. Set CLOUDFLARE_DNS_API_TOKEN and configure at least one testing zone.',
                 'missing_server_ip' => 'Testing hostname creation requires a server IP address before provisioning can continue.',
                 default => $detail !== ''
                     ? 'Testing hostname creation failed before provisioning could continue: '.$detail
