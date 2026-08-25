@@ -470,6 +470,16 @@ class SiteDeployPipelineRunner
      */
     private function ensureViteManifest(RemoteShell $ssh, Site $site, string $workingDirectory, string $cwd): array
     {
+        // public/build/manifest.json is a Laravel-Vite convention. A Node app
+        // (Next, Nuxt, SvelteKit) has its own build output and no such manifest,
+        // so this guard could only ever "fail the deploy because the manifest is
+        // missing" for something that never has one. It fired on a Next.js site
+        // because a stale vite.config.js was left behind by a previous repo.
+        $runtime = (string) ($site->runtimeKey() ?? '');
+        if ($runtime !== '' && ! in_array($runtime, ['php', 'static'], true)) {
+            return ['log' => '', 'ok' => true, 'step' => null];
+        }
+
         $probe = $ssh->exec(sprintf(
             'cd %s 2>/dev/null && { vite=no; for f in vite.config.js vite.config.ts vite.config.mjs vite.config.cjs; do [ -f "$f" ] && vite=yes; done; '
             .'man=no; { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && man=yes; '
@@ -494,7 +504,17 @@ class SiteDeployPipelineRunner
         // tooling prefix by synthesizing an npm step.
         $synthetic = new SiteDeployStep;
         $synthetic->step_type = SiteDeployStep::TYPE_NPM_RUN;
-        $buildCmd = 'npm ci --include=dev && npm run build --if-present';
+
+        // Follow the repository's package manager. Hardcoding `npm ci` failed
+        // outright on a pnpm/yarn project ("package.json and package-lock.json
+        // are not in sync"), turning a self-heal into a deploy-breaker.
+        $manager = strtolower((string) ($site->resolvedRuntimeAppDetection()['package_manager'] ?? 'npm'));
+        $buildCmd = match ($manager) {
+            'pnpm' => 'corepack pnpm install --prod=false && corepack pnpm run build',
+            'yarn' => 'corepack yarn install && corepack yarn build',
+            'bun' => 'bun install && bun run build',
+            default => 'npm ci --include=dev && npm run build --if-present',
+        };
         $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd, $site).$buildCmd;
 
         $start = microtime(true);

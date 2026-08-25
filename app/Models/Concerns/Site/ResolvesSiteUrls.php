@@ -85,8 +85,19 @@ trait ResolvesSiteUrls
     {
         $meta = $this->meta ?? [];
         $value = $meta['git_ref_kind'] ?? null;
+        $kind = in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
 
-        return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
+        // A commit pin has to actually be a commit. A site left with
+        // git_ref_kind=commit while git_branch is a branch name made every
+        // deploy a silent no-op: the deployer fetches the URL (which populates
+        // FETCH_HEAD only, never origin/*), checks out the unchanged local
+        // branch, then returns early because "commits have no upstream to
+        // pull" — so the checkout never moved while deploys reported success.
+        if ($kind === 'commit' && preg_match('/^[0-9a-f]{7,40}$/i', trim((string) $this->git_branch)) !== 1) {
+            return 'branch';
+        }
+
+        return $kind;
     }
 
     /**
