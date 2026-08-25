@@ -264,6 +264,14 @@ class AtomicSiteDeployer
             $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
 
             app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+
+            // Same reconcile as the simple deployer: make the build steps match
+            // what detection just found in the checkout, so a Node repo stops
+            // running composer_install left over from the site's PHP seeding.
+            $reconcileNote = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+            if ($reconcileNote !== null) {
+                $log .= $reconcileNote."\n";
+            }
         }
 
         // ── ENV ── seed the fresh release's .env. A release is a clean git

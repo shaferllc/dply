@@ -268,6 +268,15 @@ class SiteGitDeployer
         // even for obvious Laravel apps (esp. when the app-picker was skipped).
         app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
 
+        // ── RECONCILE ── the pipeline is seeded once at site creation and never
+        // revisited, so a site created as PHP kept a composer_install step even
+        // after a Node repo was connected. Now that detection has run against
+        // the fresh checkout, make the build steps match what the repo is.
+        $reconcileNote = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+        if ($reconcileNote !== null) {
+            $log .= "\n".$reconcileNote."\n";
+        }
+
         // ── ENV ── compose the .env (env cache + attached resource bindings'
         // connection vars + workspace variables) and write it BEFORE build, so
         // composer/asset steps and the live app see bound resources (DB_*,
