@@ -101,6 +101,22 @@ if command -v mariadb >/dev/null 2>&1; then
   printf "MARIADB_VERSION=%s\n" "\$(mariadb --version 2>/dev/null | head -n 1)"
 fi
 printf "MYSQL_END\n"
+printf "POSTGRES_BEGIN\n"
+if command -v psql >/dev/null 2>&1; then
+  printf "PRESENT=1\n"
+  printf "VERSION=%s\n" "\$(psql --version 2>/dev/null | head -n 1)"
+fi
+printf "POSTGRES_END\n"
+printf "SQLITE_BEGIN\n"
+if command -v sqlite3 >/dev/null 2>&1; then
+  printf "PRESENT=1\n"
+  printf "VERSION=%s\n" "\$(sqlite3 --version 2>/dev/null | awk '{print \$1}')"
+fi
+printf "SQLITE_END\n"
+printf "MEMORY_BEGIN\n"
+printf "TOTAL_MB=%s\n" "\$(awk '/MemTotal:/ {print int(\$2/1024)}' /proc/meminfo 2>/dev/null)"
+printf "SWAP_MB=%s\n" "\$(awk '/SwapTotal:/ {print int(\$2/1024)}' /proc/meminfo 2>/dev/null)"
+printf "MEMORY_END\n"
 printf "REDIS_BEGIN\n"
 if command -v redis-cli >/dev/null 2>&1; then
   printf "PRESENT=1\n"
@@ -534,6 +550,24 @@ SH;
         // MySQL/MariaDB
         $meta['manage_mysql'] = $this->extractKvBlock($out, 'MYSQL');
 
+        $meta['manage_postgres'] = $this->extractKvBlock($out, 'POSTGRES');
+        $meta['manage_sqlite'] = $this->extractKvBlock($out, 'SQLITE');
+        $meta['manage_memory'] = $this->extractKvBlock($out, 'MEMORY');
+
+        // Refresh meta.installed_stack from what is on the box RIGHT NOW.
+        //
+        // It was written once, at the end of provisioning, and never again — so
+        // a server kept reporting the stack it was born with. On a droplet whose
+        // Postgres was swapped for SQLite by the low-memory fallback and which
+        // was later resized and had Postgres installed, the snapshot still read
+        // database=sqlite3, low_mem_mode=true, total_memory_mb=458 against 2GB
+        // of RAM and a running Postgres.
+        //
+        // Not cosmetic: InstalledStack::fromMeta() feeds the site vhost's PHP
+        // version (ResolvesWebserverConfig), the servers list, and the
+        // "diverges from request" banner.
+        $meta = $this->refreshInstalledStack($meta);
+
         // Redis (key/value plus a fenced INFO_BEGIN/INFO_END inner block)
         $redis = $this->extractKvBlock($out, 'REDIS');
         if (preg_match('/REDIS_BEGIN.*?INFO_BEGIN\s*\R(.*?)\RINFO_END.*?REDIS_END/s', $out, $rm)) {
@@ -753,5 +787,88 @@ SH;
         }
 
         return $kv;
+    }
+
+    /**
+     * Rebuild meta.installed_stack from the probe's findings.
+     *
+     * Only fields the probe actually resolved are overwritten; anything it could
+     * not determine keeps its previous value rather than being blanked, so a
+     * partial probe degrades the snapshot instead of destroying it.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function refreshInstalledStack(array $meta): array
+    {
+        $key = \App\Support\Servers\InstalledStack::META_KEY;
+
+        $existing = is_array($meta[$key] ?? null) ? $meta[$key] : [];
+
+        // extractKvBlock() lowercases keys and casts `present` to a bool.
+        $present = static fn (string $block): bool => ! empty($meta[$block]['present']);
+
+        // Engine precedence matches the provisioner's own: a real server engine
+        // outranks the SQLite substitute, which is only ever the fallback.
+        $database = $existing['database'] ?? null;
+        $databaseVersion = $existing['database_version'] ?? null;
+
+        if ($present('manage_postgres')) {
+            $database = 'postgres';
+            $databaseVersion = self::versionNumber((string) ($meta['manage_postgres']['version'] ?? ''));
+        } elseif ($present('manage_mysql')) {
+            $database = ! empty($meta['manage_mysql']['mariadb_present']) ? 'mariadb' : 'mysql';
+            $databaseVersion = self::versionNumber((string) ($meta['manage_mysql']['version'] ?? ''));
+        } elseif ($present('manage_sqlite')) {
+            $database = 'sqlite3';
+            $databaseVersion = self::versionNumber((string) ($meta['manage_sqlite']['version'] ?? ''));
+        }
+
+        $totalMb = isset($meta['manage_memory']['total_mb']) && is_numeric($meta['manage_memory']['total_mb'])
+            ? (int) $meta['manage_memory']['total_mb']
+            : ($existing['total_memory_mb'] ?? null);
+
+        $swapMb = isset($meta['manage_memory']['swap_mb']) && is_numeric($meta['manage_memory']['swap_mb'])
+            ? (int) $meta['manage_memory']['swap_mb']
+            : ($existing['swap_mb'] ?? null);
+
+        // low_mem_mode described the box at provision time. Re-derive it from the
+        // memory just measured, so a resized droplet stops claiming it.
+        $lowMem = $totalMb !== null ? $totalMb < 1024 : (bool) ($existing['low_mem_mode'] ?? false);
+
+        $phpVersions = is_array($meta['manage_php_fpm']['versions'] ?? null)
+            ? $meta['manage_php_fpm']['versions']
+            : [];
+        $phpVersion = $existing['php_version'] ?? null;
+        if ($phpVersions !== []) {
+            $phpVersion = (string) ($phpVersions[0]['version'] ?? $phpVersion);
+        } elseif (array_key_exists('manage_php_fpm', $meta)) {
+            // Probed and found nothing: this box has no PHP-FPM.
+            $phpVersion = 'none';
+        }
+
+        $meta[$key] = [
+            'database' => $database,
+            'database_version' => $databaseVersion,
+            'php_version' => $phpVersion,
+            'webserver' => ! empty($meta['manage_nginx']['present'])
+                ? 'nginx'
+                : ($existing['webserver'] ?? null),
+            'cache_service' => ! empty($meta['manage_redis']['present'])
+                ? 'redis'
+                : ($existing['cache_service'] ?? null),
+            'low_mem_mode' => $lowMem,
+            'total_memory_mb' => $totalMb,
+            'swap_mb' => $swapMb,
+            'refreshed_at' => now()->toIso8601String(),
+        ];
+
+        return $meta;
+    }
+
+    /** First dotted version number in a tool's --version output, or null. */
+    private static function versionNumber(string $raw): ?string
+    {
+        return preg_match('/(\d+(?:\.\d+)+)/', $raw, $m) === 1 ? $m[1] : null;
     }
 }
