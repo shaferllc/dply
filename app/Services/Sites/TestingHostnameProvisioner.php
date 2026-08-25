@@ -387,7 +387,7 @@ class TestingHostnameProvisioner
 
         $domains = app(UnifiedPreviewHostname::class)->orderedTestingZones($domains);
 
-        $strategy = (string) config('services.digitalocean.testing_domain_strategy', 'deterministic');
+        $strategy = (string) config('services.cloudflare.testing_domain_strategy', 'deterministic');
 
         return match ($strategy) {
             'random' => $domains[array_rand($domains)],
@@ -485,7 +485,7 @@ class TestingHostnameProvisioner
         $previewRow = $site->previewDomains()->where('hostname', $hostname)->first();
         $providerType = is_string($previewRow?->provider_type) && $previewRow->provider_type !== ''
             ? $previewRow->provider_type
-            : ($site->dnsAutomationCredential()->provider ?? 'digitalocean');
+            : ($site->dnsAutomationCredential()->provider ?? 'cloudflare');
 
         if ($providerType === 'namecheap') {
             $recordId = (string) ($testingMeta['record_id'] ?? '');
@@ -530,7 +530,14 @@ class TestingHostnameProvisioner
                 return;
             }
             SiteDnsProviderFactory::forCredential($credential)->deleteRecord($zone, $recordId);
-        } else {
+        } elseif ($providerType === 'digitalocean') {
+            // LEGACY ONLY. Testing hostnames have not been created through
+            // DigitalOcean since the switch to Cloudflare-only routing; this
+            // branch exists so records written by the old code are still
+            // deletable instead of becoming orphan A records. It is scoped to
+            // an explicit 'digitalocean' provider_type rather than acting as
+            // the catch-all `else`, which used to fire DigitalOcean API calls
+            // for any unrecognised value.
             $service = new DigitalOceanService($this->tokenForSite($site));
             $recordId = (int) ($testingMeta['record_id'] ?? 0);
 
@@ -555,16 +562,11 @@ class TestingHostnameProvisioner
     /** @return array<int, string> */
     public function configuredDomains(): array
     {
-        $domains = config('services.digitalocean.testing_domains', TestingDomains::vm());
-
-        $normalized = collect(is_array($domains) ? $domains : [])
-            ->filter(fn (mixed $domain): bool => is_string($domain) && trim($domain) !== '')
-            ->map(fn (string $domain): string => strtolower(trim($domain)))
-            ->unique()
-            ->values()
-            ->all();
-
-        return $normalized !== [] ? $normalized : TestingDomains::vm();
+        // Testing zones are Cloudflare-only. This used to read
+        // services.digitalocean.testing_domains and re-normalise the result,
+        // but that key no longer exists in config and TestingDomains::vm()
+        // already lowercases, trims, de-dupes and returns a list.
+        return TestingDomains::vm();
     }
 
     private function relativeRecordName(string $hostname, string $zone): string
@@ -654,9 +656,11 @@ class TestingHostnameProvisioner
 
     /**
      * Per-provider testing-zone pool from config. Reads the new
-     * services.dply.testing_domains.<provider> map, with DigitalOcean
-     * folding in the legacy services.digitalocean.testing_domains list
-     * so existing setups keep working without env changes.
+     * services.dply.testing_domains.<provider> map.
+     *
+     * The DigitalOcean branch that folded in a legacy zone list is gone:
+     * testing zones are Cloudflare-only, and that merge is what kept the
+     * DigitalOcean pool non-empty and therefore selectable.
      *
      * @return list<string>
      */
@@ -665,10 +669,6 @@ class TestingHostnameProvisioner
         $provider = strtolower(trim($provider));
         $map = config('services.dply.testing_domains', []);
         $list = is_array($map) && is_array($map[$provider] ?? null) ? $map[$provider] : [];
-
-        if ($provider === 'digitalocean') {
-            $list = array_merge($list, $this->configuredDomains());
-        }
 
         return array_values(array_unique(array_filter(array_map(
             static fn (mixed $v): string => is_string($v) ? strtolower(trim($v)) : '',
@@ -694,7 +694,7 @@ class TestingHostnameProvisioner
         }
 
         $ordered = app(UnifiedPreviewHostname::class)->orderedTestingZones($pool);
-        $strategy = (string) config('services.digitalocean.testing_domain_strategy', 'deterministic');
+        $strategy = (string) config('services.cloudflare.testing_domain_strategy', 'deterministic');
 
         return match ($strategy) {
             'random' => $ordered[array_rand($ordered)],
@@ -757,9 +757,10 @@ class TestingHostnameProvisioner
         $routing = $this->resolveTestingProviderForSite($site);
         $credential = $routing['credential'] ?? null;
         if (! $credential instanceof ProviderCredential) {
-            return TestingDomains::cloudflareIsConfigured() || NamecheapDnsService::isConfigured() || trim((string) config('services.digitalocean.token')) !== ''
-                ? 'app_config'
-                : 'none';
+            // Cloudflare only: a Namecheap or DigitalOcean token present in
+            // config cannot write a dply testing zone, so reporting
+            // "app_config" for them claimed a capability that does not exist.
+            return TestingDomains::cloudflareIsConfigured() ? 'app_config' : 'none';
         }
 
         if ($site->dns_provider_credential_id && $credential->id === $site->dns_provider_credential_id) {

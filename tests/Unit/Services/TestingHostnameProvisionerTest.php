@@ -35,9 +35,10 @@ test('vm testing hostnames prefer cloudflare when a platform token exists', func
 });
 
 test('it chooses a domain from the owned pool deterministically', function () {
+    // Cloudflare-namespaced now: the DigitalOcean keys no longer feed the pool.
     config([
-        'services.digitalocean.testing_domains' => ['dply.cc', 'dply.host', 'dply.io'],
-        'services.digitalocean.testing_domain_strategy' => 'deterministic',
+        'services.cloudflare.vm' => ['dply.cc', 'dply.host', 'dply.io'],
+        'services.cloudflare.testing_domain_strategy' => 'deterministic',
     ]);
 
     $site = new Site([
