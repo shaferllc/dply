@@ -31,6 +31,41 @@ final class PipelineAnchorScriptRunner
         return preg_match(self::TRANSIENT_NETWORK_PATTERN, $output) === 1;
     }
 
+    /**
+     * Whether the checkout already on disk is a clone of the requested repo.
+     *
+     * Compared credential-stripped and `.git`-insensitive, so an authenticated
+     * URL (token injected for private HTTPS repos) still matches the clean URL
+     * stored in `origin`. Unknown/unreadable remote counts as a mismatch: it is
+     * safer to re-initialise than to build someone else's code.
+     */
+    private function remoteMatches(RemoteShell $ssh, string $releaseEsc, string $repoUrl): bool
+    {
+        $origin = trim($ssh->exec(
+            sprintf('cd %s && git remote get-url origin 2>/dev/null', $releaseEsc),
+            30
+        ));
+
+        if ($origin === '') {
+            return false;
+        }
+
+        return self::normalizeRemote($origin) === self::normalizeRemote($repoUrl);
+    }
+
+    private static function stripCredentials(string $url): string
+    {
+        return (string) preg_replace('#(https?://)[^@\s]+@#', '$1', trim($url));
+    }
+
+    private static function normalizeRemote(string $url): string
+    {
+        $url = strtolower(self::stripCredentials($url));
+        $url = preg_replace('#\.git$#', '', rtrim($url, '/')) ?? $url;
+
+        return rtrim((string) $url, '/');
+    }
+
     public function runClone(
         RemoteShell $ssh,
         Site $site,
@@ -108,6 +143,21 @@ final class PipelineAnchorScriptRunner
             return $log;
         }
 
+        // An existing checkout is only reusable if it is a checkout of the SAME
+        // repository. Changing a site's repository URL used to leave the old
+        // clone in place: `git fetch <newUrl>` populated FETCH_HEAD, `git
+        // checkout <branch>` landed on the OLD repo's local branch, and the
+        // pull failed on unrelated histories — so the deploy kept building the
+        // previous repo, and detection kept correctly reporting it. Fall
+        // through to the init path below, which re-points origin and
+        // hard-resets, overwriting the old tree.
+        if ($hasExistingGit && ! $this->remoteMatches($ssh, $releaseEsc, $repoUrl)) {
+            $hasExistingGit = false;
+            $log = "\n[dply] The checkout on disk points at a different repository — re-initialising it against "
+                .self::stripCredentials($repoUrl)."\n";
+            $ssh->exec(sprintf('rm -rf %s/.git', $releaseEsc), 60);
+        }
+
         if ($hasExistingGit) {
             // Pass the repo URL explicitly to fetch/pull so that an
             // authenticated URL (with an injected token) is actually used,
@@ -141,7 +191,7 @@ final class PipelineAnchorScriptRunner
         // the target holds a provisioning placeholder or leftovers from a
         // previous failed deploy. init + fetch + hard-reset is idempotent and
         // overwrites tracked files without choking on a pre-existing folder.
-        $log = "\n--- git clone ---\n";
+        $log = ($log ?? '')."\n--- git clone ---\n";
 
         // Store the credential-stripped URL as the remote so tokens are never
         // persisted in .git/config. The fetch command receives the (possibly
