@@ -45,7 +45,15 @@
     // pure runtime-managed state). Everything else is "available" and lives only
     // in the single global "Add resource" dropdown until attached. Shared by the
     // header dropdown and each group column so they stay in lockstep.
-    $isShownAsCard = function ($t) {
+    // Publication is runtime-owned: the deploy writes it, an operator never
+    // attaches it. Until the runtime fills it in there is nothing to show but a
+    // "set on deploy" placeholder.
+    $publicationTarget = is_array(data_get($site->runtimeTarget(), 'publication'))
+        ? data_get($site->runtimeTarget(), 'publication')
+        : [];
+    $hasPublication = filled($publicationTarget['url'] ?? $publicationTarget['hostname'] ?? null);
+
+    $isShownAsCard = function ($t) use ($hasPublication) {
         if ($t['type'] === 'storage') {
             return ($t['bindings'] ?? collect())->isNotEmpty();
         }
@@ -55,12 +63,26 @@
         return $t['attached'];
     };
 
+    // Whether a type is reason enough for its whole pathway to appear. Same as
+    // isShownAsCard() except for publication: its placeholder must not keep the
+    // Runtime hub on screen forever on a site with nothing attached at all —
+    // that is the "wall of empty ghost cards" this map exists to avoid. Once
+    // the group is visible for a real reason, the placeholder is still drawn,
+    // because there it tells you what the next deploy will fill in.
+    $countsForVisibility = function ($t) use ($isShownAsCard, $hasPublication) {
+        if ($t['type'] === 'publication') {
+            return $hasPublication;
+        }
+
+        return $isShownAsCard($t);
+    };
+
     // Only draw a group pathway (hub + column + its trunk edge) once it actually
     // has a card to show. Empty pathways stay hidden until you add a resource to
     // them from the global "Add resource" dropdown, which then makes them appear.
     $visibleGroups = array_filter(
         $hubGroups,
-        fn ($g) => collect($g['types'])->contains(fn ($t) => $isShownAsCard($t))
+        fn ($g) => collect($g['types'])->contains(fn ($t) => $countsForVisibility($t))
     );
     $groupCount = count($visibleGroups);
 

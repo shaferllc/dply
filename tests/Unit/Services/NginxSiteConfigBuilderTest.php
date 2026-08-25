@@ -372,6 +372,57 @@ test('listen port mode rewrites listens and strips tls', function () {
     $this->assertStringNotContainsString('ssl_certificate', $testPort);
 });
 
+// Regression: a custom domain with no certificate of its own became
+// unreachable the moment ANY cert existed on the site. The :80 app block was
+// replaced wholesale by an HTTPS redirect covering every server_name, but only
+// certificated hostnames got a :443 block — so http 301'd to an https that had
+// no matching block, and the browser hit a cert-name mismatch on whichever
+// :443 block nginx picked first.
+test('an uncertificated domain keeps serving on port 80 alongside a certificated one', function () {
+    $site = Site::factory()->create([
+        'slug' => 'mixed-tls',
+        'type' => SiteType::Php,
+        'document_root' => '/var/www/mixed-tls/public',
+        'repository_path' => '/var/www/mixed-tls',
+        'ssl_status' => Site::SSL_ACTIVE,
+    ]);
+    SitePreviewDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'mixed-tls.on-dply.com',
+        'is_primary' => true,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'plain.example.com',
+        'is_primary' => false,
+    ]);
+    SiteCertificate::query()->create([
+        'site_id' => $site->id,
+        'scope_type' => SiteCertificate::SCOPE_PREVIEW,
+        'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+        'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+        'status' => SiteCertificate::STATUS_ACTIVE,
+        'last_installed_at' => now(),
+        'domains_json' => ['mixed-tls.on-dply.com'],
+    ]);
+
+    $site->refresh()->load('domains', 'redirects', 'previewDomains');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    // The certificated host gets its :443 block and its :80 redirect.
+    expect($nginx)->toContain('ssl_certificate /etc/letsencrypt/live/mixed-tls.on-dply.com/fullchain.pem;');
+    expect($nginx)->toMatch('/server_name[^;]*mixed-tls\.on-dply\.com[^;]*;\s*\n\s*location \^~ \/\.well-known/');
+
+    // The uncertificated one is served, not redirected into a block that does
+    // not exist: it keeps a :80 server block that still has the app root.
+    expect($nginx)->toContain('plain.example.com');
+    expect($nginx)->toMatch('/server_name\s+plain\.example\.com;/');
+
+    // ...and it is NOT named in the redirect block.
+    preg_match('/# Managed by Dply — HTTP→HTTPS redirect.*?\n\}/s', $nginx, $redirect);
+    expect($redirect[0] ?? '')->not->toContain('plain.example.com');
+});
+
 test('active certificate appends https server block with basic auth', function () {
     $site = Site::factory()->create([
         'slug' => 'auth-tls',
