@@ -750,9 +750,16 @@ trait ManagesSiteDomainsRouting
                 ? $host
                 : ($host === $zone ? '@' : rtrim(substr($host, 0, -(strlen($zone) + 1)), '.'));
 
-            $status = ! empty($reach['behind_cloudflare']) ? 'cloudflare'
-                : ($reach['points_here'] ? 'pointing'
-                : ($reach['resolves'] ? 'wrong' : 'missing'));
+            // 'propagating' outranks 'wrong': the record is already correct at
+            // the nameservers and only a cache still disagrees, so there is
+            // nothing for the operator to fix.
+            $status = match (true) {
+                ! empty($reach['behind_cloudflare']) => 'cloudflare',
+                (bool) $reach['points_here'] => 'pointing',
+                ! empty($reach['propagating']) => 'propagating',
+                (bool) $reach['resolves'] => 'wrong',
+                default => 'missing',
+            };
 
             $rows[] = [
                 'hostname' => $host,
