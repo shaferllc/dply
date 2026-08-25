@@ -9,6 +9,7 @@ use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerInstalledServices;
 use App\Support\Servers\ServerTags;
 use Database\Factories\ServerFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -615,6 +616,43 @@ class Server extends Model
     public function hasRuntimeInstalled(string $runtime): bool
     {
         return in_array($runtime, $this->installedRuntimeKeys(), true);
+    }
+
+    /**
+     * Site type a NEW site on this server should default to when nothing else
+     * has picked one — a bare create, or "start blank" in the app picker.
+     *
+     * Was hardcoded to PHP at every such call site, which on a php_version=none
+     * box (e.g. the Node/Next.js preset) produced a site whose workspace offered
+     * PHP-FPM controls for an interpreter the server does not have.
+     *
+     * Order: PHP while the box has one, else the first mise-pinned runtime that
+     * maps to a SiteType, else static — a blank site only serves a splash page,
+     * so static is the honest fallback for a python/ruby/go host.
+     *
+     * Fails open to PHP when the stack summary hasn't landed yet, so servers we
+     * can't yet read keep exactly the behaviour they have today.
+     *
+     * ponytail: node is the only non-PHP runtime with its own SiteType; add a
+     * case here if python/ruby/go ever grow one.
+     *
+     * @return array{0: string, 1: string|null} [site type, runtime version]
+     */
+    public function defaultSiteRuntime(): array
+    {
+        if (ServerInstalledServices::hasAny($this, ['php', 'unknown'])) {
+            return ['php', null];
+        }
+
+        $meta = $this->meta ?? [];
+        $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
+
+        $node = trim((string) ($defaults['node'] ?? ''));
+        if ($node !== '') {
+            return ['node', $node];
+        }
+
+        return ['static', null];
     }
 
     /** @return HasOne<ServerDatabaseAdminCredential, $this> */

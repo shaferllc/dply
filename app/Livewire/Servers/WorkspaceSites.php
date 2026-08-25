@@ -139,7 +139,12 @@ class WorkspaceSites extends Component
             $this->form->php_version = $phpData['preselected_version'];
         }
 
-        $this->form->applyDefaultsForType($this->form->type);
+        // Default to what the server can actually run — see Server::defaultSiteRuntime().
+        [$defaultType, $defaultRuntimeVersion] = $this->server->defaultSiteRuntime();
+        $this->form->applyDefaultsForType($defaultType);
+        if ($defaultRuntimeVersion !== null) {
+            $this->form->runtime_version = $defaultRuntimeVersion;
+        }
     }
 
     public function openAddSiteModal(): void

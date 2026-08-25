@@ -36,13 +36,19 @@ class RefreshServerInventoryJob implements ShouldQueue
             return;
         }
 
+        $deploy = trim((string) $server->ssh_user) ?: 'root';
+
         $script = $svc->build(
             extended: true,
             previewLines: (int) config('server_settings.inventory_package_preview_lines', 80),
+            // Without this the per-user mise blocks are skipped and
+            // meta.manage_mise_runtimes never gets written — so a box whose only
+            // runtime is mise-managed (node/python/ruby/go) reads as having no
+            // runtime at all in the workspace. RunsServerInventoryProbe already
+            // passed it; this path (the scheduled/post-provision one) did not.
+            deployUser: $deploy !== 'root' ? $deploy : null,
         );
         $wrapped = '/bin/sh -c '.escapeshellarg($script);
-
-        $deploy = trim((string) $server->ssh_user) ?: 'root';
         $candidates = [];
         if ((bool) config('server_settings.inventory_use_root_ssh', true) && $deploy !== 'root') {
             $candidates[] = 'root';

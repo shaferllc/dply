@@ -147,7 +147,13 @@ class Create extends Component
         if ($this->siteCreateBlockedReason !== '') {
             return;
         }
-        $this->form->applyDefaultsForType($this->form->type);
+        // Default to what the server can actually run, not always PHP —
+        // see Server::defaultSiteRuntime().
+        [$defaultType, $defaultRuntimeVersion] = $server->defaultSiteRuntime();
+        $this->form->applyDefaultsForType($defaultType);
+        if ($defaultRuntimeVersion !== null) {
+            $this->form->runtime_version = $defaultRuntimeVersion;
+        }
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
             $phpData = $phpManager->siteCreationPhpData($server);
             $this->phpVersions = $phpData['available_versions'];

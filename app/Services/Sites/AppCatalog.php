@@ -9,6 +9,7 @@ use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ChooseApp;
 use App\Models\Server;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\ServerInstalledServices;
 
 /**
  * Data-driven registry of applications the choose-app flow can install on a
@@ -59,8 +60,14 @@ class AppCatalog
         }
 
         $installedFamilies = $this->installedDatabaseFamilies($server);
+        // Same architecture gate as the DB one below, for the interpreter: every
+        // installer here is PHP, so on a php_version=none box they'd scaffold an
+        // app the server can never execute. 'unknown' keeps this fail-open for
+        // servers with no stack_summary artifact yet (still building, imported).
+        $hasPhp = ServerInstalledServices::hasAny($server, ['php', 'unknown']);
 
         return collect($this->vmTiles())
+            ->filter(fn (array $tile): bool => $hasPhp || ! ($tile['needs_php'] ?? false))
             // Architecture gate: hide a DB-backed installer when the server has
             // no engine it supports (e.g. WordPress on a Postgres-only box).
             ->filter(function (array $tile) use ($installedFamilies): bool {
@@ -137,6 +144,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-newspaper',
                 'kind' => 'scaffold',
                 'needs_db' => true,
+                'needs_php' => true,
                 'needs_admin_email' => true,
                 'framework' => 'wordpress',
                 'web_subdir' => '',
@@ -149,6 +157,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-bolt',
                 'kind' => 'scaffold',
                 'needs_db' => true,
+                'needs_php' => true,
                 'needs_admin_email' => true,
                 'framework' => 'laravel',
                 'web_subdir' => '/public',
@@ -161,6 +170,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-document-text',
                 'kind' => 'scaffold',
                 'needs_db' => false,
+                'needs_php' => true,
                 'framework' => 'statamic',
                 'web_subdir' => '/public',
                 'recipe' => [
@@ -177,6 +187,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-squares-2x2',
                 'kind' => 'scaffold',
                 'needs_db' => false,
+                'needs_php' => true,
                 'framework' => 'symfony',
                 'web_subdir' => '/public',
                 'recipe' => [
@@ -193,6 +204,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-cube',
                 'kind' => 'scaffold',
                 'needs_db' => true,
+                'needs_php' => true,
                 'framework' => 'craft',
                 'web_subdir' => '/web',
                 'recipe' => [
@@ -210,6 +222,7 @@ class AppCatalog
                 'icon' => 'heroicon-o-globe-alt',
                 'kind' => 'scaffold',
                 'needs_db' => true,
+                'needs_php' => true,
                 'framework' => 'drupal',
                 'web_subdir' => '/web',
                 'recipe' => [

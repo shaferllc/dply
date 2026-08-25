@@ -69,7 +69,8 @@ final class CreateVmSite
             throw new InvalidArgumentException('A site name is required.');
         }
 
-        $type = (string) ($payload['type'] ?? 'php');
+        [$defaultType, $defaultRuntimeVersion] = $server->defaultSiteRuntime();
+        $type = (string) ($payload['type'] ?? $defaultType);
         if (! in_array($type, ['php', 'static', 'node'], true)) {
             throw new InvalidArgumentException('Site type must be php, static, or node.');
         }
@@ -95,6 +96,9 @@ final class CreateVmSite
         $branch = trim((string) ($payload['git_branch'] ?? '')) ?: 'main';
         $runtime = trim((string) ($payload['runtime'] ?? '')) ?: $type;
         $runtimeVersion = trim((string) ($payload['runtime_version'] ?? ''));
+        if ($runtimeVersion === '' && $type === $defaultType && $defaultRuntimeVersion !== null) {
+            $runtimeVersion = $defaultRuntimeVersion;
+        }
 
         $site = Site::query()->create([
             'server_id' => $server->id,

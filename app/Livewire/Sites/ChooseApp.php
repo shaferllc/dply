@@ -419,10 +419,19 @@ class ChooseApp extends Component
      */
     private function runBlank(array $tile, SiteProvisioner $siteProvisioner): mixed
     {
+        // "Start blank" only keeps the splash page, so follow what the server
+        // can actually run rather than always claiming PHP — a php_version=none
+        // box was getting a PHP site with PHP-FPM controls for an interpreter
+        // it doesn't have. See Server::defaultSiteRuntime().
+        [$blankType, $blankRuntimeVersion] = $this->server->defaultSiteRuntime();
+        $blankVersion = $blankType === 'php'
+            ? ($this->phpVersion !== '' ? $this->phpVersion : null)
+            : $blankRuntimeVersion;
+
         $this->site->forceFill([
-            'type' => SiteType::Php,
-            'runtime' => 'php',
-            'runtime_version' => $this->phpVersion !== '' ? $this->phpVersion : null,
+            'type' => SiteType::from($blankType),
+            'runtime' => $blankType,
+            'runtime_version' => $blankVersion,
             'document_root' => $this->documentRoot($tile),
             'status' => Site::STATUS_PENDING,
             'meta' => $this->mergedMeta([
@@ -435,7 +444,7 @@ class ChooseApp extends Component
             ]),
         ])->save();
 
-        $this->seedDeployStepsAndProvision($tile, 'php', $siteProvisioner);
+        $this->seedDeployStepsAndProvision($tile, $blankType, $siteProvisioner);
 
         $this->auditChosen($tile, 'blank');
 
