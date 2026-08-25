@@ -65,7 +65,6 @@ trait ManagesSiteRuntimeHealth
     public function canConfigureWorkerMode(): bool
     {
         return $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime()
@@ -334,7 +333,6 @@ trait ManagesSiteRuntimeHealth
     public function canMeasureDiskUsage(): bool
     {
         return $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime();
@@ -361,12 +359,6 @@ trait ManagesSiteRuntimeHealth
     public function saveRuntimePreferences(): void
     {
         $this->authorize('update', $this->site);
-
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->toastError(__('Runtime preferences apply to VM and container sites. Use Deploy for function targets.'));
-
-            return;
-        }
 
         $rules = [];
 
@@ -453,10 +445,6 @@ trait ManagesSiteRuntimeHealth
 
     private function shouldShowRuntimeAppPortField(): bool
     {
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return false;
-        }
-
         $resolved = $this->site->resolvedRuntimeAppDetection();
         $fw = strtolower((string) ($resolved['framework'] ?? ''));
 

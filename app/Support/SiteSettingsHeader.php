@@ -62,14 +62,12 @@ final class SiteSettingsHeader
             ],
             'runtime' => [
                 'title' => __('Runtime'),
-                'description' => $site->usesFunctionsRuntime()
-                    ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
-                    : match (true) {
-                        $site->type === SiteType::Php || (string) ($site->runtime ?? '') === 'php' => __('How this site runs on the box — PHP version, FPM workers, OPcache, and request limits. Tune them on the PHP tab.'),
-                        (string) ($site->runtime ?? '') === 'ruby' => __('How this site runs on the box — Ruby version, processes, and detection. Tune them on the Ruby tab.'),
-                        (string) ($site->runtime ?? '') === 'static' => __('How this static site is served — detection, document root, and static-file settings.'),
-                        default => __('How this :resource runs on the box — language, live processes, and what we detected from the repo.', ['resource' => $resourceNoun]),
-                    },
+                'description' => match (true) {
+                    $site->type === SiteType::Php || (string) ($site->runtime ?? '') === 'php' => __('How this site runs on the box — PHP version, FPM workers, OPcache, and request limits. Tune them on the PHP tab.'),
+                    (string) ($site->runtime ?? '') === 'ruby' => __('How this site runs on the box — Ruby version, processes, and detection. Tune them on the Ruby tab.'),
+                    (string) ($site->runtime ?? '') === 'static' => __('How this static site is served — detection, document root, and static-file settings.'),
+                    default => __('How this :resource runs on the box — language, live processes, and what we detected from the repo.', ['resource' => $resourceNoun]),
+                },
                 'icon' => 'heroicon-o-cube-transparent',
             ],
             'access' => [

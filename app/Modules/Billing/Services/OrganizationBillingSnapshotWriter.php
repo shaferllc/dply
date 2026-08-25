@@ -29,7 +29,6 @@ final class OrganizationBillingSnapshotWriter
                 'category_breakdown' => $this->categoryBreakdown($state),
                 'fleet_counts' => [
                     'servers' => $state->serverCount(),
-                    'serverless' => $state->serverlessCount,
                     'cloud' => $state->cloudCount,
                     'edge' => $state->edgeCount,
                     'realtime' => $state->realtimeCount,
@@ -55,8 +54,6 @@ final class OrganizationBillingSnapshotWriter
     {
         return [
             'plan_cents' => $state->planPriceCents,
-            'serverless_cents' => $state->serverlessSubtotalCents,
-            'serverless_usage_cents' => $state->serverlessUsageSubtotalCents,
             'managed_server_cents' => $state->managedServerSubtotalCents,
             'cloud_cents' => $state->cloudSubtotalCents,
             'cloud_resource_cents' => $state->cloudResourceSubtotalCents,
@@ -80,7 +77,6 @@ final class OrganizationBillingSnapshotWriter
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
             array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
-                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),

@@ -49,7 +49,7 @@ final class SiteQuickDeployCommitPoller
         }
 
         $server = $site->server;
-        if ($server === null || ! $server->isVmHost() || $site->usesFunctionsRuntime() || $site->usesEdgeRuntime()) {
+        if ($server === null || ! $server->isVmHost() || $site->usesEdgeRuntime()) {
             return $this->result(false, false, null, 'unsupported_runtime');
         }
 

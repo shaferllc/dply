@@ -112,7 +112,7 @@ final class StandbyBlueprintPlanner
                 continue;
             }
 
-            if ($site->server_id !== null && ! $site->usesFunctionsRuntime()) {
+            if ($site->server_id !== null) {
                 $byoSites[] = [
                     'id' => (string) $site->id,
                     'name' => (string) $site->name,

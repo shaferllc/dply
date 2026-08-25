@@ -63,10 +63,6 @@ final class UnifiedPreviewCatalog
         }
 
         foreach ($sites as $site) {
-            if ($site->usesFunctionsRuntime()) {
-                continue;
-            }
-
             if ($site->usesContainerRuntime()) {
                 continue;
             }

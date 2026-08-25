@@ -721,7 +721,6 @@ class Show extends Component
         $yearlyIds = array_merge(
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
             [
-                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
             ],

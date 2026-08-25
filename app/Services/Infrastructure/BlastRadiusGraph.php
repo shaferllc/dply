@@ -242,9 +242,6 @@ final class BlastRadiusGraph
         if ($site->usesEdgeRuntime()) {
             return 'edge';
         }
-        if ($site->usesFunctionsRuntime()) {
-            return 'serverless';
-        }
         if ($site->usesContainerRuntime()) {
             return 'cloud';
         }

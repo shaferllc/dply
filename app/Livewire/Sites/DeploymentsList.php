@@ -297,7 +297,6 @@ class DeploymentsList extends Component
         $site ??= $this->site;
 
         return $site->runtimeTargetMode() === 'vm'
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime();
     }
 
@@ -452,7 +451,7 @@ class DeploymentsList extends Component
         // a VM peer on the same repo would queue a BYO deploy that cannot
         // run on a Functions host (and vice versa).
         return $peers
-            ->filter(fn (Site $peer): bool => $peer->id === $this->site->id || $peer->usesFunctionsRuntime())
+            ->filter(fn (Site $peer): bool => $peer->id === $this->site->id)
             ->values();
     }
 
@@ -465,8 +464,7 @@ class DeploymentsList extends Component
     {
         $site ??= $this->site;
 
-        return $site->usesFunctionsRuntime()
-            || (bool) $site->server?->isDigitalOceanFunctionsHost();
+        return (bool) $site->server?->isDigitalOceanFunctionsHost();
     }
 
     /** Persist (and mirror to the sidebar) the Sync selection as it changes. */
@@ -1080,7 +1078,6 @@ class DeploymentsList extends Component
 
         $runtimeMode = $this->site->runtimeTargetMode();
         $isVmDeployHub = $runtimeMode === 'vm'
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime();
         $isFunctionsDeployHub = $this->isFunctionsDeployHub();
         $isDeployHub = $isVmDeployHub || $isFunctionsDeployHub;

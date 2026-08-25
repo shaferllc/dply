@@ -59,7 +59,7 @@ class SitePromote extends Component
         $this->authorize('clone', $site);
 
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
-        abort_if($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime(), 404);
+        abort_if($site->usesDockerRuntime() || $site->usesKubernetesRuntime(), 404);
 
         $this->server = $server;
         $this->site = $site;

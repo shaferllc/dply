@@ -22,19 +22,17 @@ const client = () => fakeClient({
     { id: 'e'.repeat(26), name: 'acme-api', kind: 'cloud', status: 'running', runtime_mode_label: 'Container' },
   ],
   '/edge/sites': [{ id: 'b'.repeat(26), name: 'docs-site', status: 'live', hostname: 'docs.acme.com' }],
-  '/serverless/sites': [{ id: 'c'.repeat(26), name: 'checkout-fn', is_live: true, runtime: 'php:8.4' }],
 });
 
-test('fetchAllSites unions the three endpoints and tags each kind', async () => {
+test('fetchAllSites unions the endpoints and tags each kind', async () => {
   const rows = await fetchAllSites(client());
 
   assert.deepEqual(rows.map((r) => `${r.kind}:${r.name}`), [
     'cloud:acme-api',
     'vm:acme-web',
-    'serverless:checkout-fn',
     'edge:docs-site',
   ]);
-  assert.equal(rows.find((r) => r.kind === 'serverless').status, 'live');
+  assert.equal(rows.find((r) => r.kind === 'edge').status, 'live');
 });
 
 test('fetchAllSites survives an endpoint the token cannot read', async () => {
@@ -47,19 +45,17 @@ test('fetchAllSites survives an endpoint the token cannot read', async () => {
 test('fetchAllSites lets the specific kind win when a site appears twice', async () => {
   const id = 'd'.repeat(26);
   const dupe = fakeClient({
-    '/sites': [{ id, name: 'checkout-fn', status: 'ready' }],
-    '/edge/sites': [],
-    '/serverless/sites': [{ id, name: 'checkout-fn', is_live: true }],
+    '/sites': [{ id, name: 'docs-site', status: 'ready' }],
+    '/edge/sites': [{ id, name: 'docs-site', status: 'live' }],
   });
 
   const rows = await fetchAllSites(dupe);
 
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].kind, 'serverless');
+  assert.equal(rows[0].kind, 'edge');
 });
 
 test('--kind selects one product, including the two /sites serves', async () => {
-  assert.deepEqual((await fetchAllSites(client(), { kind: 'fn' })).map((r) => r.name), ['checkout-fn']);
   assert.deepEqual((await fetchAllSites(client(), { kind: 'cloud' })).map((r) => r.name), ['acme-api']);
   assert.deepEqual((await fetchAllSites(client(), { kind: 'vm' })).map((r) => r.name), ['acme-web']);
   assert.deepEqual((await fetchAllSites(client(), { kind: 'edge' })).map((r) => r.name), ['docs-site']);
@@ -75,7 +71,6 @@ test('normalizeKind accepts the obvious spellings and rejects nonsense', () => {
   assert.equal(normalizeKind('byo'), 'vm');
   assert.equal(normalizeKind('containers'), 'cloud');
   assert.equal(normalizeKind('apps'), 'cloud');
-  assert.equal(normalizeKind('functions'), 'serverless');
   assert.equal(normalizeKind('EDGE'), 'edge');
   assert.equal(normalizeKind(''), null);
   assert.equal(normalizeKind(undefined), null);
@@ -85,8 +80,8 @@ test('normalizeKind accepts the obvious spellings and rejects nonsense', () => {
 test('matchSites takes an id verbatim and a name loosely', async () => {
   const rows = await fetchAllSites(client());
 
-  assert.deepEqual(matchSites(rows, 'c'.repeat(26)).map((r) => r.name), ['checkout-fn']);
-  assert.deepEqual(matchSites(rows, 'checkout').map((r) => r.name), ['checkout-fn']);
+  assert.deepEqual(matchSites(rows, 'b'.repeat(26)).map((r) => r.name), ['docs-site']);
+  assert.deepEqual(matchSites(rows, 'docs').map((r) => r.name), ['docs-site']);
   assert.deepEqual(matchSites(rows, 'site').map((r) => r.name), ['docs-site']);
   assert.deepEqual(matchSites(rows, 'nope'), []);
 });

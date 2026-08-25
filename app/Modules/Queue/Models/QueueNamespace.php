@@ -139,7 +139,7 @@ class QueueNamespace extends Model
             return true;
         }
 
-        return $this->site?->serverless_backend !== Site::SERVERLESS_BACKEND_DPLY;
+        return ($this->site?->serverless_backend ?? '') !== 'dply_serverless';
     }
 
     /** The capacity tier this namespace reserves, and what it costs. */

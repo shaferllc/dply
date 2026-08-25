@@ -31,11 +31,10 @@ final class SiteShowViewData
         array $deploymentPreflight,
         string $activeTab,
     ): array {
-        $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
+        $functionsHost = false;
         $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
         $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
         $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
         $showVmCronDaemonsLinks = $showWebserverConfigEditor;
@@ -163,8 +162,7 @@ final class SiteShowViewData
         // SEPARATELY once a repo is connected, so showing a "Waiting for first
         // deploy" step in its provisioning journey would imply provisioning waits
         // for a deploy it never triggers. Drop it for VM hosts.
-        $entersFirstDeployState = $site->usesFunctionsRuntime()
-            || $site->usesDockerRuntime()
+        $entersFirstDeployState = $site->usesDockerRuntime()
             || $site->usesKubernetesRuntime();
 
         $statusSteps = self::byoStatusSteps($site, $provisioningState, $entersFirstDeployState);
@@ -341,7 +339,7 @@ final class SiteShowViewData
             return false;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime() || $site->usesEdgeRuntime()) {
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime() || $site->usesEdgeRuntime()) {
             return false;
         }
 
@@ -456,7 +454,7 @@ final class SiteShowViewData
         ][$statusTone];
 
         $showRuntimeTab = ! $site->usesEdgeRuntime()
-            && ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime());
+            && ($site->usesDockerRuntime() || $site->usesKubernetesRuntime());
         $showSslTab = ! $site->usesEdgeRuntime()
             && ! $site->usesDockerRuntime()
             && ($previewDomain || $site->certificates->isNotEmpty());

@@ -18,8 +18,6 @@ return [
     |   line item to share a billing interval, so each tier has both a monthly
     |   and a yearly price; the yearly variant is 20% off the monthly × 12.
     |
-    |   STRIPE_PRICE_STANDARD_SERVERLESS=price_...         (flat per-function fee, monthly)
-    |   STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_...  (flat per-function fee, yearly)
     |   STRIPE_PRICE_STANDARD_CLOUD=price_...              (flat dply Cloud platform fee, monthly)
     |   STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_...
     |   STRIPE_PRICE_STANDARD_CLOUD_USAGE=price_...         (metered Cloud resources, per-cent unit)
@@ -35,10 +33,9 @@ return [
         // Flat plans metered by BYO server COUNT (not size). Customers pay
         // their own provider for server size; dply's fee scales with how many
         // servers it manages. Mirrors the proven Ploi/Forge/RunCloud model and
-        // sits inside the $8–39 market cluster. Managed products (serverless,
-        // Cloud, Edge) bill a la carte per unit on top of any plan — including
-        // Free — because they run on dply-owned infra. See
-        // docs/PRICING_AND_REVENUE.md.
+        // sits inside the $8–39 market cluster. Managed products (Cloud, Edge)
+        // bill a la carte per unit on top of any plan — including Free —
+        // because they run on dply-owned infra. See docs/PRICING_AND_REVENUE.md.
         'annual_discount_pct' => 20,
         'trial_days' => (int) env('SUBSCRIPTION_TRIAL_DAYS', 14),
         'soft_pause_days' => (int) env('SUBSCRIPTION_SOFT_PAUSE_DAYS', 30),
@@ -59,35 +56,20 @@ return [
         //   max_sites       sites on real machines (VM + Docker/Kubernetes)
         //   max_cloud_apps  dply Cloud container apps
         //   max_edge_apps   dply Edge static/SSG/hybrid sites
-        //   max_functions   serverless functions
         //
         // These were ONE shared ceiling until 2026-08-18, which meant a Free org
-        // with two Edge sites and a function was locked out of its first VM site
-        // ("3 / 1" on an empty server). The managed surfaces are billed a la
-        // carte per app anyway (edge_cents / cloud_cents / serverless_cents), so
-        // their ceilings are abuse bounds rather than revenue levers and are set
-        // generously. Every value here is >= the old shared ceiling, so the split
-        // cannot newly block an org that was previously within its limit.
+        // with two Edge sites was locked out of its first VM site ("3 / 1" on an
+        // empty server). The managed surfaces are billed a la carte per app
+        // anyway (edge_cents / cloud_cents), so their ceilings are abuse bounds
+        // rather than revenue levers and are set generously. Every value here is
+        // >= the old shared ceiling, so the split cannot newly block an org that
+        // was previously within its limit.
         'plans' => [
-            'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3, 'max_functions' => 3],
-            'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10, 'max_cloud_apps' => 10, 'max_edge_apps' => 25, 'max_functions' => 25],
-            'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30, 'max_cloud_apps' => 30, 'max_edge_apps' => 100, 'max_functions' => 100],
-            'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null, 'max_functions' => null],
+            'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3],
+            'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10, 'max_cloud_apps' => 10, 'max_edge_apps' => 25],
+            'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30, 'max_cloud_apps' => 30, 'max_edge_apps' => 100],
+            'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null],
         ],
-        // Flat per-function fee for serverless (FaaS) targets. A serverless
-        // function has no vCPU/RAM, so it isn't spec-tiered — it's its own
-        // billable unit. See project_serverless_v1 memo. For BYO functions
-        // (customer's own provider account) this is the entire dply charge; for
-        // dply-managed functions it's the platform fee and metered usage +
-        // managed DB/cache resources are billed on top (see dply.serverless).
-        'serverless_cents' => 200,
-        // Metered managed-serverless usage + resources billed in 1-cent Stripe
-        // units (quantity = cents), like Edge/Cloud usage. Monthly only.
-        'serverless_usage_unit_cents' => 1,
-        // Markup applied to raw DO managed database/cache list prices when a
-        // dply-managed function provisions them on dply's own account (dply pays
-        // DO, so it must bill back with margin — same idea as cloud_markup_percent).
-        'serverless_markup_percent' => (int) env('SUBSCRIPTION_SERVERLESS_MARKUP_PERCENT', 40),
 
         /*
         |----------------------------------------------------------------------
@@ -134,7 +116,6 @@ return [
             'sites' => (int) env('SUBSCRIPTION_BETA_SITES', 25),
             'cloud_apps' => (int) env('SUBSCRIPTION_BETA_CLOUD_APPS', 10),
             'edge_apps' => (int) env('SUBSCRIPTION_BETA_EDGE_APPS', 25),
-            'functions' => (int) env('SUBSCRIPTION_BETA_FUNCTIONS', 25),
             'managed_size' => env('SUBSCRIPTION_BETA_MANAGED_SIZE', 'cx22'),
             'cutover_at' => env('SUBSCRIPTION_BETA_CUTOVER_AT'),
             'invite_expiry_days' => (int) env('SUBSCRIPTION_BETA_INVITE_EXPIRY_DAYS', 30),
@@ -270,10 +251,6 @@ return [
                 'pro' => env('STRIPE_PRICE_STANDARD_PRO_YEARLY', ''),
                 'business' => env('STRIPE_PRICE_STANDARD_BUSINESS_YEARLY', ''),
             ],
-            'serverless' => env('STRIPE_PRICE_STANDARD_SERVERLESS', ''),
-            'serverless_yearly' => env('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY', ''),
-            // Metered managed-serverless usage + resources line (per-cent unit), monthly only.
-            'serverless_usage' => env('STRIPE_PRICE_STANDARD_SERVERLESS_USAGE', ''),
             // Metered managed-server (all-in cost-plus) line (per-cent unit), monthly only.
             'managed_server' => env('STRIPE_PRICE_STANDARD_MANAGED_SERVER', ''),
             'cloud' => env('STRIPE_PRICE_STANDARD_CLOUD', ''),
@@ -321,8 +298,7 @@ return [
             // dply Queue — one line per namespace capacity tier. Tier
             // definitions/prices live in config('queue_service.tiers'); these are
             // the Stripe price IDs the syncer drives to the BILLABLE namespace
-            // count. Namespaces serving a dply Serverless site are free and never
-            // reach a line here (docs/adr/managed-services-tier.md, decision 4).
+            // count.
             'queue_tiers' => [
                 'standard' => env('STRIPE_PRICE_STANDARD_QUEUE_STANDARD', ''),
                 'pro' => env('STRIPE_PRICE_STANDARD_QUEUE_PRO', ''),

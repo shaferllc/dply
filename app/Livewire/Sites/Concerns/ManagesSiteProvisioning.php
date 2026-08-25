@@ -48,7 +48,6 @@ trait ManagesSiteProvisioning
     public function shouldAutoReapplyManagedWebserverConfig(): bool
     {
         return $this->server->hostCapabilities()->supportsWebserverProvisioning()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime();
     }

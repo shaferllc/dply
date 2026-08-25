@@ -178,7 +178,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         $syncedSiteIds = [];
 
         foreach ($sites as $site) {
-            if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            if ($site->usesKubernetesRuntime()) {
                 continue;
             }
             if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {

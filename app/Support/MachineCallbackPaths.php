@@ -9,9 +9,9 @@ use Illuminate\Http\Request;
 /**
  * Canonical list of non-interactive machine / external-callback request paths.
  *
- * These are hit by provisioned servers, deploy/git providers, billing
- * providers, and customer traffic to deployed functions — NOT by a human
- * browsing with a session. They carry their own authentication (signed URLs,
+ * These are hit by provisioned servers, deploy/git providers, and billing
+ * providers — NOT by a human browsing with a session. They carry their own
+ * authentication (signed URLs,
  * webhook secrets, per-site tokens) and must therefore bypass any guest-facing
  * gate, otherwise the gate silently swallows the request (a 302/503 that the
  * caller's bare `curl` treats as success).
@@ -33,8 +33,6 @@ final class MachineCallbackPaths
     public const PATTERNS = [
         'webhook/*',                   // TaskRunner lifecycle callbacks (provisioning, runs)
         'hooks/*',                     // deploy / GitHub App / log / vitals webhooks
-        'fn/*',                        // public serverless function invocation URLs
-        'serverless-assets/*',         // published Functions Laravel Vite/build assets
         'api/edge/preview-comments/*', // cross-origin preview-comment widget (per-site token)
         'api/queue/*',                 // dply Queue data plane (SigV4, per-namespace credential)
         'api/cache/*',                 // dply Cache data plane (SigV4, per-cache grant)

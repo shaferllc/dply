@@ -16,7 +16,6 @@ class SiteBillingObserver
      * @var list<string>
      */
     private const BILLABLE_STATUSES = [
-        Site::STATUS_FUNCTIONS_ACTIVE,
         Site::STATUS_CONTAINER_ACTIVE,
         Site::STATUS_EDGE_ACTIVE,
     ];

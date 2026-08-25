@@ -33,7 +33,7 @@ class RemoveSiteRepositoryJob implements ShouldQueue
             return;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             return;
         }
 

@@ -36,24 +36,6 @@ class SiteProvisioner
         $site->loadMissing(['server', 'domains']);
         $this->runPreflight($site);
 
-        if ($site->usesFunctionsRuntime()) {
-            $this->appendLog($site, 'info', 'queued', 'Serverless host provisioning worker started.', [
-                'runtime_profile' => $site->runtimeProfile(),
-                'server_id' => (string) $site->server_id,
-            ]);
-
-            $this->updateProvisioning($site, [
-                'state' => 'configuring_functions_runtime',
-                'webserver' => $site->webserver(),
-                'started_at' => now()->toIso8601String(),
-                'error' => null,
-            ]);
-
-            $this->appendLog($site, 'info', 'configuring_functions_runtime', 'Serverless runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
-
-            return;
-        }
-
         if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             $runtimeProfile = $site->runtimeProfile();
             $state = $site->usesDockerRuntime()

@@ -40,11 +40,10 @@ final class SiteSettingsViewData
             return self::forEdgeWorkspace($server, $site, $section, $user);
         }
 
-        $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
+        $functionsHost = false;
         $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
         $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
         $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
         $supportsHttp3Certificates = $server->hostCapabilities()->supportsHttp3Certificates();

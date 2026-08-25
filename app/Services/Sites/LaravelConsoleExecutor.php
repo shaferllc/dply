@@ -47,10 +47,6 @@ final class LaravelConsoleExecutor
             return 'local_k8s';
         }
 
-        if ($site->usesFunctionsRuntime()) {
-            return 'unsupported';
-        }
-
         if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             return 'unsupported';
         }

@@ -6,7 +6,6 @@ use App\Models\LookoutProject;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerLogUsageDaily;
-use App\Models\Site;
 use App\Modules\Logs\Services\ServerLogEntitlements;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Realtime\Models\RealtimeApp;
@@ -18,8 +17,7 @@ use Illuminate\Support\Collection;
  *
  * - **BYO servers** — ready VM hosts the customer SSHs into. Counted, not
  *   sized: the flat plan is chosen by how many there are. dply-managed logical
- *   hosts (Cloud, Edge, serverless namespaces) are excluded from this scan.
- * - **Serverless functions** — code actions on active function-Sites.
+ *   hosts (Cloud, Edge) are excluded from this scan.
  * - **dply Cloud apps** — container_active sites on container_backend
  *   `dply_cloud`, excluding branch previews.
  * - **dply Edge sites** — edge_active sites with edge_backend set, excluding
@@ -147,8 +145,7 @@ class OrganizationBillingStateComputer
      *
      * The trial/pause banner asks this on every authenticated page render (see
      * {@see Organization::owesNothingThisCycle}), and computeFresh() is
-     * expensive: site scan with a function_actions subquery, realtime + lookout
-     * reads, and three usage SUMs — nine queries for one boolean.
+     * expensive: site scan, realtime + lookout reads, and usage SUMs.
      *
      * The shortcut is exact, not an approximation. monthlyTotalCents is
      * planPriceCents plus a series of subtotals that {@see
@@ -159,9 +156,9 @@ class OrganizationBillingStateComputer
      * count, which is one already-memoized query.
      *
      * Orgs under the free server ceiling still fall through to the full
-     * compute: they may owe for serverless, Cloud, Edge, or metered usage, and
-     * only the scan can tell. Those are the smallest fleets, so the scan is
-     * cheapest exactly where it is still needed.
+     * compute: they may owe for Cloud, Edge, or metered usage, and only the
+     * scan can tell. Those are the smallest fleets, so the scan is cheapest
+     * exactly where it is still needed.
      */
     public function isFree(Organization $organization): bool
     {
@@ -250,23 +247,11 @@ class OrganizationBillingStateComputer
         $managedServerCount = $billableManagedServers->count();
         $managedServerSubtotalCents = $this->serverResourceCalculator->subtotalCents($billableManagedServers);
 
-        // Serverless / Cloud / Edge are removed (remove-cloud-edge-serverless).
-        // The scan that counted them read Site::isDplyCloudSite(),
-        // isCloudPreview(), isEdgePreview(), edgeMeta() and the FunctionAction
-        // model — all deleted — so it could only have fatalled on the first
-        // site row. The counts stay in the billing state, permanently zero, so
-        // DesiredBillingState and the Stripe line-item mapping keep their shape
-        // until those product lines are retired deliberately.
-        $serverlessCount = 0;
+        // Cloud / Edge per-unit counts stay in the billing state (zero until
+        // those surfaces are scanned again). Serverless product billing is gone.
         $cloudCount = 0;
         $edgeCount = 0;
         $edgeSsrCount = 0;
-
-        // Cloud/Edge/Serverless metering is gone with those surfaces
-        // (remove-cloud-edge-serverless). The per-unit counts below still scan,
-        // so a stray legacy row keeps its flat fee and stays visible on the
-        // bill; only the metered add-ons — which had no reader left to read
-        // them — are zero.
         $cloudResourceSubtotalCents = 0;
 
         // Managed Realtime apps — billed per connection-tier (one line per tier,
@@ -309,22 +294,15 @@ class OrganizationBillingStateComputer
                 });
         }
 
-        // dply Queue namespaces — billed per capacity tier, and free when the
-        // namespace serves a dply Serverless site (QueueNamespace::isBillable()).
-        // Dark until DPLY_QUEUE_BILLING_ENABLED, which must stay off until this
-        // predicate ships: ServerlessQueueProvisioner auto-creates namespaces
-        // the moment surface.queue opens, so billing-before-predicate would
-        // charge Serverless customers for what they were told was included.
-        // See docs/adr/managed-services-tier.md, decisions 4, 5 and 11.
+        // dply Queue namespaces — billed per capacity tier when
+        // DPLY_QUEUE_BILLING_ENABLED is on.
         $queueTierQuantities = [];
         $queueBillableNamespaceIds = [];
         if ((bool) config('queue_service.billing.enabled', false)) {
             $organization->queueNamespaces()
                 ->where('status', QueueNamespace::STATUS_ACTIVE)
                 ->where('created_at', '<=', $ageCutoff)
-                // Eager-loaded because isBillable() reads the site's backend;
-                // without it this is an N+1 across every namespace in the org.
-                ->with('site:id,serverless_backend')
+                ->with('site')
                 ->get(['id', 'site_id', 'tier'])
                 ->each(function (QueueNamespace $namespace) use (&$queueTierQuantities, &$queueBillableNamespaceIds): void {
                     if (! $namespace->isBillable()) {
@@ -366,11 +344,6 @@ class OrganizationBillingStateComputer
         );
         $serverLogUsageSubtotalCents = (int) ($serverLogUsageEstimate['subtotal_cents']);
 
-        // Managed-serverless usage (metered invocations above the included
-        // allowance) + managed DB/cache resources, both cost-plus. BYO
-        // functions contribute nothing here.
-        $serverlessUsageSubtotalCents = 0;
-
         // Managed queue workers: metered MiB-seconds by compute class plus job
         // operations. Read from the daily rollup rather than the live counters
         // so a recomputed invoice gives the same answer tomorrow.
@@ -398,9 +371,6 @@ class OrganizationBillingStateComputer
         return DesiredBillingState::fromPlanAndUsage(
             plan: $plan,
             billableServerCount: $billableServerCount,
-            serverlessCount: $serverlessCount,
-            serverlessUnitCents: (int) config('subscription.standard.serverless_cents', 200),
-            serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
             managedServerCount: $managedServerCount,
             managedServerSubtotalCents: $managedServerSubtotalCents,
             cloudCount: $cloudCount,

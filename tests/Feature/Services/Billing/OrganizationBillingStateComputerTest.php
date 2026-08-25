@@ -3,10 +3,8 @@
 namespace Tests\Feature\Services\Billing\OrganizationBillingStateComputerTest;
 
 use App\Models\EdgeUsageSnapshot;
-use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\ServerlessUsageSnapshot;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
@@ -351,135 +349,6 @@ test('edge delivery usage adds pass through subtotal when enabled', function () 
     expect($state->monthlyTotalCents)->toBe(400);
 });
 
-test('active serverless functions bill per function', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(3);
-    expect($state->serverlessSubtotalCents)->toBe(600);
-
-    // Free plan ($0, serverless hosts aren't billable servers) + 3 × $2 = $6
-    expect($state->monthlyTotalCents)->toBe(600);
-});
-
-test('non active functions are not billed', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_CONFIGURED);
-    // pre-deploy
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(1);
-});
-
-test('each code action in a package is billed and sequences are not', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    $site = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    foreach (['a', 'b', 'c'] as $name) {
-        FunctionAction::query()->create([
-            'site_id' => $site->id,
-            'name' => $name,
-            'kind' => FunctionAction::KIND_CODE,
-        ]);
-    }
-
-    // A codeless sequence — composition is free, it must not be metered.
-    FunctionAction::query()->create([
-        'site_id' => $site->id,
-        'name' => 'pipeline',
-        'kind' => FunctionAction::KIND_SEQUENCE,
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(3);
-    expect($state->serverlessSubtotalCents)->toBe(600);
-});
-
-test('an active function site with no enumerated actions still bills once', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-
-    // No function_actions rows — the per-action meter must floor at one
-    // so the bill never regresses below the per-Site model.
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(1);
-});
-
-test('managed serverless functions add metered invocation usage on top of the flat fee', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    Config::set('dply.serverless.usage_billing.enabled', true);
-    Config::set('dply.serverless.usage_billing.markup_percent', 0);
-    Config::set('dply.serverless.usage_billing.invocations_cents_per_million', 40);
-    Config::set('dply.serverless.usage_billing.included_invocations_per_function', 0);
-
-    $org = Organization::factory()->create();
-    $site = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $site->update(['serverless_backend' => Site::SERVERLESS_BACKEND_DPLY]);
-
-    ServerlessUsageSnapshot::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'period_start' => now()->toDateString(),
-        'period_end' => now()->toDateString(),
-        'invocations' => 2_000_000,
-        'gib_seconds' => 0,
-        'source' => ServerlessUsageSnapshot::SOURCE_FUNCTION_INVOCATIONS,
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    // 2M invocations × 40¢/million = 80¢ usage, on top of the flat $2 fee.
-    expect($state->serverlessCount)->toBe(1);
-    expect($state->serverlessUsageSubtotalCents)->toBe(80);
-    expect($state->monthlyTotalCents)->toBe(280);
-});
-
-test('managed serverless databases are billed cost-plus and BYO functions are not metered', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    Config::set('subscription.standard.serverless_markup_percent', 40);
-    Config::set('dply.serverless.usage_billing.enabled', false);
-    Config::set('serverless_pricing.database.db-s-1vcpu-1gb', 15);
-
-    $org = Organization::factory()->create();
-
-    // Managed function with an attached managed database.
-    $managed = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $managed->update([
-        'serverless_backend' => Site::SERVERLESS_BACKEND_DPLY,
-        'meta' => array_merge((array) $managed->meta, [
-            'serverless' => ['database' => ['size' => 'db-s-1vcpu-1gb']],
-        ]),
-    ]);
-
-    // BYO function with the same database config — must NOT be metered.
-    $byo = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $byo->update([
-        'serverless_backend' => Site::SERVERLESS_BACKEND_BYO,
-        'meta' => array_merge((array) $byo->meta, [
-            'serverless' => ['database' => ['size' => 'db-s-1vcpu-1gb']],
-        ]),
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    // Only the managed DB: $15 × 1.40 = $21 = 2100¢. BYO contributes nothing.
-    expect($state->serverlessCount)->toBe(2);
-    expect($state->serverlessUsageSubtotalCents)->toBe(2100);
-});
-
 test('managed servers are billed all-in cost-plus and excluded from the plan tier', function () {
     Config::set('subscription.standard.managed_server_markup_percent', 60);
     Config::set('subscription.standard.managed_server_cents', ['cx22' => 450]);
@@ -547,21 +416,6 @@ function makeServerWithSpecs(Organization $org, string $status, int $cpuCount, i
     ]);
 
     return $server;
-}
-
-function makeFunctionSite(Organization $org, string $status): Site
-{
-    $server = Server::factory()->create([
-        'organization_id' => $org->id,
-        'status' => Server::STATUS_READY,
-        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
-    ]);
-
-    return Site::factory()->create([
-        'organization_id' => $org->id,
-        'server_id' => $server->id,
-        'status' => $status,
-    ]);
 }
 
 function makeCloudSite(Organization $org, string $status, bool $preview = false): Site

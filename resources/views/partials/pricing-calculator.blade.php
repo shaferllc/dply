@@ -1,9 +1,9 @@
 @php
     $presets = [
-        ['label' => 'Solo dev', 'hint' => '1 server', 'servers' => 1, 'edge' => 0, 'cloud' => 0, 'serverless' => 0],
-        ['label' => 'Side project', 'hint' => '2 servers + 1 Edge site', 'servers' => 2, 'edge' => 1, 'cloud' => 0, 'serverless' => 0],
-        ['label' => 'Small team', 'hint' => '5 servers + 2 Cloud apps', 'servers' => 5, 'edge' => 0, 'cloud' => 2, 'serverless' => 0],
-        ['label' => 'Growing fleet', 'hint' => '12 servers, mixed managed', 'servers' => 12, 'edge' => 3, 'cloud' => 2, 'serverless' => 4],
+        ['label' => 'Solo dev', 'hint' => '1 server', 'servers' => 1, 'edge' => 0, 'cloud' => 0],
+        ['label' => 'Side project', 'hint' => '2 servers + 1 Edge site', 'servers' => 2, 'edge' => 1, 'cloud' => 0],
+        ['label' => 'Small team', 'hint' => '5 servers + 2 Cloud apps', 'servers' => 5, 'edge' => 0, 'cloud' => 2],
+        ['label' => 'Growing fleet', 'hint' => '12 servers, mixed managed', 'servers' => 12, 'edge' => 3, 'cloud' => 2],
     ];
 
     // Managed surfaces that aren't live yet render as "coming soon": the row is
@@ -11,7 +11,6 @@
     $surfaceAvailable = [
         'edge' => \Laravel\Pennant\Feature::active('surface.edge'),
         'cloud' => \Laravel\Pennant\Feature::active('surface.cloud'),
-        'serverless' => \Laravel\Pennant\Feature::active('surface.serverless'),
     ];
 @endphp
 
@@ -50,14 +49,14 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-brand-ink/60 mr-2">Quick picks</span>
             @foreach ($presets as $preset)
                 <button type="button"
-                        @click="servers = {{ $preset['servers'] }}; edge = {{ $surfaceAvailable['edge'] ? $preset['edge'] : 0 }}; cloud = {{ $surfaceAvailable['cloud'] ? $preset['cloud'] : 0 }}; serverless = {{ $surfaceAvailable['serverless'] ? $preset['serverless'] : 0 }}"
+                        @click="servers = {{ $preset['servers'] }}; edge = {{ $surfaceAvailable['edge'] ? $preset['edge'] : 0 }}; cloud = {{ $surfaceAvailable['cloud'] ? $preset['cloud'] : 0 }}"
                         class="inline-flex flex-col items-start rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors text-left">
                     <span class="text-xs font-semibold text-brand-ink">{{ $preset['label'] }}</span>
                     <span class="text-2xs text-brand-moss/80">{{ $preset['hint'] }}</span>
                 </button>
             @endforeach
             <button type="button"
-                    @click="servers = 1; edge = 0; cloud = 0; serverless = 0"
+                    @click="servers = 1; edge = 0; cloud = 0"
                     class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs text-brand-moss hover:text-brand-ink transition-colors ml-auto">
                 Reset
             </button>
@@ -94,7 +93,6 @@
             @foreach ([
                 ['key' => 'edge', 'label' => 'dply Edge sites', 'priceVar' => 'edgePrice', 'unit' => 'per site'],
                 ['key' => 'cloud', 'label' => 'dply Cloud apps', 'priceVar' => 'cloudPrice', 'unit' => 'per app'],
-                ['key' => 'serverless', 'label' => 'Serverless functions', 'priceVar' => 'serverlessPrice', 'unit' => 'per function'],
             ] as $row)
                 @php $comingSoon = ! ($surfaceAvailable[$row['key']] ?? false); @endphp
                 <div @class([

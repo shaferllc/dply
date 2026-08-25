@@ -20,7 +20,7 @@ class SiteWebserverConfigApplier
     {
         $site->loadMissing('server');
 
-        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesKubernetesRuntime()) {
             throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
         }
 
@@ -44,7 +44,7 @@ class SiteWebserverConfigApplier
     {
         $site->loadMissing('server');
 
-        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesKubernetesRuntime()) {
             throw new \RuntimeException('This site runtime does not use managed VM webserver config.');
         }
 

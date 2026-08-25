@@ -19,10 +19,6 @@ final class ProductLineKillSwitches
             return false;
         }
 
-        if ($site->usesFunctionsRuntime()) {
-            return false;
-        }
-
         if ($site->usesContainerRuntime()) {
             return false;
         }

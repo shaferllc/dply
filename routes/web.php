@@ -235,7 +235,6 @@ Route::post('/hooks/telegram', TelegramWebhookController::class)
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.telegram');
 
-// Per-request log records POSTed by a deployed serverless function's handler
 Route::post('/hooks/acme-dns', AcmeDnsHookController::class)
     ->middleware(['throttle:60,1'])
     ->name('hooks.acme-dns');
@@ -662,7 +661,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
     })->name('sites.queue-workers');
     Route::livewire('servers/{server}/sites/{site}/backups', WorkspaceBackups::class)->name('sites.backups');
-    // BACKGROUND group for container/serverless workspaces — engine-level
+    // BACKGROUND group for container workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
     Route::livewire('servers/{server}/sites/{site}/schedule', WorkspaceSchedule::class)->name('sites.schedule');

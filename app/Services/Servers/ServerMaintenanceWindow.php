@@ -425,7 +425,6 @@ final class ServerMaintenanceWindow
         }
 
         return $server->hostCapabilities()->supportsWebserverProvisioning()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
     }
@@ -438,10 +437,6 @@ final class ServerMaintenanceWindow
 
         if ($site->usesKubernetesRuntime()) {
             return __('Kubernetes runtime — not managed by VM webserver suspend');
-        }
-
-        if ($site->usesFunctionsRuntime()) {
-            return __('Serverless runtime — not managed by VM webserver suspend');
         }
 
         $server = $site->server;

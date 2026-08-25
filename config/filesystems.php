@@ -91,45 +91,6 @@ return [
             'report' => false,
         ],
 
-        /*
-         | Published front-end builds for dply-managed serverless functions
-         | (serverless-assets/{label}/build/…), served through the CDN rather
-         | than off the control plane — a Vite bundle streamed through PHP on
-         | every request is our CPU and our bandwidth, for files that should be
-         | sitting on an edge.
-         |
-         | `driver` is intentionally UNSET by default. ServerlessServiceProvider
-         | aliases this disk onto the durable local `site_assets` root whenever
-         | no driver is configured, so development and any environment without
-         | object storage keeps working untouched. Setting
-         | SERVERLESS_ASSETS_DISK_DRIVER=s3 (plus bucket/key/secret) takes over.
-         |
-         | Virtual-host addressing, NOT path-style: Cloudflare's origin is
-         | {bucket}.{region}.digitaloceanspaces.com, so the request path maps
-         | straight onto the bucket key with no bucket segment in the way.
-         */
-        'serverless_assets' => [
-            'driver' => env('SERVERLESS_ASSETS_DISK_DRIVER'),
-            'key' => env('SERVERLESS_ASSETS_S3_KEY'),
-            'secret' => env('SERVERLESS_ASSETS_S3_SECRET'),
-            'region' => env('SERVERLESS_ASSETS_S3_REGION', 'nyc3'),
-            'bucket' => env('SERVERLESS_ASSETS_S3_BUCKET'),
-            // Derived from the region when unset. Without a default the SDK
-            // would fall back to AWS's own endpoint and quietly talk to S3
-            // instead of Spaces — a confusing failure for one missing var.
-            // Matches the digitalocean_spaces endpoint_template in
-            // config/product/object_storage.php.
-            'endpoint' => env('SERVERLESS_ASSETS_S3_ENDPOINT')
-                ?: 'https://'.env('SERVERLESS_ASSETS_S3_REGION', 'nyc3').'.digitaloceanspaces.com',
-            'use_path_style_endpoint' => false,
-            // Only consulted when the CDN is off; otherwise ASSET_URL is the
-            // site's own hostname (see ServerlessAssetPublisher::cdnUrl()).
-            'url' => env('SERVERLESS_ASSETS_URL'),
-            'visibility' => 'public',
-            'throw' => false,
-            'report' => false,
-        ],
-
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

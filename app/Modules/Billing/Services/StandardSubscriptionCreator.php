@@ -15,8 +15,8 @@ use RuntimeException;
  * - One **flat plan** price (Starter / Pro / Business), chosen by billable
  *   server count. The Free plan has no Stripe price, so a Free-plan org never
  *   contributes a plan line.
- * - One line per **managed product** in use (serverless / Cloud / Edge), each
- *   billed a la carte per unit on top of the plan — including for Free orgs.
+ * - One line per **managed product** in use (Cloud / Edge), each billed a la
+ *   carte per unit on top of the plan — including for Free orgs.
  * - A metered **Edge usage** line (monthly only).
  *
  * Stripe Checkout requires every line item in a subscription to share a
@@ -55,13 +55,6 @@ class StandardSubscriptionCreator
             }
 
             $items[] = ['price' => $planPriceId, 'quantity' => 1];
-        }
-
-        if ($desired->serverlessCount > 0) {
-            $serverlessPriceId = $this->managedProductPriceIdForInterval('serverless', $interval);
-            if ($serverlessPriceId !== '') {
-                $items[] = ['price' => $serverlessPriceId, 'quantity' => $desired->serverlessCount];
-            }
         }
 
         if ($desired->cloudCount > 0) {
@@ -132,11 +125,6 @@ class StandardSubscriptionCreator
         return $items;
     }
 
-    public function serverlessPriceIdForInterval(string $interval): string
-    {
-        return $this->managedProductPriceIdForInterval('serverless', $interval);
-    }
-
     public function cloudPriceIdForInterval(string $interval): string
     {
         return $this->managedProductPriceIdForInterval('cloud', $interval);
@@ -187,11 +175,6 @@ class StandardSubscriptionCreator
     public function cloudUsagePriceId(): string
     {
         return (string) (config('subscription.standard.stripe.cloud_usage') ?? '');
-    }
-
-    public function serverlessUsagePriceId(): string
-    {
-        return (string) (config('subscription.standard.stripe.serverless_usage') ?? '');
     }
 
     public function managedServerPriceId(): string

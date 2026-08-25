@@ -78,10 +78,10 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/account/organizations', [AccountApiController::class, 'organizations'])
             ->middleware('ability:'.$apiAbilities['account.organizations']);
 
-        // What this instance offers — surfaces, creatable kinds, serverless
-        // regions and upload limits. `dply init` reads it before showing
-        // anything, so the CLI hardcodes none of it and an older instance
-        // (404 here) degrades to a named message instead of a mystery.
+        // What this instance offers — surfaces, creatable kinds, and upload
+        // limits. `dply init` reads it before showing anything, so the CLI
+        // hardcodes none of it and an older instance (404 here) degrades to
+        // a named message instead of a mystery.
         Route::get('/capabilities', [CapabilitiesApiController::class, 'show'])
             ->middleware('ability:'.$apiAbilities['account.organizations']);
         Route::get('/account/projects', [AccountApiController::class, 'projects'])
@@ -196,9 +196,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/sites', [SiteController::class, 'index'])->middleware('ability:'.$apiAbilities['sites.index']);
         // Creating a site on a server the org owns. Ordinary webserver hosts
-        // only — a container/Kubernetes/functions/headless host returns a
-        // typed blocker pointing at the dashboard, where its host-specific
-        // options live.
+        // only — a container/Kubernetes/headless host returns a typed
+        // blocker pointing at the dashboard, where its host-specific options live.
         Route::post('/servers/{server}/sites', [VmSiteCreateApiController::class, 'store'])
             ->middleware(['ability:'.$apiAbilities['sites.store'], 'throttle:site-create']);
 
@@ -257,9 +256,6 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/imports/migrations', [ImportMigrationController::class, 'index'])->middleware('ability:'.$apiAbilities['imports.migrations_index']);
         Route::get('/imports/migrations/{migration}', [ImportMigrationController::class, 'show'])->middleware('ability:'.$apiAbilities['imports.migrations_show']);
 
-        // Serverless surface. Shares the edge-api throttle for the same
-        // reason: `serverless logs --follow` and `serverless errors --watch`
-        // poll on a timer, and the default v1 limit is sized for one-shot calls.
     });
 });
 

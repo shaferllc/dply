@@ -315,7 +315,6 @@ trait WatchesSiteDeploys
 
         return $server !== null
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
             && Gate::allows('update', $site);
     }

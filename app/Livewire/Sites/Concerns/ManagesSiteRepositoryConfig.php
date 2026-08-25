@@ -78,31 +78,6 @@ trait ManagesSiteRepositoryConfig
             'post_deploy_command' => 'nullable|string|max:4000',
         ];
 
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
-                $this->toastError((string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.')));
-
-                return;
-            }
-
-            $rules = array_merge($rules, [
-                'functions_repo_source' => 'required|string|in:manual,provider',
-                'functions_source_control_account_id' => 'nullable|string|max:26',
-                'functions_repository_selection' => 'nullable|string|max:500',
-                'functions_repository_subdirectory' => 'nullable|string|max:255',
-                'functions_runtime' => 'required|string|max:50',
-                'functions_entrypoint' => 'required|string|max:255',
-                'functions_build_command' => 'required|string|max:4000',
-                'functions_artifact_output_path' => 'required|string|max:255',
-                'git_repository_url' => 'required|string|max:500',
-                'git_branch' => 'required|string|max:120',
-            ]);
-
-            if ($this->functions_repo_source === 'provider') {
-                $rules['functions_source_control_account_id'] = 'required|string|max:26';
-            }
-        }
-
         $this->validate($rules);
 
         $updates = [
@@ -110,24 +85,6 @@ trait ManagesSiteRepositoryConfig
             'git_branch' => trim($this->git_branch) ?: 'main',
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
         ];
-
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $meta = is_array($this->site->meta) ? $this->site->meta : [];
-            $functionsConfig = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-            $meta['serverless'] = array_merge($functionsConfig, [
-                'repo_source' => trim($this->functions_repo_source),
-                'source_control_account_id' => $this->functions_repo_source === 'provider'
-                    ? trim($this->functions_source_control_account_id)
-                    : null,
-                'repository_subdirectory' => trim($this->functions_repository_subdirectory),
-                'runtime' => trim($this->functions_runtime),
-                'entrypoint' => trim($this->functions_entrypoint),
-                'build_command' => trim($this->functions_build_command),
-                'artifact_output_path' => trim($this->functions_artifact_output_path),
-                'detected_runtime' => $this->functionsDetection !== [] ? $this->functionsDetection : null,
-            ]);
-            $updates['meta'] = $meta;
-        }
 
         $oldRepoSnapshot = [
             'git_repository_url' => $this->site->git_repository_url,
@@ -175,10 +132,6 @@ trait ManagesSiteRepositoryConfig
             'git_source_control_account_id' => 'nullable|string|max:26',
             'deploy_sync_include_peers_on_manual' => 'boolean',
         ];
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $rules['git_repository_url'] = 'required|string|max:500';
-            $rules['git_branch'] = 'required|string|max:120';
-        }
         if ($this->git_provider_kind !== 'custom' && $this->git_source_control_account_id === '') {
             $this->addError('git_source_control_account_id', __('Select a linked source control account or choose Custom.'));
 
@@ -341,7 +294,7 @@ trait ManagesSiteRepositoryConfig
             return;
         }
 
-        if ($this->site->usesFunctionsRuntime() || $this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
+        if ($this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
             $this->toastError(__('This runtime does not use a traditional VM repository path.'));
 
             return;
@@ -473,71 +426,11 @@ trait ManagesSiteRepositoryConfig
 
     private function refreshFunctionsDetection(): void
     {
-        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return;
-        }
-
-        $repositoryUrl = trim($this->git_repository_url);
-        $branch = trim($this->git_branch);
-
-        if ($repositoryUrl === '' || $branch === '') {
-            $this->functionsDetection = [];
-
-            return;
-        }
-
-        $checkout = null;
-
-        try {
-            $checkout = app(RepositoryCheckout::class)->checkout(
-                'preview-site-'.$this->site->id.'-'.md5($repositoryUrl.'|'.$branch.'|'.$this->functions_repository_subdirectory),
-                $repositoryUrl,
-                $branch,
-                $this->functions_repository_subdirectory,
-                $this->site->user_id,
-                $this->functions_repo_source === 'provider' ? $this->functions_source_control_account_id : null,
-            );
-
-            $this->functionsDetection = app(RepositoryRuntimeDetector::class)->detect(
-                $checkout['working_directory'],
-                self::detectionCapabilities(),
-            );
-
-            if (! $this->functionsOverridesTouched) {
-                $this->functions_runtime = (string) $this->functionsDetection['runtime'];
-                $this->functions_entrypoint = (string) $this->functionsDetection['entrypoint'];
-                $this->functions_build_command = (string) $this->functionsDetection['build_command'];
-                $this->functions_artifact_output_path = (string) $this->functionsDetection['artifact_output_path'];
-            }
-        } catch (\Throwable $e) {
-            $this->functionsDetection = [
-                'framework' => 'unknown',
-                'language' => 'unknown',
-                'runtime' => '',
-                'entrypoint' => '',
-                'build_command' => '',
-                'artifact_output_path' => '',
-                'package' => 'default',
-                'confidence' => 'low',
-                'reasons' => [],
-                'warnings' => [$e->getMessage()],
-                'unsupported_for_target' => false,
-            ];
-        } finally {
-            if (is_array($checkout)) {
-                app(RepositoryCheckout::class)->cleanup($checkout['workspace_path']);
-            }
-        }
     }
 
     public function generateDeployKey(): void
     {
         $this->authorize('update', $this->site);
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->toastError(__('Serverless-backed sites deploy from the configured artifact zip instead of a server-side git checkout.'));
-
-            return;
-        }
 
         try {
             [$private, $public] = SiteDeployKeyGenerator::generate();
@@ -553,31 +446,5 @@ trait ManagesSiteRepositoryConfig
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(request()->user());
-
-        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return;
-        }
-
-        if ($this->linkedSourceControlAccounts === []) {
-            $this->functions_repo_source = 'manual';
-
-            return;
-        }
-
-        if ($this->functions_repo_source === 'provider' && $this->functions_source_control_account_id === '') {
-            $this->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
-        }
-
-        if ($this->functions_repo_source !== 'provider') {
-            return;
-        }
-
-        $user = request()->user();
-        $account = $user !== null
-            ? app(GitIdentityResolver::class)->forId($user, $this->functions_source_control_account_id)
-            : null;
-        $this->availableFunctionsRepositories = $account
-            ? $repositoryBrowser->repositoriesForAccount($account)
-            : [];
     }
 }

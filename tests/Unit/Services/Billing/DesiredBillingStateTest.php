@@ -68,43 +68,18 @@ test('a negative server count is clamped to zero', function () {
     expect($state->serverCount())->toBe(0);
 });
 
-test('serverless functions add a flat per function subtotal on top of the plan', function () {
-    // Free plan + 3 functions × $2 = $6
-    $state = DesiredBillingState::fromPlanAndUsage(
-        plan: FREE,
-        serverlessCount: 3,
-        serverlessUnitCents: 200,
-    );
-
-    expect($state->serverlessCount)->toBe(3);
-    expect($state->serverlessSubtotalCents)->toBe(600);
-    expect($state->monthlyTotalCents)->toBe(600);
-    expect($state->isFree())->toBeFalse();
-});
-
 test('plan and managed products combine in the total', function () {
-    // Starter ($9) + 4 functions ($8) = $17
+    // Starter ($9) + 2 cloud apps ($10) = $19
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: STARTER,
         billableServerCount: 2,
-        serverlessCount: 4,
-        serverlessUnitCents: 200,
+        cloudCount: 2,
+        cloudUnitCents: 500,
     );
 
     expect($state->planPriceCents)->toBe(900);
-    expect($state->serverlessSubtotalCents)->toBe(800);
-    expect($state->monthlyTotalCents)->toBe(1700);
-});
-
-test('negative serverless count is clamped', function () {
-    $state = DesiredBillingState::fromPlanAndUsage(
-        plan: FREE,
-        serverlessCount: -5,
-        serverlessUnitCents: 200,
-    );
-
-    expect($state->serverlessCount)->toBe(0);
-    expect($state->serverlessSubtotalCents)->toBe(0);
+    expect($state->cloudSubtotalCents)->toBe(1000);
+    expect($state->monthlyTotalCents)->toBe(1900);
 });
 
 test('cloud apps add a flat per app subtotal', function () {

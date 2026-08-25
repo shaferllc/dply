@@ -34,15 +34,15 @@ test('slug never returns an empty name', () => {
 test('rankKinds always returns every kind, fitting or not', () => {
   const ranked = rankKinds({ files: [] });
 
-  assert.deepEqual(ranked.map((r) => r.kind).sort(), ['cloud', 'edge', 'serverless', 'vm']);
+  assert.deepEqual(ranked.map((r) => r.kind).sort(), ['cloud', 'edge', 'vm']);
 });
 
 test('rankKinds gives an ineligible kind a reason rather than hiding it', () => {
   const ranked = rankKinds({ files: ['README.md'] });
-  const serverless = ranked.find((r) => r.kind === 'serverless');
+  const edge = ranked.find((r) => r.kind === 'edge');
 
-  assert.equal(serverless.fits, false);
-  assert.match(serverless.reason, /no package manifest/);
+  assert.equal(edge.fits, false);
+  assert.match(edge.reason, /no static build output/);
 });
 
 test('rankKinds puts a static folder on edge, ahead of the rest', () => {
@@ -57,7 +57,7 @@ test('rankKinds does not call a PHP project static just because it has an index.
   const edge = ranked.find((r) => r.kind === 'edge');
 
   assert.equal(edge.fits, false);
-  assert.equal(ranked.find((r) => r.kind === 'serverless').fits, true);
+  assert.equal(ranked.find((r) => r.kind === 'vm').fits, true);
 });
 
 test('rankKinds treats a Dockerfile as the thing that makes cloud possible', () => {
@@ -167,7 +167,7 @@ test('humanBytes rounds to something a person can read', () => {
 });
 
 test('manifestKind reads a declared kind from a dply manifest', () => {
-  assert.equal(manifestKind('kind: serverless\nruntime: php\n'), 'serverless');
+  assert.equal(manifestKind('kind: cloud\nruntime: php\n'), 'cloud');
   assert.equal(manifestKind('runtime: php\nkind: cloud\n'), 'cloud');
   assert.equal(manifestKind('kind: "edge"'), 'edge');
   assert.equal(manifestKind("kind: 'vm'  # a server we own"), 'vm');
@@ -175,11 +175,12 @@ test('manifestKind reads a declared kind from a dply manifest', () => {
 
 test('manifestKind ignores a kind that is not top-level', () => {
   // An indented `kind:` belongs to some nested block, not to the site.
-  assert.equal(manifestKind('processes:\n  - kind: serverless\n'), null);
+  assert.equal(manifestKind('processes:\n  - kind: cloud\n'), null);
 });
 
 test('manifestKind ignores comments and unknown values', () => {
-  assert.equal(manifestKind('# kind: serverless\nruntime: php'), null);
+  assert.equal(manifestKind('# kind: cloud\nruntime: php'), null);
+  assert.equal(manifestKind('kind: serverless'), null);
   assert.equal(manifestKind('kind: lambda'), null);
   assert.equal(manifestKind('runtime: php'), null);
   assert.equal(manifestKind(''), null);

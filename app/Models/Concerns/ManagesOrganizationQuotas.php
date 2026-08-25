@@ -59,10 +59,13 @@ trait ManagesOrganizationQuotas
             $tally[$surface->value] = 0;
         }
 
-        // Edge/Cloud preview sites used to be skipped so a preview never ate
-        // quota; both surfaces are removed (remove-cloud-edge-serverless), so
-        // there is nothing left to exclude.
+        // Leftover Cloud / Edge / function hosts are not a quota surface
+        // anymore — they must not consume the VM site ceiling.
         foreach ($this->sites()->with('server')->get() as $site) {
+            if ($site->server?->isManagedProductHost()) {
+                continue;
+            }
+
             $tally[QuotaSurface::forSite($site)->value]++;
         }
 
@@ -139,8 +142,7 @@ trait ManagesOrganizationQuotas
     /**
      * The org's machine-site ceiling, or null when unlimited.
      *
-     * Machine sites only (VM + Docker/Kubernetes) since the 2026-08-18 split —
-     * Edge, Cloud and functions have their own ceilings. Kept as a named method
+     * Machine sites only (VM + Docker/Kubernetes). Kept as a named method
      * because plan-summary surfaces read "sites" specifically.
      */
     public function planSiteLimit(): ?int

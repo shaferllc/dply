@@ -28,7 +28,6 @@ final class SiteSettingsSidebar
         }
 
         $showWebserverConfigEditor = $supportsSsh
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
 
@@ -112,19 +111,8 @@ final class SiteSettingsSidebar
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
 
-        // Platform (the OpenWhisk inspector), Access, Data, and Assets only
-        // apply to DigitalOcean Functions hosts, not docker / kubernetes
-        // containers, which share this branch.
-        if (! $site->usesFunctionsRuntime()) {
-            $functionsOnly = ['platform', 'access', 'data', 'assets'];
-            $base = array_values(array_filter($base, fn (array $item): bool => ! in_array($item['id'], $functionsOnly, true)));
-        }
-
-        // Serverless keeps a dedicated Workers page; the Resources Livewire
-        // surface only admits container + VM runtimes and 404s for functions.
-        if ($site->usesFunctionsRuntime()) {
-            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'resources'));
-        }
+        $functionsOnly = ['platform', 'access', 'data', 'assets'];
+        $base = array_values(array_filter($base, fn (array $item): bool => ! in_array($item['id'], $functionsOnly, true)));
 
         // Worker hosts run Caddy purely to attach testing URLs to background/
         // queue workloads — page caching and CDN/edge delivery don't apply, so

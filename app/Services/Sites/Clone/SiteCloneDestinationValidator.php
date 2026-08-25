@@ -50,8 +50,7 @@ final class SiteCloneDestinationValidator
 
         self::assertCompatibleRuntime($source, $destServer);
 
-        if (! $source->usesFunctionsRuntime()
-            && ! $source->usesDockerRuntime()
+        if (! $source->usesDockerRuntime()
             && ! $source->usesKubernetesRuntime()) {
             $srcSrv = $source->server;
             if ($srcSrv === null || ! $srcSrv->isReady() || ! $srcSrv->hasAnySshPrivateKey()) {
@@ -65,20 +64,6 @@ final class SiteCloneDestinationValidator
      */
     public static function assertCompatibleRuntime(Site $source, Server $destServer): void
     {
-        $srcHost = $source->server?->hostKind();
-        $dstHost = $destServer->hostKind();
-
-        if ($source->usesFunctionsRuntime()) {
-            if (! $destServer->hostCapabilities()->supportsFunctionDeploy()) {
-                throw new \RuntimeException(__('Clone a serverless site only to a serverless-capable host (same class of target).'));
-            }
-            if ($srcHost !== $dstHost) {
-                throw new \RuntimeException(__('Serverless clones must use the same host kind as the source (for example AWS Lambda to AWS Lambda).'));
-            }
-
-            return;
-        }
-
         if ($source->usesDockerRuntime()) {
             if (! $destServer->hostCapabilities()->supportsContainerDeploy()) {
                 throw new \RuntimeException(__('Clone a Docker runtime site only to a Docker-capable server.'));

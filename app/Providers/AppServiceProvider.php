@@ -634,20 +634,16 @@ class AppServiceProvider extends ServiceProvider
         });
 
 
-        // Creating and tearing down sites that provision infrastructure —
-        // functions and container apps alike. Keyed by ORGANIZATION rather
-        // than token: quota bounds how many functions can exist, but it does
-        // not bound churn — a failed create consumes no quota while still
-        // calling DigitalOcean, and a create/delete loop stays under the
-        // ceiling forever. Deliberately not on `edge-api`, which is sized for
-        // log polling and is the wrong shape for provisioning.
+        // Creating and tearing down sites that provision infrastructure.
+        // Keyed by ORGANIZATION rather than token so a create/delete loop
+        // cannot churn provider APIs under a per-token ceiling.
         RateLimiter::for('site-create', function (Request $request) {
             $organization = $request->attributes->get('api_organization');
             $key = $organization !== null
                 ? 'site-create:'.$organization->id
                 : 'site-create-ip:'.$request->ip();
 
-            return Limit::perMinute((int) config('serverless.create_max_per_minute', 10))->by($key);
+            return Limit::perMinute(10)->by($key);
         });
 
         RateLimiter::for('site-webhook', function (Request $request) {
@@ -661,17 +657,6 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(300)->by($request->ip());
         });
 
-        // Per-request log POSTs from deployed serverless functions. Keyed by
-        // site so one busy function can't starve another; generous because a
-        // function fires this once per request it serves. Over the limit the
-        // handler's fire-and-forget POST just 429s and the row is dropped.
-        RateLimiter::for('function-log-ingest', function (Request $request) {
-            $site = $request->route('site');
-            $key = $site instanceof Site ? 'fli:'.$site->id : 'fli-ip:'.$request->ip();
-
-            return Limit::perMinute((int) config('sites.function_log_ingest_per_minute', 1000))->by($key);
-        });
-
         RateLimiter::for('metrics-guest-push', function (Request $request) {
             $sid = $request->input('server_id');
 
@@ -679,7 +664,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // dply Queue data plane. Keyed by namespace so one tenant's drain loop
-        // cannot starve another's — same reasoning as function-log-ingest. The
+        // cannot starve another's. The
         // ceiling is an entitlement, not a constant, so a plan that pays for
         // throughput gets it; AuthenticateQueueCredential sets the context
         // before this runs.

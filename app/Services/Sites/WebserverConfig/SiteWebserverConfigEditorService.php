@@ -409,7 +409,7 @@ class SiteWebserverConfigEditorService
             return false;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesKubernetesRuntime()) {
             return false;
         }
 

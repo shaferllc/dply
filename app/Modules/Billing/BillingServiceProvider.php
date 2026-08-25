@@ -20,7 +20,7 @@ use Livewire\Livewire;
  * Billing module wiring (docs/adr/modular-monolith-structure.md).
  *
  * The revenue engine: 29 Services (subscriptions, Stripe sync, metering, usage cost
- * calculators incl. the serverless/log/vat billing services other modules depend on),
+ * calculators incl. the log/vat billing services other modules depend on),
  * SyncOrganizationBillingJob, the sync/snapshot/provision commands, the billing
  * controllers + the org billing Livewire pages.
  *

@@ -30,7 +30,6 @@ class SiteWorkspaceController
         if (
             $section === 'deploy'
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
         ) {
             return redirect()->route('sites.deployments.index', [
@@ -50,7 +49,6 @@ class SiteWorkspaceController
         if (
             $section === 'environment'
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
         ) {
             return redirect()->route('sites.environment', [

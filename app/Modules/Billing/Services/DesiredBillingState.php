@@ -99,9 +99,6 @@ class DesiredBillingState
     public static function fromPlanAndUsage(
         array $plan,
         int $billableServerCount = 0,
-        int $serverlessCount = 0,
-        int $serverlessUnitCents = 0,
-        int $serverlessUsageSubtotalCents = 0,
         int $managedServerCount = 0,
         int $managedServerSubtotalCents = 0,
         int $cloudCount = 0,
@@ -129,10 +126,6 @@ class DesiredBillingState
         $billableServerCount = max(0, $billableServerCount);
 
         $planPriceCents = max(0, (int) $plan['price_cents']);
-
-        $serverlessCount = max(0, $serverlessCount);
-        $serverlessSubtotal = $serverlessCount * max(0, $serverlessUnitCents);
-        $serverlessUsageSubtotalCents = max(0, $serverlessUsageSubtotalCents);
 
         $managedServerCount = max(0, $managedServerCount);
         $managedServerSubtotalCents = max(0, $managedServerSubtotalCents);
@@ -194,9 +187,8 @@ class DesiredBillingState
         $lookoutCount = array_sum($lookoutTierNormalized);
 
         // dply Queue: one line per namespace capacity tier, priced from
-        // config('queue_service.tiers'). The computer has already dropped
-        // Serverless-attached namespaces (they ride free) and zeroes everything
-        // when queue_service.billing.enabled is off.
+        // config('queue_service.tiers'). The computer zeroes everything when
+        // queue_service.billing.enabled is off.
         $queueTiers = (array) config('queue_service.tiers', []);
         $queueTierNormalized = [];
         $queueSubtotal = 0;
@@ -211,8 +203,6 @@ class DesiredBillingState
         $queueCount = array_sum($queueTierNormalized);
 
         $monthly = $planPriceCents
-            + $serverlessSubtotal
-            + $serverlessUsageSubtotalCents
             + $managedServerSubtotalCents
             + $cloudSubtotal
             + $cloudResourceSubtotalCents
@@ -229,9 +219,6 @@ class DesiredBillingState
             planLabel: $plan['label'],
             planPriceCents: $planPriceCents,
             billableServerCount: $billableServerCount,
-            serverlessCount: $serverlessCount,
-            serverlessSubtotalCents: $serverlessSubtotal,
-            serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
             managedServerCount: $managedServerCount,
             managedServerSubtotalCents: $managedServerSubtotalCents,
             cloudCount: $cloudCount,
@@ -283,8 +270,7 @@ class DesiredBillingState
      */
     public function managedSubtotalCents(): int
     {
-        return $this->serverlessSubtotalCents
-            + $this->managedServerSubtotalCents
+        return $this->managedServerSubtotalCents
             + $this->cloudSubtotalCents
             + $this->cloudResourceSubtotalCents
             + $this->edgeSubtotalCents
@@ -313,9 +299,6 @@ class DesiredBillingState
             'plan_label' => $this->planLabel,
             'plan_price_cents' => $this->planPriceCents,
             'server_count' => $this->serverCount(),
-            'serverless_count' => $this->serverlessCount,
-            'serverless_subtotal_cents' => $this->serverlessSubtotalCents,
-            'serverless_usage_subtotal_cents' => $this->serverlessUsageSubtotalCents,
             'managed_server_count' => $this->managedServerCount,
             'managed_server_subtotal_cents' => $this->managedServerSubtotalCents,
             'cloud_count' => $this->cloudCount,

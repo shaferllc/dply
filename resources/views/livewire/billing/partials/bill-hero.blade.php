@@ -9,7 +9,6 @@
     // product, then metered Edge usage.
     $tierBarColors = [
         'plan' => 'bg-brand-ink/80',
-        'serverless' => 'bg-violet-500/70',
         'cloud' => 'bg-sky-500/70',
         'edge' => 'bg-emerald-500/70',
         'edge_usage' => 'bg-brand-sage/50',
@@ -19,9 +18,6 @@
     $segments = [
         ['key' => 'plan', 'label' => $state->planLabel, 'cents' => $state->planPriceCents],
     ];
-    if ($state->serverlessSubtotalCents > 0) {
-        $segments[] = ['key' => 'serverless', 'label' => __('Serverless').' × '.$state->serverlessCount, 'cents' => $state->serverlessSubtotalCents];
-    }
     if ($state->cloudSubtotalCents > 0) {
         $segments[] = ['key' => 'cloud', 'label' => __('Cloud').' × '.$state->cloudCount, 'cents' => $state->cloudSubtotalCents];
     }

@@ -40,8 +40,8 @@ test('site create access blocks deployer role', function () {
 
 test('managed-product apps no longer consume the machine-site ceiling', function () {
     config(['subscription.standard.plans' => [
-        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3, 'max_functions' => 3],
-        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null, 'max_functions' => null],
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null],
     ]]);
 
     $user = User::factory()->create();
@@ -69,19 +69,16 @@ test('managed-product apps no longer consume the machine-site ceiling', function
     Site::factory()->count(2)->create(['organization_id' => $org->id, 'server_id' => $edgeHost->id]);
     Site::factory()->create(['organization_id' => $org->id, 'server_id' => $functionsHost->id]);
 
-    // Three managed-product apps used to read as "3 / 1" here and hard-block.
+    // Leftover managed-product apps must not consume the VM site ceiling.
     expect($org->quotaUsageBySurface())->toBe([
         'site' => 0,
-        'edge' => 2,
-        'cloud' => 0,
-        'serverless' => 1,
     ])->and(SiteCreateAccess::canCreate($vm, $user))->toBeTrue();
 });
 
 test('quota block names the surface and says where the usage is', function () {
     config(['subscription.standard.plans' => [
-        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3, 'max_functions' => 3],
-        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null, 'max_functions' => null],
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null],
     ]]);
 
     $user = User::factory()->create();
@@ -115,8 +112,8 @@ test('quota block names the surface and says where the usage is', function () {
 
 test('each managed surface blocks on its own ceiling', function () {
     config(['subscription.standard.plans' => [
-        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3, 'max_functions' => 3],
-        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null, 'max_functions' => null],
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1, 'max_cloud_apps' => 1, 'max_edge_apps' => 3],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null, 'max_cloud_apps' => null, 'max_edge_apps' => null],
     ]]);
 
     $org = Organization::factory()->create();

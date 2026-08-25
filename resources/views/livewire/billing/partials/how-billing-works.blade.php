@@ -30,7 +30,7 @@
             <div>
                 <dt class="font-semibold text-brand-ink">{{ __('Managed products bill on top') }}</dt>
                 <dd class="mt-1 text-brand-moss">
-                    {{ __('dply Cloud apps, Edge sites, and serverless functions run on dply-owned infrastructure, so they\'re billed a la carte per unit on top of your plan — even on the Free plan.') }}
+                    {{ __('dply Cloud apps and Edge sites run on dply-owned infrastructure, so they\'re billed a la carte per unit on top of your plan — even on the Free plan.') }}
                 </dd>
             </div>
             <div>

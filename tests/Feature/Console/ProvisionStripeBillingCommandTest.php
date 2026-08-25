@@ -26,7 +26,6 @@ test('dry run lists objects without calling stripe', function () {
         ->expectsOutputToContain('free, no Stripe object')
         ->expectsOutputToContain('$9.00/mo')
         ->expectsOutputToContain('$39.00/mo')
-        ->expectsOutputToContain('dply serverless function')
         ->expectsOutputToContain('dply Cloud app')
         ->expectsOutputToContain('Per app $5.00/mo')
         ->expectsOutputToContain('dply Edge site')
@@ -53,8 +52,6 @@ test('format env emits expected lines', function () {
         StripeBillingProvisioner::ROLE_PLAN_PREFIX.'pro'.StripeBillingProvisioner::ROLE_PLAN_YEARLY_SUFFIX => 'price_pro_y',
         StripeBillingProvisioner::ROLE_PLAN_PREFIX.'business' => 'price_business',
         StripeBillingProvisioner::ROLE_PLAN_PREFIX.'business'.StripeBillingProvisioner::ROLE_PLAN_YEARLY_SUFFIX => 'price_business_y',
-        StripeBillingProvisioner::ROLE_SERVERLESS_MONTHLY => 'price_sl',
-        StripeBillingProvisioner::ROLE_SERVERLESS_YEARLY => 'price_sl_y',
         StripeBillingProvisioner::ROLE_CLOUD_MONTHLY => 'price_cloud',
         StripeBillingProvisioner::ROLE_CLOUD_YEARLY => 'price_cloud_y',
         StripeBillingProvisioner::ROLE_EDGE_MONTHLY => 'price_edge',
@@ -70,8 +67,6 @@ test('format env emits expected lines', function () {
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_PRO_YEARLY=price_pro_y', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BUSINESS=price_business', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BUSINESS_YEARLY=price_business_y', $env);
-    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS=price_sl', $env);
-    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_sl_y', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD=price_cloud', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_cloud_y', $env);
     $this->assertStringContainsString('STRIPE_PRICE_STANDARD_EDGE=price_edge', $env);

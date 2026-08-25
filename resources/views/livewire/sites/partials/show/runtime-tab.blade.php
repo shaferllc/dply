@@ -74,44 +74,7 @@
                             </dl>
                         @endif
 
-                        @if ($site->usesFunctionsRuntime())
-                            <dl class="grid gap-4 sm:grid-cols-2">
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Runtime') }}</dt>
-                                    <dd class="mt-2 font-mono text-sm text-brand-ink">{{ $serverlessRuntime['runtime'] ?? '—' }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Entrypoint') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['entrypoint'] ?? '—' }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Revision') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['last_revision_id'] ?? __('Not deployed yet') }}</dd>
-                                </div>
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest artifact') }}</dt>
-                                    <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['artifact_path'] ?? __('Not built yet') }}</dd>
-                                </div>
-                                @if (! empty($serverlessRuntime['function_arn']))
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function ARN') }}</dt>
-                                        <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['function_arn'] }}</dd>
-                                    </div>
-                                @endif
-                                @if (! empty($serverlessRuntime['function_url']))
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Function URL') }}</dt>
-                                        <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['function_url'] }}</dd>
-                                    </div>
-                                @endif
-                                @if (! empty($serverlessRuntime['action_url']))
-                                    <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Published action URL') }}</dt>
-                                        <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $serverlessRuntime['action_url'] }}</dd>
-                                    </div>
-                                @endif
-                            </dl>
-                        @elseif ($site->usesDockerRuntime())
+                        @if ($site->usesDockerRuntime())
                             <dl class="grid gap-4 sm:grid-cols-2">
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
                                     <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Compose file') }}</dt>

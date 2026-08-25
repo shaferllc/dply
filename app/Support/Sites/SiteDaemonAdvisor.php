@@ -35,7 +35,7 @@ final class SiteDaemonAdvisor
         if ($server === null || ! $server->isVmHost()) {
             return [];
         }
-        if ($site->usesFunctionsRuntime() || $site->usesEdgeRuntime()) {
+        if ($site->usesEdgeRuntime()) {
             return [];
         }
         if (! $site->isLaravelFrameworkDetected()) {

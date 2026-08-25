@@ -14,11 +14,11 @@ use RuntimeException;
 /**
  * The env a managed worker needs to reach its own queue.
  *
- * Deliberately the same four keys `ServerlessQueueProvisioner` writes into a
- * deployed app: a dply-owned worker authenticates over the public
- * SQS-compatible endpoint exactly like a customer's own app would. Giving the
- * managed path a private shortcut into the store would mean the endpoint
- * customers depend on is the one dply itself never exercises.
+ * Deliberately the same four keys a deployed app receives: a dply-owned
+ * worker authenticates over the public SQS-compatible endpoint exactly like
+ * a customer's own app would. Giving the managed path a private shortcut
+ * into the store would mean the endpoint customers depend on is the one
+ * dply itself never exercises.
  */
 class FleetWorkerEnvironment
 {

@@ -373,11 +373,7 @@
         'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => $envMergedChrome,
     ])>
         @php
-            // Functions get the serverless namespace; VM/BYO sites keep the
-            // `site` one. Both drive the same env store over the same API.
-            $envCli = $site->usesFunctionsRuntime()
-                ? 'dply serverless env '.$site->slug
-                : 'dply site env '.$site->slug;
+            $envCli = 'dply site env '.$site->slug;
         @endphp
         <x-cli-snippet
             :intro="__('Manage env via CLI when you have many keys at once:')"

@@ -27,7 +27,6 @@ trait ManagesCronCommandPresets
     protected function siteSupportsVmManagedCron(Site $site): bool
     {
         return $this->server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
     }

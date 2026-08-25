@@ -1,19 +1,10 @@
 /**
- * What `dply deploy` has to do *before* it queues anything, for a site created
- * by `dply init`.
+ * Git checks `dply deploy` runs before it queues anything.
  *
- * Two cases the older deploy path never had to think about:
- *
- *  - An upload-source site has no remote to push to, so "deploy" means "send
- *    this folder again". That is not a fallback — it is the whole mechanism.
- *  - A git-source site deploys `origin/<branch>`, which is not necessarily
- *    what is on screen. init says so on the first run; this says so on every
- *    run after, because that is the one people actually repeat.
- *
- * The two signals are not equally serious and are not treated alike:
- * uncommitted files are usually unrelated noise and get a dim note, while
- * unpushed commits mean dply will deploy work you have already finished and
- * cannot see — that gets a confirmation.
+ * A git-source site deploys `origin/<branch>`, which is not necessarily what
+ * is on screen. Uncommitted files are usually unrelated noise and get a dim
+ * note; unpushed commits mean dply will deploy work you have already finished
+ * and cannot see — that gets a confirmation.
  */
 import { spawnSync } from 'node:child_process';
 import * as readline from 'node:readline/promises';

@@ -303,7 +303,6 @@
                             // this, so a stale click is a safe no-op either way.
                             $isWorkerReplica = $isWorkerHost || $s->isFleetReplica();
                             $siteDeployable = $server->isVmHost()
-                                && ! $s->usesFunctionsRuntime()
                                 && ! $s->usesEdgeRuntime()
                                 && auth()->user()?->can('update', $s);
 

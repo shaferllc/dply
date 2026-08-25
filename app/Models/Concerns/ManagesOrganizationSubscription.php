@@ -87,8 +87,6 @@ trait ManagesOrganizationSubscription
             array_values((array) ($stripe['plans'] ?? [])),
             array_values((array) ($stripe['plans_yearly'] ?? [])),
             [
-                $stripe['serverless'] ?? null,
-                $stripe['serverless_yearly'] ?? null,
                 $stripe['cloud'] ?? null,
                 $stripe['cloud_yearly'] ?? null,
                 $stripe['edge'] ?? null,

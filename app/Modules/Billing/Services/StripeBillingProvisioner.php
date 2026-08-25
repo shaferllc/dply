@@ -130,56 +130,6 @@ class StripeBillingProvisioner
             )->id;
         }
 
-        // Serverless — a flat per-function fee. Its own product so the
-        // invoice line reads "dply serverless function", not a server tier.
-        $serverlessCents = (int) ($standardConfig['serverless_cents'] ?? 200);
-        if ($serverlessCents > 0) {
-            $serverlessProduct = $this->upsertProduct(
-                name: 'dply serverless function',
-                description: 'Per-function fee for serverless (FaaS) targets. Covers deploys, config, and console management for each function — billed per function, not per server.',
-                role: self::ROLE_SERVERLESS_PRODUCT,
-            );
-            $result[self::ROLE_SERVERLESS_PRODUCT] = $serverlessProduct->id;
-
-            $result[self::ROLE_SERVERLESS_MONTHLY] = $this->upsertRecurringPrice(
-                productId: $serverlessProduct->id,
-                amount: $serverlessCents,
-                interval: 'month',
-                nickname: 'Serverless function — Monthly',
-                role: self::ROLE_SERVERLESS_MONTHLY,
-            )->id;
-
-            $result[self::ROLE_SERVERLESS_YEARLY] = $this->upsertRecurringPrice(
-                productId: $serverlessProduct->id,
-                amount: $this->annualAmount($serverlessCents, $annualPct),
-                interval: 'year',
-                nickname: 'Serverless function — Yearly',
-                role: self::ROLE_SERVERLESS_YEARLY,
-            )->id;
-        }
-
-        // Metered managed-serverless usage — invocations beyond the included
-        // allowance plus marked-up managed DB/cache resources, billed per cent
-        // (quantity = cents) on top of the flat per-function fee. Only accrues
-        // for dply-managed functions (dply pays the provider).
-        $serverlessUsageUnitCents = (int) ($standardConfig['serverless_usage_unit_cents'] ?? 1);
-        if ($serverlessUsageUnitCents > 0) {
-            $serverlessUsageProduct = $this->upsertProduct(
-                name: 'dply serverless usage',
-                description: 'Metered usage for dply-managed serverless functions — invocations beyond the included monthly allowance plus managed databases and caches. Billed monthly in pass-through-plus-margin units on top of the flat per-function fee.',
-                role: self::ROLE_SERVERLESS_USAGE_PRODUCT,
-            );
-            $result[self::ROLE_SERVERLESS_USAGE_PRODUCT] = $serverlessUsageProduct->id;
-
-            $result[self::ROLE_SERVERLESS_USAGE_MONTHLY] = $this->upsertRecurringPrice(
-                productId: $serverlessUsageProduct->id,
-                amount: $serverlessUsageUnitCents,
-                interval: 'month',
-                nickname: 'Serverless usage — Monthly (per cent)',
-                role: self::ROLE_SERVERLESS_USAGE_MONTHLY,
-            )->id;
-        }
-
         // Metered dply-managed server — all-in cost-plus (Hetzner provider price
         // × markup) billed per cent (quantity = cents), monthly. Replaces the
         // per-server tier fee for VMs dply runs on its own infrastructure.
@@ -359,16 +309,12 @@ class StripeBillingProvisioner
 
         // dply Queue — one product, one monthly + yearly price per capacity
         // tier. Prices come from config('queue_service.tiers'); each tier is
-        // billed per billable namespace. Namespaces attached to a dply
-        // Serverless site never reach a Stripe line at all: the billing
-        // computer drops them before quantities are counted, so there is no
-        // "free" price to provision here (docs/adr/managed-services-tier.md,
-        // decisions 4 and 5).
+        // billed per billable namespace.
         $queueTiers = (array) config('queue_service.tiers', []);
         if ($queueTiers !== []) {
             $queueProduct = $this->upsertProduct(
                 name: 'dply Queue namespace',
-                description: 'Per-namespace fee for dply Queue — a managed, SQS-compatible job queue hosted by dply. Covers the job store, visibility/lease handling, failed-job retention, and the dashboard. Billed per namespace, priced by capacity tier. Included at no charge for namespaces serving a dply Serverless site.',
+                description: 'Per-namespace fee for dply Queue — a managed, SQS-compatible job queue hosted by dply. Covers the job store, visibility/lease handling, failed-job retention, and the dashboard. Billed per namespace, priced by capacity tier.',
                 role: self::ROLE_QUEUE_PRODUCT,
             );
             $result[self::ROLE_QUEUE_PRODUCT] = $queueProduct->id;
@@ -419,9 +365,6 @@ class StripeBillingProvisioner
     {
         // Managed products + edge usage map to fixed env var names.
         $static = [
-            self::ROLE_SERVERLESS_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS',
-            self::ROLE_SERVERLESS_YEARLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY',
-            self::ROLE_SERVERLESS_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_USAGE',
             self::ROLE_MANAGED_SERVER_MONTHLY => 'STRIPE_PRICE_STANDARD_MANAGED_SERVER',
             self::ROLE_CLOUD_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD',
             self::ROLE_CLOUD_YEARLY => 'STRIPE_PRICE_STANDARD_CLOUD_YEARLY',

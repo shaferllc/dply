@@ -8,7 +8,6 @@ use App\Models\BillingSubscriptionSyncEvent;
 use App\Models\Organization;
 use App\Models\OrganizationBillingSnapshot;
 use App\Models\Server;
-use App\Models\Site;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\SubscriptionItem;
 use Carbon\CarbonInterface;
@@ -84,7 +83,6 @@ final class BillingAnalytics
             'stripe_status' => $defaultSubscription?->stripe_status,
             'next_invoice_at' => $this->nextInvoiceAt($organization)?->toDateString(),
             'server_count' => $state->serverCount(),
-            'serverless_count' => $state->serverlessCount,
             'cloud_count' => $state->cloudCount,
             'edge_count' => $state->edgeCount,
             'realtime_count' => $state->realtimeCount,
@@ -107,24 +105,6 @@ final class BillingAnalytics
                 'color' => 'bg-brand-ink/80',
             ],
         ];
-
-        if ($state->serverlessSubtotalCents > 0) {
-            $segments[] = [
-                'key' => 'serverless',
-                'label' => __('Serverless').' × '.$state->serverlessCount,
-                'cents' => $state->serverlessSubtotalCents,
-                'color' => 'bg-violet-500/70',
-            ];
-        }
-
-        if ($state->serverlessUsageSubtotalCents > 0) {
-            $segments[] = [
-                'key' => 'serverless_usage',
-                'label' => __('Serverless usage'),
-                'cents' => $state->serverlessUsageSubtotalCents,
-                'color' => 'bg-violet-500/40',
-            ];
-        }
 
         if ($state->managedServerSubtotalCents > 0) {
             $segments[] = [
@@ -199,27 +179,6 @@ final class BillingAnalytics
                 ? trans_choice(':count server|:count servers', $serverCount, ['count' => $serverCount])
                 : null,
         ]];
-
-        if ($state->serverlessCount > 0) {
-            $unit = (int) config('subscription.standard.serverless_cents', 200);
-            $items[] = [
-                'label' => __('dply serverless function'),
-                'quantity' => $state->serverlessCount,
-                'unit_cents' => $unit,
-                'line_cents' => $state->serverlessSubtotalCents,
-                'detail' => null,
-            ];
-        }
-
-        if ($state->serverlessUsageSubtotalCents > 0) {
-            $items[] = [
-                'label' => __('dply serverless usage'),
-                'quantity' => 1,
-                'unit_cents' => $state->serverlessUsageSubtotalCents,
-                'line_cents' => $state->serverlessUsageSubtotalCents,
-                'detail' => __('Metered invocations, managed databases & caches'),
-            ];
-        }
 
         if ($state->managedServerSubtotalCents > 0) {
             $items[] = [
@@ -432,31 +391,11 @@ final class BillingAnalytics
     }
 
     /**
-     * @return array{serverless: list<array>, cloud: list<array>, edge: list<array>}
+     * @return array{cloud: list<array>, edge: list<array>}
      */
     private function managedProducts(Organization $organization): array
     {
-        // Cloud and Edge are removed (remove-cloud-edge-serverless) — the
-        // Site helpers this read (isDplyCloudSite, containerLiveUrl, edgeMeta,
-        // edgeLiveUrl…) no longer exist, so those buckets are always empty.
-        // Serverless still has a status and a per-unit price, so it keeps
-        // listing until that product line is retired too.
-        $serverless = [];
-
-        $organization->sites()
-            ->where('status', Site::STATUS_FUNCTIONS_ACTIVE)
-            ->orderBy('name')
-            ->get()
-            ->each(function (Site $site) use (&$serverless): void {
-                $serverless[] = [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'status' => $site->status,
-                    'unit_cents' => (int) config('subscription.standard.serverless_cents', 200),
-                ];
-            });
-
-        return ['serverless' => $serverless, 'cloud' => [], 'edge' => []];
+        return ['cloud' => [], 'edge' => []];
     }
 
     /**
@@ -594,7 +533,6 @@ final class BillingAnalytics
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
             array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
-                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),
@@ -667,7 +605,6 @@ final class BillingAnalytics
             'is_free' => $state->isFree(),
             'counts' => [
                 'servers' => $state->serverCount(),
-                'serverless' => $state->serverlessCount,
                 'managed_servers' => $state->managedServerCount,
                 'cloud' => $state->cloudCount,
                 'edge' => $state->edgeCount,

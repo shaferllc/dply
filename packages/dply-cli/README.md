@@ -138,55 +138,37 @@ dply init
 It signs you in if you are not, works out what the folder is, creates the site,
 and follows the deploy until the URL answers.
 
-**The kind menu never hides a path.** All four kinds are listed, best fit first,
-and one that does not suit the folder still says why — `Edge — no static build
-output found` — rather than vanishing. Kinds the CLI cannot create yet open the
-dashboard wizard, prefilled.
-
-**Git or upload, whichever the folder is.** A reachable remote deploys from git
-and gets push-to-deploy. No remote — or one dply cannot clone — uploads the
-folder instead, and that is a fully supported source, not a fallback: it gets the
-same framework detection, build hooks, adapters, asset publishing and rollback.
-The one thing it cannot have is push-to-deploy, because there is no remote to
-push to. `dply deploy` re-uploads.
+**The kind menu never hides a path.** VM, Cloud, and Edge are listed, best fit
+first, and one that does not suit the folder still says why — `Edge — no static
+build output found` — rather than vanishing. Kinds the CLI cannot create yet
+open the dashboard wizard, prefilled.
 
 **It says what will actually deploy.** dply builds `origin/<branch>`, not your
-working folder. With unpushed commits it offers to push, deploy the remote as it
-stands, or upload the folder as-is — rather than letting you find out from the
-deployed site. `dply deploy` keeps a lighter version of that check.
+working folder. With unpushed commits it offers to push first rather than
+letting you find out from the deployed site.
 
 **Monorepos work.** Run it in `apps/api` and that subdirectory is what builds.
 
 **Secrets are asked for, never assumed.** A `.env` is offered by key name only —
-values are never printed — and goes into the site's encrypted environment rather
-than riding the upload.
+values are never printed — and goes into the site's encrypted environment.
 
-**One confirmation.** Name, source, detected runtime, region, whose account it
-runs in, and where it lands against your plan's function quota, behind a single
-`[Y/n]`.
-
-Empty folder? It offers to write a hello-world (`--template node|php|python`)
-and deploys that.
+**One confirmation.** Name, source, region, and where it lands against your
+plan quota, behind a single `[Y/n]`.
 
 Flags — every prompt has one, so init runs in a pipeline:
 
 ```
---kind <vm|cloud|edge|serverless>   --name <name>        --region <slug>
---source <git|upload>               --delivery <managed|byo>
---runtime <auto|nodejs:20|php:8.4>  --template <node|php|python>
---exclude <path>                    --env-file <path> / --no-env-file
---no-deploy                         --yes
+--kind <vm|cloud|edge>   --name <name>        --region <slug>
+--env-file <path> / --no-env-file
+--yes
 ```
 
 Non-interactive without enough flags exits 2 naming what is missing. Re-running
 `dply init` in a linked folder shows the site and offers to deploy, open, or
 create another — it is always safe to type.
 
-Creating functions needs the **`serverless.create`** scope; a session older than
-that is offered an inline re-approval.
-
-`dply link` still attaches a folder to a site that **already exists**, and now
-lists all four kinds rather than only BYO and Edge.
+`dply link` still attaches a folder to a site that **already exists**, and lists
+VM, Cloud, and Edge sites.
 
 ## Deploy a BYO site (hero workflow)
 
@@ -215,47 +197,15 @@ dply edge status              # linked site, or --site <id>
 dply edge status --wait       # block until latest deploy finishes
 ```
 
-### Serverless functions
-
-Requires the **`serverless.read`** scope.
-
-```sh
-dply serverless list                          # every function in the org
-dply serverless status checkout               # detail, limits, 24h health
-dply serverless errors --site checkout        # every failed invocation
-dply serverless errors --site checkout --watch
-dply serverless invocations --site checkout --source web --limit 20
-dply serverless invocation <id> --site checkout   # + captured log lines
-dply serverless logs --site checkout --level error --follow
-```
-
-`serverless errors` reads **failed invocations** — every one, raw. That is where
-a function's failures actually live: the platform's activations API returns
-nothing, so dply's own invocation table is the only record. It exits 1 when
-anything failed.
-
-It is the drill-down under `dply errors`, not a rival. A failing streak also
-folds into **one** open error event for the site, so `dply errors` (and the
-site's Errors tab, and site-error notifications) tells you the function is
-broken, and `dply serverless errors` tells you which requests broke. The folded
-event closes by itself once the function serves a successful invocation again.
-
-Two log surfaces, deliberately separate:
-
-| Command | Shows |
-| --- | --- |
-| `serverless logs` | the site's application log drain (searchable, level-filtered, 30-day) |
-| `serverless invocation <id>` | stdout/stderr captured from that one activation |
-
 ### Sites
 
 One list, every kind. `Site` is a single model on the platform — a VM site, a
-Cloud container app, an Edge site and a serverless function differ by attributes
-— so `dply sites` shows them together with what each one is:
+Cloud container app, and an Edge site differ by attributes — so `dply sites`
+shows them together with what each one is:
 
 ```sh
-dply sites                     # vm · cloud · edge · serverless, one table
-dply sites --kind cloud        # one kind (vm | cloud | edge | serverless)
+dply sites                     # vm · cloud · edge, one table
+dply sites --kind cloud        # one kind (vm | cloud | edge)
 dply sites checkout            # filter by name
 dply sites --json
 ```
@@ -265,22 +215,20 @@ dply sites --json
 | `vm` | a site on a server you own (BYO) |
 | `cloud` | a managed container app (DO App Platform / AWS App Runner) |
 | `edge` | a static/SSG site on the edge network |
-| `serverless` | a managed function |
 
 The API says which: `/sites` returns every server-backed site with a `kind`
-field, and `/edge/sites` + `/serverless/sites` remain the scope-gated
-product-specific views. Cloud needs no list endpoint of its own.
+field, and `/edge/sites` remains the scope-gated Edge view. Cloud needs no list
+endpoint of its own.
 
 The product namespaces keep the verbs only they have — `dply edge previews`,
-`dply serverless invocations`, `dply site deploy` — and `dply site list` stays
-the VM-only list. Anything that works on a site regardless of where it runs
-(`dply errors`) resolves a name across all three kinds, and naming the wrong
-kind tells you where it actually lives:
+`dply site deploy` — and `dply site list` stays the VM-only list. Anything that
+works on a site regardless of where it runs (`dply errors`) resolves a name
+across kinds, and naming the wrong kind tells you where it actually lives:
 
 ```
-$ dply site logs checkout-fn
-"checkout-fn" is a serverless function, not a VM site — try
-`dply serverless status checkout-fn`, or `dply errors checkout-fn`.
+$ dply site logs docs-site
+"docs-site" is an Edge site, not a VM site — try
+`dply edge status --site docs-site`, or `dply errors docs-site`.
 ```
 
 ### Notifications
@@ -304,8 +252,8 @@ dply notifications test <channel>      # send that channel its test message
 
 Subscribing **adds** to a channel instead of replacing its selection, so two
 people routing different events can't clobber each other. Events are validated
-against the subject: an Edge site is offered `edge.*`, a function
-`serverless.*`, and a `server.*` event on a site is refused.
+against the subject: an Edge site is offered `edge.*`, and a `server.*` event
+on a site is refused.
 
 ### Uptime monitors
 
@@ -333,79 +281,9 @@ Leave the monitor id off on a TTY and you get a picker; when something is down,
 the list offers to re-check it. Probes are unique per monitor for two minutes —
 asking twice in that window probes once.
 
-The **Platform** surface — what is actually running on the functions host:
-
-```sh
-dply serverless platform checkout             # action doc + namespace inventory
-dply serverless platform checkout --schedules # cron triggers
-dply serverless platform checkout --json
-
-dply serverless invoke checkout                              # a real GET /
-dply serverless invoke checkout --method POST --path /health --body '{"ping":1}'
-dply serverless invoke checkout --header 'X-Token: secret'
-
-dply serverless credentials checkout                  # which key dply holds
-dply serverless credentials checkout --set <id>:<secret>   # store a rotated one
-```
-
-`invoke` runs your code and is recorded as a `source=test` invocation (it shows
-up in `dply serverless invocations --source test`), so it needs the
-**`serverless.invoke`** scope rather than `serverless.read`. It exits 1 when the
-function answers with a failure.
-
-```bash
-dply serverless workers checkout                    # engine + worker table
-dply serverless workers checkout --enable           # process queue jobs
-dply serverless workers checkout --tick             # one queue tick, now
-dply serverless workers checkout --add queue-default --command 'php artisan queue:work'
-dply serverless workers checkout --stop queue-default
-dply serverless workers checkout --remove queue-default
-```
-
-```bash
-dply serverless schedule checkout                   # switch + recent ticks
-dply serverless schedule checkout --enable          # run the scheduler tick
-dply serverless schedule checkout --tick            # fire one now
-dply serverless schedule checkout --failed --limit 50
-```
-
-```bash
-dply serverless env checkout list                   # keys (values are write-only)
-dply serverless env checkout set STRIPE_KEY=sk_live_x
-dply serverless env checkout rm OLD_KEY
-dply serverless env checkout push --file .env       # upsert each key
-dply serverless env checkout pull --values > .env   # needs sites.write
-
-dply serverless runtime checkout                    # limits, HTTP, toggles
-dply serverless runtime checkout --memory 512 --timeout 60000
-dply serverless runtime checkout --web-mode web --secure --cors on --cors-origins https://app.test
-dply serverless runtime checkout --param STRIPE_MODE=live --rm-param OLD
-dply serverless runtime checkout --maintenance on --keep-warm on
-dply serverless runtime checkout --rotate-secret
-```
-
-`env` edits the same store as the Environment tab; new values reach the
-function on its next deploy. `runtime` is the Runtime tab — every flag maps to
-one field of a single PATCH, so several settings change in one call. Resource
-limits apply on the next deploy; HTTP settings are pushed to the live function.
-
-`schedule` is dply's own minute-cadence scheduler tick and its firing history;
-it exits 1 when a listed tick failed. The functions host's cron triggers are a
-different surface — `dply serverless platform <site> --schedules`.
-
-`workers` is the Workers tab: the queue engine (one switch driving the
-minute-cadence tick) and the named worker definitions. Workers are addressed by
-name or id. Writes need **`serverless.write`**; `--tick` runs your code, so it
-needs **`serverless.invoke`** and exits 1 when the tick reports a failure.
-
-`credentials` reads the namespace key dply stores for the function and checks the
-host still accepts it (only the key id is ever shown). `--set` replaces it after
-you rotate on the host — the new key is verified before it sticks, and the old
-one stays in place if the host rejects it. Writing needs **`serverless.write`**.
-
 ### Errors
 
-Open error events for a site — **all four kinds**, since an error event belongs
+Open error events for a site — VM, Cloud, or Edge, since an error event belongs
 to the site whatever the site runs on. Newest first. Requires the
 **`sites.read`** scope.
 
@@ -415,15 +293,14 @@ dply errors acme                   # by name or ID (prefix is enough)
 dply sites:errors acme             # same thing — any `a b` route also takes `a:b`
 dply errors --full                 # detail, remediation code, deep link
 dply errors --category ssl,deploy  # filter by category (comma-separated)
-dply errors --category function_invocation   # just the broken-function events
 dply errors --watch                # poll for new events (--interval ms)
 dply errors --json                 # raw payload
 ```
 
-With no site to go on, `dply errors` and `dply serverless errors` list what your
-token can see and ask which one — the same picker every site-scoped command now
-falls through to. Off a TTY (CI, pipes) they keep failing with exit 2 instead of
-blocking, so `--site` stays required in scripts.
+With no site to go on, `dply errors` lists what your token can see and asks
+which one — the same picker every site-scoped command now falls through to. Off
+a TTY (CI, pipes) it keeps failing with exit 2 instead of blocking, so `--site`
+stays required in scripts.
 
 Reading is half of it — the same three verbs the workspace Errors view offers
 work from the terminal:

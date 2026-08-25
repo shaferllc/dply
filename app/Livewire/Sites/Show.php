@@ -268,10 +268,6 @@ class Show extends Component
 
     public function shouldShowSystemUserPanel(): bool
     {
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return false;
-        }
-
         return $this->site->shouldShowPhpOctaneRolloutSettings();
     }
 
@@ -476,8 +472,7 @@ class Show extends Component
             return 'overview';
         }
 
-        $showRuntimeTab = $this->site->usesFunctionsRuntime()
-            || $this->site->usesDockerRuntime()
+        $showRuntimeTab = $this->site->usesDockerRuntime()
             || $this->site->usesKubernetesRuntime();
         $showSslTab = ! $this->site->usesDockerRuntime()
             && ($this->site->primaryPreviewDomain() || $this->site->certificates()->exists());

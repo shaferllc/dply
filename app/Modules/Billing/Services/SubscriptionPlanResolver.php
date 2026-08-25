@@ -13,8 +13,8 @@ use InvalidArgumentException;
  * scales with how many servers it manages. The resolver picks the cheapest
  * plan whose `max_servers` ceiling covers the count (null ceiling = unlimited).
  *
- * Managed products (serverless, Cloud, Edge) are billed a la carte on top of
- * the plan and are intentionally NOT part of plan resolution.
+ * Managed products (Cloud, Edge) are billed a la carte on top of the plan
+ * and are intentionally NOT part of plan resolution.
  */
 class SubscriptionPlanResolver
 {
@@ -25,7 +25,7 @@ class SubscriptionPlanResolver
     /**
      * Resolve the plan that covers the given billable server count.
      *
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int}
      */
     public function resolveForServerCount(int $serverCount): array
     {
@@ -49,7 +49,7 @@ class SubscriptionPlanResolver
     /**
      * Resolve a plan by its key (e.g. 'free', 'pro').
      *
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int}
      */
     public function resolveByKey(string $key): array
     {
@@ -87,7 +87,7 @@ class SubscriptionPlanResolver
     /**
      * All configured plans, normalized, cheapest first.
      *
-     * @return list<array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}>
+     * @return list<array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int}>
      */
     public function all(): array
     {
@@ -109,7 +109,7 @@ class SubscriptionPlanResolver
 
     /**
      * @param  array<string, mixed>  $plan
-     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int, max_functions: ?int}
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int, max_cloud_apps: ?int, max_edge_apps: ?int}
      */
     private function normalize(string $key, array $plan): array
     {
@@ -128,7 +128,6 @@ class SubscriptionPlanResolver
             'max_sites' => $ceiling($plan['max_sites'] ?? null),
             'max_cloud_apps' => $ceiling($plan['max_cloud_apps'] ?? null),
             'max_edge_apps' => $ceiling($plan['max_edge_apps'] ?? null),
-            'max_functions' => $ceiling($plan['max_functions'] ?? null),
         ];
     }
 }

@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Support;
 
 use App\Modules\Queue\Models\QueueNamespace;
-use App\Modules\Queue\Services\ServerlessQueueProvisioner;
 
 /**
  * The public URL a customer's queue client posts to.
  *
- * Shared by the deploy-time env writer ({@see ServerlessQueueProvisioner})
- * and the dashboard, which must show the customer exactly the string their app
- * will be configured with. Two copies of this would drift, and the failure mode
- * of drift here is a documented endpoint that does not work.
+ * Shared by the deploy-time env writer and the dashboard, which must show the
+ * customer exactly the string their app will be configured with. Two copies of
+ * this would drift, and the failure mode of drift here is a documented endpoint
+ * that does not work.
  */
 final class QueueEndpoint
 {

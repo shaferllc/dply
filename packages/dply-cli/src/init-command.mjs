@@ -254,6 +254,25 @@ async function handleLinkedFolder(client, linked, capabilities, { noPrompt, flag
     throw err;
   }
 
+  if (! site) {
+    warn('This folder is linked to a site that no longer exists (or belongs to another organization).');
+    info(c.dim(`Linked id: ${siteId}`));
+
+    if (noPrompt) {
+      throw exit('Pass --force to create a new site here.', 2);
+    }
+
+    if (! canCreateAnything(capabilities)) {
+      info(c.dim(`${instanceKey(client.baseUrl)} cannot create sites from the CLI — use \`dply link\` to attach an existing one.`));
+
+      return true;
+    }
+
+    const answer = await ask('Create a new site for this folder? [y/N] ');
+
+    return ! /^y(es)?$/i.test(answer.trim());
+  }
+
   const url = site.url ?? site.visit_url ?? site.live_url ?? site.primary_hostname;
   info('');
   info(`${c.bold(site.name)} ${c.dim(`· ${kind === 'byo' ? 'vm' : kind}`)}`);
@@ -544,11 +563,10 @@ function guessSiteType(folder) {
 /**
  * A managed container app.
  *
- * Shorter than the serverless flow for one structural reason: the container
- * backend clones and builds the repository itself, so dply never holds the
- * source. There is no upload alternative to fall back on — a folder with no
- * reachable remote simply cannot become a cloud app, and saying so beats
- * inventing a path that would fail at provision time.
+ * The container backend clones and builds the repository itself, so dply
+ * never holds the source. There is no upload alternative to fall back on —
+ * a folder with no reachable remote simply cannot become a cloud app, and
+ * saying so beats inventing a path that would fail at provision time.
  */
 async function initCloud(client, cwd, capabilities, { flags, noPrompt, assumeYes }) {
   const git = readGitState(cwd);
@@ -556,7 +574,7 @@ async function initCloud(client, cwd, capabilities, { flags, noPrompt, assumeYes
   if (! git.hasRemote) {
     throw exit(
       'A cloud app builds from a git repository, and this folder has no remote.\n'
-      + 'Push it somewhere first, or run `dply init --kind serverless`, which can deploy the folder as-is.',
+      + 'Push it somewhere first, then run `dply init` again.',
       2,
     );
   }
@@ -571,8 +589,7 @@ async function initCloud(client, cwd, capabilities, { flags, noPrompt, assumeYes
       runGit(cwd, ['push', '-u', 'origin', git.branch]);
     }
   } else {
-    // Same trap as the serverless git path: the backend builds the remote, not
-    // the folder on screen.
+    // The backend builds the remote, not the folder on screen.
     await warnIfBehindRemote(git, { noPrompt, cwd });
   }
 
@@ -651,8 +668,7 @@ async function initCloud(client, cwd, capabilities, { flags, noPrompt, assumeYes
 }
 
 /**
- * The container backend builds `origin/<branch>`, so unpushed work is invisible
- * to it in exactly the way it is for a git-source function.
+ * The container backend builds `origin/<branch>`, so unpushed work is invisible.
  */
 async function warnIfBehindRemote(git, { noPrompt, cwd }) {
   if (git.aheadCommits === 0) {
@@ -675,205 +691,12 @@ async function warnIfBehindRemote(git, { noPrompt, cwd }) {
   }
 }
 
-/* ------------------------------------------------------------- source */
-
-async function chooseSource(git, { flags, noPrompt }) {
-  const forced = String(flags.source ?? '').trim().toLowerCase();
-  if (forced === 'upload' || forced === 'git') {
-    return { kind: forced, action: null };
-  }
-
-  const state = classifyGitState(git);
-
-  if (state.deployable === 'upload') {
-    info(c.dim(`Source: this folder (${state.summary}).`));
-
-    return { kind: 'upload', action: null };
-  }
-
-  if (state.code === 'clean') {
-    return { kind: 'git', action: null };
-  }
-
-  // dply deploys origin/<branch>, not what is on screen. Say so before it
-  // becomes a mystery on the deployed site.
-  info('');
-  warn(`Heads up — ${state.summary}.`);
-  info(c.dim(`dply deploys ${c.bold(`origin/${git.branch}`)}${git.headSha ? ` @ ${git.headSha.slice(0, 7)}` : ''}, not your working folder.`));
-
-  if (noPrompt) {
-    info(c.dim('Continuing with the remote (non-interactive).'));
-
-    return { kind: 'git', action: null };
-  }
-
-  const options = [{ id: 'push', name: `Push to origin/${git.branch}, then deploy that` }];
-  if (state.code !== 'no-upstream') {
-    options.push({ id: 'origin', name: `Deploy origin/${git.branch} as it is now` });
-  }
-  options.push({ id: 'upload', name: 'Deploy this folder as-is (upload, no push-to-deploy)' });
-
-  const choice = await pickRow(options, { title: 'What should dply deploy?' });
-
-  if (choice?.id === 'upload') {
-    return { kind: 'upload', action: null };
-  }
-
-  return { kind: 'git', action: choice?.id === 'push' ? 'push' : null };
-}
-
-/**
- * Pack the folder and send it.
- *
- * With no `siteId` this stashes for a create that has not happened yet and
- * returns the handle; with one it replaces that site's source and redeploys —
- * which is what `dply deploy` means for an upload-source site.
- *
- * @param {import('./api.mjs').ApiClient} client
- * @param {string} cwd
- * @param {Record<string, any>} flags
- * @param {string|null} [siteId]
- * @param {Record<string, any>|null} [capabilities]
- */
-export async function uploadCurrentFolder(client, cwd, flags, siteId = null, capabilities = null) {
-  const paths = collectUploadPaths(cwd, flags);
-  if (paths.length === 0) {
-    throw exit('There is nothing to upload in this folder.', 2);
-  }
-
-  const stamp = `${Date.now()}-${process.pid}`;
-  const archive = join(tmpdir(), `dply-src-${stamp}.tar.gz`);
-  const listFile = join(tmpdir(), `dply-src-${stamp}.list`);
-  writeFileSync(listFile, `${paths.join('\n')}\n`);
-
-  // System tar rather than a dependency: this package deliberately has none,
-  // and every platform it runs on ships one (Windows 10+ as bsdtar). `-h`
-  // dereferences symlinks into real files, which is also what keeps the
-  // server's archive validation from rejecting an ordinary repo.
-  const tar = spawnSync('tar', ['-czhf', archive, '-T', listFile], { cwd, encoding: 'utf8' });
-  if (tar.status !== 0) {
-    throw exit(`Could not build the upload archive: ${tar.stderr || tar.error?.message || 'tar failed'}`, 1);
-  }
-
-  const size = statSync(archive).size;
-  const max = Number(
-    capabilities?.serverless?.upload?.max_bytes
-    ?? (await client.get('/capabilities').catch(() => null))?.data?.serverless?.upload?.max_bytes
-    ?? 104857600,
-  );
-
-  // Fail before spending the upload: a 413 after a two-minute transfer says
-  // nothing about which directory caused it.
-  if (size > max) {
-    reportOversize(cwd, paths, size, max);
-    throw exit('Upload is too large.', 2);
-  }
-
-  info(c.dim(`Uploading ${paths.length} files (${humanBytes(size)})…`));
-
-  const form = new FormData();
-  form.append('archive', new Blob([readFileSync(archive)]), 'source.tar.gz');
-
-  const path = siteId
-    ? `/serverless/sites/${encodeURIComponent(siteId)}/source`
-    : '/serverless/sites/source';
-
-  const response = await client.request(path, { method: 'POST', body: form });
-
-  return response?.data?.source_handle ?? null;
-}
-
-function collectUploadPaths(cwd, flags) {
-  const excludes = [].concat(flags.exclude ?? []).filter(Boolean).map(String);
-
-  const tracked = spawnSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd, encoding: 'utf8' });
-  if (tracked.status === 0) {
-    return filterUploadPaths(tracked.stdout.split('\n').filter(Boolean), excludes);
-  }
-
-  // Not a repository: walk it, honouring the built-in ignore list only.
-  const out = [];
-  const walk = (dir, prefix = '') => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (filterUploadPaths([rel], excludes).length === 0) {
-        continue;
-      }
-      if (entry.isDirectory()) {
-        walk(join(dir, entry.name), rel);
-      } else if (entry.isFile()) {
-        out.push(rel);
-      }
-    }
-  };
-  walk(cwd);
-
-  return out;
-}
-
-/**
- * Fail before spending the upload, and say which directory caused it —
- * a 413 after a two-minute transfer tells the user nothing.
- */
-function reportOversize(cwd, paths, size, max) {
-  const byTop = new Map();
-  for (const path of paths) {
-    const top = path.split('/')[0];
-    let bytes = 0;
-    try {
-      bytes = statSync(join(cwd, path)).size;
-    } catch {
-      bytes = 0;
-    }
-    byTop.set(top, (byTop.get(top) ?? 0) + bytes);
-  }
-
-  const worst = [...byTop.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-  warn(`This folder packs to ${humanBytes(size)}, over the ${humanBytes(max)} limit for this instance.`);
-  info('');
-  info('Largest paths:');
-  for (const [name, bytes] of worst) {
-    info(`  ${humanBytes(bytes).padStart(8)}  ${name}`);
-  }
-  info('');
-  info(c.dim(`Exclude one with ${c.cyan('--exclude <path>')}, or add it to .gitignore.`));
-}
-
 /* --------------------------------------------------------- prompts */
 
-async function chooseDeliveryMode(capabilities, { flags, noPrompt }) {
-  const forced = String(flags.delivery ?? '').trim().toLowerCase();
-  if (forced === 'managed' || forced === 'byo') {
-    return forced;
-  }
-
-  const managedAvailable = Boolean(capabilities.serverless?.managed_available);
-  if (! managedAvailable) {
-    return 'byo';
-  }
-
-  if (noPrompt) {
-    return 'managed';
-  }
-
-  // Only asked when both are genuinely possible — it decides whose account
-  // the infrastructure lands in, which is not a default worth hiding.
-  const choice = await pickRow(
-    [
-      { id: 'managed', name: 'Run it on dply — billed with your dply subscription' },
-      { id: 'byo', name: 'Run it in your own DigitalOcean account' },
-    ],
-    { title: 'Where should this function run?' },
-  );
-
-  return choice?.id ?? 'managed';
-}
-
 /**
- * A `.env` is the difference between a Laravel function that boots and one
- * that 500s on first hit — but it is also secrets leaving the machine, so it
- * is never implied. Key names are shown; values are never printed.
+ * A `.env` is the difference between an app that boots and one that 500s on
+ * first hit — but it is also secrets leaving the machine, so it is never
+ * implied. Key names are shown; values are never printed.
  */
 async function offerEnvImport(cwd, { noPrompt, flags }) {
   if (flags['no-env-file']) {
@@ -900,59 +723,14 @@ async function offerEnvImport(cwd, { noPrompt, flags }) {
   info(c.dim(`  ${keys.slice(0, 12).join(', ')}${keys.length > 12 ? `, +${keys.length - 12} more` : ''}`));
   info(c.dim('  Values are never shown here, and never ride the upload — they go straight'));
   info(c.dim('  into this site\'s encrypted environment.'));
-  const answer = await ask('Import them as this function\'s environment? [y/N] ');
+  const answer = await ask('Import them as this site\'s environment? [y/N] ');
 
   return /^y(es)?$/i.test(answer.trim()) ? contents : null;
 }
 
-async function offerHelloWorld(cwd, { noPrompt, flags }) {
-  const language = String(flags.template ?? '').trim().toLowerCase();
-
-  if (! language && noPrompt) {
-    throw exit(
-      'Nothing deployable here — looked for a framework, a package manifest, a main.{js,php,py,go}, or an index.html.\n'
-      + 'Pass --template node|php|python to start from a minimal function.',
-      2,
-    );
-  }
-
-  let chosen = language;
-  if (! chosen) {
-    info('');
-    warn('There is nothing deployable in this folder yet.');
-    const choice = await pickRow(
-      [
-        { id: 'node', name: 'Start from a minimal Node function' },
-        { id: 'php', name: 'Start from a minimal PHP function' },
-        { id: 'python', name: 'Start from a minimal Python function' },
-      ],
-      { title: 'Write a hello-world to get going?' },
-    );
-    if (! choice) {
-      throw exit('Nothing to deploy.', 2);
-    }
-    chosen = choice.id;
-  }
-
-  const template = HELLO_WORLD[chosen];
-  if (! template) {
-    throw exit(`Unknown --template "${chosen}". Use node, php, or python.`, 2);
-  }
-
-  const path = join(cwd, template.file);
-  if (existsSync(path)) {
-    return true;
-  }
-
-  writeFileSync(path, template.body);
-  ok(`Wrote ${c.bold(template.file)} — edit it and run \`dply deploy\` any time.`);
-
-  return true;
-}
-
 /* ------------------------------------------------------- dry run + create */
 
-async function dryRun(client, payload, { noPrompt }, endpoint = '/serverless/sites') {
+async function dryRun(client, payload, { noPrompt }, endpoint) {
   for (;;) {
     let response;
     try {
@@ -1011,7 +789,7 @@ async function handleBlocker(blocker, { noPrompt }) {
   }
 
   if (noPrompt || ! blocker.resolve_url) {
-    throw exit('Cannot create a function until that is resolved.', 2);
+    throw exit('Cannot create a site until that is resolved.', 2);
   }
 
   const answer = await ask('Open that page now, then retry? [Y/n] ');
@@ -1026,239 +804,32 @@ async function handleBlocker(blocker, { noPrompt }) {
   return true;
 }
 
-async function createSite(client, payload) {
-  // Same key for every retry of this run: a create whose response is lost must
-  // not provision a second billable namespace.
-  const idempotencyKey = `init-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-  return client.post('/serverless/sites', payload, {
-    headers: { 'Idempotency-Key': idempotencyKey },
-  });
-}
-
-/* --------------------------------------------------------------- output */
-
-function printSummary({ payload, plan, quota, git, source, proposed }) {
-  const detected = plan?.detected ?? null;
-
-  info('');
-  info(c.bold('About to create'));
-  info(`  name       ${payload.name}${proposed.qualified ? c.dim(' (folder name was too generic on its own)') : ''}`);
-  info(`  kind       serverless`);
-  info(`  source     ${source.kind === 'upload'
-    ? 'this folder, uploaded'
-    : `${git.remoteUrl} · ${git.branch}${git.prefix ? ` · ${git.prefix}` : ''}`}`);
-
-  if (detected) {
-    const label = [detected.framework, detected.runtime].filter((v) => v && v !== 'unknown').join(' · ');
-    info(`  runtime    auto${label ? c.dim(` → detected ${label}`) : ''}`);
-    if (detected.build_command) {
-      info(`  build      ${c.dim(detected.build_command)}`);
-    }
-  } else {
-    info(`  runtime    auto${plan?.error ? c.dim(` (could not inspect: ${plan.error})`) : ''}`);
-  }
-
-  info(`  region     ${payload.region}`);
-  info(`  delivery   ${payload.delivery_mode === 'managed' ? 'dply’s platform' : 'your own DigitalOcean account'}`);
-
-  if (quota && quota.limit !== null && quota.limit !== undefined) {
-    info(`  quota      function ${Number(quota.used) + 1} of ${quota.limit} on your plan`);
-  }
-
-  if (payload.env_file_content) {
-    info(`  env        importing from .env`);
-  }
-
-  for (const warning of detected?.warnings ?? []) {
-    info(c.dim(`  ! ${warning}`));
-  }
-
-  info('');
-}
-
-/**
- * Horizon or a scheduler in the repo means queued work the function will never
- * run unless the matching engine is on. dply has both engines — the moment to
- * mention it is now, not when someone files a bug about jobs not running.
- */
-async function offerEngines(client, site, plan, { noPrompt, flags }) {
-  const detected = plan?.detected;
-  if (! detected?.laravel_horizon || flags['no-workers']) {
-    return;
-  }
-
-  info('');
-  info(c.dim('This app uses Horizon, so it expects a queue worker.'));
-
-  if (noPrompt && ! flags.workers) {
-    info(c.dim('Enable it later with `dply serverless workers <name> --enable`.'));
-
-    return;
-  }
-
-  if (! noPrompt) {
-    const answer = await ask('Turn on the queue engine for this function? [Y/n] ');
-    if (/^n(o)?$/i.test(answer.trim())) {
-      return;
-    }
-  }
-
-  try {
-    await client.put(`/serverless/sites/${encodeURIComponent(site.id)}/workers`, { enabled: true });
-    ok('Queue engine on.');
-  } catch (err) {
-    warn(`Could not enable the queue engine: ${err.message}`);
-  }
-}
-
-/**
- * Two phases, two different things to watch. Provisioning the namespace has no
- * SiteDeployment to poll — it lives on the host — and it is where a bad
- * DigitalOcean credential shows up, so it gets followed properly instead of
- * appearing as an endless wait.
- */
-async function followInit(client, site, cwd, { noPrompt }) {
-  info('');
-  info(c.dim('Provisioning the function namespace…'));
-
-  // Ctrl-C means "give me my terminal back", not "destroy the thing I just
-  // paid to provision". The deploy runs server-side and .dply/site.json is
-  // already written, so detaching orphans nothing — but saying so is the
-  // difference between a calm exit and a panic.
-  const detach = () => {
-    info('');
-    info(c.dim('Stopped watching — the deploy is still running.'));
-    info(c.dim(`  re-attach: ${c.cyan('dply deploy --wait')}`));
-    info(c.dim(`  status:    ${c.cyan('dply serverless status ' + site.name)}`));
-    info(c.dim(`  cancel it: ${site.workspace_url}`));
-    process.exit(130);
-  };
-  process.on('SIGINT', detach);
-
-  const deadline = Date.now() + 5 * 60 * 1000;
-  let deploymentId = null;
-
-  while (Date.now() < deadline) {
-    const current = (await client.get(`/serverless/sites/${encodeURIComponent(site.id)}`))?.data ?? {};
-
-    if (current.provision?.failed) {
-      process.off('SIGINT', detach);
-      warn(`Provisioning failed: ${current.provision.error ?? 'the namespace could not be created.'}`);
-
-      return offerCleanup(client, site, cwd, { noPrompt });
-    }
-
-    const deployments = (await client.get(`/sites/${encodeURIComponent(site.id)}/deployments?limit=1`))?.data ?? [];
-    if (deployments.length > 0) {
-      deploymentId = deployments[0].id;
-      break;
-    }
-
-    await sleep(2000);
-  }
-
-  if (! deploymentId) {
-    process.off('SIGINT', detach);
-    warn('The deploy has not started yet. Re-attach with `dply deploy --wait`.');
-
-    return;
-  }
-
-  let succeeded = false;
-  try {
-    const result = await followSiteDeployment(client, site.id, deploymentId);
-    succeeded = result?.status === 'success' || result === true;
-  } catch (err) {
-    warn(err.message);
-  }
-
-  process.off('SIGINT', detach);
-
-  if (! succeeded) {
-    return offerCleanup(client, site, cwd, { noPrompt });
-  }
-
-  await printLiveUrl(client, site);
-}
-
-async function printLiveUrl(client, site) {
-  const current = (await client.get(`/serverless/sites/${encodeURIComponent(site.id)}`))?.data ?? {};
-  const url = current.url;
-
-  info('');
-  if (! url) {
-    ok('Deployed.');
-    info(c.dim(`  ${site.workspace_url}`));
-
-    return;
-  }
-
-  // "Deployed" should mean "answering". A URL that 404s ten seconds after a
-  // success message is the one outcome worth designing against.
-  let live = false;
-  try {
-    const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
-    live = response.status < 500;
-  } catch {
-    live = false;
-  }
-
-  ok(`Live at ${c.cyan(url)}${live ? '' : c.dim(' (not answering yet — give it a moment)')}`);
-  info(c.dim(`  dashboard: ${site.workspace_url}`));
-}
-
-/**
- * The undo. Only ever offered for a function that never deployed — which is
- * also the only thing the endpoint will accept.
- */
-async function offerCleanup(client, site, cwd, { noPrompt }) {
-  info('');
-  info(c.dim(`The function exists but has not deployed. Retry with ${c.cyan('dply deploy')}, or open ${site.workspace_url}`));
-
-  if (noPrompt) {
-    throw exit('Deploy failed.', 1);
-  }
-
-  const choice = await pickRow(
-    [
-      { id: 'retry', name: 'Try the deploy again' },
-      { id: 'keep', name: 'Leave it and open the dashboard' },
-      { id: 'delete', name: 'Delete it and start over' },
-    ],
-    { title: 'What now?' },
-  );
-
-  if (choice?.id === 'retry') {
-    const { deploy } = await import('./commands.mjs');
-    await deploy([], { wait: true });
-
-    return;
-  }
-
-  if (choice?.id === 'delete') {
-    try {
-      const result = await client.delete(`/serverless/sites/${encodeURIComponent(site.id)}`);
-      ok(`Deleted ${site.name}.`);
-      // A namespace or bucket dply could not reach keeps costing money, so it
-      // is named rather than folded into a clean success.
-      for (const key of ['remote_error', 'bucket_error']) {
-        if (result?.data?.[key]) {
-          warn(`…but ${key.replace('_', ' ')}: ${result.data[key]}`);
-        }
-      }
-    } catch (err) {
-      warn(`Could not delete it: ${err.message}`);
-    }
-
-    return;
-  }
-
-  const { openInBrowser } = await import('./commands.mjs');
-  await openInBrowser(site.workspace_url);
-}
-
 /* --------------------------------------------------------------- helpers */
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} siteId
+ * @param {string} kind
+ */
+async function fetchLinkedSite(client, siteId, kind) {
+  if (kind === 'edge') {
+    return (await client.get(`/edge/sites/${encodeURIComponent(siteId)}`))?.data ?? null;
+  }
+
+  if (kind === 'cloud') {
+    try {
+      return (await client.get(`/cloud/sites/${encodeURIComponent(siteId)}`))?.data ?? null;
+    } catch (err) {
+      if (err?.status !== 404) {
+        throw err;
+      }
+    }
+  }
+
+  const rows = (await client.get('/sites'))?.data ?? [];
+
+  return rows.find((row) => String(row.id) === String(siteId)) ?? null;
+}
 
 /**
  * `kind:` from the repository's dply manifest, if it has one.
@@ -1304,11 +875,6 @@ function readFolder(cwd) {
   }
 
   return { files, packageJson };
-}
-
-function hasEntryFile(files) {
-  return ['main.js', 'main.mjs', 'main.php', 'main.py', 'main.go', 'index.js', 'index.mjs', 'index.html']
-    .some((f) => files.includes(f));
 }
 
 /**
@@ -1362,10 +928,6 @@ async function ask(question) {
   } finally {
     rl.close();
   }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function exit(message, code) {

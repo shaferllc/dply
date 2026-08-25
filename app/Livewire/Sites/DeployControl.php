@@ -132,7 +132,6 @@ class DeployControl extends Component
         return $this->site !== null
             && $this->server !== null
             && $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
             && Gate::allows('update', $this->site);
     }

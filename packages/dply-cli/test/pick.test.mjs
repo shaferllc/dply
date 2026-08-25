@@ -23,7 +23,7 @@ test('pickRow returns null off a TTY instead of blocking a pipeline', async () =
 
 test('expandArgv treats a colon as a space', () => {
   assert.deepEqual(expandArgv(['sites:errors', 'placeholder']), ['errors', 'placeholder']);
-  assert.deepEqual(expandArgv(['serverless:errors']), ['serverless', 'errors']);
+  assert.deepEqual(expandArgv(['edge:status']), ['edge', 'status']);
   assert.deepEqual(expandArgv(['site:logs', '--follow']), ['site', 'logs', '--follow']);
   assert.deepEqual(expandArgv(['account:orgs']), ['account', 'orgs']);
   assert.deepEqual(expandArgv(['sites']), ['sites']);

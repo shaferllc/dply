@@ -47,7 +47,6 @@ trait ManagesDaemonOperations
     protected function siteSupportsVmManagedDaemons(Site $site): bool
     {
         return $this->server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
     }

@@ -49,13 +49,11 @@ final class PreflightIssueFixResolver
                 __('Open environment'),
                 route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'environment']),
             ),
-            'database' => $site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()
+            'database' => $site->usesDockerRuntime() || $site->usesKubernetesRuntime()
                 ? self::link(__('Open resources'), route('sites.resources', ['server' => $server, 'site' => $site]))
                 : self::link(__('Open server databases'), route('servers.databases', $server)),
             'scheduler' => self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site])),
-            'queue', 'workers' => $site->usesFunctionsRuntime()
-                ? self::link(__('Open daemons'), route('sites.daemons', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
+            'queue', 'workers' => self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
             'runtime_revision' => self::link(
                 __('Open deploy settings'),
                 route('sites.pipeline', ['server' => $server, 'site' => $site]),
@@ -81,7 +79,7 @@ final class PreflightIssueFixResolver
             return null;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             return self::link(__('Open resources'), route('sites.resources', ['server' => $server, 'site' => $site]));
         }
 

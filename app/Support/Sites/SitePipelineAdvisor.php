@@ -38,7 +38,7 @@ final class SitePipelineAdvisor
             return [];
         }
         // Container/serverless/edge runtimes don't use this step pipeline.
-        if ($site->usesFunctionsRuntime() || $site->usesEdgeRuntime()) {
+        if ($site->usesEdgeRuntime()) {
             return [];
         }
 

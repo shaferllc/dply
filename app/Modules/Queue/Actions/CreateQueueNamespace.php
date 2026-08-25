@@ -33,10 +33,8 @@ final class CreateQueueNamespace
         ?string $userId = null,
     ): array {
         // The platform kill switch, checked here rather than at the call sites
-        // so it actually holds. `ServerlessQueueProvisioner` honoured it and the
-        // control plane did not, which meant flipping DPLY_QUEUE_ENABLED off
-        // stopped deploys wiring queues but still let the dashboard mint them —
-        // exactly the namespaces there would be no data plane to serve.
+        // so it actually holds. Flipping DPLY_QUEUE_ENABLED off must stop
+        // the dashboard minting namespaces there would be no data plane to serve.
         if (! (bool) config('queue_service.enabled', false)) {
             throw new RuntimeException('dply Queue is currently unavailable.');
         }
