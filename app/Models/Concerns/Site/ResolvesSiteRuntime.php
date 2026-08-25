@@ -346,6 +346,29 @@ trait ResolvesSiteRuntime
      * Fails open when the server isn't loaded or has no stack summary yet, so
      * a host we cannot read keeps the panels it has always had.
      */
+    /**
+     * The site type the WEB SERVER CONFIG should be built for.
+     *
+     * Identical to `type` in every case but one: a reverse-proxied site with no
+     * application yet. Nothing is listening on its internal port — there is no
+     * code, no systemd unit, no process — so a proxy vhost can only ever return
+     * 502, which is indistinguishable from a crashed app. Serving the document
+     * root instead (where installPlaceholderPage() puts the splash) is the
+     * honest holding state until the first deploy puts a process there.
+     *
+     * All four config builders (Nginx / Caddy / Apache / OpenLiteSpeed) match on
+     * this rather than on `type`, so the holding state can't be implemented in
+     * one web server and forgotten in the other three.
+     */
+    public function configSiteType(): SiteType
+    {
+        if ($this->type === SiteType::Node && $this->lacksInstalledApp()) {
+            return SiteType::Static;
+        }
+
+        return $this->type;
+    }
+
     public function runsPhpOnItsServer(): bool
     {
         if ((string) ($this->runtimeKey() ?? '') !== 'php') {

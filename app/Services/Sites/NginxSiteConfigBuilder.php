@@ -202,7 +202,7 @@ class NginxSiteConfigBuilder
             ? "\n    # php-fpm pool user (configure pool on server): {$poolUser}\n"
             : '';
 
-        $config = match ($site->type) {
+        $config = match ($site->configSiteType()) {
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
             SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),

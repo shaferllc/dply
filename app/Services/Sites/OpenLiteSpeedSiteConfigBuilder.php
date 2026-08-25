@@ -64,7 +64,7 @@ class OpenLiteSpeedSiteConfigBuilder
         $lsapiHandler = $this->olsLsapiHandlerName($site);
         $managedErrors = SiteManagedErrorPageSupport::openLiteSpeedBlock($site);
 
-        return match ($site->type) {
+        return match ($site->configSiteType()) {
             SiteType::Php => <<<CONF
 docRoot                   \$VH_ROOT/public/
 vhDomain                  {$hostnames->implode(',')}

@@ -103,7 +103,11 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
      */
     protected function installPlaceholderPage(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
     {
-        if (! in_array($site->type, [SiteType::Php, SiteType::Static], true)) {
+        // configSiteType(), not type: a proxied site with no application yet is
+        // built as Static (its vhost serves the doc root rather than proxying to
+        // a port nothing listens on), so it needs the placeholder written or the
+        // holding page is an empty directory — a 403 instead of a 502.
+        if (! in_array($site->configSiteType(), [SiteType::Php, SiteType::Static], true)) {
             return;
         }
 

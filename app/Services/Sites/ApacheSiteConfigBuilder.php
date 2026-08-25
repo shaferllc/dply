@@ -90,7 +90,7 @@ APACHE, $listenPort);
         $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
         $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride($site);
 
-        $config = match ($site->type) {
+        $config = match ($site->configSiteType()) {
             SiteType::Php => <<<APACHE
 # Managed by Dply — {$basename}
 <VirtualHost *:80>

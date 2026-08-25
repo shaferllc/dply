@@ -111,7 +111,7 @@ CADDY;
             ? "php_fastcgi unix//{$phpSock} {\n{$phpEnv}    }"
             : "php_fastcgi unix//{$phpSock}";
 
-        return match ($site->type) {
+        return match ($site->configSiteType()) {
             SiteType::Php => <<<CADDY
 {$hosts} {
 {$managedErrors}{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}

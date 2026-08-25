@@ -16,7 +16,25 @@ uses(RefreshDatabase::class);
 
 function phpSite(): Site
 {
-    $server = Server::factory()->ready()->create();
+    // A host that genuinely has both runtimes, so these tests exercise the
+    // field/apply logic rather than the "runtime not installed" guard, which is
+    // covered separately below.
+    $server = Server::factory()->ready()->create([
+        'meta' => ['php_version' => '8.3', 'runtime_defaults' => ['node' => '22']],
+    ]);
+
+    $run = \App\Models\ServerProvisionRun::create([
+        'server_id' => $server->id, 'attempt' => 1, 'status' => 'succeeded',
+    ]);
+    \App\Models\ServerProvisionArtifact::create([
+        'server_provision_run_id' => $run->id,
+        'type' => 'stack_summary',
+        'key' => 'stack-summary',
+        'label' => 'Stack summary',
+        'content' => '',
+        'metadata' => ['webserver' => 'nginx', 'php_version' => '8.3'],
+    ]);
+    \App\Support\Servers\ServerInstalledServices::forgetStackSummary((string) $server->id);
 
     return Site::factory()->create([
         'server_id' => $server->id,
