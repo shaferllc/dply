@@ -76,7 +76,22 @@
         <x-input-error :messages="$errors->get('source_control_account_id')" class="mt-2" />
     </div>
     <div>
-        <x-input-label for="{{ $idPrefix }}-repo" :value="__('Repository')" :required="$required" />
+        {{-- The list is fetched once per account selection and then held in a
+             Livewire property, so a repo created after that never shows up.
+             This asks the provider again. --}}
+        <div class="flex items-center justify-between gap-2">
+            <x-input-label for="{{ $idPrefix }}-repo" :value="__('Repository')" :required="$required" />
+            <button type="button"
+                wire:click="refreshRepositoryList"
+                wire:loading.attr="disabled"
+                wire:target="refreshRepositoryList"
+                @disabled(($source_control_account_id ?? '') === '')
+                class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold text-brand-moss transition hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40">
+                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshRepositoryList" aria-hidden="true" />
+                <span wire:loading.remove wire:target="refreshRepositoryList">{{ __('Refresh') }}</span>
+                <span wire:loading wire:target="refreshRepositoryList">{{ __('Refreshing…') }}</span>
+            </button>
+        </div>
         @if (count($availableRepositories) > 0)
             <x-repo-combobox
                 :repositories="$availableRepositories"

@@ -163,6 +163,30 @@ trait ConfiguresGitRepository
     }
 
     /**
+     * Re-fetch the repository list for the selected account.
+     *
+     * The list is fetched once when an account is picked and then held in a
+     * Livewire property, so a repository created after that point never appears
+     * and there was no way to ask again short of reloading the page. The
+     * browser hits the provider API live (nothing is cached server-side), so
+     * this genuinely returns new repos.
+     */
+    public function refreshRepositoryList(SourceControlRepositoryBrowser $repositoryBrowser): void
+    {
+        $before = count($this->availableRepositories);
+
+        $this->refreshRepositories($repositoryBrowser);
+
+        $after = count($this->availableRepositories);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess($after > $before
+                ? trans_choice('Found :count new repository|Found :count new repositories', $after - $before, ['count' => $after - $before])
+                : __('Repository list is up to date.'));
+        }
+    }
+
+    /**
      * Reload {@see $availableRepositories} for the selected account.
      *
      * Leaves Repository unselected unless the operator already picked one, or
