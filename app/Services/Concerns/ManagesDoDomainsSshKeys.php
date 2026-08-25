@@ -195,6 +195,119 @@ trait ManagesDoDomainsSshKeys
         return $record;
     }
 
+    /**
+     * Every record matching $type + $name, regardless of value.
+     *
+     * {@see findDomainRecord()} takes an optional value and stops at the first
+     * hit, which answers "does this exact record exist". Replacing a record
+     * needs the other question — "what is currently answering for this name" —
+     * including the duplicates a previous append-style upsert left behind.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function findDomainRecords(string $domain, string $type, string $name): array
+    {
+        $type = strtoupper($type);
+
+        $records = $this->getDomainRecords($domain, ['type' => $type, 'name' => $name]);
+        if ($records === []) {
+            $records = $this->getDomainRecords($domain);
+        }
+
+        return array_values(array_filter($records, static function (mixed $record) use ($type, $name): bool {
+            return is_array($record)
+                && strtoupper((string) ($record['type'] ?? '')) === $type
+                && (string) ($record['name'] ?? '') === $name;
+        }));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function updateDomainRecord(
+        string $domain,
+        int $recordId,
+        string $type,
+        string $name,
+        string $data,
+        int $ttl = 60
+    ): array {
+        $response = $this->request('put', '/domains/'.$domain.'/records/'.$recordId, [
+            'type' => strtoupper($type),
+            'name' => $name,
+            'data' => $data,
+            'ttl' => $ttl,
+        ]);
+        $this->assertSuccess($response, 'update domain record');
+        $payload = $response->json();
+        $record = $payload['domain_record'] ?? $payload;
+
+        if (! is_array($record) || $record === []) {
+            throw new \RuntimeException('DigitalOcean API did not return a domain record.');
+        }
+
+        return $record;
+    }
+
+    /**
+     * Point $name at $data, replacing whatever was there.
+     *
+     * DNS has no upsert, so this is find → update → create, the same shape
+     * {@see \App\Modules\Providers\Services\VultrService::upsertDomainRecord()}
+     * uses. It also deletes surplus records for the same name: a hostname is
+     * being pointed at ONE server, and leaving the previous address alongside
+     * the new one round-robins traffic between them — half the requests land
+     * on the old box, which reads as an intermittent, cache-shaped outage.
+     *
+     * That is not hypothetical cleanup. The previous implementation matched on
+     * VALUE before creating, so a changed IP never matched, and every re-point
+     * appended another A record instead of replacing one.
+     *
+     * @return array<string, mixed>
+     */
+    public function upsertDomainRecord(
+        string $domain,
+        string $type,
+        string $name,
+        string $data,
+        int $ttl = 60
+    ): array {
+        $existing = $this->findDomainRecords($domain, $type, $name);
+
+        if ($existing === []) {
+            return $this->createDomainRecord($domain, $type, $name, $data, $ttl);
+        }
+
+        // Prefer a record that already holds the wanted value, so the common
+        // no-op re-apply neither rewrites nor renumbers anything.
+        $keep = null;
+        foreach ($existing as $record) {
+            if ((string) ($record['data'] ?? '') === $data) {
+                $keep = $record;
+                break;
+            }
+        }
+        $keep ??= $existing[0];
+        $keepId = (int) ($keep['id'] ?? 0);
+
+        foreach ($existing as $record) {
+            $recordId = (int) ($record['id'] ?? 0);
+            if ($recordId !== 0 && $recordId !== $keepId) {
+                $this->deleteDomainRecord($domain, $recordId);
+            }
+        }
+
+        if ($keepId === 0) {
+            return $this->createDomainRecord($domain, $type, $name, $data, $ttl);
+        }
+
+        if ((string) ($keep['data'] ?? '') === $data) {
+            return $keep;
+        }
+
+        return $this->updateDomainRecord($domain, $keepId, $type, $name, $data, $ttl);
+    }
+
     public function deleteDomainRecord(string $domain, int $recordId): void
     {
         $response = $this->request('delete', '/domains/'.$domain.'/records/'.$recordId);
