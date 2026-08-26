@@ -3,6 +3,7 @@
 namespace App\Modules\Providers\Cloudflare;
 
 use App\Models\ProviderCredential;
+use App\Support\TestingDomains;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -90,7 +91,7 @@ class CloudflareDnsService
     {
         $origin = $this->tokenOrigin !== ''
             ? $this->tokenOrigin
-            : \App\Support\TestingDomains::describeCloudflareToken($this->bearerToken);
+            : TestingDomains::describeCloudflareToken($this->bearerToken);
 
         $visible = '';
         try {
@@ -373,10 +374,17 @@ class CloudflareDnsService
     {
         $zone = strtolower(trim($zone));
         $relativeName = trim($relativeName);
-        $lower = strtolower($relativeName);
-        if ($lower === '') {
+        $lower = rtrim(strtolower($relativeName), '.');
+
+        // '@' is the apex, and it is the convention every caller here uses —
+        // ApplySiteDnsRecordsJob emits it for a hostname equal to the zone, and
+        // Route53/Azure/GCP/Linode/Vultr/Namecheap all normalise it. Cloudflare
+        // was the one service that did not, so the apex became '@.example.com'
+        // and its API rejected the whole apply with "DNS name is invalid".
+        if ($lower === '' || $lower === '@') {
             return $zone;
         }
+
         if (str_ends_with($lower, '.'.$zone)) {
             return $lower;
         }
@@ -385,7 +393,7 @@ class CloudflareDnsService
     }
 
     /**
-     * @param  array<string, mixed> $queryOrBody
+     * @param  array<string, mixed>  $queryOrBody
      */
     private function request(string $method, string $path, array $queryOrBody = []): Response
     {

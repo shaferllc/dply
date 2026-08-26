@@ -4,14 +4,17 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    {{-- px-4 py-3.5 sm:px-5 is this tab's section-header scale (inspect / logs /
+         service / sync all use it). This block was on px-6 py-5 sm:px-7 and read
+         as a different, taller component in the same column. --}}
+    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
         <x-icon-badge>
             <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reuse') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Import from another site') }}</h3>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reuse') }}</p>
+            <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Import from another site') }}</h3>
+            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                 @if ($contextSiteModel)
                     {{ __('Copy Supervisor programs from another site on this server into :site. Paths and system user are adjusted for this site.', ['site' => $contextSiteModel->name]) }}
                 @else
@@ -21,99 +24,102 @@
         </div>
     </div>
 
-    <div class="space-y-5 p-6 sm:p-7">
-            <div class="grid gap-4 sm:grid-cols-2">
+    <div class="space-y-4 px-4 py-3.5 sm:px-5">
+        {{-- One select (the site-scoped case) sat in a two-column grid and left
+             half the row empty, which is most of what made this panel look
+             oversized when nothing is chosen yet. --}}
+        <div @class(['grid gap-3', 'sm:grid-cols-2' => $contextSiteModel === null, 'sm:max-w-sm' => $contextSiteModel !== null])>
+            <div>
+                <x-input-label for="import_from_site_id" value="{{ __('From site') }}" />
+                <select
+                    id="import_from_site_id"
+                    wire:model.live="import_from_site_id"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm"
+                >
+                    <option value="">{{ __('Choose a site…') }}</option>
+                    @foreach ($sitesForImport as $siteOption)
+                        <option value="{{ $siteOption->id }}">{{ $siteOption->name }}</option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('import_from_site_id')" class="mt-1" />
+            </div>
+
+            @unless ($contextSiteModel)
                 <div>
-                    <x-input-label for="import_from_site_id" value="{{ __('From site') }}" />
+                    <x-input-label for="import_to_site_id" value="{{ __('To site') }}" />
                     <select
-                        id="import_from_site_id"
-                        wire:model.live="import_from_site_id"
+                        id="import_to_site_id"
+                        wire:model.live="import_to_site_id"
                         class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm"
                     >
                         <option value="">{{ __('Choose a site…') }}</option>
-                        @foreach ($sitesForImport as $siteOption)
+                        @foreach ($sitesForServer as $siteOption)
                             <option value="{{ $siteOption->id }}">{{ $siteOption->name }}</option>
                         @endforeach
                     </select>
-                    <x-input-error :messages="$errors->get('import_from_site_id')" class="mt-1" />
+                    <x-input-error :messages="$errors->get('import_to_site_id')" class="mt-1" />
                 </div>
+            @endunless
+        </div>
 
-                @unless ($contextSiteModel)
-                    <div>
-                        <x-input-label for="import_to_site_id" value="{{ __('To site') }}" />
-                        <select
-                            id="import_to_site_id"
-                            wire:model.live="import_to_site_id"
-                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm"
-                        >
-                            <option value="">{{ __('Choose a site…') }}</option>
-                            @foreach ($sitesForServer as $siteOption)
-                                <option value="{{ $siteOption->id }}">{{ $siteOption->name }}</option>
-                            @endforeach
-                        </select>
-                        <x-input-error :messages="$errors->get('import_to_site_id')" class="mt-1" />
-                    </div>
-                @endunless
+        @if ($canImport && $import_from_site_id !== '' && $importSourcePrograms->isEmpty())
+            <p class="text-xs text-brand-moss">{{ __('No programs are linked to the source site yet.') }}</p>
+        @endif
+
+        @if ($importSourcePrograms->isNotEmpty())
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">
+                    {{ trans_choice(':count program on source site|:count programs on source site', $importSourcePrograms->count(), ['count' => $importSourcePrograms->count()]) }}
+                </p>
+                @if ($importSourcePrograms->count() > 1)
+                    <button
+                        type="button"
+                        wire:click="importAllProgramsFromSite"
+                        wire:loading.attr="disabled"
+                        wire:target="importAllProgramsFromSite,importProgramFromSite"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Import all') }}
+                    </button>
+                @endif
             </div>
 
-            @if ($canImport && $import_from_site_id !== '' && $importSourcePrograms->isEmpty())
-                <p class="text-sm text-brand-moss">{{ __('No programs are linked to the source site yet.') }}</p>
-            @endif
-
-            @if ($importSourcePrograms->isNotEmpty())
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">
-                        {{ trans_choice(':count program on source site|:count programs on source site', $importSourcePrograms->count(), ['count' => $importSourcePrograms->count()]) }}
-                    </p>
-                    @if ($importSourcePrograms->count() > 1)
+            <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
+                @foreach ($importSourcePrograms as $program)
+                    <li class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" wire:key="import-src-{{ $program->id }}">
+                        <div class="min-w-0">
+                            <p class="font-mono text-sm font-semibold text-brand-ink">{{ $program->slug }}</p>
+                            <p class="mt-0.5 text-xs text-brand-moss">
+                                <span class="font-medium text-brand-ink/80">{{ $program->program_type }}</span>
+                                · {{ __('numprocs') }} {{ $program->numprocs }}
+                            </p>
+                            <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist">{{ $program->command }}</p>
+                        </div>
                         <button
                             type="button"
-                            wire:click="importAllProgramsFromSite"
+                            wire:click="importProgramFromSite('{{ $program->id }}')"
                             wire:loading.attr="disabled"
-                            wire:target="importAllProgramsFromSite,importProgramFromSite"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            wire:target="importProgramFromSite,importAllProgramsFromSite"
+                            class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
                         >
-                            <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Import all') }}
+                            <span wire:loading.remove wire:target="importProgramFromSite,importAllProgramsFromSite">
+                                {{ __('Import') }}
+                            </span>
+                            <span wire:loading wire:target="importProgramFromSite,importAllProgramsFromSite" class="inline-flex items-center gap-1.5">
+                                <x-spinner variant="cream" size="sm" />
+                                {{ __('Importing…') }}
+                            </span>
                         </button>
-                    @endif
-                </div>
+                    </li>
+                @endforeach
+            </ul>
 
-                <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
-                    @foreach ($importSourcePrograms as $program)
-                        <li class="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between" wire:key="import-src-{{ $program->id }}">
-                            <div class="min-w-0">
-                                <p class="font-mono text-sm font-semibold text-brand-ink">{{ $program->slug }}</p>
-                                <p class="mt-0.5 text-xs text-brand-moss">
-                                    <span class="font-medium text-brand-ink/80">{{ $program->program_type }}</span>
-                                    · {{ __('numprocs') }} {{ $program->numprocs }}
-                                </p>
-                                <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist">{{ $program->command }}</p>
-                            </div>
-                            <button
-                                type="button"
-                                wire:click="importProgramFromSite('{{ $program->id }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="importProgramFromSite,importAllProgramsFromSite"
-                                class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-ink disabled:cursor-not-allowed disabled:opacity-50 sm:self-center"
-                            >
-                                <span wire:loading.remove wire:target="importProgramFromSite,importAllProgramsFromSite">
-                                    {{ __('Import') }}
-                                </span>
-                                <span wire:loading wire:target="importProgramFromSite,importAllProgramsFromSite" class="inline-flex items-center gap-1.5">
-                                    <x-spinner variant="cream" size="sm" />
-                                    {{ __('Importing…') }}
-                                </span>
-                            </button>
-                        </li>
-                    @endforeach
-                </ul>
-
-                @if ($importTargetSite)
-                    <p class="text-xs leading-relaxed text-brand-moss">
-                        {{ __('Imported programs are assigned to :site with updated directory paths. Sync Supervisor afterward to write configs on the server.', ['site' => $importTargetSite->name]) }}
-                    </p>
-                @endif
+            @if ($importTargetSite)
+                <p class="text-xs leading-relaxed text-brand-moss">
+                    {{ __('Imported programs are assigned to :site with updated directory paths. Sync Supervisor afterward to write configs on the server.', ['site' => $importTargetSite->name]) }}
+                </p>
             @endif
+        @endif
     </div>
 </section>
