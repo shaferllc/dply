@@ -83,7 +83,9 @@ class ApplySiteDnsRecordsJob implements ShouldQueue
 
             $applied = 0;
             $skipped = 0;
-            foreach ($site->customerDomainHostnames() as $host) {
+            // Aliases too — `www` lives there, and pointing every name but
+            // the one visitors actually type is not "DNS applied".
+            foreach ($site->customerFacingHostnames() as $host) {
                 $host = strtolower(trim((string) $host));
                 if ($host === '') {
                     continue;

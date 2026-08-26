@@ -78,6 +78,7 @@ trait ResolvesSiteHostnames
         }
 
         $meta = $this->meta ?? [];
+
         return (string) ($meta['testing_hostname']['hostname'] ?? '');
     }
 
@@ -319,17 +320,34 @@ trait ResolvesSiteHostnames
     }
 
     /**
-     * Customer domains plus domain aliases for automatic customer-scope certificate issuance (e.g. bulk “issue SSL”).
+     * Every hostname a visitor may type: the site's domains plus its aliases.
+     *
+     * `www` is stored as an alias, not a domain, so anything that iterates
+     * customerDomainHostnames() alone silently skips it. The vhost and the
+     * certificate never did — webserverHostnames() and sslIssuanceHostnames()
+     * both include aliases — which is why a missing `www` A record presented as
+     * "DNS updated but www is still broken": nginx answered for it and the cert
+     * covered it, and the name did not resolve.
      *
      * @return list<string>
      */
-    public function sslIssuanceHostnames(): array
+    public function customerFacingHostnames(): array
     {
         return collect($this->customerDomainHostnames())
             ->merge($this->aliasHostnames())
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Customer domains plus domain aliases for automatic customer-scope certificate issuance (e.g. bulk “issue SSL”).
+     *
+     * @return list<string>
+     */
+    public function sslIssuanceHostnames(): array
+    {
+        return $this->customerFacingHostnames();
     }
 
     /**

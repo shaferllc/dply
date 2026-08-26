@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteDnsRecordsJob;
-use App\Services\Sites\Dns\DnsZoneCredentialResolver;
-use App\Services\Sites\TenantDnsProvisioner;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
-use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Services\Sites\Dns\DnsZoneCredentialResolver;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\SiteReachabilityChecker;
+use App\Services\Sites\TenantDnsProvisioner;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
@@ -57,7 +57,6 @@ trait ManagesSiteDomainsRouting
     public bool $rename_reissue_cert = false;
 
     /** Opt-in: detach old + attach new on the site's container backend during rename confirmation. */
-
     public string $editing_domain_hostname = '';
 
     public string $editing_domain_comment = '';
@@ -738,7 +737,9 @@ trait ManagesSiteDomainsRouting
         $checker = app(SiteReachabilityChecker::class);
 
         $rows = [];
-        foreach ($this->site->customerDomainHostnames() as $host) {
+        // Same set the apply job writes, so the table can never report a clean
+        // bill of health for names it never looked at.
+        foreach ($this->site->customerFacingHostnames() as $host) {
             $host = strtolower(trim((string) $host));
             if ($host === '') {
                 continue;
