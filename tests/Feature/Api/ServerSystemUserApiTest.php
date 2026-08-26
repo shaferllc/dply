@@ -13,6 +13,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerSystemUser;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -103,4 +105,83 @@ test('system users write requires ability', function (): void {
         ->assertForbidden();
 
     Queue::assertNotPushed(CreateServerSystemUserJob::class);
+});
+
+test('project viewer cannot provision a sudo account on a workspace server', function (): void {
+    Queue::fake();
+
+    $org = Organization::factory()->create();
+    $owner = User::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $workspace = Workspace::factory()->create(['organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'organization_id' => $org->id,
+        'user_id' => $owner->id,
+        'workspace_id' => $workspace->id,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
+
+    $viewer = User::factory()->create();
+    $org->users()->attach($viewer->id, ['role' => 'member']);
+    $workspace->members()->create([
+        'user_id' => $viewer->id,
+        'role' => WorkspaceMember::ROLE_VIEWER,
+    ]);
+
+    ['plaintext' => $plain] = ApiToken::createToken($viewer, $org, 'viewer-token', null, [
+        'system_users.read',
+        'system_users.write',
+        'system_users.delete',
+    ]);
+    $headers = ['Authorization' => 'Bearer '.$plain];
+
+    $this->postJson('/api/v1/servers/'.$server->id.'/system-users', [
+        'username' => 'intruder',
+        'sudo' => true,
+    ], $headers)->assertForbidden();
+
+    $this->getJson('/api/v1/servers/'.$server->id.'/system-users', $headers)->assertForbidden();
+    $this->deleteJson('/api/v1/servers/'.$server->id.'/system-users/deployer', [], $headers)->assertForbidden();
+
+    Queue::assertNotPushed(CreateServerSystemUserJob::class);
+    Queue::assertNotPushed(DeleteServerSystemUserJob::class);
+});
+
+test('workspace maintainer keeps system user access', function (): void {
+    Queue::fake();
+
+    $org = Organization::factory()->create();
+    $owner = User::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $workspace = Workspace::factory()->create(['organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'organization_id' => $org->id,
+        'user_id' => $owner->id,
+        'workspace_id' => $workspace->id,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
+
+    $maintainer = User::factory()->create();
+    $org->users()->attach($maintainer->id, ['role' => 'member']);
+    $workspace->members()->create([
+        'user_id' => $maintainer->id,
+        'role' => WorkspaceMember::ROLE_MAINTAINER,
+    ]);
+
+    ['plaintext' => $plain] = ApiToken::createToken($maintainer, $org, 'maintainer-token', null, [
+        'system_users.read',
+        'system_users.write',
+    ]);
+
+    $this->postJson('/api/v1/servers/'.$server->id.'/system-users', [
+        'username' => 'deployer',
+    ], ['Authorization' => 'Bearer '.$plain])->assertStatus(202);
+
+    Queue::assertPushed(CreateServerSystemUserJob::class);
 });

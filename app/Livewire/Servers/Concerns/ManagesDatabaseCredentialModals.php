@@ -9,6 +9,7 @@ use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -17,8 +18,16 @@ use Illuminate\Support\Str;
  */
 trait ManagesDatabaseCredentialModals
 {
+    /**
+     * Both modals render plaintext credentials, so their ids are set only by
+     * the open* methods below — which gate on `update`. Without #[Locked] the
+     * client could `$wire.set()` an id straight past that check and have
+     * render() hydrate the password-bearing row for a view-only member.
+     */
+    #[Locked]
     public ?string $credentials_modal_db_id = null;
 
+    #[Locked]
     public ?string $connection_url_modal_db_id = null;
 
     public ?string $share_target_db_id = null;

@@ -9,7 +9,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnectionFactory;
-use App\Support\Sites\MailTransportRequirements;
+use App\Support\Sites\MailSendFailureHint;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -105,7 +105,24 @@ class SendBindingTestEmailJob implements ShouldQueue
             $autoload = rtrim($site->effectiveEnvDirectory(), '/').'/vendor/autoload.php';
             $scriptPath = '/tmp/dply-mailtest-'.$this->consoleActionId.'.php';
 
-            $emit->step('send', sprintf('From %s — sending a test email via %s to %s …', (string) $site->server->name, $provider, $this->recipient));
+            // Credential-free description of where the mail is going. SMTP is
+            // the only provider whose destination is not implied by its name.
+            $endpointLabel = $provider === 'smtp'
+                ? trim((string) ($env['MAIL_HOST'] ?? '')).(($env['MAIL_PORT'] ?? '') !== '' ? ':'.$env['MAIL_PORT'] : '')
+                : '';
+
+            $subject = sprintf('dply test email — %s — %s', $site->name, now()->format('Y-m-d H:i:s T'));
+
+            // Everything the operator needs to find this message in the
+            // provider's dashboard, and to tell WHICH from-address was used —
+            // the previous single line named only the server and recipient, so
+            // a rejected sender looked like a dply problem. The DSN is never
+            // printed: it carries the credential.
+            $emit->step('send', sprintf('Provider   %s%s', $provider, $endpointLabel !== '' ? ' ('.$endpointLabel.')' : ''));
+            $emit->step('send', sprintf('From       %s', $fromName !== '' ? sprintf('%s <%s>', $fromName, $from) : $from));
+            $emit->step('send', sprintf('To         %s', $this->recipient));
+            $emit->step('send', sprintf('Subject    %s', $subject));
+            $emit->step('send', sprintf('Sending from %s as the site user, using %s', (string) $site->server->name, $autoload));
 
             $conn = $factory->forServer($site->server);
             if (! $conn->connect(10)) {
@@ -135,6 +152,7 @@ class SendBindingTestEmailJob implements ShouldQueue
                 'DPLY_MAIL_FROM='.escapeshellarg($from),
                 'DPLY_MAIL_FROMNAME='.escapeshellarg($fromName),
                 'DPLY_MAIL_TO='.escapeshellarg($this->recipient),
+                'DPLY_MAIL_SUBJECT='.escapeshellarg($subject),
                 'php', escapeshellarg($scriptPath), '2>&1',
             ]);
 
@@ -144,7 +162,26 @@ class SendBindingTestEmailJob implements ShouldQueue
             $conn->exec('rm -f '.escapeshellarg($scriptPath), 10);
 
             if (str_contains($out, 'DPLY_MAIL_OK')) {
-                $emit->success('send', sprintf('Sent — %s delivered a test email to %s via %s.', (string) $site->server->name, $this->recipient, $provider));
+                // Arguments are (line, source) — this passed them the other way
+                // round, so the console rendered "[Sent — …] send".
+                $emit->success(sprintf('Sent — %s accepted the message.', $provider), 'send');
+                $emit->step('send', sprintf('From       %s', $fromName !== '' ? sprintf('%s <%s>', $fromName, $from) : $from));
+                $emit->step('send', sprintf('To         %s', $this->recipient));
+                $emit->step('send', sprintf('Subject    %s', $subject));
+
+                $messageId = $this->marker($out, 'DPLY_MAIL_ID');
+                if ($messageId !== '') {
+                    // The id the provider assigned: the one string that finds
+                    // this exact message in their dashboard or a bounce report.
+                    $emit->step('send', sprintf('Message-ID %s', $messageId));
+                }
+
+                $transportClass = $this->marker($out, 'DPLY_MAIL_TRANSPORT');
+                if ($transportClass !== '') {
+                    $emit->step('send', sprintf('Transport  %s', $transportClass));
+                }
+
+                $emit->step('send', 'Accepted by the provider is not the same as delivered — check the inbox, and the provider\'s log if it does not arrive.');
                 $this->finish($emit, true, null);
 
                 return;
@@ -156,13 +193,14 @@ class SendBindingTestEmailJob implements ShouldQueue
             $detail = $detail !== '' ? $detail : 'The transport reported no output.';
             $emit->error('Send failed: '.mb_substr($detail, 0, 1000), 'send');
 
-            // "Class Symfony\Component\HttpClient\HttpClient not found" names a
-            // Symfony internal, not the package to install. We know the provider,
-            // so say the actual composer require line instead of describing it.
-            $packages = MailTransportRequirements::packagesFor($provider);
-            $emit->step('send', $packages !== [] && str_contains($detail, 'not found')
-                ? sprintf('%s sends through %s, which is not installed in this app. Add it to the repository and redeploy:  composer require %s', $provider, implode(' + ', $packages), implode(' ', $packages))
-                : 'If this names a missing class/package, add the provider\'s transport package to your app\'s composer.json and redeploy.');
+            // One hint per recognised cause, and none otherwise — the verbatim
+            // transport error above beats a guess. This line used to always
+            // advise adding a composer package, which sent people to edit
+            // composer.json over a rejected From address.
+            $hint = MailSendFailureHint::for($provider, $detail);
+            if ($hint !== null) {
+                $emit->step('send', $hint);
+            }
             $this->finish($emit, false, mb_substr($detail, 0, 1000), failed: true);
         } catch (\Throwable $e) {
             $message = mb_substr($e->getMessage(), 0, 1000);
@@ -283,7 +321,6 @@ if (! $autoload || ! is_file($autoload)) {
 }
 require $autoload;
 
-use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
@@ -307,20 +344,29 @@ try {
     } else {
         $transport = Transport::fromDsn($dsn);
     }
-    $mailer = new Mailer($transport);
 
     $fromName = (string) getenv('DPLY_MAIL_FROMNAME');
     $from = $fromName !== ''
         ? new Address((string) getenv('DPLY_MAIL_FROM'), $fromName)
         : new Address((string) getenv('DPLY_MAIL_FROM'));
 
+    $subject = (string) getenv('DPLY_MAIL_SUBJECT');
+
     $email = (new Email())
         ->from($from)
         ->to((string) getenv('DPLY_MAIL_TO'))
-        ->subject('dply test email')
+        ->subject($subject !== '' ? $subject : 'dply test email')
         ->text("This is a test email sent by dply to verify your site's mail resource configuration.\n\nIf you received this, the transport is working.");
 
-    $mailer->send($email);
+    // send() on the TRANSPORT returns the SentMessage; Mailer::send() returns
+    // void, so going through the mailer threw away the provider's message id —
+    // the one string that finds this message in their dashboard.
+    $sent = $transport->send($email);
+    $messageId = $sent !== null ? (string) $sent->getMessageId() : '';
+    if ($messageId !== '') {
+        echo 'DPLY_MAIL_ID='.$messageId."\n";
+    }
+    echo 'DPLY_MAIL_TRANSPORT='.get_class($transport)."\n";
     echo "DPLY_MAIL_OK\n";
 } catch (\Throwable $e) {
     fwrite(STDERR, get_class($e).': '.$e->getMessage()."\n");
@@ -328,6 +374,20 @@ try {
     exit(1);
 }
 PHP;
+    }
+
+    /** The value of a `KEY=value` marker line the remote runner printed. */
+    private function marker(string $output, string $key): string
+    {
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            $line = trim($line);
+
+            if (str_starts_with($line, $key.'=')) {
+                return trim(substr($line, strlen($key) + 1));
+            }
+        }
+
+        return '';
     }
 
     private function finish(ConsoleEmitter $emit, bool $ok, ?string $error, bool $failed = false): void

@@ -13,16 +13,19 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseEngine;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Notifications\ServerDatabaseCredentialsNotification;
-use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Services\Servers\ServerDatabaseDriftAnalyzer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -880,4 +883,55 @@ test('delete database backup from databases workspace removes row and artifact',
 
     expect(ServerDatabaseBackup::find($backup->id))->toBeNull();
     expect(Storage::disk('local')->exists('databases/app.sql'))->toBeFalse();
+});
+
+test('project viewer cannot open a credentials modal by setting the locked id', function () {
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $workspace = Workspace::factory()->create(['organization_id' => $org->id]);
+
+    $server = Server::factory()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+        'status' => Server::STATUS_READY,
+        'ssh_user' => 'root',
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1lZDI1NTE5AAAA\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
+
+    $db = ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'appdb',
+        'engine' => 'mysql',
+        'username' => 'appuser',
+        'password' => 'super-secret-pw',
+        'status' => 'ready',
+    ]);
+
+    $viewer = User::factory()->create();
+    $org->users()->attach($viewer->id, ['role' => 'member']);
+    $workspace->members()->create([
+        'user_id' => $viewer->id,
+        'role' => WorkspaceMember::ROLE_VIEWER,
+    ]);
+    session(['current_organization_id' => $org->id]);
+
+    // The open* action gates on `update`.
+    Livewire::actingAs($viewer)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openCredentialsModal', $db->id)
+        ->assertForbidden();
+
+    // ...and the id can no longer be pushed straight from the client, which is
+    // how a viewer previously walked past that gate.
+    expect(fn () => Livewire::actingAs($viewer)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('credentials_modal_db_id', $db->id))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+
+    Livewire::actingAs($viewer)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->assertDontSee('super-secret-pw');
 });

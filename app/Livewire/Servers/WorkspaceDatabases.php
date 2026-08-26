@@ -27,10 +27,13 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\DatabaseWorkspaceViewData;
+use App\Support\Servers\ServerNetworkPeers;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -153,7 +156,7 @@ class WorkspaceDatabases extends Component
     /**
      * Destinations a database backup can be sent to. Three transports back
      * these and the exporter already dispatches across all three
-     * ({@see \App\Modules\Backups\Services\DatabaseBackupExporter::exportToDestination}):
+     * ({@see DatabaseBackupExporter::exportToDestination}):
      *
      *   S3 / Spaces      — presigned PUT
      *   SFTP / FTP / Rclone — client binary on the server (FileTransportCommandFactory)
@@ -235,15 +238,21 @@ class WorkspaceDatabases extends Component
         // deferred to wire:init via loadDriftSnapshot() on the Connections subtab so it
         // never blocks first paint. The drift card shows a "checking…" state until then.
 
+        // Second gate on the credential modals: the ids are #[Locked] so only
+        // the open* methods (which authorize) can set them, but re-check here so
+        // a member who loses `update` mid-session stops seeing the password on
+        // the very next render instead of keeping the open modal alive.
+        $canManageDatabases = Gate::allows('update', $this->server);
+
         $credentialsModalDatabase = null;
-        if ($this->credentials_modal_db_id !== null) {
+        if ($canManageDatabases && $this->credentials_modal_db_id !== null) {
             $credentialsModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->credentials_modal_db_id);
         }
 
         $connectionUrlModalDatabase = null;
-        if ($this->connection_url_modal_db_id !== null) {
+        if ($canManageDatabases && $this->connection_url_modal_db_id !== null) {
             $connectionUrlModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->connection_url_modal_db_id);
@@ -328,7 +337,7 @@ class WorkspaceDatabases extends Component
                 // Servers this box can actually reach privately — the pick-list for
                 // engine-level remote access. Same rule the Networking workspace
                 // map uses, so the two can't disagree about who is a peer.
-                'engineRemotePeers' => \App\Support\Servers\ServerNetworkPeers::for($this->server),
+                'engineRemotePeers' => ServerNetworkPeers::for($this->server),
                 'recentBackupsByEngine' => $recentBackupsByEngine,
                 'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
                 'databaseImportMaxBytes' => $databaseImportMaxBytes,

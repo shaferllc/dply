@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 class ServerSystemUserApiController extends Controller
@@ -148,10 +149,20 @@ class ServerSystemUserApiController extends Controller
         ], 202);
     }
 
+    /**
+     * Every endpoint here provisions, mutates or reveals Linux accounts on the
+     * box (store can hand out a persistent sudo shell), so the org check alone
+     * is not enough — a workspace-scoped server must clear ServerPolicy::update
+     * exactly as WorkspaceSystemUsers does in the UI.
+     */
     private function authorizeServer(Request $request, Server $server): ?JsonResponse
     {
         $organization = $request->attributes->get('api_organization');
         if ($server->organization_id !== $organization->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        if (! Gate::forUser($request->user())->allows('update', $server)) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
