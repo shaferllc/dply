@@ -654,6 +654,10 @@ final class RepositoryRuntimeDetector
             // release-phase steps at all, so schema changes never applied on
             // deploy — the Laravel side has had artisan_migrate since forever.
             'migration_tool' => self::nodeMigrationTool($dependencies),
+            // How to RUN the app. A proxied runtime is nothing without it:
+            // SetSiteRuntime refuses the switch, and a vhost that proxies to a
+            // process no one can start 502s on every request.
+            'start_command' => self::nodeStartCommand($scripts, $packageJson, $framework),
             'deploy_kind' => $deployKind,
             'language' => 'node',
             'runtime' => (string) ($capabilities['default_runtime'] ?? 'nodejs:18'),
@@ -720,6 +724,35 @@ final class RepositoryRuntimeDetector
             ['Detected package.json without framework markers or a build script.'],
             [],
         );
+    }
+
+    /**
+     * The command that starts a Node app, in the same order the site-create
+     * planner uses: an explicit `start` script, then a framework default, then
+     * `package.json#main`. Null when the repo gives no way to run it — a
+     * Workers/CLI package has nothing to start, and guessing would publish a
+     * proxy to a process that never listens.
+     *
+     * @param  array<string, mixed>  $scripts
+     * @param  array<string, mixed>  $packageJson
+     */
+    private static function nodeStartCommand(array $scripts, array $packageJson, string $framework): ?string
+    {
+        if (is_string($scripts['start'] ?? null) && trim($scripts['start']) !== '') {
+            return 'npm start';
+        }
+
+        if ($framework === 'nextjs') {
+            return 'next start';
+        }
+
+        if ($framework === 'nuxt') {
+            return 'node .output/server/index.mjs';
+        }
+
+        $main = $packageJson['main'] ?? null;
+
+        return is_string($main) && trim($main) !== '' ? 'node '.trim($main) : null;
     }
 
     /**

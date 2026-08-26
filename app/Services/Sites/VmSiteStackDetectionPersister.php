@@ -6,6 +6,7 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
+use App\Modules\Deploy\Contracts\RepositoryFiles;
 use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 use App\Modules\Deploy\Services\RepositoryRuntimeDetector;
 use App\Modules\Deploy\Support\RemoteRepositoryFiles;
@@ -21,7 +22,7 @@ use App\Modules\Deploy\Support\RemoteRepositoryFiles;
  * There is no second detector here. {@see RepositoryRuntimeDetector} already
  * recognises Laravel, Symfony, Next, Nuxt, Express, Django, Flask, FastAPI, Go
  * and the generic language cases; it simply could not see a remote checkout, so
- * it now reads through {@see \App\Modules\Deploy\Contracts\RepositoryFiles} and
+ * it now reads through {@see RepositoryFiles} and
  * this class hands it an SSH-backed implementation. One detector, one
  * vocabulary, every language.
  */
@@ -64,6 +65,7 @@ final class VmSiteStackDetectionPersister
             'build_command' => (string) ($result['build_command'] ?? ''),
             'package_manager' => (string) ($result['package_manager'] ?? ''),
             'migration_tool' => (string) ($result['migration_tool'] ?? ''),
+            'start_command' => (string) ($result['start_command'] ?? ''),
         ];
 
         // Laravel's per-package flags (octane, horizon, reverb, …) drive the

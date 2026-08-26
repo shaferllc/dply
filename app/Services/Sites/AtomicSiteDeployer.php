@@ -272,6 +272,13 @@ class AtomicSiteDeployer
             if ($reconcileNote !== null) {
                 $log .= $reconcileNote."\n";
             }
+
+            // Same reason as the step reconcile: a Node repo that deploys green
+            // and then serves a PHP-FPM vhost is a silent failure.
+            $runtimeNote = app(SiteRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+            if ($runtimeNote !== null) {
+                $log .= $runtimeNote."\n";
+            }
         }
 
         // ── ENV ── seed the fresh release's .env. A release is a clean git

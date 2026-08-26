@@ -16,9 +16,9 @@ use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\SupervisorDeployRestarter;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
-use App\Support\Servers\ServerInstalledServices;
 
 /**
  * Extracted from {@see Site}. Composed back into the model via `use`.
@@ -240,6 +240,12 @@ trait ResolvesSiteRuntime
             // so the release phase can apply schema changes on deploy.
             if (isset($blob['migration_tool']) && is_string($blob['migration_tool']) && $blob['migration_tool'] !== '') {
                 $out['migration_tool'] = $blob['migration_tool'];
+            }
+
+            // How to start the app, when the repo says. SiteRuntimeReconciler
+            // needs it before it can move the site onto a proxied runtime.
+            if (isset($blob['start_command']) && is_string($blob['start_command']) && $blob['start_command'] !== '') {
+                $out['start_command'] = $blob['start_command'];
             }
 
             if (isset($blob['confidence']) && is_string($blob['confidence']) && $blob['confidence'] !== '') {

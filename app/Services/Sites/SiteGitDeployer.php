@@ -277,6 +277,14 @@ class SiteGitDeployer
             $log .= "\n".$reconcileNote."\n";
         }
 
+        // The steps now match the repo; the SITE still may not. Without this a
+        // Node repo deploys green and then serves nothing, because the vhost is
+        // still PHP-FPM rooted at a public/ dir the repo has no reason to own.
+        $runtimeNote = app(SiteRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+        if ($runtimeNote !== null) {
+            $log .= $runtimeNote."\n";
+        }
+
         // ── PROCESS ── install/refresh the systemd unit that actually RUNS a
         // reverse-proxied app. Nothing in either deployer did this, so a Node
         // site deployed its code, wrote a vhost proxying to its port, and then
