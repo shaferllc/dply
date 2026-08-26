@@ -393,7 +393,7 @@
                         <span x-text="phaseLabel"></span> {{ __('commands') }}
                     </h2>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-script-catalog')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'deploy-script-catalog')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>

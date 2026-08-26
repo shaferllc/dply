@@ -14,7 +14,6 @@ use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
-use App\Services\Sites\SiteSystemdProvisioner;
 
 class SiteGitDeployer
 {
@@ -323,6 +322,7 @@ class SiteGitDeployer
         $log .= $build['log'];
         $deployment?->recordPhaseResults('build', $build['steps']);
         if (! $build['ok']) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
         }
 
@@ -390,6 +390,7 @@ class SiteGitDeployer
         $deployment?->recordPhaseResults('release', $releaseSteps);
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
         if (! $releaseOk) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
         }
 

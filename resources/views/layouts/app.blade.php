@@ -39,6 +39,7 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-skip-link />
         <x-impersonation-banner />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
@@ -77,7 +78,7 @@
             @endisset
 
             <!-- Page Content -->
-            <main class="flex-1 w-full pb-28 sm:pb-32">
+            <main id="main-content" class="flex-1 w-full pb-28 sm:pb-32">
                 {{ $slot }}
             </main>
         </div>

@@ -18,7 +18,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Connect to this database') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Works with TablePlus, DBeaver, DataGrip, psql — any client.') }}</p>
                 </div>
-                <button type="button" wire:click="closeConnect" x-on:click="$dispatch('close-modal', '{{ $modalName }}')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" wire:click="closeConnect" x-on:click="$dispatch('close-modal', '{{ $modalName }}')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>

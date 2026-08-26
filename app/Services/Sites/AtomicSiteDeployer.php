@@ -354,6 +354,7 @@ class AtomicSiteDeployer
             // last live snapshot with the settled step results.
             $deployment?->recordPhaseResults('build', $build['steps']);
             if (! $build['ok']) {
+                $deployment?->recordPartialLog($log);
                 throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
             }
 
@@ -410,6 +411,7 @@ class AtomicSiteDeployer
             $log .= $releaseLog;
             $deployment?->recordPhaseResults('release', $releaseSteps);
             if (! $release['ok']) {
+                $deployment?->recordPartialLog($log);
                 throw new \RuntimeException('Deploy failed during the release phase before cutover — the previous release is still live and nothing changed. See the deployment log for details.');
             }
         } else {
@@ -489,6 +491,7 @@ class AtomicSiteDeployer
 
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
         if (! $postOk) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the post-deploy command (after cutover). See the deployment log for details.');
         }
 
@@ -528,6 +531,10 @@ class AtomicSiteDeployer
                 ]]);
             }
         } catch (\Throwable $e) {
+            // Everything up to the health failure, on the row before any throw
+            // below unwinds the frame that holds it.
+            $deployment?->recordPartialLog($log);
+
             // Record a FAILED Health check phase whose output carries the on-box
             // cause (laravel.log + nginx tail from diagnose()), so the timeline
             // surfaces WHERE and WHY instead of reading all-green on a failure.
@@ -544,6 +551,7 @@ class AtomicSiteDeployer
                 try {
                     $log .= "\n--- auto rollback ---\n";
                     $log .= app(SiteReleaseRollback::class)->rollbackTo($site->fresh(), $previousActiveRelease);
+                    $deployment?->recordPartialLog($log);
                 } catch (\Throwable $rollbackEx) {
                     throw new \RuntimeException(
                         $e->getMessage().' '.__('Automatic rollback failed: :msg', ['msg' => $rollbackEx->getMessage()]),

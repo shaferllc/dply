@@ -63,7 +63,29 @@
        sm — a card header's own actions (Add variable, Edit all).
        Both are fixed-height so a row of mixed buttons shares one baseline. */
     .dply-btn {
-        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    /* ── Keyboard focus ───────────────────────────────────────────────────
+       One ring for every control that isn't a form field. `focus-visible`
+       rather than `focus` so a mouse click doesn't leave a ring behind —
+       this matches what nav-link / dropdown-link / toggle-switch already do,
+       and the gold reads against both the cream and the zinc-900 surfaces.
+
+       Applied here so a control gets it by adding one token instead of
+       repeating three utilities at the call site; the button components'
+       `sm`/`xs` arms had simply omitted the ring their `default` arm carried,
+       which left every compact control in the workspace invisible to
+       keyboard users. */
+    .dply-focus {
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35;
+    }
+
+    /* Pressed feedback. Half a pixel of travel — enough to register as a
+       physical click without shifting the row it sits in. Disabled controls
+       never match :active, so no guard is needed. */
+    .dply-pressable {
+        @apply active:translate-y-px;
     }
 
     /* Alert/finding row. Matches the sub-row idiom used across the app —
@@ -103,7 +125,7 @@
 
     /* Icon-only control, square so it lines up with the button heights. */
     .dply-icon-btn {
-        @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-moss transition-colors hover:bg-brand-sand/40 hover:text-brand-ink;
+        @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-moss transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35 active:translate-y-px hover:bg-brand-sand/40 hover:text-brand-ink;
     }
 
     /* Inline token: an env key, a prefix filter, a count. Micro label scale. */
@@ -225,6 +247,28 @@
 
 /* Surfaces that still use raw `bg-white` in Blade — sink them in dark mode */
 @layer utilities {
+    /*
+     * Icon-only controls (modal-header closes) keep their compact 24–28px visual
+     * box but get a 44x44 pointer target from a centred pseudo-element, so the
+     * layout does not shift. WCAG 2.2 AA 2.5.8 already passes at 24px; this meets
+     * the platform 44px guidance.
+     * ponytail: overlay — only put this on a control with >=10px clear space on
+     * every side, or it will swallow a neighbour's clicks.
+     */
+    .dply-hit-44 {
+        position: relative;
+    }
+
+    .dply-hit-44::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        height: 44px;
+        width: 44px;
+        transform: translate(-50%, -50%);
+    }
+
     html.dark .bg-white {
         background-color: rgb(24 24 27);
     }
@@ -547,4 +591,36 @@
 
 .dply-tablist-scroll::-webkit-scrollbar-thumb:hover {
     background-color: rgb(104 132 121 / 0.5);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────
+   The app animates in three places that matter to a motion-sensitive user:
+   the global button spinner (a continuous rotation), Alpine's x-transition on
+   every dropdown/flyout, and the colour/transform transitions on controls.
+
+   Rotation is the one thing that must not simply be shortened — a spinner
+   snapped to 0.01ms still reads as a stuttering strobe — so it is slowed to a
+   near-static crawl instead. Everything else collapses to effectively
+   instant, which keeps the state change visible without the travel.
+
+   Deliberately not `transition: none`: several panels rely on a transition
+   ending (opacity 0 -> hidden) rather than on a class toggle, and killing the
+   transition outright means `transitionend` never fires and the panel stays
+   on screen. A 0.01ms transition still fires the event.
+   ponytail: revisit if a component ever needs real motion for meaning —
+   then gate that one on the media query itself rather than widening this. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .dply-btn-busy::after {
+        animation-duration: 3s !important;
+        animation-iteration-count: infinite !important;
+    }
 }

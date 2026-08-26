@@ -673,7 +673,7 @@
                                             wire:target="setAuthPassword"
                                         />
                                         <div class="absolute inset-y-0 right-2 flex items-center gap-1">
-                                            <button type="button" x-on:click="shown = !shown" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
+                                            <button x-bind:aria-label="shown ? '{{ __('Hide password') }}' : '{{ __('Show password') }}'" type="button" x-on:click="shown = !shown" class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink">
                                                 <x-heroicon-o-eye class="h-4 w-4" x-show="!shown" />
                                                 <x-heroicon-o-eye-slash class="h-4 w-4" x-show="shown" x-cloak />
                                             </button>

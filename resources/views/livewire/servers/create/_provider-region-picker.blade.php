@@ -196,7 +196,7 @@
                                     <h3 class="text-lg font-semibold text-slate-900">{{ __('Region map') }}</h3>
                                     <p class="mt-1 text-sm text-slate-600">{{ __('Pick a region by location, or use the list on the right.') }}</p>
                                 </div>
-                                <button type="button" x-on:click="mapOpen = false" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                                <button aria-label="{{ __('Close') }}" type="button" x-on:click="mapOpen = false" class="dply-hit-44 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
                                     <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
                                 </button>
                             </div>

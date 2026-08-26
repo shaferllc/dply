@@ -193,7 +193,7 @@
             <div class="rounded-xl border border-brand-ink/10 bg-brand-ink/5">
                 <div class="flex items-center justify-between border-b border-brand-ink/10 px-4 py-2">
                     <p class="font-mono text-xs text-brand-moss">config/logging.php</p>
-                    <button type="button" wire:click="$set('showLoggingPreview', false)" class="text-brand-mist hover:text-brand-ink"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
+                    <button aria-label="{{ __('Close preview') }}" type="button" wire:click="$set('showLoggingPreview', false)" class="dply-hit-44 text-brand-mist hover:text-brand-ink"><x-heroicon-o-x-mark class="h-4 w-4" /></button>
                 </div>
                 <pre class="max-h-96 overflow-auto px-4 py-3 text-xs leading-relaxed text-brand-ink"><code>{{ $loggingPreviewContent }}</code></pre>
             </div>

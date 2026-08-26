@@ -21,7 +21,7 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Clone a starter into your organization’s scripts, then run it from Scripts or Server commands.') }}</p>
                     </div>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>

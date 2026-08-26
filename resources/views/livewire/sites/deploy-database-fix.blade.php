@@ -121,7 +121,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Attach a database') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('dply provisions the database on this server and writes the connection into your environment, then pushes it live.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-db-fix-attach')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'deploy-db-fix-attach')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -182,7 +182,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Inject database settings') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Edit the DB_* variables below. They’re merged into your environment and pushed to the server.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'deploy-db-fix-inject')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'deploy-db-fix-inject')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>

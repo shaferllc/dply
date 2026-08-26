@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DeployLogRedactor;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -138,6 +139,29 @@ class SiteDeployment extends Model
      *
      * @param  list<array<string, mixed>>  $results
      */
+    /**
+     * Persist the log accumulated so far, so a failure mid-deploy still has one.
+     *
+     * Both deployers build their log in a local variable and only the SUCCESS
+     * path ever wrote it to this row. Every "Deploy failed during the build
+     * phase. See the deployment log for details." therefore showed exactly that
+     * sentence and no log — the detail it points at was thrown away with the
+     * stack frame. Call this immediately before those throws.
+     *
+     * Redaction lives here rather than at the call sites so no future one can
+     * forget it and write credentials into the row.
+     */
+    public function recordPartialLog(string $log): void
+    {
+        $log = trim(DeployLogRedactor::redact($log));
+
+        if ($log === '') {
+            return;
+        }
+
+        $this->forceFill(['log_output' => $log])->save();
+    }
+
     public function recordPhaseResults(string $phase, array $results): void
     {
         $existing = $this->phase_results;

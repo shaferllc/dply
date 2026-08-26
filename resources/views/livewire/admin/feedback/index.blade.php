@@ -126,7 +126,7 @@
                                 · {{ $selected->created_at->format('M j, Y g:ia') }}
                             </p>
                         </div>
-                        <button type="button" wire:click="closeReport" class="rounded-lg border border-brand-ink/15 bg-white p-1.5 text-brand-moss hover:bg-brand-sand/40">
+                        <button aria-label="{{ __('Close report') }}" type="button" wire:click="closeReport" class="dply-hit-44 rounded-lg border border-brand-ink/15 bg-white p-1.5 text-brand-moss hover:bg-brand-sand/40">
                             <x-heroicon-o-x-mark class="h-4 w-4" />
                         </button>
                     </div>

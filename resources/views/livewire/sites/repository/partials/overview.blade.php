@@ -87,7 +87,7 @@
                                 </p>
                             </div>
                             @if (! empty($commit['html_url']))
-                                <a href="{{ $commit['html_url'] }}" target="_blank" rel="noopener noreferrer"
+                                <a aria-label="{{ __('Open commit in a new tab') }}" href="{{ $commit['html_url'] }}" target="_blank" rel="noopener noreferrer"
                                    class="shrink-0 self-center inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                     <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                                 </a>

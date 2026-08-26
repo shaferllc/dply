@@ -220,7 +220,7 @@
                                                         {{ __('Queuing…') }}
                                                     </span>
                                                 </button>
-                                                <button type="button" wire:click="loadMiseAvailableVersions('{{ $runtime }}')" class="text-xs text-brand-mist hover:text-brand-ink">
+                                                <button aria-label="{{ __('Refresh available versions') }}" type="button" wire:click="loadMiseAvailableVersions('{{ $runtime }}')" class="text-xs text-brand-mist hover:text-brand-ink">
                                                     <x-heroicon-o-arrow-path class="h-3 w-3" aria-hidden="true" />
                                                 </button>
                                             </form>

@@ -336,7 +336,7 @@
                                         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login detail') }}</p>
                                         <p class="mt-0.5 text-base font-semibold text-brand-ink" x-text="selected?.label"></p>
                                     </div>
-                                    <button type="button" @click="selected = null" class="rounded-lg p-1.5 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                                    <button aria-label="{{ __('Close') }}" type="button" @click="selected = null" class="dply-hit-44 rounded-lg p-1.5 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                         <x-heroicon-o-x-mark class="h-5 w-5" />
                                     </button>
                                 </div>

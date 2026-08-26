@@ -21,7 +21,6 @@
       "Bash(bash -n /tmp/dply_preamble3.sh)",
       "Bash(bash -n /tmp/dply_full3.sh)",
       "Bash(php *)",
-      "Bash(grep -n 'ServerProvisionArtifact\\\\|class.*Artifact\\\\|protected $fillable\\\\|->label\\\\|->content' /Users/tomshafer/Projects/Apps/dply/app/Models/ServerProvisionArtifact.php)",
       "Bash(bash -n /tmp/dply_full6.sh)",
       "Bash(bash -n /tmp/dply_recon.sh)",
       "Bash(bash -c ' *)",
@@ -37,7 +36,6 @@
       "Bash(./vendor/bin/pest --testsuite=Edge)",
       "Bash(./vendor/bin/pest --testsuite=Edge --stop-on-failure)",
       "Bash(grep -n 'edgeSiteAccessRule\\\\|mount\\\\|$site\\\\b' app/Livewire/Concerns/ManagesEdgeDeploymentLifecycle.php)",
-      "Bash(grep -nE \"sites\\\\..*audit|sites/\\\\{|sites\\\\..*export\" routes/web.php)",
       "Bash(gh auth *)",
       "Bash(composer --version)",
       "Read(//Users/tomshafer/Projects/Apps/**)",
@@ -47,5 +45,9 @@
       "Bash(/opt/homebrew/bin/gh repo *)",
       "Bash(grep -nE 'protected \\\\$fillable' /Users/tomshafer/Projects/Apps/dply/app/Models/ForgeSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiServer.php)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "laravel-auditor",
+    "laravel-boost"
+  ]
 }

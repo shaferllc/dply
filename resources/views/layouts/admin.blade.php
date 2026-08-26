@@ -20,11 +20,12 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-skip-link />
         <x-impersonation-banner />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
 
-            <main class="flex-1 w-full pb-28 sm:pb-32">
+            <main id="main-content" class="flex-1 w-full pb-28 sm:pb-32">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
                         <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">

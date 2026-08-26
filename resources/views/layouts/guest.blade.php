@@ -17,6 +17,7 @@
     <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;">
+    <x-skip-link />
     <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
     <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
 
@@ -24,7 +25,7 @@
 
     @include('partials.auth-aside-variant')
 
-    <main class="flex-1 w-full px-4 sm:px-6 py-10 sm:py-14 lg:py-16">
+    <main id="main-content" class="flex-1 w-full px-4 sm:px-6 py-10 sm:py-14 lg:py-16">
         <div class="mx-auto max-w-7xl">
             <div class="grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
                 <div class="lg:col-span-5 order-2 lg:order-1">

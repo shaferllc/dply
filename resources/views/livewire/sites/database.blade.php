@@ -427,7 +427,7 @@
                         @endif
                     </p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -474,7 +474,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Add database user') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Grants a new user full privileges on this database. The user is created on the server in the background.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>

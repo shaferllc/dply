@@ -22,6 +22,6 @@
     };
 @endphp
 
-<a {{ $attributes->merge(['class' => 'inline-flex items-center border border-brand-ink/15 bg-white text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 '.$sizeClasses]) }}>
+<a {{ $attributes->merge(['class' => 'inline-flex items-center border border-brand-ink/15 bg-white text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 dply-focus dply-pressable '.$sizeClasses]) }}>
     {{ $slot }}
 </a>

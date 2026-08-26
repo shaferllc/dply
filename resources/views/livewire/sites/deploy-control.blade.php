@@ -145,7 +145,7 @@
                                     <x-heroicon-o-rocket-launch class="h-4 w-4" /> {{ __('Deploy now') }}
                                 @endif
                             </button>
-                            <button type="button" x-on:click="$store.deployControl.closeDeployDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <button aria-label="{{ __('Close') }}" type="button" x-on:click="$store.deployControl.closeDeployDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                 <x-heroicon-o-x-mark class="h-5 w-5" />
                             </button>
                         </div>
@@ -319,7 +319,7 @@
                                     <x-heroicon-o-arrow-left class="h-4 w-4" /> {{ __('New sync') }}
                                 </button>
                             @endif
-                            <button type="button" x-on:click="$store.deployControl.closeSyncDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <button aria-label="{{ __('Close') }}" type="button" x-on:click="$store.deployControl.closeSyncDrawer()" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                 <x-heroicon-o-x-mark class="h-5 w-5" />
                             </button>
                         </div>

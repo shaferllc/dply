@@ -823,7 +823,7 @@
                                 @endif
                             </p>
                         </div>
-                        <button type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                        <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                             <x-heroicon-o-x-mark class="h-5 w-5" />
                         </button>
                     </div>

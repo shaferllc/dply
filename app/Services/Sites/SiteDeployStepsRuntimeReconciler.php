@@ -50,7 +50,13 @@ final class SiteDeployStepsRuntimeReconciler
             return null;
         }
 
-        $pipeline = $site->deployPipelines()->with('steps')->first();
+        // The deploy runs Site::deploySteps(), which filters on
+        // active_deploy_pipeline_id. Reconciling "the first pipeline by
+        // sort_order" rewrote a pipeline the deploy never reads as soon as a
+        // site had more than one, and the stale composer_install kept running.
+        $pipeline = $site->activeDeployPipeline()->with('steps')->first()
+            ?? $site->deployPipelines()->with('steps')->first();
+
         if ($pipeline === null) {
             return null;
         }
