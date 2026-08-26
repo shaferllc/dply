@@ -1,7 +1,7 @@
 # CLAUDE.md — codebase map & navigation
 
 dply is a single Laravel app (one PostgreSQL DB) that manages servers, sites,
-and managed compute (Cloud / Edge / Serverless). This file is the **structural
+and managed services (databases, caches, queues, realtime, logs). This file is the **structural
 map**: how the code is organized and where to find things. For product/UI
 **conventions** (styling, Livewire patterns, feature-flag layers, billing
 model, etc.) see **`AGENTS.md`**. For the *why* of the structure see
@@ -64,9 +64,6 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 |--------|--------------|
 | **TaskRunner** | The SSH/remote-task framework — tasks, callbacks/webhooks, key-pair gen, resolved via `SshConnectionFactory`. Near-vendored (own Models/routes/config/Tests). All remote server control flows through here. |
 | **Deploy** | VM/site deploy engine — pipelines, phases, runtime detection, scheduled deploys. |
-| **Cloud** | Managed-container PaaS (DO App Platform / AWS App Runner) behind `EdgeBackend`. `Actions/`, `Backends/`, `Cloudflare/`, lifecycle `Jobs/`. |
-| **Edge** | First-party Netlify-style static/SSG platform (Cloudflare R2/Workers). Build/publish jobs, edge workspace UI, previews. |
-| **Serverless** | FaaS (DO Functions, web functions). Adapters, `Contracts/`, create/deploy jobs. Also owns published front-end asset delivery + its storage/egress meters, and per-site app buckets (`docs/adr/serverless-asset-delivery.md`). |
 | **Database** | Managed database engine — the `DatabaseBackend` abstraction and its DigitalOcean / Vultr / Neon / PlanetScale / Supabase / Upstash implementations, plus day-two operations on a cluster (users, resize, metrics, backups + restore-to-new, trusted-source grants). The record is still `App\Models\CloudDatabase`; the on-box `ServerDatabase` lifecycle stays in the kernel. |
 | **Billing** | Revenue engine — subscriptions, Stripe sync, metering, usage cost calculators (other modules depend on these). |
 | **Insights** | Site/server health, metrics, URL-health checks, cost observatory. |
@@ -74,6 +71,8 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Secrets** | Secret vault — residency, escrow, age encryption. |
 | **Logs** | dply Logs server-log add-on — Vector aggregator install/policy, ClickHouse. |
 | **Certificates** | SSL/TLS issuance + renewal. |
+| **Cache** | Managed cache engine — `ManagedCache`/`CacheSite` records, the Postgres-backed store, and the cache workspace UI. |
+| **Providers** | Infrastructure provider clients — DigitalOcean / AWS (EC2, App Runner, EKS) / Azure / GCP compute + DNS, plus Cloudflare and Namecheap. |
 | **Backups** | Site/DB backup engine. |
 | **Snapshots** | Server/site snapshots. |
 | **Realtime** | Managed Pusher-compatible relay (Cloudflare Workers + DO). |
@@ -86,7 +85,6 @@ unrelated WIP commit three days earlier, so the boundary was silently unchecked.
 | **Projects** | `Workspace` grouping container UI. |
 | **Scaffold** | Repo scaffolding pipeline. |
 | **SourceControl** | Git provider OAuth/integration (GitHub/GitLab/Bitbucket). |
-| **OpsCopilot** | Org-wide infra deploy-failure triage (`/infrastructure/copilot`). |
 | **Remediations** | Guided remediation jobs/services. |
 | **RemoteCli** | Remote CLI execution. |
 | **ConfigRevisions** | Config-file revision history. |

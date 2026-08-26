@@ -19,9 +19,6 @@ using any number below in a forecast.
 | Line | Billing gate | Live? |
 |---|---|---|
 | Plan fee (Free → Business) | — | ✅ |
-| dply Cloud platform fee + metered DO resources | — | ✅ |
-| dply Edge platform fee | — | ✅ |
-| dply Edge delivery usage | `dply.edge.usage_billing.enabled` (default **true**) | ✅ |
 | dply-managed servers (cost-plus) | — | ✅ |
 | Managed Realtime (per connection tier) | — | ✅ |
 | Managed Lookout (per project tier) | `lookout.billing_enabled` = **false** (hardcoded) | ❌ dark |
@@ -31,6 +28,13 @@ using any number below in a forecast.
 
 A line also silently no-ops when its Stripe price ID is unset — `StripeSubscriptionSyncer` skips any
 item with an empty price id rather than failing.
+
+> **Cloud and Edge were removed from the app.** `app/Modules/Cloud` and `app/Modules/Edge` no
+> longer exist, and neither does `CloudResourceCostCalculator` or `EdgeUsageCostCalculator`. Their
+> three lines have been dropped from the table above: nothing meters them and nothing bills them.
+> Vestiges remain — `config/product/dply.php` still carries the dead `dply.edge.usage_billing.*`
+> keys, and the revenue sections below still price and forecast both products. Those sections are
+> **historical** until the projections are recomputed; do not quote them.
 
 > **Serverless was removed from the app.** `app/Modules/Serverless` no longer exists and there is no
 > `serverless_cents` key, no field on `DesiredBillingState`, and no Stripe price. Earlier revisions of

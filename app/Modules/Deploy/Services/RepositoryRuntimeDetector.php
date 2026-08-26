@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Deploy\Services;
 
 use App\Modules\Deploy\Contracts\RepositoryFiles;
+use App\Services\Sites\VmSiteRuntimeDetectionPersister;
 
 /**
  * Classifies a checked-out repository for serverless deployment.
@@ -159,6 +160,24 @@ final class RepositoryRuntimeDetector
             return $rawAction;
         }
 
+        // ---- 4b. node_generic — Node packaging, no framework, no build script
+        // Symmetric with php_generic; without it a plain Node repo (Hono on
+        // Workers, a Fastify service, anything whose scripts are only
+        // dev/deploy/typecheck) fell through to `unknown`, which the step
+        // reconciler cannot map to a language — so the site kept the
+        // composer_install it was seeded with. Placed AFTER raw-entry
+        // detection: a Go or Python module that merely carries a frontend
+        // package.json must still resolve to its own language.
+        $nodeGeneric = $this->detectNodeStack(
+            $packageJson,
+            $capabilities,
+            is_array($packageJson) ? $this->jsPackageManager($files, $packageJson) : 'npm',
+            allowGeneric: true,
+        );
+        if ($nodeGeneric !== null) {
+            return $nodeGeneric;
+        }
+
         // ---- 5. Static site ------------------------------------------------
         if ($files->exists('index.html')) {
             return [
@@ -310,7 +329,10 @@ final class RepositoryRuntimeDetector
             'php' => (bool) preg_match('/function\s+main\s*\(/i', $source),
             'node' => (bool) preg_match('/(?:exports\.main|module\.exports\s*=|export\s+(?:async\s+)?function\s+main|export\s+const\s+main|function\s+main|const\s+main\s*=)/', $source),
             'python' => (bool) preg_match('/def\s+main\s*\(/', $source),
-            'go' => (bool) preg_match('/func\s+Main\s*\(/', $source),
+            // Go's entry point is `func main()`, lower-case and case-sensitive.
+            // The pattern was `Main`, which no compilable Go program contains —
+            // so main.go never matched and a Go module fell through to unknown.
+            'go' => (bool) preg_match('/func\s+main\s*\(/', $source),
             default => false,
         };
     }
@@ -602,7 +624,7 @@ final class RepositoryRuntimeDetector
      *
      * Public because it is pure — it touches no filesystem — so callers that
      * read package.json some other way can reuse it. VM deploys are the reason:
-     * the checkout lives on the remote box, so {@see \App\Services\Sites\VmSiteRuntimeDetectionPersister}
+     * the checkout lives on the remote box, so {@see VmSiteRuntimeDetectionPersister}
      * cats the file over SSH and feeds the decoded array in here rather than
      * duplicating the dependency-to-framework mapping.
      *
@@ -610,7 +632,7 @@ final class RepositoryRuntimeDetector
      * @param  array<string, mixed>  $capabilities
      * @return array<string, mixed>|null
      */
-    public function detectNodeStack(?array $packageJson, array $capabilities, string $packageManager = 'npm'): ?array
+    public function detectNodeStack(?array $packageJson, array $capabilities, string $packageManager = 'npm', bool $allowGeneric = false): ?array
     {
         if ($packageJson === null) {
             return null;
@@ -680,9 +702,25 @@ final class RepositoryRuntimeDetector
             );
         }
 
-        return null;
-    }
+        // A package.json with neither a recognised framework dependency nor a
+        // `build` script is still a Node project — Hono/Fastify/Workers apps
+        // routinely ship only dev/deploy/typecheck scripts. Returning null here
+        // dropped them through every later branch to `unknown`, which the step
+        // reconciler cannot map to a language, so a Node repo kept the
+        // composer_install step it was seeded with and the deploy died on a
+        // missing composer.json. Guarded by $allowGeneric so this stays out of
+        // the framework-marker pass in detect() — a Go or PHP repo that merely
+        // carries a package.json for its frontend must still match its own
+        // language first.
+        if (! $allowGeneric) {
+            return null;
+        }
 
+        return $node('node_generic', 'raw', '.', 'medium',
+            ['Detected package.json without framework markers or a build script.'],
+            [],
+        );
+    }
 
     /**
      * The migration tool a Node project ships, from its dependencies.
