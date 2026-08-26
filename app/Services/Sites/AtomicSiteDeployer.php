@@ -366,6 +366,14 @@ class AtomicSiteDeployer
             }
 
             $log .= sprintf("[dply] BUILD done → %d step(s), ok=true\n", count($build['steps']));
+
+            // Same check as the simple deployer: vendor/ exists now, so this is
+            // the first moment we can tell whether the mail transport package
+            // the site's binding needs was actually installed.
+            $mailNote = app(MailTransportPreflight::class)->check($site->fresh() ?? $site, $ssh, $newRelease);
+            if ($mailNote !== null) {
+                $log .= "\n".$mailNote."\n";
+            }
         } else {
             $log .= sprintf("\n[dply] BUILD → skipped (resume from %s); reusing the build already staged in %s\n", $resume->startFromPhase, $newRelease);
         }

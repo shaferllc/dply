@@ -334,6 +334,13 @@ class SiteGitDeployer
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
         }
 
+        // The binding injected MAIL_* above; the transport package lives in the
+        // customer's composer.json and we can only tell them it is missing.
+        $mailNote = app(MailTransportPreflight::class)->check($site->fresh() ?? $site, $ssh, $path);
+        if ($mailNote !== null) {
+            $log .= "\n".$mailNote."\n";
+        }
+
         // ── LOGGING ── overlay dply's generated config/logging.php now that
         // vendor/ exists (the probe boots the app) and before activate, so a
         // rejected config aborts the deploy without going live. No-op unless the

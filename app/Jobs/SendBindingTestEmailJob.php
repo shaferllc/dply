@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnectionFactory;
+use App\Support\Sites\MailTransportRequirements;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -154,7 +155,14 @@ class SendBindingTestEmailJob implements ShouldQueue
             $detail = trim(str_replace(['DPLY_MAIL_FAIL', 'DPLY_MAIL_OK'], '', $out));
             $detail = $detail !== '' ? $detail : 'The transport reported no output.';
             $emit->error('Send failed: '.mb_substr($detail, 0, 1000), 'send');
-            $emit->step('send', 'If this names a missing class/package, add the provider\'s transport package to your app\'s composer.json and redeploy.');
+
+            // "Class Symfony\Component\HttpClient\HttpClient not found" names a
+            // Symfony internal, not the package to install. We know the provider,
+            // so say the actual composer require line instead of describing it.
+            $packages = MailTransportRequirements::packagesFor($provider);
+            $emit->step('send', $packages !== [] && str_contains($detail, 'not found')
+                ? sprintf('%s sends through %s, which is not installed in this app. Add it to the repository and redeploy:  composer require %s', $provider, implode(' + ', $packages), implode(' ', $packages))
+                : 'If this names a missing class/package, add the provider\'s transport package to your app\'s composer.json and redeploy.');
             $this->finish($emit, false, mb_substr($detail, 0, 1000), failed: true);
         } catch (\Throwable $e) {
             $message = mb_substr($e->getMessage(), 0, 1000);
