@@ -71,7 +71,7 @@ final class SitePipelineAdvisor
                 $out[] = self::make(
                     'upgrade_php',
                     __('Upgrade PHP to :version', ['version' => $phpTarget]),
-                    __('Composer needs PHP :needed, but this site is on :current — the build will fail until the runtime is upgraded.', [
+                    __('Composer needs PHP :needed, but this site is on :current, so the build will keep failing. Installs :needed on the server and switches this site onto it — other sites on this server keep the version they pin.', [
                         'needed' => $phpTarget,
                         'current' => $current,
                     ]),

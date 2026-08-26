@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Remediations\Services\Actions\InstallPhpExtensionAction;
 use App\Modules\Remediations\Services\Actions\RebuildWebserverConfigAction;
 use App\Modules\Remediations\Services\Actions\UpgradePhpAction;
 use App\Services\Servers\PhpRedisExtensionScripts;
@@ -225,6 +226,26 @@ BASH,
                 'recommended' => true,
                 'auto_safe' => false,
                 'handler' => UpgradePhpAction::class,
+            ],
+        ],
+    ],
+
+    // Ordered AFTER php_ext_redis_missing and php_pdo_driver_missing on purpose:
+    // match() returns the first hit, and both of those own a symbol this
+    // signature would otherwise swallow with a plain apt install — phpredis
+    // needs its PECL fallback and duplicate-module handling, PDO drivers need
+    // the driver-specific package.
+    'php_ext_missing' => [
+        'signature' => '/Class ["\'](?:Imagick|ImagickPixel|ImagickDraw|Memcached|MongoDB\\\\Driver\\\\Manager|ZipArchive|SoapClient|SoapServer|IntlDateFormatter|NumberFormatter|Collator|XSLTProcessor|tidy|GMP|SNMP|AMQPConnection|SSH2)["\'] not found|Call to undefined function\s+\\\\?(?:imagecreate|imagecreatetruecolor|imagejpeg|imagepng|exif_read_data|bcadd|bcmul|gmp_add|curl_init|mb_strlen|ldap_connect|imap_open|yaml_parse|msgpack_pack|igbinary_serialize|apcu_fetch|socket_create|gettext)\s*\(/i',
+        'title' => 'A PHP extension this app needs is not installed',
+        'explanation' => 'PHP reports the missing symbol, not the package — "Class \'Imagick\' not found" means the imagick extension is absent for this site\'s PHP version. dply can read the extension out of the error and install it for that version only; other sites keep the extensions they have.',
+        'actions' => [
+            [
+                'key' => 'install_php_extension',
+                'label' => 'Install the missing extension for this site\'s PHP',
+                'recommended' => true,
+                'auto_safe' => false,
+                'handler' => InstallPhpExtensionAction::class,
             ],
         ],
     ],

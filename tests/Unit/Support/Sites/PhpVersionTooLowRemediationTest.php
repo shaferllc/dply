@@ -135,15 +135,26 @@ test('upgrade php action installs the version and switches the site', function (
         'finished_at' => now(),
     ]);
 
+    // Exactly one package action, and it must be the install. The second call
+    // this used to expect was `set_cli_default`, which moved the SERVER-wide
+    // CLI PHP to fix one site and silently changed what every neighbouring
+    // site's composer step ran under. The fix is site-scoped now; asserting
+    // the count alone would let that regress, so pin the action too.
+    $actions = [];
     $php = Mockery::mock(ServerPhpManager::class);
     $php->shouldReceive('applyPackageAction')
-        ->twice()
-        ->andReturn(['status' => 'succeeded', 'message' => 'ok', 'output' => 'installed']);
+        ->once()
+        ->andReturnUsing(function (...$args) use (&$actions) {
+            $actions[] = (string) ($args[1] ?? '');
+
+            return ['status' => 'succeeded', 'message' => 'ok', 'output' => 'installed'];
+        });
     app()->instance(ServerPhpManager::class, $php);
 
     $error = (new UpgradePhpAction)->apply($appServer, $site->fresh(), null, new ConsoleEmitter);
 
     expect($error)->toBeNull()
+        ->and($actions)->toBe(['install'])
         ->and($site->fresh()->runtime_version)->toBe('8.4');
 
     Queue::assertPushed(ApplySiteWebserverConfigJob::class);

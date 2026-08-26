@@ -72,7 +72,14 @@ final class DeployHubFixes
                 'reason' => (string) $suggestion['reason'],
                 'method' => 'addSuggestedPipelineStep',
                 'args' => [$key],
-                'button' => __('Apply fix'),
+                // The PHP fix is site-scoped — it installs the version and
+                // points THIS site at it, leaving every neighbour on the
+                // version it pins. A generic "Apply fix" hid that, and the
+                // one thing an operator wants to know before clicking is
+                // whose runtime is about to move.
+                'button' => ($suggestion['action'] ?? '') === 'upgrade_php'
+                    ? __('Use PHP :version on this site', ['version' => (string) ($suggestion['command'] ?? '')])
+                    : __('Apply fix'),
                 'dismiss_key' => $key,
             ];
             $claimed['php_version_too_low'] = true;
