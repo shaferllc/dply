@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\ErrorEvent;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
@@ -16,9 +17,9 @@ use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
-use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Services\Sites\SiteUptimeHistorySummary;
 use App\Support\Errors\ErrorEventActions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -246,9 +247,9 @@ class SiteResourceApiController extends Controller
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<ErrorEvent>
+     * @return Builder<ErrorEvent>
      */
-    private function scopedErrors(Site $site): \Illuminate\Database\Eloquent\Builder
+    private function scopedErrors(Site $site): Builder
     {
         return ErrorEvent::query()->where('site_id', $site->id);
     }
@@ -464,14 +465,18 @@ class SiteResourceApiController extends Controller
             ->where('site_id', $site->id)
             ->orderByDesc('is_primary')
             ->orderBy('hostname')
-            ->get(['id', 'hostname', 'is_primary', 'www_redirect', 'comment']);
+            ->get(['id', 'hostname', 'is_primary', 'comment']);
 
+        // `www_redirect` is deliberately absent. The column exists and every
+        // creation path writes false, but nothing reads it — no config builder
+        // emits a redirect — so returning it advertised a setting that does
+        // nothing. Serve www by adding it as a domain alias instead; aliases
+        // reach the vhost, the certificate and the DNS records.
         return response()->json([
             'data' => $domains->map(fn (SiteDomain $d) => [
                 'id' => $d->id,
                 'hostname' => $d->hostname,
                 'is_primary' => $d->is_primary,
-                'www_redirect' => $d->www_redirect,
                 'comment' => $d->comment,
             ]),
         ]);
@@ -481,10 +486,11 @@ class SiteResourceApiController extends Controller
     {
         $this->checkOwnership($request, $site);
 
+        // No `www_redirect`: accepting it let a caller set the flag, read it
+        // back as true, and get no redirect. Nothing implements one.
         $data = $request->validate([
             'hostname' => ['required', 'string', 'max:253'],
             'is_primary' => ['boolean'],
-            'www_redirect' => ['boolean'],
         ]);
 
         $exists = SiteDomain::query()
@@ -504,7 +510,6 @@ class SiteResourceApiController extends Controller
             'site_id' => $site->id,
             'hostname' => $data['hostname'],
             'is_primary' => $data['is_primary'] ?? false,
-            'www_redirect' => $data['www_redirect'] ?? false,
         ]);
 
         return response()->json(['data' => ['id' => $domain->id, 'hostname' => $domain->hostname]], 201);

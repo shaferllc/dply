@@ -107,8 +107,18 @@
                                 @elseif ($row['status'] === 'propagating')
                                     {{-- Say what the stale answer is, because dig from a laptop
                                          may still show it too, and an unexplained mismatch is
-                                         exactly what sends someone editing a correct record. --}}
-                                    <span class="text-sky-700">{{ __('set at the nameservers — :ips still cached, expires on its own', ['ips' => implode(', ', array_slice($row['resolved_ips'], 0, 3))]) }}</span>
+                                         exactly what sends someone editing a correct record.
+                                         With no stale IPs to name the old sentence rendered as
+                                         "set at the nameservers — still cached", which reads as
+                                         a warning about nothing; name the provider instead so it
+                                         is obvious the record is already correct there. --}}
+                                    <span class="text-sky-700">
+                                        @if ($row['resolved_ips'] !== [])
+                                            {{ __('already correct at :provider — :ips still cached elsewhere, expires on its own', ['provider' => $resolvedCredential?->dnsProviderLabel() ?? __('your DNS provider'), 'ips' => implode(', ', array_slice($row['resolved_ips'], 0, 3))]) }}
+                                        @else
+                                            {{ __('already correct at :provider — nothing to do here; public resolvers are still catching up', ['provider' => $resolvedCredential?->dnsProviderLabel() ?? __('your DNS provider')]) }}
+                                        @endif
+                                    </span>
                                 @elseif ($row['status'] === 'cloudflare')
                                     <span class="text-sky-700">{{ __('proxied — Cloudflare serves TLS at its edge') }}</span>
                                 @elseif (! $row['in_zone'] && $row['status'] !== 'pointing')

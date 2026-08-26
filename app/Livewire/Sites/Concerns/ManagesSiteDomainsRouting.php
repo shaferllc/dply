@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
+use App\Models\SiteDomainAlias;
 use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
@@ -35,6 +36,14 @@ trait ManagesSiteDomainsRouting
 
     /** Optional intent comment captured at add-time and rendered on the row. */
     public string $new_domain_comment = '';
+
+    /**
+     * Add `www.<hostname>` alongside the domain. On by default: every layer
+     * downstream already handles an alias (vhost server_name, certificate SAN,
+     * A record), and a domain added without it silently serves the apex only —
+     * which reads as "dply broke www" the first time a visitor types it.
+     */
+    public bool $new_domain_with_www = true;
 
     /** Multi-line bulk paste — one hostname per line. */
     public string $bulk_domain_input = '';
@@ -145,15 +154,71 @@ trait ManagesSiteDomainsRouting
             ]);
         }
 
+        $wwwHostname = $this->addWwwAliasFor($newDomain->hostname);
+
         $this->new_domain_hostname = '';
         $this->new_domain_comment = '';
+        $this->new_domain_with_www = true;
 
         $attached = $this->autoAttachDomainDns($newDomain->hostname);
+
+        if ($wwwHostname !== null) {
+            $this->autoAttachDomainDns($wwwHostname);
+        }
 
         $this->finalizeRoutingMutation(
             $attached ?? 'Domain added.',
             closeModal: 'add-domain-modal',
         );
+    }
+
+    /**
+     * Add `www.<hostname>` as a domain alias, when asked and not already there.
+     *
+     * An alias rather than a new domain: aliases already flow into
+     * {@see Site::webserverHostnames()} (nginx server_name),
+     * {@see Site::sslIssuanceHostnames()} (certificate SANs) and
+     * {@see Site::customerFacingHostnames()} (the A records "Apply records"
+     * writes), so www is served, certificated and pointed with no new plumbing.
+     *
+     * Skipped for a hostname that is already a www, and for one whose www form
+     * some other site already claims — a duplicate would fail the alias
+     * uniqueness rule and take the whole add down with it.
+     *
+     * @return string|null The alias hostname created, or null when none was.
+     */
+    private function addWwwAliasFor(string $hostname): ?string
+    {
+        if (! $this->new_domain_with_www) {
+            return null;
+        }
+
+        $hostname = strtolower(trim($hostname));
+
+        if ($hostname === '' || str_starts_with($hostname, 'www.')) {
+            return null;
+        }
+
+        $www = 'www.'.$hostname;
+
+        $taken = SiteDomainAlias::query()->where('hostname', $www)->exists()
+            || SiteDomain::query()->where('hostname', $www)->exists();
+
+        if ($taken) {
+            return null;
+        }
+
+        SiteDomainAlias::query()->create([
+            'site_id' => $this->site->id,
+            'hostname' => $www,
+            'label' => null,
+            'comment' => __('Added automatically with :hostname.', ['hostname' => $hostname]),
+            'sort_order' => (int) ($this->site->domainAliases()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->site->load('domainAliases');
+
+        return $www;
     }
 
     /**

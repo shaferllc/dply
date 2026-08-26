@@ -73,6 +73,13 @@
                     <x-text-input id="new_domain_hostname" wire:model="new_domain_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="www.example.com" />
                     <x-input-error :messages="$errors->get('new_domain_hostname')" class="mt-1" />
                 </div>
+                <label for="new_domain_with_www" class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
+                    <input id="new_domain_with_www" type="checkbox" wire:model="new_domain_with_www" class="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40" />
+                    <span class="text-sm leading-5 text-brand-ink">
+                        {{ __('Also serve www') }}
+                        <span class="mt-0.5 block text-xs leading-5 text-brand-moss">{{ __('Adds the www alias too, so it gets a vhost entry, a certificate and an A record. Untick for a subdomain like api.example.com.') }}</span>
+                    </span>
+                </label>
                 <div>
                     <x-input-label for="new_domain_comment" :value="__('Comment (optional)')" />
                     <textarea id="new_domain_comment" wire:model="new_domain_comment" rows="2" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="{{ __('e.g. EU CDN — primary marketing domain') }}"></textarea>
