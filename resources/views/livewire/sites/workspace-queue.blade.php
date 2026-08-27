@@ -22,6 +22,13 @@
             </x-slot:actions>
         </x-workspace-panel-head>
 
+        @if ($queueConfigWarning)
+            <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-amber-50 px-4 py-3 sm:px-5">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                <p class="text-xs leading-relaxed text-amber-900">{{ $queueConfigWarning }}</p>
+            </div>
+        @endif
+
         <x-workspace-panel-head
             dense
             icon="heroicon-o-chart-bar"

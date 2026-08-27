@@ -3213,3 +3213,32 @@ test('site settings suspend and resume updates site and applies webserver config
     $meta = is_array($site->meta) ? $site->meta : [];
     $this->assertArrayNotHasKey('suspended_message', $meta);
 });
+
+test('queue section renders without the workspace hero card', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+        // Otherwise needsAppChoice() forces every section to the choose-app picker.
+        'meta' => ['choose_app' => ['skipped' => true]],
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue'], false));
+
+    // 'queue' is merged-chrome: the page is one dply-card, so the floating hero
+    // must not render above it. Assert on the hero's own description — the
+    // section header entry feeds ONLY the hero here, so its absence proves the
+    // hero is gone rather than merely that the copy changed.
+    $response->assertOk()
+        ->assertSee('Queue')
+        ->assertDontSee('Queue depth, failed jobs')
+        ->assertDontSee('Manage this site.');
+});

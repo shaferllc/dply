@@ -90,6 +90,11 @@ final class SiteSettingsHeader
                 'description' => __('The Linux user that owns this :resource on the server, plus permissions and sudo controls.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-user',
             ],
+            'queue' => [
+                'title' => __('Queue'),
+                'description' => __('Queue depth, failed jobs, and the workers draining them for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-queue-list',
+            ],
             'worker-fleet' => [
                 'title' => __('Worker Servers'),
                 'description' => __('Add worker VMs of this :resource — same code and queue, no webserver. Scale them here and watch the queues they drain.', ['resource' => $resourceNoun]),

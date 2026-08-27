@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Sites;
+
+use App\Models\Site;
+
+/**
+ * What queue driver this site's app is actually configured to use.
+ *
+ * The failure this exists for: a Supervisor worker running against
+ * `QUEUE_CONNECTION=sync` consumes nothing, because `sync` executes jobs inline
+ * at dispatch and never writes to a store. The worker reports RUNNING, the
+ * queue page shows depth 0, and every reading looks healthy — the queue is
+ * simply not a queue. Nothing on the box can tell you that; only the env can.
+ *
+ * Read from dply's own copy of the env, never over SSH: this is consulted while
+ * rendering, and a render-path SSH is a 30-second timeout waiting to happen.
+ */
+final class SiteQueueConfiguration
+{
+    /**
+     * Drivers that persist a job somewhere a worker can pick it up.
+     *
+     * @var list<string>
+     */
+    private const ASYNC_DRIVERS = ['database', 'redis', 'sqs', 'beanstalkd', 'rabbitmq', 'kafka', 'dply'];
+
+    public function __construct(
+        public readonly ?string $connection,
+        public readonly bool $isConfigured,
+        public readonly bool $isSync,
+    ) {}
+
+    public static function for(Site $site): self
+    {
+        $env = self::parse($site->effectiveEnvFileContent());
+        $connection = strtolower(trim((string) ($env['QUEUE_CONNECTION'] ?? '')));
+
+        if ($connection === '') {
+            // Laravel's own default when the key is absent is `sync`, so an
+            // unset value is not "unknown" — it is the broken case, and saying
+            // so is the whole point of this class.
+            return new self(null, false, true);
+        }
+
+        return new self(
+            $connection,
+            in_array($connection, self::ASYNC_DRIVERS, true),
+            $connection === 'sync',
+        );
+    }
+
+    /** A single sentence for the page, or null when there is nothing wrong. */
+    public function warning(): ?string
+    {
+        if ($this->isSync) {
+            return __('This app runs jobs inline (QUEUE_CONNECTION=:c). Workers here will consume nothing until it points at a real queue driver.', [
+                'c' => $this->connection ?? 'sync',
+            ]);
+        }
+
+        if (! $this->isConfigured) {
+            return __('QUEUE_CONNECTION is set to ":c", which dply does not recognise as a queue driver. Jobs may not reach a worker.', [
+                'c' => (string) $this->connection,
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parse(string $content): array
+    {
+        $vars = [];
+
+        foreach (preg_split('/\r\n|\r|\n/', $content) ?: [] as $line) {
+            if (preg_match('/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)$/', $line, $m) !== 1) {
+                continue;
+            }
+
+            // Values are commonly quoted; the quotes are syntax, not value.
+            $vars[$m[1]] = trim(trim($m[2]), "\"'");
+        }
+
+        return $vars;
+    }
+}

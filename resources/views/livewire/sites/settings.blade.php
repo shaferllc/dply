@@ -1,5 +1,5 @@
 @php
-    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'rails-stack', 'wordpress', 'logs', 'notifications', 'platform', 'backends', 'deploy', 'basic-auth', 'danger', 'worker-fleet', 'access', 'data', 'assets'];
+    $mergedChromeSections = ['general', 'settings', 'cli', 'routing', 'certificates', 'repository', 'runtime', 'resources', 'system-user', 'laravel-stack', 'rails-stack', 'wordpress', 'logs', 'notifications', 'platform', 'backends', 'deploy', 'basic-auth', 'danger', 'worker-fleet', 'access', 'data', 'assets', 'queue'];
     $usesMergedChrome = in_array($section, $mergedChromeSections, true);
 @endphp
 <div>

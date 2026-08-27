@@ -14,6 +14,7 @@ use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Support\Sites\QueueWorkerClassifier;
 use App\Support\Sites\SiteDaemonAdvisor;
+use App\Support\Sites\SiteQueueConfiguration;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -424,6 +425,9 @@ class WorkspaceQueue extends Component
         $pools = $this->site->attachedWorkerPools();
 
         return view('livewire.sites.workspace-queue', [
+            // The check nothing on the box can make: a worker against `sync`
+            // consumes nothing while every other reading looks healthy.
+            'queueConfigWarning' => SiteQueueConfiguration::for($this->site)->warning(),
             // Managed worker servers are part of "is my queue healthy", so they
             // render here rather than only under Worker Servers.
             'pools' => $pools,
