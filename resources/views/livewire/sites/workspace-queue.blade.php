@@ -1,6 +1,6 @@
-{{-- Rendered as a workspace SECTION, so no page wrapper and no breadcrumb —
-     the Settings chrome around it owns both, and duplicating them here is what
-     made this read as a detached page. --}}
+{{-- One card, a glance strip, and tabs — the same frame the Schedule
+     workspace uses. Three sibling cards read as three unrelated features; the
+     question is singular ("is my queue healthy"), so the surface is too. --}}
 <div class="space-y-4">
     <section class="dply-card min-w-0 overflow-hidden p-0">
         <x-workspace-panel-head
@@ -22,15 +22,61 @@
             </x-slot:actions>
         </x-workspace-panel-head>
 
-        @if ($failedTotal !== null)
-            <div class="border-b border-brand-ink/10 px-4 py-3 sm:px-5">
-                <p class="text-xs text-brand-moss">
-                    {{ trans_choice(':count failed job|:count failed jobs', (int) $failedTotal, ['count' => (int) $failedTotal]) }}
-                    <span class="text-brand-mist">· {{ __('across every queue on this site') }}</span>
-                </p>
-            </div>
-        @endif
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-chart-bar"
+            :title="__('Queues at a glance')"
+            :note="__('Counts for this site\'s queues and the workers draining them.')"
+            class="border-b border-brand-ink/10"
+        />
 
+        <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+            ['label' => __('Queues'), 'value' => $queueStats['queues'], 'hint' => __('Seen in the last :h h', ['h' => $window_hours])],
+            [
+                'label' => __('Pending'),
+                'value' => $queueStats['pending'],
+                'tone' => $queueStats['pending'] > 0 ? 'warn' : null,
+                'hint' => __('Waiting right now'),
+            ],
+            [
+                'label' => __('Failed'),
+                'value' => $queueStats['failed'],
+                'tone' => $queueStats['failed'] > 0 ? 'warn' : null,
+                'hint' => __('Across every queue'),
+            ],
+            [
+                'label' => __('Workers'),
+                'value' => $queueStats['workers'] + $queueStats['machines'],
+                'tone' => ($queueStats['workers'] + $queueStats['machines']) > 0 ? 'ok' : null,
+                'hint' => __('On this box and on pools'),
+            ],
+        ]" />
+
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Queue workspace sections')" scroll bare class="!mb-0 w-full">
+                <x-server-workspace-tab id="queue-tab-queues" icon="heroicon-o-queue-list" :active="$queue_workspace_tab === 'queues'" wire:click="$set('queue_workspace_tab', 'queues')">
+                    {{ __('Queues') }}
+                    @if ($queueStats['queues'] > 0)
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $queueStats['queues'] }}</span>
+                    @endif
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-workers" icon="heroicon-o-cpu-chip" :active="$queue_workspace_tab === 'workers'" wire:click="$set('queue_workspace_tab', 'workers')">
+                    {{ __('Workers') }}
+                    @if ($queueStats['workers'] > 0)
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $queueStats['workers'] }}</span>
+                    @endif
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-fleet" icon="heroicon-o-square-3-stack-3d" :active="$queue_workspace_tab === 'fleet'" wire:click="$set('queue_workspace_tab', 'fleet')">
+                    {{ __('Managed servers') }}
+                    @if ($queueStats['machines'] > 0)
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $queueStats['machines'] }}</span>
+                    @endif
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+        </div>
+
+        @if ($queue_workspace_tab === 'queues')
+            <x-server-workspace-tab-panel id="queue-panel-queues" labelled-by="queue-tab-queues" panel-class="min-w-0">
         @if ($queueSuggestions !== [])
             {{-- Inside the card, above the list: a suggestion is about this
                  queue's state, not a separate concern needing its own panel. --}}
@@ -92,62 +138,18 @@
                 @endforeach
             </ul>
         @endif
-    </section>
-
-    @if ($pools->isNotEmpty())
-        <section class="dply-card min-w-0 overflow-hidden p-0">
-            <x-workspace-panel-head
-                dense
-                class="border-b border-brand-ink/10"
-                icon="heroicon-o-square-3-stack-3d"
-                :title="__('Managed worker servers')"
-                :note="__('Pools attached to this site. They run this app and drain the same queues.')"
-            />
-            <ul class="divide-y divide-brand-ink/10">
-                @foreach ($pools as $pool)
-                    @php($horizon = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : null)
-                    <li class="px-4 py-3.5 sm:px-5" wire:key="pool-{{ $pool->id }}">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div class="min-w-0">
-                                <p class="text-sm font-semibold text-brand-ink">{{ $pool->name }}</p>
-                                <p class="mt-0.5 text-xs text-brand-moss">
-                                    {{ trans_choice(':count machine|:count machines', (int) $pool->desired_count, ['count' => (int) $pool->desired_count]) }}
-                                    @if ((int) $pool->max_size > 0)
-                                        <span class="text-brand-mist">{{ __('of :max max', ['max' => (int) $pool->max_size]) }}</span>
-                                    @endif
-                                    @if ($horizon && ($horizon['status'] ?? null))
-                                        · {{ __('Horizon') }} {{ $horizon['status'] }}
-                                    @endif
-                                </p>
-                            </div>
-                            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'worker-fleet']) }}"
-                               wire:navigate
-                               class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage fleet') }}</a>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        </section>
-    @endif
-
-    <section class="dply-card min-w-0 overflow-hidden p-0">
-        <x-workspace-panel-head
-            dense
-            class="border-b border-brand-ink/10"
-            icon="heroicon-o-cpu-chip"
-            :title="__('Queue workers')"
-            :note="__('Supervisor programs on this site that consume jobs. Other daemons live under Workers.')"
-        >
-            <x-slot:actions>
-                @can('update', $site)
-                    <x-primary-button size="sm" type="button" wire:click="openCreate">
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                        {{ __('Add worker') }}
-                    </x-primary-button>
-                @endcan
-            </x-slot:actions>
-        </x-workspace-panel-head>
-
+            </x-server-workspace-tab-panel>
+        @elseif ($queue_workspace_tab === 'workers')
+            <x-server-workspace-tab-panel id="queue-panel-workers" labelled-by="queue-tab-workers" panel-class="min-w-0">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <p class="text-xs text-brand-moss">{{ __('Supervisor programs on this site that consume jobs.') }}</p>
+                    @can('update', $site)
+                        <x-primary-button size="sm" type="button" wire:click="openCreate">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add worker') }}
+                        </x-primary-button>
+                    @endcan
+                </div>
         @if ($showCreate)
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
                 {{-- A queue is not a resource you create — it exists the moment
@@ -282,10 +284,52 @@
                 @endforeach
             </ul>
         @endif
-
         <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
             {{ __('These are managed here. Non-queue daemons for this site live under') }}
             <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Workers') }}</a>{{ __('.') }}
+        </div>
+            </x-server-workspace-tab-panel>
+        @else
+            <x-server-workspace-tab-panel id="queue-panel-fleet" labelled-by="queue-tab-fleet" panel-class="min-w-0">
+                @if ($pools->isEmpty())
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No managed worker servers attached.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">
+                            {{ __('Attach a pool to drain this site\'s queues on dedicated machines.') }}
+                            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'worker-fleet']) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Add one') }}</a>
+                        </p>
+                    </div>
+                @else
+            <ul class="divide-y divide-brand-ink/10">
+                @foreach ($pools as $pool)
+                    @php($horizon = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : null)
+                    <li class="px-4 py-3.5 sm:px-5" wire:key="pool-{{ $pool->id }}">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-brand-ink">{{ $pool->name }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">
+                                    {{ trans_choice(':count machine|:count machines', (int) $pool->desired_count, ['count' => (int) $pool->desired_count]) }}
+                                    @if ((int) $pool->max_size > 0)
+                                        <span class="text-brand-mist">{{ __('of :max max', ['max' => (int) $pool->max_size]) }}</span>
+                                    @endif
+                                    @if ($horizon && ($horizon['status'] ?? null))
+                                        · {{ __('Horizon') }} {{ $horizon['status'] }}
+                                    @endif
+                                </p>
+                            </div>
+                            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'worker-fleet']) }}"
+                               wire:navigate
+                               class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage fleet') }}</a>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+                @endif
+            </x-server-workspace-tab-panel>
+        @endif
+
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-3 sm:px-5">
+            <x-cli-snippet tone="stub" />
         </div>
     </section>
 </div>

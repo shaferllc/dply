@@ -44,6 +44,9 @@ class WorkspaceQueue extends Component
     /** Hours of history the depth table summarises. */
     public int $window_hours = 24;
 
+    /** Which section of the Queue workspace is showing. */
+    public string $queue_workspace_tab = 'queues';
+
     public bool $showCreate = false;
 
     /**
@@ -418,10 +421,22 @@ class WorkspaceQueue extends Component
             }
         }
 
+        $pools = $this->site->attachedWorkerPools();
+
         return view('livewire.sites.workspace-queue', [
             // Managed worker servers are part of "is my queue healthy", so they
             // render here rather than only under Worker Servers.
-            'pools' => $this->site->attachedWorkerPools(),
+            'pools' => $pools,
+            // Counts for the at-a-glance strip. Computed from the SAME sets the
+            // tabs render, so a number can never disagree with the list beneath
+            // it.
+            'queueStats' => [
+                'queues' => $byQueue->count(),
+                'pending' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->pending ?? 0)),
+                'failed' => (int) ($snapshots->first()?->failed_total ?? 0),
+                'workers' => $workers->where('is_active', true)->count(),
+                'machines' => (int) $pools->sum('desired_count'),
+            ],
             'queueSuggestions' => SiteDaemonAdvisor::onlyForSurface(
                 SiteDaemonAdvisor::suggestions($this->site),
                 SiteDaemonAdvisor::SURFACE_QUEUE,
