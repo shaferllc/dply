@@ -5,18 +5,26 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Jobs\CollectSiteQueueJobsJob;
+use App\Jobs\RunSiteQueueCanaryJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\SupervisorDaemonAudit;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\Servers\SupervisorProvisioner;
+use App\Services\Sites\QueueInsightsInstaller;
+use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
 use App\Support\Sites\SiteDaemonAdvisor;
 use App\Support\Sites\SiteQueueConfiguration;
+use App\Support\Sites\SiteQueueReadiness;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -37,6 +45,7 @@ use Livewire\Component;
 class WorkspaceQueue extends Component
 {
     use DispatchesToastNotifications;
+    use SeedsSiteConsoleActions;
 
     public Server $server;
 
@@ -47,6 +56,9 @@ class WorkspaceQueue extends Component
 
     /** Which section of the Queue workspace is showing. */
     public string $queue_workspace_tab = 'queues';
+
+    /** Queue whose waiting jobs the Jobs tab is showing. */
+    public string $inspect_queue = '';
 
     public bool $showCreate = false;
 
@@ -371,6 +383,125 @@ class WorkspaceQueue extends Component
         return $program;
     }
 
+    /**
+     * Put a job in and watch it come out.
+     *
+     * The only check that covers the whole chain — driver, connection, a live
+     * worker, and the config the app actually booted with. Everything cheaper
+     * passes while jobs never run.
+     */
+    public function runCanary(string $queue = 'default'): void
+    {
+        $this->authorize('update', $this->site);
+
+        $run = method_exists($this, 'seedQueuedConsoleAction')
+            ? $this->seedQueuedConsoleAction('queue_canary', __('Testing the queue'))
+            : null;
+
+        if ($run === null) {
+            $this->toastError(__('Could not start the test.'));
+
+            return;
+        }
+
+        RunSiteQueueCanaryJob::dispatch((string) $run->id, (string) $this->site->id, $queue !== '' ? $queue : 'default');
+
+        $this->toastSuccess(__('Testing — progress shows in the console above.'));
+    }
+
+    /**
+     * Opt this site into the in-app queue agent.
+     *
+     * Stored on meta, not a column: this is a preference about dply's own
+     * tooling rather than a property of the site's runtime. Takes effect on the
+     * next deploy, when {@see QueueInsightsInstaller}
+     * requires the package into the release — nothing is installed behind the
+     * operator's back at the moment they flip a switch.
+     */
+    public function toggleQueueAgent(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $enabled = ! (bool) data_get($meta, 'queue_insights.enabled', false);
+        $meta['queue_insights'] = ['enabled' => $enabled];
+
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        $this->toastSuccess($enabled
+            ? __('The queue agent installs on the next deploy.')
+            : __('The queue agent will not be installed. It stays in place until the next deploy removes it.'));
+    }
+
+    public function queueAgentEnabled(): bool
+    {
+        return (bool) data_get($this->site->meta, 'queue_insights.enabled', false);
+    }
+
+    /**
+     * Turn on restart-after-deploy.
+     *
+     * The one readiness failure dply can fix with a column write: the flag
+     * already exists and {@see SupervisorDeployRestarter}
+     * already honours it — it was only ever reachable from the Pipeline page,
+     * two clicks from where the consequence shows up.
+     */
+    public function enableDeployRestart(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->forceFill(['restart_supervisor_programs_after_deploy' => true])->save();
+
+        $this->toastSuccess(__('Workers will restart after each deploy.'));
+    }
+
+    /**
+     * Ask the box what is waiting on a queue.
+     *
+     * Queued and cached rather than read inline: this is SSH work, and SSH in
+     * the render path is a 30-second timeout waiting to happen.
+     */
+    public function inspectQueue(string $queue): void
+    {
+        $this->authorize('view', $this->site);
+
+        $this->inspect_queue = $queue;
+        $this->queue_workspace_tab = 'jobs';
+
+        CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $queue);
+    }
+
+    /**
+     * The cached read for the inspected queue, parsed into rows.
+     *
+     * @return array{jobs: list<QueueJobPayload>, driver: ?string, truncated: bool, error: ?string, read_at: ?string}|null
+     */
+    public function inspectedJobs(): ?array
+    {
+        if ($this->inspect_queue === '') {
+            return null;
+        }
+
+        $cached = Cache::get(CollectSiteQueueJobsJob::cacheKey((string) $this->site->id, $this->inspect_queue));
+
+        if (! is_array($cached)) {
+            return null;
+        }
+
+        $now = strtotime((string) ($cached['read_at'] ?? 'now')) ?: null;
+
+        return [
+            'jobs' => array_values(array_filter(array_map(
+                static fn (string $json): ?QueueJobPayload => QueueJobPayload::fromJson($json, $now),
+                array_map('strval', (array) ($cached['jobs'] ?? [])),
+            ))),
+            'driver' => $cached['driver'] ?? null,
+            'truncated' => (bool) ($cached['truncated'] ?? false),
+            'error' => $cached['error'] ?? null,
+            'read_at' => $cached['read_at'] ?? null,
+        ];
+    }
+
     /** Supervisor programs on this site that actually consume jobs. */
     public function workers(): Collection
     {
@@ -428,6 +559,7 @@ class WorkspaceQueue extends Component
             // The check nothing on the box can make: a worker against `sync`
             // consumes nothing while every other reading looks healthy.
             'queueConfigWarning' => SiteQueueConfiguration::for($this->site)->warning(),
+            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers, $pools, $snapshots->first()),
             // Managed worker servers are part of "is my queue healthy", so they
             // render here rather than only under Worker Servers.
             'pools' => $pools,

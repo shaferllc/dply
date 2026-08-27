@@ -118,6 +118,15 @@ return [
     // Queue-depth history. One SSH per server every five minutes; off
     // switches the sweep without touching the pages that read it.
     'site_queue_snapshots_enabled' => env('DPLY_SITE_QUEUE_SNAPSHOTS', true),
+
+    // The in-app queue agent. Opt-in per site (meta.queue_insights.enabled) with
+    // this as the platform switch above it: installing a package into a
+    // customer's application is their decision twice over.
+    'queue_insights' => [
+        'enabled' => env('DPLY_QUEUE_INSIGHTS', false),
+        'package' => env('DPLY_QUEUE_INSIGHTS_PACKAGE', 'dply/queue-insights'),
+        'constraint' => env('DPLY_QUEUE_INSIGHTS_CONSTRAINT', '^1.0'),
+    ],
     'site_queue_snapshot_retention_days' => (int) env('DPLY_SITE_QUEUE_SNAPSHOT_RETENTION_DAYS', 14),
     'deploy_notifications' => filter_var(true, FILTER_VALIDATE_BOOL),
 

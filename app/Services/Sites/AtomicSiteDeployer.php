@@ -374,6 +374,11 @@ class AtomicSiteDeployer
             if ($mailNote !== null) {
                 $log .= "\n".$mailNote."\n";
             }
+
+            $agentNote = app(QueueInsightsInstaller::class)->ensure($site->fresh() ?? $site, $ssh, $newRelease);
+            if ($agentNote !== null) {
+                $log .= "\n".$agentNote."\n";
+            }
         } else {
             $log .= sprintf("\n[dply] BUILD → skipped (resume from %s); reusing the build already staged in %s\n", $resume->startFromPhase, $newRelease);
         }

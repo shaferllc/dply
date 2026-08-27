@@ -14,6 +14,10 @@
         >
             <x-slot:actions>
                 @can('update', $site)
+                    <x-secondary-button size="sm" type="button" wire:click="runCanary" wire:loading.attr="disabled" wire:target="runCanary">
+                        <span wire:loading.remove wire:target="runCanary">{{ __('Test queue') }}</span>
+                        <span wire:loading wire:target="runCanary">{{ __('Starting…') }}</span>
+                    </x-secondary-button>
                     <x-primary-button size="sm" type="button" wire:click="refreshSnapshot" wire:loading.attr="disabled" wire:target="refreshSnapshot">
                         <span wire:loading.remove wire:target="refreshSnapshot">{{ __('Refresh') }}</span>
                         <span wire:loading wire:target="refreshSnapshot">{{ __('Queueing…') }}</span>
@@ -26,6 +30,38 @@
             <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-amber-50 px-4 py-3 sm:px-5">
                 <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
                 <p class="text-xs leading-relaxed text-amber-900">{{ $queueConfigWarning }}</p>
+            </div>
+        @endif
+
+        @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
+
+        @php($ready = \App\Support\Sites\SiteQueueReadiness::isReady($readinessChecks))
+        @if (! $ready)
+            {{-- Four things must all hold for a job to run, and each fails
+                 silently on its own. The checklist names which link is broken
+                 instead of leaving someone to infer it from a depth of zero. --}}
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:px-5">
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Queue readiness') }}</p>
+                <ul class="mt-2 space-y-1.5">
+                    @foreach ($readinessChecks as $check)
+                        <li class="flex items-start gap-2">
+                            @if ($check['status'] === 'ok')
+                                <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                            @else
+                                <x-heroicon-m-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                            @endif
+                            <p class="min-w-0 text-xs leading-relaxed {{ $check['status'] === 'ok' ? 'text-brand-moss' : 'text-brand-ink' }}">
+                                <span class="font-semibold">{{ $check['label'] }}</span>
+                                <span class="text-brand-moss">— {{ $check['detail'] }}</span>
+                                @if ($check['key'] === 'deploy_restart' && $check['status'] !== 'ok')
+                                    @can('update', $site)
+                                        <button type="button" wire:click="enableDeployRestart" class="ml-1 font-semibold text-brand-forest hover:underline">{{ __('Turn on') }}</button>
+                                    @endcan
+                                @endif
+                            </p>
+                        </li>
+                    @endforeach
+                </ul>
             </div>
         @endif
 
@@ -73,6 +109,9 @@
                         <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $queueStats['workers'] }}</span>
                     @endif
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-jobs" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'jobs'" wire:click="$set('queue_workspace_tab', 'jobs')">
+                    {{ __('Jobs') }}
+                </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-fleet" icon="heroicon-o-square-3-stack-3d" :active="$queue_workspace_tab === 'fleet'" wire:click="$set('queue_workspace_tab', 'fleet')">
                     {{ __('Managed servers') }}
                     @if ($queueStats['machines'] > 0)
@@ -105,7 +144,9 @@
                     @php($latest = $data['latest'])
                     <li class="px-4 py-3.5 sm:px-5" wire:key="queue-{{ $queueName }}">
                         <div class="flex flex-wrap items-baseline justify-between gap-2">
-                            <p class="font-mono text-sm font-semibold text-brand-ink">{{ $queueName }}</p>
+                            <button type="button" wire:click="inspectQueue(@js($queueName))" class="font-mono text-sm font-semibold text-brand-ink hover:text-brand-forest hover:underline">
+                                {{ $queueName }}
+                            </button>
                             @if ($latest)
                                 <p class="text-xs text-brand-mist">
                                     {{ __('source') }} {{ $latest->source }} ·
@@ -296,6 +337,68 @@
             <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Workers') }}</a>{{ __('.') }}
         </div>
             </x-server-workspace-tab-panel>
+        @elseif ($queue_workspace_tab === 'jobs')
+            <x-server-workspace-tab-panel id="queue-panel-jobs" labelled-by="queue-tab-jobs" panel-class="min-w-0">
+                @php($inspected = $this->inspectedJobs())
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <p class="text-xs text-brand-moss">
+                        @if ($inspect_queue !== '')
+                            {{ __('Waiting on') }} <span class="font-mono font-semibold text-brand-ink">{{ $inspect_queue }}</span>
+                            @if ($inspected && $inspected['read_at'])
+                                <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($inspected['read_at'])->diffForHumans()]) }}</span>
+                            @endif
+                        @else
+                            {{ __('Pick a queue on the Queues tab to see what is waiting on it.') }}
+                        @endif
+                    </p>
+                    @if ($inspect_queue !== '')
+                        <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
+                    @endif
+                </div>
+
+                @if ($inspect_queue === '')
+                    <div class="px-4 py-5 text-center text-xs text-brand-moss sm:px-5">{{ __('No queue selected.') }}</div>
+                @elseif ($inspected === null)
+                    {{-- Dispatched but nothing cached yet: this is a queued SSH read,
+                         so "reading" is the honest state rather than "empty". --}}
+                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
+                        <x-spinner size="sm" /> {{ __('Reading the queue…') }}
+                    </div>
+                @elseif ($inspected['error'])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list jobs on this driver.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $inspected['error'] }}</p>
+                    </div>
+                @elseif ($inspected['jobs'] === [])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Nothing waiting.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Only jobs still queued are listed — one that already ran leaves no row behind.') }}</p>
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($inspected['jobs'] as $job)
+                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5">
+                                <p class="min-w-0 font-mono text-xs font-semibold text-brand-ink">{{ $job->name }}</p>
+                                <p class="text-2xs text-brand-mist">
+                                    @if ($job->attempts > 1)
+                                        <span class="font-semibold text-amber-800">{{ __('attempt :n', ['n' => $job->attempts]) }}</span> ·
+                                    @endif
+                                    @if ($job->waitingSeconds !== null)
+                                        {{ __('waiting :s s', ['s' => $job->waitingSeconds]) }}
+                                    @else
+                                        {{ __('queued') }}
+                                    @endif
+                                </p>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($inspected['truncated'])
+                        <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
+                            {{ __('Showing the first :n. The backlog is longer.', ['n' => \App\Jobs\CollectSiteQueueJobsJob::LIMIT]) }}
+                        </div>
+                    @endif
+                @endif
+            </x-server-workspace-tab-panel>
         @else
             <x-server-workspace-tab-panel id="queue-panel-fleet" labelled-by="queue-tab-fleet" panel-class="min-w-0">
                 @if ($pools->isEmpty())
@@ -333,6 +436,22 @@
             </ul>
                 @endif
             </x-server-workspace-tab-panel>
+        @endif
+
+        @if (config('dply.queue_insights.enabled'))
+            <div class="flex flex-wrap items-start justify-between gap-3 border-t border-brand-ink/10 px-4 py-3 sm:px-5">
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-brand-ink">{{ __('Job timing and throughput') }}</p>
+                    <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                        {{ __('Depth, waiting jobs and failures are read from the queue store already. Duration, success and per-class throughput need dply/queue-insights inside the app — a completed job deletes its own row, so nothing outside can see it.') }}
+                    </p>
+                </div>
+                @can('update', $site)
+                    <x-secondary-button size="sm" type="button" wire:click="toggleQueueAgent" class="shrink-0">
+                        {{ $this->queueAgentEnabled() ? __('Disable agent') : __('Install on next deploy') }}
+                    </x-secondary-button>
+                @endcan
+            </div>
         @endif
 
         <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-3 sm:px-5">

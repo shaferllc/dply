@@ -341,6 +341,13 @@ class SiteGitDeployer
             $log .= "\n".$mailNote."\n";
         }
 
+        // Opt-in agent: adds job timing and throughput that reading a store
+        // cannot see. Never fatal — a registry outage must not stop a deploy.
+        $agentNote = app(QueueInsightsInstaller::class)->ensure($site->fresh() ?? $site, $ssh, $path);
+        if ($agentNote !== null) {
+            $log .= "\n".$agentNote."\n";
+        }
+
         // ── LOGGING ── overlay dply's generated config/logging.php now that
         // vendor/ exists (the probe boots the app) and before activate, so a
         // rejected config aborts the deploy without going live. No-op unless the
