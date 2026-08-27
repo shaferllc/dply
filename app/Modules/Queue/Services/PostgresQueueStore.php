@@ -84,6 +84,7 @@ class PostgresQueueStore implements QueueStore
                 'job_max_tries' => $meta['job_max_tries'],
                 'batch_id' => $meta['batch_id'],
                 'display_name' => $meta['display_name'],
+                'group_key' => $meta['group_key'] ?? null,
                 'payload_bytes' => strlen($payload),
                 'created_at' => DB::raw('now()'),
             ];
@@ -198,15 +199,45 @@ class PostgresQueueStore implements QueueStore
         $max = (int) config('queue_service.reservation.max_visibility_seconds', 43200);
 
         $sql = '
-            WITH claimed AS (
-                SELECT id
-                  FROM '.self::JOBS.'
-                 WHERE namespace_id = ?
-                   AND queue = ?
-                   AND visible_at <= now()
-                 ORDER BY visible_at, id
+            WITH locked AS (
+                SELECT j.id, j.group_key, j.visible_at
+                  FROM '.self::JOBS.' j
+                 WHERE j.namespace_id = ?
+                   AND j.queue = ?
+                   AND j.visible_at <= now()
+                   -- Per-group FIFO, half one: skip a group that already has a
+                   -- job in flight. state = 1 with a future visible_at is the
+                   -- in-flight marker the UPDATE below sets.
+                   AND (
+                       j.group_key IS NULL
+                       OR NOT EXISTS (
+                           SELECT 1
+                             FROM '.self::JOBS.' g
+                            WHERE g.namespace_id = j.namespace_id
+                              AND g.queue = j.queue
+                              AND g.group_key = j.group_key
+                              AND g.state = 1
+                              AND g.visible_at > now()
+                       )
+                   )
+                 ORDER BY j.visible_at, j.id
                    FOR UPDATE SKIP LOCKED
                  LIMIT '.$limit.'
+            ), claimed AS (
+                -- Half two, and the one that is easy to miss: the NOT EXISTS
+                -- above is evaluated before ANY row in this batch is reserved,
+                -- so without this a single claim of limit N happily returns N
+                -- jobs from the same group and orders nothing. Keep the first
+                -- row per group; ungrouped rows are exempt because PARTITION BY
+                -- treats all NULLs as one group.
+                SELECT id
+                  FROM (
+                        SELECT id,
+                               group_key,
+                               row_number() OVER (PARTITION BY group_key ORDER BY visible_at, id) AS rn
+                          FROM locked
+                       ) ranked
+                 WHERE group_key IS NULL OR rn = 1
             )
             UPDATE '.self::JOBS.' j
                SET visible_at = now() + (

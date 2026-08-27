@@ -150,7 +150,20 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
   store that follows is scoped as **Horizon compatibility** (a real
   RESP-protocol endpoint), not as a storage swap.
 - `SKIP LOCKED` is not FIFO under concurrency; Laravel users expect the database
-  driver to be. Must be documented.
+  driver to be. **Addressed 2026-08-27 by per-group FIFO**, in the shape SQS
+  message groups use: a job may carry `group_key` (read from `data.groupKey` /
+  `data.messageGroupId` or the envelope), and the claim skips a group that
+  already has a job in flight. Ordering is guaranteed *within* a group; groups
+  run fully in parallel and ungrouped jobs keep today's behaviour, so the
+  autoscaler is untouched. Global FIFO was rejected: it caps a queue at one
+  worker, which is the same as deleting the autoscaler for that queue.
+
+  Two halves are needed and only the first is obvious. The `NOT EXISTS`
+  in-flight check is evaluated *before* any row in a batch is reserved, so a
+  single claim of limit N will return N jobs from one group and order nothing;
+  the CTE therefore also keeps `row_number() = 1` per group. Verified against
+  live Postgres, not mocked — the first version had exactly this bug and passed
+  every reading that did not actually claim twice.
 - Three cache-backed queue features and the failed-job store remain broken on
   serverless after this ships. `ServerlessQueueBackend` and
   `dply:serverless:queue-doctor` must detect and report them, or the product

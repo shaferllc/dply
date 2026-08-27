@@ -44,6 +44,7 @@ final class QueuePayloadInspector
             'job_max_tries' => null,
             'batch_id' => null,
             'display_name' => null,
+            'group_key' => null,
         ];
 
         $decoded = json_decode($payload, true);
@@ -60,6 +61,14 @@ final class QueuePayloadInspector
             'job_max_tries' => $this->positiveInt($decoded['maxTries'] ?? null),
             'batch_id' => $this->string($data['batchId'] ?? null, 64),
             'display_name' => $this->string($decoded['displayName'] ?? null, 255),
+            // Per-group FIFO. Read from the job's own data first — a job that
+            // knows its ordering key sets it — then the envelope, which is
+            // where an SQS-compatible client puts MessageGroupId. Absent means
+            // ungrouped, which is today's fully-concurrent behaviour.
+            'group_key' => $this->string(
+                $data['groupKey'] ?? $data['messageGroupId'] ?? $decoded['groupKey'] ?? $decoded['messageGroupId'] ?? null,
+                128,
+            ),
         ];
     }
 
