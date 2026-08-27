@@ -35,3 +35,33 @@ test('unparseable output is null so the caller can say the app did not answer', 
     expect(extract(''))->toBeNull()
         ->and(extract('DPLY_QC_STARTnot jsonDPLY_QC_END'))->toBeNull();
 });
+
+test('the canary runs from a real file, never through eval', function () {
+    // SerializableClosure reads a closure's SOURCE FILE to serialise it, so a
+    // script delivered via `php -r "eval(...)"` cannot dispatch one:
+    // "file_get_contents(Command line code(1) : eval()'d code)". Every other
+    // remote reader in dply uses eval safely because none serialises a closure.
+    // This test is the only thing standing between that difference and a
+    // canary that fails on every site.
+    $job = new RunSiteQueueCanaryJob('c1', '01hzzzzzzzzzzzzzzzzzzzzzzz', 'default');
+    $bash = (new ReflectionMethod($job, 'buildScript'))->invoke($job, '/srv/app', 'cGF5bG9hZA==');
+
+    expect($bash)->not->toContain('eval(')
+        ->and($bash)->toContain('cat > ')
+        ->and($bash)->toContain('/tmp/dply-canary-c1.php')
+        // The script must be a real PHP file, so it needs its own opening tag.
+        ->and($bash)->toContain('<?php')
+        // And it must clean up after itself.
+        ->and($bash)->toContain('rm -f');
+});
+
+test('the script is removed even when the run fails', function () {
+    $job = new RunSiteQueueCanaryJob('c2', '01hzzzzzzzzzzzzzzzzzzzzzzz', 'default');
+    $bash = (new ReflectionMethod($job, 'buildScript'))->invoke($job, '/srv/app', 'x');
+    $lines = explode("\n", $bash);
+
+    // `|| true` on the run line, so a non-zero exit cannot skip the rm under
+    // runInlineBash's `set -e`.
+    expect(end($lines))->toContain('rm -f')
+        ->and($bash)->toContain('2>&1 || true');
+});

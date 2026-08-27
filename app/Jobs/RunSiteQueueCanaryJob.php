@@ -68,12 +68,7 @@ class RunSiteQueueCanaryJob implements ShouldQueue
             'wait' => self::WAIT_SECONDS,
         ]));
 
-        $bash = sprintf(
-            'cd %s 2>/dev/null && DPLY_QC_IN=%s php -d error_reporting=0 -r "eval(base64_decode(\'%s\'));" 2>&1 || true',
-            escapeshellarg($dir),
-            escapeshellarg($payload),
-            base64_encode($this->remotePhp()),
-        );
+        $bash = $this->buildScript($dir, $payload);
 
         try {
             $out = $exec->runInlineBash($site->server, 'site:queue-canary', $bash, timeoutSeconds: 90, asRoot: false);
@@ -117,6 +112,32 @@ class RunSiteQueueCanaryJob implements ShouldQueue
             'd' => (string) ($result['driver'] ?? '?'),
             'q' => $this->queueName,
         ]));
+    }
+
+    /**
+     * The bash that writes, runs and removes the canary script.
+     *
+     * A real file on disk, never `php -r "eval(...)"`. SerializableClosure
+     * serialises a closure by READING ITS SOURCE FILE through reflection, so
+     * code that arrived via eval() has no file and the dispatch dies with
+     * "file_get_contents(Command line code(1) : eval()'d code)". Every other
+     * remote reader in dply can use eval because none of them serialises a
+     * closure; this one cannot, and the difference is invisible until a real
+     * app tries to dispatch.
+     */
+    private function buildScript(string $dir, string $payload): string
+    {
+        $scriptPath = '/tmp/dply-canary-'.$this->consoleActionId.'.php';
+
+        return implode("\n", [
+            sprintf('cd %s 2>/dev/null || exit 0', escapeshellarg($dir)),
+            sprintf("cat > %s <<'DPLYCANARY'", escapeshellarg($scriptPath)),
+            "<?php\n".$this->remotePhp(),
+            'DPLYCANARY',
+            sprintf('DPLY_QC_IN=%s php -d error_reporting=0 %s 2>&1 || true', escapeshellarg($payload), escapeshellarg($scriptPath)),
+            // Best effort: a leftover script is inert, but /tmp is not a bin.
+            sprintf('rm -f %s || true', escapeshellarg($scriptPath)),
+        ]);
     }
 
     /**
