@@ -391,9 +391,15 @@ class WorkspaceQueue extends Component
      * worker, and the config the app actually booted with. Everything cheaper
      * passes while jobs never run.
      */
-    public function runCanary(string $queue = 'default'): void
+    public function runCanary(string $queue = ''): void
     {
         $this->authorize('update', $this->site);
+
+        // Test the queue a worker actually drains. Hardcoding 'default' meant
+        // the canary could sit forever on a queue nothing consumes while the
+        // real one was fine — a false negative that looks exactly like a broken
+        // queue.
+        $queue = $queue !== '' ? $queue : $this->firstDrainedQueue();
 
         $run = method_exists($this, 'seedQueuedConsoleAction')
             ? $this->seedQueuedConsoleAction('queue_canary', __('Testing the queue'))
@@ -405,9 +411,31 @@ class WorkspaceQueue extends Component
             return;
         }
 
-        RunSiteQueueCanaryJob::dispatch((string) $run->id, (string) $this->site->id, $queue !== '' ? $queue : 'default');
+        RunSiteQueueCanaryJob::dispatch((string) $run->id, (string) $this->site->id, $queue);
 
         $this->toastSuccess(__('Testing — progress shows in the console above.'));
+    }
+
+    /**
+     * The queue the site's first active worker drains, or 'default'.
+     *
+     * A worker with no `--queue=` takes the app's default queue, which only the
+     * app can resolve — 'default' is the right guess for every framework dply
+     * supports.
+     */
+    private function firstDrainedQueue(): string
+    {
+        $worker = $this->workers()->firstWhere('is_active', true) ?? $this->workers()->first();
+
+        if ($worker === null) {
+            return 'default';
+        }
+
+        // A multi-queue worker drains its list in priority order; the first is
+        // the one it reaches for.
+        $declared = QueueWorkerClassifier::queueNameFrom($worker->command) ?? 'default';
+
+        return trim(explode(',', $declared)[0]) ?: 'default';
     }
 
     /**

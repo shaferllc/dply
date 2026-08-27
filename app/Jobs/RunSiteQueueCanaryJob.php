@@ -103,13 +103,20 @@ class RunSiteQueueCanaryJob implements ShouldQueue
             // because "we left something on your queue" should never be a
             // surprise.
             $emit->error(__('No worker picked the job up within :n seconds. It is still queued and harmless — it writes one cache key when something drains it.', ['n' => self::WAIT_SECONDS]), 'canary');
-            $emit->step('canary', __('Driver reported by the app: :d', ['d' => (string) ($result['driver'] ?? 'unknown')]));
+            $emit->step('canary', __('App reports connection :c, driver :d.', [
+                'c' => (string) ($result['connection'] ?? '?'),
+                'd' => (string) ($result['driver'] ?? 'unknown'),
+            ]));
 
             return;
         }
 
         $emit->success(__('Round trip in :ms ms — this site processes queued jobs.', ['ms' => (int) ($result['ms'] ?? 0)]), 'canary');
-        $emit->step('canary', __('Driver :d · queue :q', ['d' => (string) ($result['driver'] ?? '?'), 'q' => $this->queueName]));
+        $emit->step('canary', __('Connection :c · driver :d · queue :q', [
+            'c' => (string) ($result['connection'] ?? '?'),
+            'd' => (string) ($result['driver'] ?? '?'),
+            'q' => $this->queueName,
+        ]));
     }
 
     /**
@@ -134,7 +141,11 @@ $app = $T(function () {
     return $a;
 });
 if ($app === null) { echo 'DPLY_QC_START'.json_encode(['error' => 'Could not boot the application.']).'DPLY_QC_END'; return; }
-$out = ['driver' => $T(fn () => config('queue.connections.'.config('queue.default').'.driver'), null), 'consumed' => false];
+// Pin the connection once and dispatch onto it explicitly. Reading the default
+// twice invites the canary testing one connection while the worker drains
+// another — the exact mismatch this is supposed to catch.
+$conn = $T(fn () => (string) config('queue.default'), '');
+$out = ['driver' => $T(fn () => config('queue.connections.'.$conn.'.driver'), null), 'consumed' => false];
 $cacheDriver = $T(fn () => config('cache.default'), null);
 $store = $T(fn () => config('cache.stores.'.$cacheDriver.'.driver'), null);
 if (in_array($store, ['array', 'null'], true)) {
@@ -147,18 +158,20 @@ if ($out['driver'] === 'sync') {
 }
 $key = 'dply:queue-canary:'.$in['token'];
 $started = microtime(true);
-$dispatched = $T(function () use ($key, $in) {
+// Report what actually went wrong. A swallowed exception here made a missing
+// class, a serialization failure and a broken connection all read as the same
+// guess, which is worse than no message at all.
+$out['connection'] = $conn;
+try {
     // create() wraps the closure in whatever SerializableClosure the installed
     // Laravel uses; naming that class here would break on a version bump.
     \Illuminate\Support\Facades\Bus::dispatch(
         \Illuminate\Queue\CallQueuedClosure::create(function () use ($key) {
             \Illuminate\Support\Facades\Cache::put($key, microtime(true), 300);
-        })->onQueue($in['queue'])
+        })->onConnection($conn)->onQueue($in['queue'])
     );
-    return true;
-}, false);
-if (! $dispatched) {
-    $out['error'] = 'Could not dispatch a closure onto the queue. This app may have closure serialization disabled.';
+} catch (\Throwable $e) {
+    $out['error'] = 'Dispatch failed: '.get_class($e).': '.mb_substr($e->getMessage(), 0, 400);
     echo 'DPLY_QC_START'.json_encode($out).'DPLY_QC_END'; return;
 }
 $deadline = time() + (int) $in['wait'];
