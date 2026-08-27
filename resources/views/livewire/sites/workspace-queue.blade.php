@@ -125,23 +125,17 @@
                         <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $queueStats['workers'] }}</span>
                     @endif
                 </x-server-workspace-tab>
-                <x-server-workspace-tab id="queue-tab-jobs" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'jobs'" wire:click="$set('queue_workspace_tab', 'jobs')">
-                    {{ __('Jobs') }}
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="queue-tab-failed" icon="heroicon-o-exclamation-triangle" :active="$queue_workspace_tab === 'failed'" wire:click="showFailed">
-                    {{ __('Failed') }}
+                <x-server-workspace-tab id="queue-tab-activity" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'activity'" wire:click="showActivity('waiting')">
+                    {{ __('Activity') }}
                     @if ($queueStats['failed'] > 0)
+                        {{-- Failures badge the top level: burying them one level
+                             down would mean opening a tab to learn there is a
+                             problem. --}}
                         <span class="inline-flex shrink-0 items-center rounded-full bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-rose-800">{{ $queueStats['failed'] }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-catalog" icon="heroicon-o-squares-2x2" :active="$queue_workspace_tab === 'catalog'" wire:click="showJobCatalog">
                     {{ __('Job classes') }}
-                </x-server-workspace-tab>
-                <x-server-workspace-tab id="queue-tab-history" icon="heroicon-o-clock" :active="$queue_workspace_tab === 'history'" wire:click="$set('queue_workspace_tab', 'history')">
-                    {{ __('History') }}
-                    @if ($jobRuns->isNotEmpty())
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $jobRuns->count() }}</span>
-                    @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-fleet" icon="heroicon-o-square-3-stack-3d" :active="$queue_workspace_tab === 'fleet'" wire:click="$set('queue_workspace_tab', 'fleet')">
                     {{ __('Managed servers') }}
@@ -213,6 +207,23 @@
                                 </div>
                             </dl>
                         @endif
+
+                        @can('update', $site)
+                            @php($isPaused = in_array($queueName, $this->pausedQueues(), true))
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($queueName))">{{ __('Inspect') }}</x-secondary-button>
+                                @if ($isPaused)
+                                    {{-- Resume restores the worker's ORIGINAL command, so a
+                                         queue that was paused out of a multi-queue worker goes
+                                         back with every flag it had. --}}
+                                    <x-secondary-button size="sm" type="button" wire:click="resumeQueue(@js($queueName))">{{ __('Resume') }}</x-secondary-button>
+                                    <span class="text-2xs font-semibold text-amber-800">{{ __('paused — jobs are piling up') }}</span>
+                                @else
+                                    <x-secondary-button size="sm" type="button" wire:click="pauseQueue(@js($queueName))">{{ __('Pause') }}</x-secondary-button>
+                                @endif
+                                <x-danger-button size="sm" type="button" wire:click="confirmPurge(@js($queueName))">{{ __('Purge') }}</x-danger-button>
+                            </div>
+                        @endcan
                     </li>
                 @endforeach
             </ul>
@@ -229,13 +240,17 @@
                         </x-primary-button>
                     @endcan
                 </div>
-        @if ($showCreate)
+        @if ($showCreate || $edit_worker_id !== '')
+            @php($editing = $edit_worker_id !== '')
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
                 {{-- A queue is not a resource you create — it exists the moment
                      something enqueues to the name. What you create is the worker
                      that drains it, so the form asks for exactly that. --}}
-                <form wire:submit="createWorker" class="space-y-3">
-                    <div>
+                <form wire:submit="{{ $editing ? 'saveWorker' : 'createWorker' }}" class="space-y-3">
+                    @if ($editing)
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('Editing worker') }}</p>
+                    @endif
+                    <div @class(['hidden' => $editing])>
                         <x-input-label for="new_placement" :value="__('Run on')" />
                         <select id="new_placement" wire:model.live="new_placement" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm sm:max-w-sm">
                             <option value="server">{{ __('This server (Supervisor)') }}</option>
@@ -252,7 +267,7 @@
                         @endif
                     </div>
 
-                    @if ($new_placement !== 'server')
+                    @if (! $editing && $new_placement !== 'server')
                         {{-- A pool already runs this app and drains its queues, so the
                              only meaningful "add a worker" there is another machine.
                              Saying so beats a form whose fields quietly do nothing. --}}
@@ -311,12 +326,31 @@
                         </details>
                     @endif
 
+                    @if ($editing)
+                        {{-- The line that will actually be written, rendered through
+                             the same path save uses so the preview cannot drift from
+                             the conf. Flags dply does not model appear here untouched. --}}
+                        <div>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Command to be written') }}</p>
+                            <p class="mt-1 break-all rounded-lg border border-brand-ink/10 bg-white px-3 py-2 font-mono text-2xs text-brand-ink">{{ $this->editedCommand() }}</p>
+                        </div>
+
+                        <details class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
+                            <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Advanced — edit the command directly') }}</summary>
+                            <p class="mt-2 text-2xs leading-4 text-brand-moss">{{ __('Changing this wins over the fields above. It must still be a queue worker, or it belongs under Daemons.') }}</p>
+                            <x-text-input wire:model="edit_command" class="mt-2 block w-full font-mono text-2xs" />
+                            <x-input-error :messages="$errors->get('edit_command')" class="mt-1" />
+                        </details>
+                    @endif
+
                     <div class="flex flex-wrap items-center gap-2">
-                        <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="createWorker">
-                            <span wire:loading.remove wire:target="createWorker">{{ $new_placement === 'server' ? __('Create worker') : __('Add a machine') }}</span>
-                            <span wire:loading wire:target="createWorker">{{ __('Creating…') }}</span>
+                        <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="createWorker,saveWorker">
+                            <span wire:loading.remove wire:target="createWorker,saveWorker">
+                                {{ $editing ? __('Save and restart') : ($new_placement === 'server' ? __('Create worker') : __('Add a machine')) }}
+                            </span>
+                            <span wire:loading wire:target="createWorker,saveWorker">{{ $editing ? __('Saving…') : __('Creating…') }}</span>
                         </x-primary-button>
-                        <x-secondary-button size="sm" type="button" wire:click="closeCreate">{{ __('Cancel') }}</x-secondary-button>
+                        <x-secondary-button size="sm" type="button" wire:click="{{ $editing ? 'cancelEdit' : 'closeCreate' }}">{{ __('Cancel') }}</x-secondary-button>
                     </div>
                 </form>
             </div>
@@ -352,6 +386,7 @@
                                     <x-secondary-button size="sm" type="button" wire:click="startWorker('{{ $worker->id }}')">{{ __('Start') }}</x-secondary-button>
                                 @endif
                                 <x-secondary-button size="sm" type="button" wire:click="restartWorker('{{ $worker->id }}')">{{ __('Restart') }}</x-secondary-button>
+                                <x-secondary-button size="sm" type="button" wire:click="editWorker('{{ $worker->id }}')">{{ __('Edit') }}</x-secondary-button>
                                 <x-danger-button size="sm" type="button"
                                     wire:click="deleteWorker('{{ $worker->id }}')"
                                     wire:confirm="{{ __('Remove this worker? Jobs on its queue will sit unprocessed until another worker drains them.') }}">
@@ -368,131 +403,48 @@
             <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Workers') }}</a>{{ __('.') }}
         </div>
             </x-server-workspace-tab-panel>
-        @elseif ($queue_workspace_tab === 'history')
-            <x-server-workspace-tab-panel id="queue-panel-history" labelled-by="queue-tab-history" panel-class="min-w-0">
-                @if ($jobRuns->isEmpty())
-                    <div class="px-4 py-5 text-center sm:px-5">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
-                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
-                            {{ __('Jobs you run from the Job classes tab appear here immediately. The app\'s own traffic leaves nothing behind in the queue store once it finishes, so that can only come from inside the app.') }}
-                            @if (! $this->queueAgentEnabled())
-                                {{ __('Install the queue agent below and it records from the next deploy.') }}
-                            @else
-                                {{ __('The agent is on — history appears once it is deployed and a job runs.') }}
+        @elseif ($queue_workspace_tab === 'activity')
+            <x-server-workspace-tab-panel id="queue-panel-activity" labelled-by="queue-tab-activity" panel-class="min-w-0">
+                {{-- Waiting, failed and finished are the same question in three
+                     tenses — "what is happening to my jobs" — so they share a
+                     panel rather than three top-level tabs you have to correlate
+                     by memory. --}}
+                <nav class="flex gap-0.5 overflow-x-auto border-b border-brand-ink/10 px-3 py-2 sm:gap-1 sm:px-4" style="-webkit-overflow-scrolling: touch;" aria-label="{{ __('Activity views') }}">
+                    @foreach ([
+                        ['key' => 'waiting', 'label' => __('Waiting'), 'icon' => 'list-bullet', 'count' => null],
+                        ['key' => 'delayed', 'label' => __('Delayed'), 'icon' => 'clock', 'count' => null],
+                        ['key' => 'failed', 'label' => __('Failed'), 'icon' => 'exclamation-triangle', 'count' => $queueStats['failed'] ?: null],
+                        ['key' => 'history', 'label' => __('History'), 'icon' => 'clock', 'count' => $jobRuns->count() ?: null],
+                    ] as $view)
+                        <button
+                            type="button"
+                            wire:click="showActivity(@js($view['key']))"
+                            aria-pressed="{{ $activity_view === $view['key'] ? 'true' : 'false' }}"
+                            @class([
+                                'group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition',
+                                'bg-brand-ink text-brand-cream' => $activity_view === $view['key'],
+                                'text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink' => $activity_view !== $view['key'],
+                            ])
+                        >
+                            <x-dynamic-component :component="'heroicon-o-'.$view['icon']" @class([
+                                'h-3.5 w-3.5 shrink-0',
+                                'text-brand-cream' => $activity_view === $view['key'],
+                                'text-brand-mist group-hover:text-brand-ink' => $activity_view !== $view['key'],
+                            ]) aria-hidden="true" />
+                            {{ $view['label'] }}
+                            @if ($view['count'])
+                                <span @class([
+                                    'inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums',
+                                    'bg-brand-cream/20 text-brand-cream' => $activity_view === $view['key'],
+                                    'bg-brand-sand/80 text-brand-ink' => $activity_view !== $view['key'],
+                                ])>{{ $view['count'] }}</span>
                             @endif
-                        </p>
-                    </div>
-                @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($jobRuns as $run)
-                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="run-{{ $run->id }}">
-                                <div class="min-w-0">
-                                    <p class="font-mono text-xs font-semibold {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-ink' }}">{{ $run->name }}</p>
-                                    @if ($run->status === 'failed' && $run->message)
-                                        <p class="mt-0.5 truncate text-2xs text-rose-700">{{ $run->exception }}: {{ $run->message }}</p>
-                                    @elseif ($run->status !== 'processed' && $run->message)
-                                        <p class="mt-0.5 truncate text-2xs text-brand-moss">{{ $run->message }}</p>
-                                    @endif
-                                </div>
-                                <p class="shrink-0 text-2xs text-brand-mist">
-                                    {{-- What dply can prove, said plainly. 'taken' is NOT success:
-                                         a failed job leaves the queue too, and only the agent can
-                                         tell the two apart. --}}
-                                    @if ($run->status === 'queued')
-                                        <span class="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">{{ __('queued') }}</span>
-                                        &middot;
-                                    @elseif ($run->status === 'taken')
-                                        <span class="rounded-full bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-900" title="{{ __('A worker took it off the queue. Success needs the agent.') }}">{{ __('taken') }}</span>
-                                        &middot;
-                                    @endif
-                                    @if ($run->source && $run->source !== 'agent')
-                                        {{-- One history, four origins. Without the badge a job
-                                             that ran on a pool — or a probe dply dispatched
-                                             itself — is indistinguishable from the app's own
-                                             work on this box. --}}
-                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ $run->source }}</span>
-                                        &middot;
-                                    @endif
-                                    @if ($run->queue){{ $run->queue }} &middot; @endif
-                                    @if ($run->duration_ms !== null){{ $run->duration_ms }} ms &middot; @endif
-                                    {{ $run->ran_at->diffForHumans() }}
-                                </p>
-                            </li>
-                        @endforeach
-                    </ul>
-                @endif
-            </x-server-workspace-tab-panel>
-        @elseif ($queue_workspace_tab === 'jobs')
-            <x-server-workspace-tab-panel id="queue-panel-jobs" labelled-by="queue-tab-jobs" panel-class="min-w-0">
-                @php($inspected = $this->inspectedJobs())
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
-                    <p class="text-xs text-brand-moss">
-                        @if ($inspect_queue !== '')
-                            {{ __('Waiting on') }} <span class="font-mono font-semibold text-brand-ink">{{ $inspect_queue }}</span>
-                            @if ($inspected && $inspected['read_at'])
-                                <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($inspected['read_at'])->diffForHumans()]) }}</span>
-                            @endif
-                        @else
-                            {{ __('Pick a queue on the Queues tab to see what is waiting on it.') }}
-                        @endif
-                    </p>
-                    @if ($inspect_queue !== '')
-                        <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
-                    @endif
-                </div>
+                        </button>
+                    @endforeach
+                </nav>
 
-                @if ($inspect_queue === '')
-                    <div class="px-4 py-5 text-center text-xs text-brand-moss sm:px-5">{{ __('No queue selected.') }}</div>
-                @elseif ($inspected === null)
-                    {{-- Dispatched but nothing cached yet: this is a queued SSH read,
-                         so "reading" is the honest state rather than "empty". --}}
-                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
-                        <x-spinner size="sm" /> {{ __('Reading the queue…') }}
-                    </div>
-                @elseif ($inspected['error'])
-                    <div class="px-4 py-5 text-center sm:px-5">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list jobs on this driver.') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ $inspected['error'] }}</p>
-                    </div>
-                @elseif ($inspected['jobs'] === [])
-                    <div class="px-4 py-5 text-center sm:px-5">
-                        <p class="text-sm font-medium text-brand-ink">{{ __('Nothing waiting.') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">
-                            {{ __('Only jobs still WAITING are listed. A job that already ran deletes its own row, so a fast queue looks empty — that is health, not absence.') }}
-                        </p>
-                        @if (! ($this->queueAgentEnabled()))
-                            <p class="mt-1 text-2xs text-brand-mist">
-                                {{ __('Completed jobs, durations and throughput need the in-app agent — nothing outside the app can see them.') }}
-                            </p>
-                        @endif
-                    </div>
-                @else
-                    <ul class="divide-y divide-brand-ink/10">
-                        @foreach ($inspected['jobs'] as $job)
-                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5">
-                                <p class="min-w-0 font-mono text-xs font-semibold text-brand-ink">{{ $job->name }}</p>
-                                <p class="text-2xs text-brand-mist">
-                                    @if ($job->attempts > 1)
-                                        <span class="font-semibold text-amber-800">{{ __('attempt :n', ['n' => $job->attempts]) }}</span> ·
-                                    @endif
-                                    @if ($job->waitingSeconds !== null)
-                                        {{ __('waiting :s s', ['s' => $job->waitingSeconds]) }}
-                                    @else
-                                        {{ __('queued') }}
-                                    @endif
-                                </p>
-                            </li>
-                        @endforeach
-                    </ul>
-                    @if ($inspected['truncated'])
-                        <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
-                            {{ __('Showing the first :n. The backlog is longer.', ['n' => \App\Jobs\CollectSiteQueueJobsJob::LIMIT]) }}
-                        </div>
-                    @endif
-                @endif
-            </x-server-workspace-tab-panel>
-        @elseif ($queue_workspace_tab === 'failed')
-            <x-server-workspace-tab-panel id="queue-panel-failed" labelled-by="queue-tab-failed" panel-class="min-w-0">
+                @if ($activity_view === 'failed')
+
                 @php($failed = $this->failedJobs())
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <p class="min-w-0 text-xs text-brand-moss">
@@ -555,6 +507,157 @@
                             {{ __('Showing :n of :total. Retry all and Delete all still act on every one.', ['n' => count($failed['jobs']), 'total' => $failed['total']]) }}
                         </div>
                     @endif
+                @endif
+                @elseif ($activity_view === 'history')
+                @if ($jobRuns->isEmpty())
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Jobs you run from the Job classes tab appear here immediately. The app\'s own traffic leaves nothing behind in the queue store once it finishes, so that can only come from inside the app.') }}
+                            @if (! $this->queueAgentEnabled())
+                                {{ __('Install the queue agent below and it records from the next deploy.') }}
+                            @else
+                                {{ __('The agent is on — history appears once it is deployed and a job runs.') }}
+                            @endif
+                        </p>
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($jobRuns as $run)
+                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="run-{{ $run->id }}">
+                                <div class="min-w-0">
+                                    <p class="font-mono text-xs font-semibold {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-ink' }}">{{ $run->name }}</p>
+                                    @if ($run->status === 'failed' && $run->message)
+                                        <p class="mt-0.5 truncate text-2xs text-rose-700">{{ $run->exception }}: {{ $run->message }}</p>
+                                    @elseif ($run->status !== 'processed' && $run->message)
+                                        <p class="mt-0.5 truncate text-2xs text-brand-moss">{{ $run->message }}</p>
+                                    @endif
+                                </div>
+                                <p class="shrink-0 text-2xs text-brand-mist">
+                                    {{-- What dply can prove, said plainly. 'taken' is NOT success:
+                                         a failed job leaves the queue too, and only the agent can
+                                         tell the two apart. --}}
+                                    @if ($run->status === 'queued')
+                                        <span class="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">{{ __('queued') }}</span>
+                                        &middot;
+                                    @elseif ($run->status === 'taken')
+                                        <span class="rounded-full bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-900" title="{{ __('A worker took it off the queue. Success needs the agent.') }}">{{ __('taken') }}</span>
+                                        &middot;
+                                    @endif
+                                    @if ($run->source && $run->source !== 'agent')
+                                        {{-- One history, four origins. Without the badge a job
+                                             that ran on a pool — or a probe dply dispatched
+                                             itself — is indistinguishable from the app's own
+                                             work on this box. --}}
+                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ $run->source }}</span>
+                                        &middot;
+                                    @endif
+                                    @if ($run->queue){{ $run->queue }} &middot; @endif
+                                    @if ($run->duration_ms !== null){{ $run->duration_ms }} ms &middot; @endif
+                                    {{ $run->ran_at->diffForHumans() }}
+                                </p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+                @else
+                @php($inspected = $this->inspectedJobs())
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <p class="text-xs text-brand-moss">
+                        @if ($inspect_queue !== '')
+                            {{ $activity_view === 'delayed' ? __('Scheduled on') : __('Waiting on') }}
+                            <span class="font-mono font-semibold text-brand-ink">{{ $inspect_queue }}</span>
+                            @if ($inspected && $inspected['read_at'])
+                                <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($inspected['read_at'])->diffForHumans()]) }}</span>
+                            @endif
+                        @else
+                            {{ __('Pick a queue on the Queues tab to see what is waiting on it.') }}
+                        @endif
+                    </p>
+                    @if ($inspect_queue !== '')
+                        <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
+                    @endif
+                </div>
+
+                @if ($inspect_queue === '')
+                    <div class="px-4 py-5 text-center text-xs text-brand-moss sm:px-5">{{ __('No queue selected.') }}</div>
+                @elseif ($inspected === null)
+                    {{-- Dispatched but nothing cached yet: this is a queued SSH read,
+                         so "reading" is the honest state rather than "empty". --}}
+                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
+                        <x-spinner size="sm" /> {{ __('Reading the queue…') }}
+                    </div>
+                @elseif ($inspected['error'])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list jobs on this driver.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $inspected['error'] }}</p>
+                    </div>
+                @elseif ($inspected['jobs'] === [])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ $activity_view === 'delayed' ? __('Nothing scheduled.') : __('Nothing waiting.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">
+                            {{ __('Only jobs still WAITING are listed. A job that already ran deletes its own row, so a fast queue looks empty — that is health, not absence.') }}
+                        </p>
+                        @if (! ($this->queueAgentEnabled()))
+                            <p class="mt-1 text-2xs text-brand-mist">
+                                {{ __('Completed jobs, durations and throughput need the in-app agent — nothing outside the app can see them.') }}
+                            </p>
+                        @endif
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($inspected['jobs'] as $row)
+                            @php($job = $row['job'])
+                            <li class="px-4 py-2.5 sm:px-5" wire:key="wj-{{ md5((string) ($job->uuid ?? $loop->index)) }}">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <p class="min-w-0 font-mono text-xs font-semibold text-brand-ink">{{ $job->name }}</p>
+                                    <div class="flex shrink-0 items-center gap-2">
+                                        <p class="text-2xs text-brand-mist">
+                                            @if ($job->attempts > 1)
+                                                <span class="font-semibold text-amber-800">{{ __('attempt :n', ['n' => $job->attempts]) }}</span> ·
+                                            @endif
+                                            @if ($row['available_in'] !== null)
+                                                {{ __('runs in :s s', ['s' => $row['available_in']]) }}
+                                            @elseif ($job->waitingSeconds !== null)
+                                                {{ __('waiting :s s', ['s' => $job->waitingSeconds]) }}
+                                            @else
+                                                {{ __('queued') }}
+                                            @endif
+                                        </p>
+                                        @can('update', $site)
+                                            @if ($job->uuid)
+                                                {{-- Arguments are NOT in the list: they are read from
+                                                     the box on this click, for this job only. --}}
+                                                <x-secondary-button size="sm" type="button" wire:click="revealPayload(@js($job->uuid))">
+                                                    {{ $payload_uuid === $job->uuid ? __('Hide') : __('Payload') }}
+                                                </x-secondary-button>
+                                            @endif
+                                        @endcan
+                                    </div>
+                                </div>
+
+                                @if ($payload_uuid === $job->uuid)
+                                    @php($revealed = $this->revealedPayload())
+                                    <div class="mt-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                                        @if ($revealed === null)
+                                            <p class="flex items-center gap-2 text-2xs text-brand-moss"><x-spinner size="sm" /> {{ __('Reading this job from the server…') }}</p>
+                                        @elseif ($revealed['error'])
+                                            <p class="text-2xs text-brand-moss">{{ $revealed['error'] }}</p>
+                                        @else
+                                            <pre class="max-h-64 overflow-auto whitespace-pre-wrap break-all font-mono text-2xs leading-4 text-brand-ink">{{ $revealed['payload'] }}</pre>
+                                            <p class="mt-1.5 text-2xs text-brand-mist">{{ __('Read from the server just now and not stored — this view expires in a minute.') }}</p>
+                                        @endif
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($inspected['truncated'])
+                        <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
+                            {{ __('Showing the first :n. The backlog is longer.', ['n' => \App\Jobs\CollectSiteQueueJobsJob::LIMIT]) }}
+                        </div>
+                    @endif
+                @endif
                 @endif
             </x-server-workspace-tab-panel>
         @elseif ($queue_workspace_tab === 'catalog')
@@ -707,6 +810,33 @@
             <x-cli-snippet tone="stub" />
         </div>
     </section>
+
+    {{-- Purge. queue:clear does not stop at what is waiting — delayed and
+         reserved jobs go with it — and nothing comes back, so it costs typing
+         the queue's name and lands in the Supervisor audit log. --}}
+    <x-modal name="queue-purge-confirm" max-width="lg" focusable :label="__('Purge a queue')">
+        @php($purgeDepth = $purge_queue !== '' ? (int) (($queues[$purge_queue]['latest']->pending ?? 0)) : 0)
+        <div class="p-6">
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Purge :q?', ['q' => $purge_queue ?: __('this queue')]) }}</h3>
+            <div class="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-xs text-rose-900">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                    {{ __('This runs queue:clear. It deletes what is waiting, what is scheduled for later, and what a worker is holding — :n waiting at the last reading. There is no undo.', ['n' => $purgeDepth]) }}
+                </span>
+            </div>
+
+            <div class="mt-4">
+                <x-input-label for="purge_confirm" :value="__('Type the queue name to confirm')" />
+                <x-text-input id="purge_confirm" wire:model="purge_confirm" class="mt-1 block w-full font-mono text-sm" :placeholder="$purge_queue" autocomplete="off" />
+                <x-input-error :messages="$errors->get('purge_confirm')" class="mt-1" />
+            </div>
+
+            <div class="mt-5 flex justify-end gap-2">
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-purge-confirm')">{{ __('Cancel') }}</x-secondary-button>
+                <x-danger-button size="sm" type="button" wire:click="purgeQueue" wire:loading.attr="disabled">{{ __('Purge it') }}</x-danger-button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- Bulk failed-job actions. Retry-all can put thousands of jobs back on a
          queue in one go, and delete-all destroys the only record of what broke;

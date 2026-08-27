@@ -10,6 +10,7 @@ use App\Jobs\CollectSiteJobClassesJob;
 use App\Jobs\CollectSiteQueueJobsJob;
 use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\DispatchSiteTestJobJob;
+use App\Jobs\ReadSiteQueueJobPayloadJob;
 use App\Jobs\RunSiteQueueCanaryJob;
 use App\Jobs\SetUpSiteQueueingJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -29,6 +30,7 @@ use App\Services\Sites\QueueInsightsInstaller;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
+use App\Support\Sites\QueueWorkerCommand;
 use App\Support\Sites\SiteDaemonAdvisor;
 use App\Support\Sites\SiteQueueConfiguration;
 use App\Support\Sites\SiteQueueReadiness;
@@ -67,6 +69,15 @@ class WorkspaceQueue extends Component
     /** Which section of the Queue workspace is showing. */
     public string $queue_workspace_tab = 'queues';
 
+    /**
+     * Which tense of Activity is showing: waiting, failed or history.
+     *
+     * One panel rather than three tabs — waiting, failed and finished are the
+     * same question about the same jobs, and splitting them at the top level
+     * meant correlating three lists by memory.
+     */
+    public string $activity_view = 'waiting';
+
     /** Queue whose waiting jobs the Jobs tab is showing. */
     public string $inspect_queue = '';
 
@@ -78,6 +89,21 @@ class WorkspaceQueue extends Component
 
     /** Bulk failed-job action awaiting confirmation: 'retry_all' or 'flush'. */
     public string $failed_action = '';
+
+    /** Supervisor program being edited, if any. */
+    public string $edit_worker_id = '';
+
+    /** Raw command, shown and editable under Advanced while editing. */
+    public string $edit_command = '';
+
+    /** Job whose payload was explicitly requested, by envelope uuid. */
+    public string $payload_uuid = '';
+
+    /** Queue the purge modal is asking about. */
+    public string $purge_queue = '';
+
+    /** Typed confirmation for the purge — must match {@see $purge_queue}. */
+    public string $purge_confirm = '';
 
     /** Constructor arguments for that job, as a JSON array: [12, "now"]. */
     public string $dispatch_args = '';
@@ -582,15 +608,19 @@ class WorkspaceQueue extends Component
         $this->authorize('view', $this->site);
 
         $this->inspect_queue = $queue;
-        $this->queue_workspace_tab = 'jobs';
+        $this->queue_workspace_tab = 'activity';
 
-        CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $queue);
+        if (! in_array($this->activity_view, ['waiting', 'delayed'], true)) {
+            $this->activity_view = 'waiting';
+        }
+
+        CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $queue, $this->activity_view);
     }
 
     /**
      * The cached read for the inspected queue, parsed into rows.
      *
-     * @return array{jobs: list<QueueJobPayload>, driver: ?string, truncated: bool, error: ?string, read_at: ?string}|null
+     * @return array{jobs: list<array{job: QueueJobPayload, available_in: ?int}>, driver: ?string, truncated: bool, error: ?string, read_at: ?string}|null
      */
     public function inspectedJobs(): ?array
     {
@@ -598,19 +628,34 @@ class WorkspaceQueue extends Component
             return null;
         }
 
-        $cached = Cache::get(CollectSiteQueueJobsJob::cacheKey((string) $this->site->id, $this->inspect_queue));
+        $scope = $this->activity_view === 'delayed' ? 'delayed' : 'waiting';
+        $cached = Cache::get(CollectSiteQueueJobsJob::cacheKey((string) $this->site->id, $this->inspect_queue, $scope));
 
         if (! is_array($cached)) {
             return null;
         }
 
         $now = strtotime((string) ($cached['read_at'] ?? 'now')) ?: null;
+        $jobs = [];
+
+        foreach ((array) ($cached['jobs'] ?? []) as $row) {
+            // Rows carry their release time now, so one shape covers both
+            // scopes: a waiting job simply has no `available_in`.
+            $json = is_array($row) ? (string) ($row['payload'] ?? '') : (string) $row;
+            $parsed = QueueJobPayload::fromJson($json, $now);
+
+            if ($parsed === null) {
+                continue;
+            }
+
+            $jobs[] = [
+                'job' => $parsed,
+                'available_in' => is_array($row) && is_numeric($row['available_in'] ?? null) ? (int) $row['available_in'] : null,
+            ];
+        }
 
         return [
-            'jobs' => array_values(array_filter(array_map(
-                static fn (string $json): ?QueueJobPayload => QueueJobPayload::fromJson($json, $now),
-                array_map('strval', (array) ($cached['jobs'] ?? [])),
-            ))),
+            'jobs' => $jobs,
             'driver' => $cached['driver'] ?? null,
             'truncated' => (bool) ($cached['truncated'] ?? false),
             'error' => $cached['error'] ?? null,
@@ -619,185 +664,64 @@ class WorkspaceQueue extends Component
     }
 
     /**
-     * Show the catalogue, scanning the release the first time.
+     * Ask the box for one job's full payload.
      *
-     * Scanning on tab-open rather than on page load: it is SSH work, and most
-     * visits to this page are about depth and workers, not about what the app
-     * could run.
+     * The list deliberately does not carry it — see
+     * {@see ReadSiteQueueJobPayloadJob} — so this is a fresh read of a single
+     * job, gated on the permission to change this site.
      */
-    public function showJobCatalog(): void
-    {
-        $this->queue_workspace_tab = 'catalog';
-
-        if (CollectSiteJobClassesJob::cached((string) $this->site->id) === null) {
-            $this->refreshJobCatalog();
-        }
-    }
-
-    public function refreshJobCatalog(): void
-    {
-        $this->authorize('view', $this->site);
-
-        CollectSiteJobClassesJob::dispatch((string) $this->site->id);
-    }
-
-    /**
-     * The cached catalogue, filtered.
-     *
-     * @return array{jobs: list<array<string, mixed>>, truncated: bool, error: ?string, read_at: ?string}|null
-     */
-    public function jobCatalog(): ?array
-    {
-        $cached = CollectSiteJobClassesJob::cached((string) $this->site->id);
-
-        if ($cached === null) {
-            return null;
-        }
-
-        $filter = trim(mb_strtolower($this->catalog_filter));
-
-        if ($filter !== '') {
-            $cached['jobs'] = array_values(array_filter(
-                $cached['jobs'],
-                static fn (array $job): bool => str_contains(mb_strtolower((string) $job['class']), $filter),
-            ));
-        }
-
-        return $cached;
-    }
-
-    /**
-     * Run one of the app's own jobs, for real.
-     *
-     * The class is checked against the catalogue rather than trusted from the
-     * request: this is a class name from the browser that ends up as `new $class`
-     * on the customer's box, and the catalogue is the only list of names that
-     * were ever offered. {@see DispatchSiteTestJobJob} re-checks it remotely too
-     * — the catalogue can be a deploy out of date.
-     */
-    public function dispatchTestJob(string $class): void
+    public function revealPayload(string $uuid): void
     {
         $this->authorize('update', $this->site);
 
-        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
-        $entry = collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $class);
-
-        if ($entry === null) {
-            $this->toastError(__('That job is not in this site\'s catalogue. Re-scan and try again.'));
+        if ($this->payload_uuid === $uuid) {
+            $this->payload_uuid = '';
 
             return;
         }
 
-        if (in_array($entry['kind'] ?? 'job', ['mail', 'notification', 'broadcast'], true)) {
-            $this->toastError(__('This is not dispatched on its own — it needs a recipient or an event.'));
+        $this->payload_uuid = $uuid;
 
-            return;
-        }
-
-        $args = $this->parsedDispatchArgs($class);
-
-        if ($args === null) {
-            $this->addError('dispatch_args', __('Arguments must be a JSON array of numbers, strings or booleans — for example [12, "now"].'));
-
-            return;
-        }
-
-        if (count($args) < (int) ($entry['required_args'] ?? 0)) {
-            $this->addError('dispatch_args', __('This job needs :n argument(s).', ['n' => (int) $entry['required_args']]));
-
-            return;
-        }
-
-        $run = $this->seedQueuedConsoleAction('queue_dispatch', __('Running :class', ['class' => class_basename($class)]));
-
-        DispatchSiteTestJobJob::dispatch(
-            (string) $run->id,
+        ReadSiteQueueJobPayloadJob::dispatch(
             (string) $this->site->id,
-            $class,
-            (string) ($entry['queue'] ?? '') ?: $this->firstDrainedQueue(),
-            $args,
+            $this->inspect_queue,
+            $uuid,
+            (string) auth()->id(),
+            $this->activity_view === 'delayed' ? 'delayed' : 'waiting',
         );
-
-        $this->confirm_class = '';
-        $this->dispatch_args = '';
-        $this->dispatch('close-modal', 'queue-dispatch-confirm');
-
-        $this->toastSuccess(__('Dispatched — progress shows in the console above.'));
     }
 
     /**
-     * Ask before running someone's production job.
-     *
-     * A modal rather than `wire:confirm`: the browser's dialog renders as
-     * "JavaScript from https://dply.io" above text the operator cannot read
-     * beside the job it belongs to, and it cannot carry the argument field this
-     * confirm needs anyway.
+     * @return array{payload: ?string, error: ?string}|null
      */
-    public function confirmDispatch(string $class): void
+    public function revealedPayload(): ?array
     {
-        $this->authorize('update', $this->site);
-        $this->resetValidation();
-
-        $this->dispatch_args = '';
-        $this->confirm_class = $class;
-
-        $this->dispatch('open-modal', 'queue-dispatch-confirm');
-    }
-
-    /** The catalogue row the confirm modal is describing. */
-    public function confirmEntry(): ?array
-    {
-        if ($this->confirm_class === '') {
+        if ($this->payload_uuid === '') {
             return null;
         }
 
-        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
-
-        return collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $this->confirm_class);
+        return ReadSiteQueueJobPayloadJob::cached((string) $this->site->id, (string) auth()->id(), $this->payload_uuid);
     }
 
     /**
-     * The typed arguments, or null when they are not a flat JSON array.
-     *
-     * Scalars only, and that is the whole boundary: an argument that arrives as
-     * an array or object would be handed to `newInstanceArgs` on the customer's
-     * box, and dply has no business shipping structures it cannot type-check.
-     *
-     * @return list<scalar|null>|null
+     * Switch the Activity panel between waiting, delayed, failed and history.
      */
-    private function parsedDispatchArgs(string $class): ?array
+    public function showActivity(string $view): void
     {
-        if ($this->confirm_class !== $class || trim($this->dispatch_args) === '') {
-            return [];
-        }
+        $this->queue_workspace_tab = 'activity';
+        $this->activity_view = in_array($view, ['waiting', 'delayed', 'failed', 'history'], true) ? $view : 'waiting';
 
-        $decoded = json_decode(trim($this->dispatch_args), true);
-
-        if (! is_array($decoded) || ! array_is_list($decoded)) {
-            return null;
-        }
-
-        foreach ($decoded as $value) {
-            if ($value !== null && ! is_scalar($value)) {
-                return null;
-            }
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * Show the failed jobs, reading them the first time.
-     *
-     * Same shape as the catalogue: SSH work happens when the tab is opened, not
-     * on every page load.
-     */
-    public function showFailed(): void
-    {
-        $this->queue_workspace_tab = 'failed';
-
-        if (CollectSiteFailedJobsJob::cached((string) $this->site->id) === null) {
+        // Each view pays its own way: the reads happen when their view is
+        // opened, so landing on Activity does not fire SSH reads for panels
+        // nobody looked at.
+        if ($this->activity_view === 'failed' && CollectSiteFailedJobsJob::cached((string) $this->site->id) === null) {
             $this->refreshFailedJobs();
+        }
+
+        // Delayed is read per queue, like waiting is, so it needs a queue chosen
+        // before there is anything to fetch.
+        if ($this->activity_view === 'delayed' && $this->inspect_queue !== '') {
+            CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $this->inspect_queue, 'delayed');
         }
     }
 
@@ -884,6 +808,490 @@ class WorkspaceQueue extends Component
         CollectSiteFailedJobsJob::dispatch((string) $this->site->id)->delay(now()->addSeconds(10));
 
         $this->toastSuccess($message);
+    }
+
+    /**
+     * Show the catalogue, scanning the release the first time.
+     *
+     * Scanning on tab-open rather than on page load: it is SSH work, and most
+     * visits to this page are about depth and workers, not about what the app
+     * could run.
+     */
+    public function showJobCatalog(): void
+    {
+        $this->queue_workspace_tab = 'catalog';
+
+        if (CollectSiteJobClassesJob::cached((string) $this->site->id) === null) {
+            $this->refreshJobCatalog();
+        }
+    }
+
+    public function refreshJobCatalog(): void
+    {
+        $this->authorize('view', $this->site);
+
+        CollectSiteJobClassesJob::dispatch((string) $this->site->id);
+    }
+
+    /**
+     * The cached catalogue, filtered.
+     *
+     * @return array{jobs: list<array<string, mixed>>, truncated: bool, error: ?string, read_at: ?string}|null
+     */
+    public function jobCatalog(): ?array
+    {
+        $cached = CollectSiteJobClassesJob::cached((string) $this->site->id);
+
+        if ($cached === null) {
+            return null;
+        }
+
+        $filter = trim(mb_strtolower($this->catalog_filter));
+
+        if ($filter !== '') {
+            $cached['jobs'] = array_values(array_filter(
+                $cached['jobs'],
+                static fn (array $job): bool => str_contains(mb_strtolower((string) $job['class']), $filter),
+            ));
+        }
+
+        return $cached;
+    }
+
+    /**
+     * Run one of the app's own jobs, for real.
+     *
+     * The class is checked against the catalogue rather than trusted from the
+     * request: this is a class name from the browser that ends up as
+     * `newInstanceArgs` on the customer's box, and the catalogue is the only
+     * list of names that were ever offered. {@see DispatchSiteTestJobJob}
+     * re-checks it remotely too — the catalogue can be a deploy out of date.
+     */
+    public function dispatchTestJob(string $class): void
+    {
+        $this->authorize('update', $this->site);
+
+        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
+        $entry = collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $class);
+
+        if ($entry === null) {
+            $this->toastError(__('That job is not in this site\'s catalogue. Re-scan and try again.'));
+
+            return;
+        }
+
+        if (in_array($entry['kind'] ?? 'job', ['mail', 'notification', 'broadcast'], true)) {
+            $this->toastError(__('This is not dispatched on its own — it needs a recipient or an event.'));
+
+            return;
+        }
+
+        $args = $this->parsedDispatchArgs($class);
+
+        if ($args === null) {
+            $this->addError('dispatch_args', __('Arguments must be a JSON array of numbers, strings or booleans — for example [12, "now"].'));
+
+            return;
+        }
+
+        if (count($args) < (int) ($entry['required_args'] ?? 0)) {
+            $this->addError('dispatch_args', __('This job needs :n argument(s).', ['n' => (int) $entry['required_args']]));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('queue_dispatch', __('Running :class', ['class' => class_basename($class)]));
+
+        DispatchSiteTestJobJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            $class,
+            (string) ($entry['queue'] ?? '') ?: $this->firstDrainedQueue(),
+            $args,
+        );
+
+        $this->confirm_class = '';
+        $this->dispatch_args = '';
+        $this->dispatch('close-modal', 'queue-dispatch-confirm');
+
+        $this->toastSuccess(__('Dispatched — progress shows in the console above.'));
+    }
+
+    /**
+     * Ask before running someone's production job.
+     *
+     * A modal rather than `wire:confirm`: the browser's dialog renders as
+     * "JavaScript from https://dply.io" above text the operator cannot read
+     * beside the job it belongs to, and it cannot carry the argument field this
+     * confirm needs anyway.
+     */
+    public function confirmDispatch(string $class): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetValidation();
+
+        $this->dispatch_args = '';
+        $this->confirm_class = $class;
+
+        $this->dispatch('open-modal', 'queue-dispatch-confirm');
+    }
+
+    /**
+     * The catalogue row the confirm modal is describing.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function confirmEntry(): ?array
+    {
+        if ($this->confirm_class === '') {
+            return null;
+        }
+
+        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
+
+        return collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $this->confirm_class);
+    }
+
+    /**
+     * The typed arguments, or null when they are not a flat JSON array.
+     *
+     * Scalars only, and that is the whole boundary: an argument that arrives as
+     * an array or object would be handed to `newInstanceArgs` on the customer's
+     * box, and dply has no business shipping structures it cannot type-check.
+     *
+     * @return list<scalar|null>|null
+     */
+    private function parsedDispatchArgs(string $class): ?array
+    {
+        if ($this->confirm_class !== $class || trim($this->dispatch_args) === '') {
+            return [];
+        }
+
+        $decoded = json_decode(trim($this->dispatch_args), true);
+
+        if (! is_array($decoded) || ! array_is_list($decoded)) {
+            return null;
+        }
+
+        foreach ($decoded as $value) {
+            if ($value !== null && ! is_scalar($value)) {
+                return null;
+            }
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * Load a worker into the form.
+     *
+     * The form fields are filled from the command itself rather than from
+     * remembered state — Supervisor's copy is the truth, and a worker edited
+     * over SSH since dply last looked must edit from what is actually running.
+     */
+    public function editWorker(string $id): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetValidation();
+
+        $program = $this->ownedProgram($id);
+
+        if ($program === null) {
+            return;
+        }
+
+        $command = QueueWorkerCommand::parse((string) $program->command);
+
+        $this->edit_worker_id = (string) $program->id;
+        $this->edit_command = (string) $program->command;
+        $this->new_queue = implode(',', $command->queues()) ?: 'default';
+        $this->new_connection = (string) ($command->connection ?? '');
+        $this->new_processes = max(1, (int) $program->numprocs);
+        $this->new_tries = (int) ($command->flags['tries'] ?? 3);
+        $this->new_timeout = (int) ($command->flags['timeout'] ?? 60);
+        $this->new_sleep = (int) ($command->flags['sleep'] ?? 3);
+        $this->new_memory = (int) ($command->flags['memory'] ?? 128);
+        $this->new_max_time = (int) ($command->flags['max-time'] ?? 0);
+        $this->new_backoff = (string) ($command->flags['backoff'] ?? '');
+        $this->new_max_jobs = (string) ($command->flags['max-jobs'] ?? '');
+        $this->new_rest = (string) ($command->flags['rest'] ?? '');
+        $this->new_stop_when_empty = in_array('stop-when-empty', $command->bools, true);
+
+        $this->queue_workspace_tab = 'workers';
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->edit_worker_id = '';
+        $this->edit_command = '';
+        $this->resetValidation();
+    }
+
+    /**
+     * The command an edit would write, for the operator to read before saving.
+     *
+     * Rendered from the SAME path save uses, so the preview cannot drift from
+     * what actually lands in the Supervisor conf.
+     */
+    public function editedCommand(): string
+    {
+        $program = $this->edit_worker_id !== '' ? $this->ownedProgram($this->edit_worker_id) : null;
+
+        if ($program === null) {
+            return '';
+        }
+
+        return $this->applyFormTo(QueueWorkerCommand::parse((string) $program->command))->render();
+    }
+
+    /** Apply the form's values to a parsed command, leaving unmodelled flags alone. */
+    private function applyFormTo(QueueWorkerCommand $command): QueueWorkerCommand
+    {
+        return $command->with(
+            [
+                'queue' => trim($this->new_queue),
+                'tries' => $this->new_tries,
+                'timeout' => $this->new_timeout,
+                'sleep' => $this->new_sleep,
+                'memory' => $this->new_memory,
+                'max-time' => $this->new_max_time > 0 ? $this->new_max_time : '',
+                'backoff' => $this->new_backoff,
+                'max-jobs' => $this->new_max_jobs,
+                'rest' => $this->new_rest,
+            ],
+            ['stop-when-empty' => $this->new_stop_when_empty],
+            trim($this->new_connection),
+        );
+    }
+
+    /**
+     * Save an edited worker and hand the new conf to Supervisor.
+     *
+     * `$edit_command` wins when it was changed by hand: the Advanced field is
+     * an escape hatch for the flag dply does not model, and silently rebuilding
+     * over it would make the escape hatch a lie.
+     */
+    public function saveWorker(SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $program = $this->ownedProgram($this->edit_worker_id);
+
+        if ($program === null) {
+            return;
+        }
+
+        $this->validate([
+            'new_queue' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9_\-:.,]+$/'],
+            'new_connection' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_\-]*$/'],
+            'new_processes' => ['required', 'integer', 'min:1', 'max:50'],
+            'new_tries' => ['required', 'integer', 'min:1', 'max:100'],
+            'new_timeout' => ['required', 'integer', 'min:5', 'max:3600'],
+            'new_sleep' => ['required', 'integer', 'min:0', 'max:300'],
+            'new_memory' => ['required', 'integer', 'min:32', 'max:4096'],
+            'new_max_time' => ['required', 'integer', 'min:0', 'max:86400'],
+            'new_backoff' => ['nullable', 'integer', 'min:0', 'max:86400'],
+            'new_max_jobs' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'new_rest' => ['nullable', 'numeric', 'min:0', 'max:60'],
+        ], attributes: ['new_queue' => __('queue name')]);
+
+        $rebuilt = $this->applyFormTo(QueueWorkerCommand::parse((string) $program->command))->render();
+        $handEdited = trim($this->edit_command) !== '' && trim($this->edit_command) !== trim((string) $program->command);
+        $command = $handEdited ? trim($this->edit_command) : $rebuilt;
+
+        if (! QueueWorkerClassifier::isQueueWorker($command)) {
+            // A command that stops being a queue worker vanishes from this page
+            // and reappears under Daemons, which reads as dply losing it.
+            $this->addError('edit_command', __('That command is not a queue worker any more. Manage it under Daemons instead.'));
+
+            return;
+        }
+
+        $program->forceFill([
+            'command' => $command,
+            'numprocs' => $this->new_processes,
+        ])->save();
+
+        SupervisorDaemonAudit::log($this->server->fresh(), $program, 'edit_queue_worker', [
+            'queue' => trim($this->new_queue),
+            'hand_edited' => $handEdited,
+        ]);
+
+        $this->cancelEdit();
+
+        try {
+            // Rewrites the conf and restarts the program: queue:work finishes
+            // its current job on TERM, so an edit costs one job's latency, not
+            // the job itself.
+            $provisioner->syncProgram($this->server->fresh(), (string) $program->id);
+            $this->toastSuccess(__('Worker updated and restarted.'));
+        } catch (\Throwable $e) {
+            $this->toastError(__('Saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+        }
+    }
+
+    /**
+     * Stop draining one queue without touching the worker's other work.
+     *
+     * A worker on `--queue=high,default` loses `default` and keeps serving
+     * `high`; one that drains nothing else is stopped instead. The original
+     * command is stashed on the site so resume restores exactly what was there,
+     * including flags dply does not model.
+     */
+    public function pauseQueue(string $queue, SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $paused = (array) data_get($this->site->meta, 'queue_paused', []);
+        $touched = 0;
+
+        foreach ($this->workers() as $program) {
+            $command = QueueWorkerCommand::parse((string) $program->command);
+            $queues = $command->queues();
+
+            if (! in_array($queue, $queues, true)) {
+                continue;
+            }
+
+            // The ORIGINAL line, stored whole. Rebuilding it on resume from the
+            // remaining queue names would drop whatever flags dply does not
+            // model — the same loss the edit form exists to prevent.
+            $paused[$queue][(string) $program->id] = (string) $program->command;
+
+            $remaining = array_values(array_filter($queues, static fn (string $q): bool => $q !== $queue));
+
+            if ($remaining === []) {
+                $program->forceFill(['is_active' => false])->save();
+                $this->safely(fn () => $provisioner->stopProgramGroup($this->server->fresh(), (string) $program->id));
+            } else {
+                $program->forceFill(['command' => $command->withQueues($remaining)->render()])->save();
+                $this->safely(fn () => $provisioner->syncProgram($this->server->fresh(), (string) $program->id));
+            }
+
+            SupervisorDaemonAudit::log($this->server->fresh(), $program, 'pause_queue', ['queue' => $queue]);
+            $touched++;
+        }
+
+        if ($touched === 0) {
+            $this->toastError(__('No worker on this site drains :q.', ['q' => $queue]));
+
+            return;
+        }
+
+        $this->writeSiteMeta('queue_paused', $paused);
+        $this->toastSuccess(__('Paused :q. Jobs keep arriving and wait for a worker.', ['q' => $queue]));
+    }
+
+    /** Put a paused queue back exactly as it was. */
+    public function resumeQueue(string $queue, SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $paused = (array) data_get($this->site->meta, 'queue_paused', []);
+        $entries = (array) ($paused[$queue] ?? []);
+
+        foreach ($entries as $programId => $original) {
+            $program = SupervisorProgram::query()
+                ->where('site_id', $this->site->id)
+                ->find((string) $programId);
+
+            // A worker deleted while paused simply has nothing to restore; the
+            // stale entry is cleared below either way.
+            if ($program === null || ! is_string($original) || $original === '') {
+                continue;
+            }
+
+            $program->forceFill(['command' => $original, 'is_active' => true])->save();
+            $this->safely(fn () => $provisioner->syncProgram($this->server->fresh(), (string) $program->id));
+            SupervisorDaemonAudit::log($this->server->fresh(), $program, 'resume_queue', ['queue' => $queue]);
+        }
+
+        unset($paused[$queue]);
+        $this->writeSiteMeta('queue_paused', $paused);
+
+        $this->toastSuccess(__('Resumed :q.', ['q' => $queue]));
+    }
+
+    /**
+     * Which queues are paused, and therefore resumable.
+     *
+     * @return list<string>
+     */
+    public function pausedQueues(): array
+    {
+        return array_keys((array) data_get($this->site->meta, 'queue_paused', []));
+    }
+
+    /** @param  array<string, mixed>  $value */
+    private function writeSiteMeta(string $key, array $value): void
+    {
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+
+        if ($value === []) {
+            unset($meta[$key]);
+        } else {
+            $meta[$key] = $value;
+        }
+
+        $this->site->forceFill(['meta' => $meta])->save();
+    }
+
+    /** Open the purge modal for one queue. */
+    public function confirmPurge(string $queue): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetValidation();
+
+        $this->purge_queue = $queue;
+        $this->purge_confirm = '';
+        $this->dispatch('open-modal', 'queue-purge-confirm');
+    }
+
+    /**
+     * Destroy every job on a queue.
+     *
+     * `queue:clear` takes waiting, delayed AND reserved jobs, and nothing comes
+     * back — which is why it costs typing the queue's name and lands in the
+     * audit log with the operator's id attached.
+     */
+    public function purgeQueue(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (trim($this->purge_confirm) !== trim($this->purge_queue) || $this->purge_queue === '') {
+            $this->addError('purge_confirm', __('Type the queue name exactly to confirm.'));
+
+            return;
+        }
+
+        $queue = $this->purge_queue;
+
+        ControlWorkerDaemonJob::dispatch(
+            (string) $this->site->id,
+            'queue:clear',
+            (string) auth()->id() ?: null,
+            $queue,
+        );
+
+        SupervisorDaemonAudit::log($this->server->fresh(), null, 'purge_queue', ['queue' => $queue]);
+
+        $this->purge_queue = '';
+        $this->purge_confirm = '';
+        $this->dispatch('close-modal', 'queue-purge-confirm');
+
+        CollectServerQueueSnapshotsJob::dispatch((string) $this->server->id)->delay(now()->addSeconds(15));
+
+        $this->toastSuccess(__('Clearing :q — the depth reading updates shortly.', ['q' => $queue]));
+    }
+
+    /** Supervisor calls fail on unreachable boxes; a pause must still record its intent. */
+    private function safely(callable $run): void
+    {
+        try {
+            $run();
+        } catch (\Throwable $e) {
+            $this->toastError(__('Supervisor did not respond: :msg', ['msg' => Str::limit($e->getMessage(), 200)]));
+        }
     }
 
     /** Supervisor programs on this site that actually consume jobs. */

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Read the jobs currently WAITING on one of a site's queues.
+ * Read the jobs waiting — or scheduled — on one of a site's queues.
  *
  * Pending jobs are transient by nature, so nothing here is persisted: the
  * result lands in the cache for a couple of minutes and the page renders that.
@@ -42,13 +42,15 @@ class CollectSiteQueueJobsJob implements ShouldQueue
         // NOT $queue: Queueable already defines that property for the queue the
         // JOB runs on, and redeclaring it is a fatal composition error.
         public string $queueName,
+        /** 'waiting' for the ready backlog, 'delayed' for jobs scheduled ahead. */
+        public string $scope = 'waiting',
     ) {
         $this->onQueue('dply-control');
     }
 
-    public static function cacheKey(string $siteId, string $queue): string
+    public static function cacheKey(string $siteId, string $queue, string $scope = 'waiting'): string
     {
-        return 'site:'.$siteId.':queue-jobs:'.sha1($queue);
+        return 'site:'.$siteId.':queue-jobs:'.$scope.':'.sha1($queue);
     }
 
     public function handle(ExecuteRemoteTaskOnServer $exec): void
@@ -65,7 +67,11 @@ class CollectSiteQueueJobsJob implements ShouldQueue
             return;
         }
 
-        $payload = base64_encode((string) json_encode(['queue' => $this->queueName, 'limit' => self::LIMIT]));
+        $payload = base64_encode((string) json_encode([
+            'queue' => $this->queueName,
+            'limit' => self::LIMIT,
+            'scope' => $this->scope === 'delayed' ? 'delayed' : 'waiting',
+        ]));
         $php = base64_encode($this->remotePhp());
 
         $bash = sprintf(
@@ -87,7 +93,7 @@ class CollectSiteQueueJobsJob implements ShouldQueue
 
         // Cache even an empty/failed read: the page needs to stop saying
         // "loading" whether or not the box had anything to say.
-        Cache::put(self::cacheKey($this->siteId, $this->queueName), [
+        Cache::put(self::cacheKey($this->siteId, $this->queueName, $this->scope), [
             'jobs' => $result['jobs'] ?? [],
             'driver' => $result['driver'] ?? null,
             'truncated' => (bool) ($result['truncated'] ?? false),
@@ -119,21 +125,61 @@ $app = $T(function () {
 if ($app === null) { return; }
 $queue = (string) $in['queue'];
 $limit = (int) $in['limit'];
+$delayed = ($in['scope'] ?? 'waiting') === 'delayed';
 $conn = $T(fn () => config('queue.default'), null);
 $driver = $T(fn () => config('queue.connections.'.$conn.'.driver'), null);
-$out = ['driver' => $driver, 'jobs' => [], 'truncated' => false, 'now' => time()];
+$now = time();
+$out = ['driver' => $driver, 'jobs' => [], 'truncated' => false, 'now' => $now];
+// The serialized job never leaves the box. `data.command` is the customer's
+// object graph — ids, and on occasion whole models — and this list is CACHED,
+// so shipping it would put their data at rest in dply to render a class name.
+// The payload viewer fetches one job on request instead.
+$strip = function (string $json) {
+    $d = json_decode($json, true);
+    if (! is_array($d)) { return $json; }
+    unset($d['data']['command']);
+    return (string) json_encode($d);
+};
 if ($driver === 'database') {
     $table = $T(fn () => config('queue.connections.'.$conn.'.table', 'jobs'), 'jobs');
-    $rows = $T(fn () => \Illuminate\Support\Facades\DB::table($table)->where('queue', $queue)->orderBy('id')->limit($limit + 1)->pluck('payload')->all(), []);
+    $rows = $T(function () use ($table, $queue, $limit, $delayed, $now) {
+        $q = \Illuminate\Support\Facades\DB::table($table)->where('queue', $queue);
+        // available_at is when a worker may TAKE the job; ahead of now means
+        // scheduled, at or behind means it is simply waiting its turn.
+        $q = $delayed ? $q->where('available_at', '>', $now) : $q->where('available_at', '<=', $now);
+        return $q->orderBy($delayed ? 'available_at' : 'id')->limit($limit + 1)->get(['payload', 'available_at'])->all();
+    }, []);
     $out['truncated'] = count($rows) > $limit;
-    $out['jobs'] = array_slice(array_map('strval', $rows), 0, $limit);
+    foreach (array_slice($rows, 0, $limit) as $row) {
+        $out['jobs'][] = [
+            'payload' => $strip((string) $row->payload),
+            'available_in' => $delayed ? max(0, (int) $row->available_at - $now) : null,
+        ];
+    }
 } elseif ($driver === 'redis') {
     $rc = $T(fn () => config('queue.connections.'.$conn.'.connection', 'default'), 'default');
-    $prefix = $T(fn () => (string) config('queue.connections.'.$conn.'.queue', 'default'), 'default');
-    $key = 'queues:'.$queue;
-    $rows = $T(fn () => \Illuminate\Support\Facades\Redis::connection($rc)->lrange($key, 0, $limit), []);
-    $out['truncated'] = count($rows) > $limit;
-    $out['jobs'] = array_slice(array_map('strval', $rows), 0, $limit);
+    $redis = $T(fn () => \Illuminate\Support\Facades\Redis::connection($rc), null);
+    if ($redis === null) {
+        $out['error'] = 'Could not reach Redis.';
+    } elseif ($delayed) {
+        // Delayed jobs live in a sorted set scored by their release time; the
+        // ready list holds none of them, which is why a scheduled job is
+        // invisible in the waiting view.
+        $rows = $T(fn () => $redis->zrange('queues:'.$queue.':delayed', 0, $limit, ['withscores' => true]), []);
+        $rows = is_array($rows) ? $rows : [];
+        $out['truncated'] = count($rows) > $limit;
+        $i = 0;
+        foreach ($rows as $member => $score) {
+            if ($i++ >= $limit) { break; }
+            $out['jobs'][] = ['payload' => $strip((string) $member), 'available_in' => max(0, (int) $score - $now)];
+        }
+    } else {
+        $rows = $T(fn () => $redis->lrange('queues:'.$queue, 0, $limit), []);
+        $out['truncated'] = count($rows) > $limit;
+        foreach (array_slice($rows, 0, $limit) as $row) {
+            $out['jobs'][] = ['payload' => $strip((string) $row), 'available_in' => null];
+        }
+    }
 } else {
     $out['error'] = 'This driver ('.($driver ?: 'unknown').') cannot list waiting jobs.';
 }
