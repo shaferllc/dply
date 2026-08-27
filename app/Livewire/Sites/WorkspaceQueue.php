@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\CollectServerQueueSnapshotsJob;
 use App\Jobs\CollectSiteQueueJobsJob;
 use App\Jobs\RunSiteQueueCanaryJob;
+use App\Jobs\SetUpSiteQueueingJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Models\ConsoleAction;
@@ -382,6 +383,42 @@ class WorkspaceQueue extends Component
         }
 
         return $program;
+    }
+
+    /**
+     * Move this site off `sync` onto a real driver.
+     *
+     * Runs the same stepwise flow the guided setup uses: write the env, push it,
+     * clear the config cache, ensure a worker, and turn on restart-after-deploy.
+     * The config clear is not tidy-up — with a warm cache the app keeps the old
+     * QUEUE_CONNECTION and every later step passes while jobs still run inline,
+     * which is a success indistinguishable from the bug.
+     */
+    public function switchQueueDriver(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $driver = SiteQueueConfiguration::suggestedDriverFor($this->site);
+
+        if ($driver === null) {
+            // No offer we can honour. Better to say so than to write a driver
+            // the site has nothing behind.
+            $this->toastError(__('This site has no Redis or database resource to queue onto. Attach one under Resources first.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('queue_setup', __('Switching to :d', ['d' => $driver]));
+
+        SetUpSiteQueueingJob::dispatch((string) $run->id, (string) $this->site->id, $driver, (string) auth()->id() ?: null);
+
+        $this->toastSuccess(__('Switching this site to the :d queue — progress shows in the console above.', ['d' => $driver]));
+    }
+
+    /** The driver the switch button would use, or null when there is nothing to offer. */
+    public function suggestedQueueDriver(): ?string
+    {
+        return SiteQueueConfiguration::suggestedDriverFor($this->site);
     }
 
     /**

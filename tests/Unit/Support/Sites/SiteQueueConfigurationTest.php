@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Support\Sites\SiteQueueConfigurationTest;
 
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Support\Sites\SiteQueueConfiguration;
+use Illuminate\Database\Eloquent\Collection;
 
 function siteWithEnv(string $env): Site
 {
@@ -48,4 +50,33 @@ test('an unrecognised driver warns without claiming to know better', function ()
     expect($config->isConfigured)->toBeFalse()
         ->and($config->isSync)->toBeFalse()
         ->and($config->warning())->toContain('carrier-pigeon');
+});
+
+test('redis wins over database when the site has both', function () {
+    // A site with Redis already provisioned should not be handed the database
+    // driver — that adds queue churn to its primary database for no reason.
+    $site = new Site;
+    $site->forceFill(['id' => '01hzzzzzzzzzzzzzzzzzzzzzzz']);
+    $site->setRelation('bindings', new Collection([
+        tap(new SiteBinding, fn ($b) => $b->forceFill(['type' => 'database'])),
+        tap(new SiteBinding, fn ($b) => $b->forceFill(['type' => 'redis'])),
+    ]));
+
+    expect(SiteQueueConfiguration::suggestedDriverFor($site))->toBe('redis');
+});
+
+test('database is the fallback, and nothing is offered when there is neither', function () {
+    $with = new Site;
+    $with->forceFill(['id' => 'a']);
+    $with->setRelation('bindings', new Collection([
+        tap(new SiteBinding, fn ($b) => $b->forceFill(['type' => 'database'])),
+    ]));
+
+    $without = new Site;
+    $without->forceFill(['id' => 'b']);
+    $without->setRelation('bindings', new Collection);
+
+    expect(SiteQueueConfiguration::suggestedDriverFor($with))->toBe('database')
+        // Offering a button that cannot work is worse than offering none.
+        ->and(SiteQueueConfiguration::suggestedDriverFor($without))->toBeNull();
 });

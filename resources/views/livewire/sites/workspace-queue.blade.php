@@ -27,9 +27,25 @@
         </x-workspace-panel-head>
 
         @if ($queueConfigWarning)
-            <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-amber-50 px-4 py-3 sm:px-5">
-                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-                <p class="text-xs leading-relaxed text-amber-900">{{ $queueConfigWarning }}</p>
+            @php($suggested = $this->suggestedQueueDriver())
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-amber-50 px-4 py-3 sm:px-5">
+                <div class="flex min-w-0 items-start gap-2.5">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                    <p class="text-xs leading-relaxed text-amber-900">
+                        {{ $queueConfigWarning }}
+                        @if ($suggested === null)
+                            {{ __('Attach a Redis or database resource under Resources and this becomes a one-click switch.') }}
+                        @endif
+                    </p>
+                </div>
+                @can('update', $site)
+                    @if ($suggested !== null)
+                        <x-primary-button size="sm" type="button" class="shrink-0" wire:click="switchQueueDriver" wire:loading.attr="disabled" wire:target="switchQueueDriver">
+                            <span wire:loading.remove wire:target="switchQueueDriver">{{ __('Switch to :d', ['d' => $suggested]) }}</span>
+                            <span wire:loading wire:target="switchQueueDriver">{{ __('Switching…') }}</span>
+                        </x-primary-button>
+                    @endif
+                @endcan
             </div>
         @endif
 

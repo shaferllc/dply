@@ -52,6 +52,39 @@ final class SiteQueueConfiguration
         );
     }
 
+    /**
+     * The driver to switch a `sync` site onto, chosen from what it already has.
+     *
+     * Order matters and is not arbitrary. A site with a redis binding already
+     * has the fastest option provisioned and connected, so handing it the
+     * database driver would add queue churn to its primary database for no
+     * reason. `database` is the fallback because every site has one and Laravel
+     * ships the migration — it is slower, but it works everywhere and provisions
+     * nothing.
+     *
+     * Returns null when neither is available, which is a real state: a static
+     * site or one whose resources have not been bound yet has nothing to switch
+     * TO, and offering a button that cannot work is worse than offering none.
+     */
+    public static function suggestedDriverFor(Site $site): ?string
+    {
+        $site->loadMissing('bindings');
+
+        $hasRedis = $site->bindings->contains(
+            static fn ($binding): bool => in_array($binding->type ?? null, ['redis', 'cache'], true)
+        );
+
+        if ($hasRedis) {
+            return 'redis';
+        }
+
+        $hasDatabase = $site->bindings->contains(
+            static fn ($binding): bool => ($binding->type ?? null) === 'database'
+        );
+
+        return $hasDatabase ? 'database' : null;
+    }
+
     /** A single sentence for the page, or null when there is nothing wrong. */
     public function warning(): ?string
     {
