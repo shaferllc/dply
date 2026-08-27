@@ -202,6 +202,9 @@ final class SiteSettingsSidebar
         // provided here as a convenience entry point. Cron / daemons use site-scoped routes.
         $background = [
             ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule', 'feature' => 'workspace.schedule'],
+            // Queue sits before Workers: it owns anything that consumes jobs,
+            // which leaves Workers as "everything else under Supervisor".
+            ['id' => 'queue', 'label' => __('Queue'), 'icon' => 'heroicon-o-queue-list', 'group' => 'background'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             // Worker SERVERS (the app's worker pool) — detect + scale up/down. A
             // Settings section (no route); the panel shows attached pools or an
@@ -252,6 +255,7 @@ final class SiteSettingsSidebar
             ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
+            ['id' => 'queue', 'label' => __('Queue'), 'icon' => 'heroicon-o-queue-list', 'group' => 'background'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],

@@ -271,6 +271,8 @@
                         @include('livewire.sites.settings.partials.rails.workspace')
                     @elseif ($section === 'wordpress')
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
+                    @elseif ($section === 'queue')
+                        @livewire('sites.workspace-queue', ['server' => $server, 'site' => $site], key('queue-section-'.$site->id))
                     @elseif ($section === 'worker-fleet')
                         <section class="dply-card min-w-0 overflow-hidden p-0">
                             <x-workspace-panel-head

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ServerProvider;
 use App\Http\Controllers\AcmeDnsHookController;
 use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\CaddyAdminApiProxyController;
@@ -244,7 +245,7 @@ Route::get('/', function () {
     // Providers come from the build catalog, not a hand-kept list, so the marketing
     // page can never advertise a provider that is switched off. Deliberately config-only:
     // the per-org Pennant rollout in ServerProviderGate has no meaning for a visitor.
-    $providers = collect(\App\Enums\ServerProvider::cases())
+    $providers = collect(ServerProvider::cases())
         ->filter(fn ($p) => $p->supportsCompute()
             && filter_var(config('servers.providers.enabled.'.$p->value, false), FILTER_VALIDATE_BOOL))
         ->map->label()
@@ -657,8 +658,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Site scheduling lives on Schedule (framework scheduler) + Workers (daemons).
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
+    // Queue owns anything that consumes jobs — on-box workers today, attached
+    // pools next. Workers keeps the rest of Supervisor.
+    //
+    // Deliberately NOT a Route::livewire page: a standalone route renders bare,
+    // without the site sidebar. The {section?} catch-all below hands unknown
+    // sections to the Settings workspace, which IS the chrome — so /queue is a
+    // section and looks like part of the site.
     Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
-        return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
+        return redirect()->route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue'] + request()->query());
     })->name('sites.queue-workers');
     Route::livewire('servers/{server}/sites/{site}/backups', WorkspaceBackups::class)->name('sites.backups');
     // BACKGROUND group for container workspaces — engine-level

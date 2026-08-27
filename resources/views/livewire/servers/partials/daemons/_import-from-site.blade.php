@@ -4,25 +4,19 @@
 @endphp
 
 <section class="border-b border-brand-ink/10">
-    {{-- px-4 py-3.5 sm:px-5 is this tab's section-header scale (inspect / logs /
-         service / sync all use it). This block was on px-6 py-5 sm:px-7 and read
-         as a different, taller component in the same column. --}}
-    <div class="flex items-start gap-2.5 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3.5 sm:px-5">
-        <x-icon-badge>
-            <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Reuse') }}</p>
-            <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Import from another site') }}</h3>
-            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
-                @if ($contextSiteModel)
-                    {{ __('Copy Supervisor programs from another site on this server into :site. Paths and system user are adjusted for this site.', ['site' => $contextSiteModel->name]) }}
-                @else
-                    {{ __('Copy Supervisor programs between sites on this server. Paths and system user are adjusted for the destination site.') }}
-                @endif
-            </p>
-        </div>
-    </div>
+    {{-- Same dense panel head every other section on this tab uses (inspect /
+         logs / service / sync). It replaces the icon-badge + "REUSE" eyebrow +
+         title + prose stack this block used to hand-roll, which was ~90px of
+         chrome above a single select. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-arrow-down-tray"
+        :title="__('Import from another site')"
+        :note="$contextSiteModel
+            ? __('Copy Supervisor programs from another site on this server into :site. Paths and system user are adjusted for this site.', ['site' => $contextSiteModel->name])
+            : __('Copy Supervisor programs between sites on this server. Paths and system user are adjusted for the destination site.')"
+        class="border-b border-brand-ink/10"
+    />
 
     <div class="space-y-4 px-4 py-3.5 sm:px-5">
         {{-- One select (the site-scoped case) sat in a two-column grid and left

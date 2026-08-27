@@ -13,6 +13,7 @@ use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
 use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
+use App\Console\Commands\DispatchSiteQueueSnapshotsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
@@ -30,6 +31,7 @@ use App\Console\Commands\PruneOrphanedSiteDataCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
+use App\Console\Commands\PruneSiteQueueSnapshotsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\ReapStuckConsoleActionsCommand;
@@ -43,13 +45,13 @@ use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
-use App\Modules\Cache\Console\SweepExpiredCacheItemsCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
 use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
 use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
+use App\Modules\Cache\Console\SweepExpiredCacheItemsCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
 use App\Modules\Database\Console\ReapExpiredTrustedSourcesCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
@@ -66,13 +68,13 @@ use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
+use App\Modules\Queue\Console\MeterFleetUsageCommand;
 use App\Modules\Queue\Console\MeterQueueUsageCommand;
+use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
-use App\Modules\Queue\Console\MeterFleetUsageCommand;
-use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
 use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
 use App\Support\DplyRuntime;
@@ -93,6 +95,12 @@ final class DplySchedule
         $schedule->command(DispatchSiteUptimeChecksCommand::class)
             ->everyFiveMinutes()
             ->name('dispatch-site-uptime-checks');
+
+        // Queue depth history. Five minutes is enough to watch a backlog build;
+        // the job fans out per server, so this is one SSH per box, not per site.
+        $schedule->command(DispatchSiteQueueSnapshotsCommand::class)
+            ->everyFiveMinutes()
+            ->name('dispatch-site-queue-snapshots');
 
         // Tier-2 of the server-error-reference feature: sweep PHP-FPM access logs
         // for 5xx responses into the Errors stream. Cadence sits under the
@@ -333,6 +341,7 @@ final class DplySchedule
             ->name('warm-pool-autoscale');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+        $schedule->command(PruneSiteQueueSnapshotsCommand::class)->dailyAt('03:18');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');
         $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');

@@ -1,0 +1,435 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Sites;
+
+use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteQueueSnapshot;
+use App\Models\SupervisorProgram;
+use App\Services\Servers\SupervisorDaemonAudit;
+use App\Services\Servers\SupervisorProvisioner;
+use App\Support\Sites\QueueWorkerClassifier;
+use App\Support\Sites\SiteDaemonAdvisor;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+
+/**
+ * "Is my queue healthy?" — one page, whether the work runs on this box or on an
+ * attached pool.
+ *
+ * Reads only: depth history comes from the five-minute per-server sweep
+ * ({@see CollectServerQueueSnapshotsJob}), never from SSH in the render path.
+ * Refresh queues that same job rather than connecting inline, so the page
+ * behaves identically whether you opened it or the scheduler did.
+ *
+ * Queue-shaped Supervisor programs belong here and are excluded from Workers:
+ * one process, one page, one set of controls.
+ */
+#[Layout('layouts.app')]
+class WorkspaceQueue extends Component
+{
+    use DispatchesToastNotifications;
+
+    public Server $server;
+
+    public Site $site;
+
+    /** Hours of history the depth table summarises. */
+    public int $window_hours = 24;
+
+    public bool $showCreate = false;
+
+    /**
+     * Where the worker runs: 'server' for a Supervisor program on this box, or
+     * a pool id for a managed worker server. The same question — "who drains
+     * this queue" — with two honest answers, rather than one page for each.
+     */
+    public string $new_placement = 'server';
+
+    /** Queue name the new worker drains. */
+    public string $new_queue = 'default';
+
+    /** Blank uses the app's default connection from config/queue.php. */
+    public string $new_connection = '';
+
+    public int $new_processes = 1;
+
+    public int $new_tries = 3;
+
+    public int $new_timeout = 60;
+
+    public int $new_sleep = 3;
+
+    public int $new_memory = 128;
+
+    /** Seconds before a failed job is retried. Blank omits the flag. */
+    public string $new_backoff = '';
+
+    /** Recycle after N jobs — bounds a slow memory leak. Blank omits it. */
+    public string $new_max_jobs = '';
+
+    /** Seconds a worker sleeps between jobs. Blank omits it. */
+    public string $new_rest = '';
+
+    public int $new_max_time = 3600;
+
+    /** Drain and exit instead of waiting — for burst work, not steady queues. */
+    public bool $new_stop_when_empty = false;
+
+    public function mount(Server $server, Site $site): void
+    {
+        $this->authorize('view', $site);
+
+        if ($site->server_id !== $server->id) {
+            abort(404);
+        }
+
+        $this->server = $server;
+        $this->site = $site;
+    }
+
+    /**
+     * Queue the same sweep the scheduler runs. Deliberately not an inline SSH:
+     * PHP's 30s limit makes that a coin-flip on a slow box, and the page would
+     * then show something the scheduled path never produces.
+     */
+    public function refreshSnapshot(): void
+    {
+        $this->authorize('update', $this->site);
+
+        CollectServerQueueSnapshotsJob::dispatch((string) $this->server->id);
+
+        $this->toastSuccess(__('Collecting queue depth — the table updates when it lands.'));
+    }
+
+    public function openCreate(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetValidation();
+        $this->showCreate = true;
+    }
+
+    public function closeCreate(): void
+    {
+        $this->showCreate = false;
+    }
+
+    /**
+     * Create a worker for a queue.
+     *
+     * "Create a queue" is the ask, but a queue is not a resource that exists to
+     * be created — it is a name jobs are pushed to, and it springs into being
+     * the moment something enqueues. What you actually create is the WORKER
+     * that drains it, so that is what this makes: a Supervisor program running
+     * `queue:work --queue=<name>` for this site, written through the same
+     * provisioner the Workers page uses.
+     */
+    public function createWorker(SupervisorProvisioner $provisioner, WorkerPoolManager $pools): void
+    {
+        $this->authorize('update', $this->site);
+
+        // A managed worker server already runs this app's queues; adding a
+        // worker there means one more machine draining them, not a Supervisor
+        // program on a box the site does not live on.
+        if ($this->new_placement !== 'server') {
+            $this->addPoolWorker($this->new_placement, $pools);
+
+            return;
+        }
+
+        $validated = $this->validate([
+            // Laravel allows commas for priority order; the rest is the
+            // conservative set every driver accepts as a queue name.
+            'new_queue' => ['required', 'string', 'max:120', 'regex:/^[A-Za-z0-9_\-:.,]+$/'],
+            'new_connection' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_\-]*$/'],
+            'new_processes' => ['required', 'integer', 'min:1', 'max:50'],
+            'new_tries' => ['required', 'integer', 'min:1', 'max:100'],
+            'new_timeout' => ['required', 'integer', 'min:5', 'max:3600'],
+            'new_sleep' => ['required', 'integer', 'min:0', 'max:300'],
+            'new_memory' => ['required', 'integer', 'min:32', 'max:4096'],
+            'new_max_time' => ['required', 'integer', 'min:0', 'max:86400'],
+            'new_backoff' => ['nullable', 'integer', 'min:0', 'max:86400'],
+            'new_max_jobs' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'new_rest' => ['nullable', 'numeric', 'min:0', 'max:60'],
+        ], attributes: ['new_queue' => __('queue name')]);
+
+        $queue = trim($validated['new_queue']);
+        $directory = rtrim((string) $this->site->effectiveEnvDirectory(), '/');
+
+        if ($directory === '') {
+            $this->toastError(__('This site has no application directory yet — deploy it first.'));
+
+            return;
+        }
+
+        $slug = Str::slug($this->site->name.'-queue-'.$queue);
+
+        if (SupervisorProgram::query()->where('server_id', $this->server->id)->where('slug', $slug)->exists()) {
+            $this->addError('new_queue', __('A worker for that queue already exists on this server.'));
+
+            return;
+        }
+
+        $command = $this->buildWorkerCommand($queue, $validated);
+
+        $program = SupervisorProgram::query()->create([
+            'server_id' => $this->server->id,
+            'site_id' => $this->site->id,
+            'slug' => $slug,
+            'program_type' => 'queue',
+            'command' => $command,
+            'directory' => $directory,
+            'user' => $this->site->effectiveSystemUser($this->server) ?: 'dply',
+            'numprocs' => $validated['new_processes'],
+            'is_active' => true,
+        ]);
+
+        SupervisorDaemonAudit::log($this->server->fresh(), $program, 'create_queue_worker', ['queue' => $queue]);
+
+        try {
+            // Write the conf and reread/update, so the worker is running when
+            // the modal closes rather than "created" but absent from the box.
+            $provisioner->syncProgram($this->server->fresh(), (string) $program->id);
+            $this->toastSuccess(__('Worker created for the :queue queue.', ['queue' => $queue]));
+        } catch (\Throwable $e) {
+            $this->toastError(__('Worker saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+        }
+
+        $this->showCreate = false;
+        $this->new_queue = 'default';
+    }
+
+    /**
+     * The `queue:work` command line for the chosen options.
+     *
+     * Optional flags are OMITTED rather than sent with a default: `--backoff=0`
+     * is not the same as no backoff to every driver, and a command line that
+     * only carries what you set is one you can read back and recognise.
+     *
+     * @param  array<string, mixed>  $o
+     */
+    private function buildWorkerCommand(string $queue, array $o): string
+    {
+        $parts = ['php artisan queue:work'];
+
+        // Connection is positional and must precede the flags.
+        if (trim((string) ($o['new_connection'] ?? '')) !== '') {
+            $parts[] = escapeshellarg(trim((string) $o['new_connection']));
+        }
+
+        $parts[] = sprintf("--queue='%s'", $queue);
+        $parts[] = '--sleep='.(int) $o['new_sleep'];
+        $parts[] = '--timeout='.(int) $o['new_timeout'];
+        $parts[] = '--tries='.(int) $o['new_tries'];
+        $parts[] = '--memory='.(int) $o['new_memory'];
+
+        // --max-time keeps a worker from living forever on stale code: it exits
+        // and Supervisor restarts it, which is how a deploy's new code reaches
+        // the queue at all. 0 means "never exit" — allowed, but deliberate.
+        if ((int) $o['new_max_time'] > 0) {
+            $parts[] = '--max-time='.(int) $o['new_max_time'];
+        }
+
+        foreach (['new_backoff' => '--backoff', 'new_max_jobs' => '--max-jobs', 'new_rest' => '--rest'] as $field => $flag) {
+            if (trim((string) ($o[$field] ?? '')) !== '') {
+                $parts[] = $flag.'='.trim((string) $o[$field]);
+            }
+        }
+
+        if ($this->new_stop_when_empty) {
+            $parts[] = '--stop-when-empty';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    /**
+     * Add one machine to a managed worker pool.
+     *
+     * Scaling, not program-creation: the pool already runs this app and drains
+     * its queues, so "another worker there" is another replica. Going through
+     * WorkerPoolManager keeps one owner of pool size — the Worker Servers page
+     * and this page cannot disagree about desired_count.
+     */
+    private function addPoolWorker(string $poolId, WorkerPoolManager $pools): void
+    {
+        $pool = $this->site->attachedWorkerPools()->firstWhere('id', $poolId);
+
+        if ($pool === null) {
+            $this->addError('new_placement', __('That worker server is not attached to this site.'));
+
+            return;
+        }
+
+        $desired = (int) $pool->desired_count + 1;
+        $max = (int) $pool->max_size;
+
+        if ($max > 0 && $desired > $max) {
+            $this->addError('new_placement', __('That pool is already at its maximum of :max.', ['max' => $max]));
+
+            return;
+        }
+
+        try {
+            $pools->setDesiredCount($pool, $desired);
+            $this->toastSuccess(__('Scaling :pool to :n worker(s).', ['pool' => $pool->name, 'n' => $desired]));
+            $this->showCreate = false;
+        } catch (\Throwable $e) {
+            $this->toastError(Str::limit($e->getMessage(), 300));
+        }
+    }
+
+    public function startWorker(string $id, SupervisorProvisioner $provisioner): void
+    {
+        $this->controlWorker($id, 'start', fn (SupervisorProgram $p) => $provisioner->startProgramGroup($this->server->fresh(), (string) $p->id));
+    }
+
+    public function stopWorker(string $id, SupervisorProvisioner $provisioner): void
+    {
+        $this->controlWorker($id, 'stop', fn (SupervisorProgram $p) => $provisioner->stopProgramGroup($this->server->fresh(), (string) $p->id));
+    }
+
+    public function restartWorker(string $id, SupervisorProvisioner $provisioner): void
+    {
+        $this->controlWorker($id, 'restart', fn (SupervisorProgram $p) => $provisioner->restartProgramGroup($this->server->fresh(), (string) $p->id));
+    }
+
+    public function deleteWorker(string $id, SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $program = $this->ownedProgram($id);
+
+        if ($program === null) {
+            return;
+        }
+
+        try {
+            // Conf file first, row second. The other order leaves an orphan
+            // worker on the box still consuming jobs, with nothing in dply left
+            // pointing at it to stop it.
+            $provisioner->deleteConfigFile($this->server->fresh(), (string) $program->id);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not remove it from Supervisor: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+
+            return;
+        }
+
+        SupervisorDaemonAudit::log($this->server->fresh(), $program, 'delete_queue_worker', []);
+        $program->delete();
+        $this->toastSuccess(__('Worker removed.'));
+    }
+
+    /**
+     * Every control goes through here so a program id from another site (or
+     * another server) can never be started, stopped or deleted from this page.
+     */
+    private function controlWorker(string $id, string $action, callable $run): void
+    {
+        $this->authorize('update', $this->site);
+
+        $program = $this->ownedProgram($id);
+
+        if ($program === null) {
+            return;
+        }
+
+        try {
+            $out = (string) $run($program);
+            SupervisorDaemonAudit::log($this->server->fresh(), $program, $action.'_queue_worker', ['output' => Str::limit($out, 500)]);
+            $this->toastSuccess(Str::limit(trim($out) !== '' ? $out : __('Done.'), 300));
+        } catch (\Throwable $e) {
+            $this->toastError(Str::limit($e->getMessage(), 300));
+        }
+    }
+
+    private function ownedProgram(string $id): ?SupervisorProgram
+    {
+        $program = SupervisorProgram::query()
+            ->where('server_id', $this->server->id)
+            ->where('site_id', $this->site->id)
+            ->whereKey($id)
+            ->first();
+
+        if ($program === null || ! QueueWorkerClassifier::isQueueWorker($program->command)) {
+            $this->toastError(__('That worker is not managed from this page.'));
+
+            return null;
+        }
+
+        return $program;
+    }
+
+    /** Supervisor programs on this site that actually consume jobs. */
+    public function workers(): Collection
+    {
+        return SupervisorProgram::query()
+            ->where('site_id', $this->site->id)
+            ->orderBy('slug')
+            ->get()
+            ->filter(fn (SupervisorProgram $program): bool => QueueWorkerClassifier::isQueueWorker($program->command))
+            ->values();
+    }
+
+    public function render(): View
+    {
+        $since = now()->subHours(max(1, $this->window_hours));
+
+        $snapshots = SiteQueueSnapshot::query()
+            ->where('site_id', $this->site->id)
+            ->where('captured_at', '>=', $since)
+            ->orderByDesc('captured_at')
+            ->limit(2000)
+            ->get();
+
+        // One card per queue: newest reading, plus the window's peak so a
+        // backlog that has already drained is still visible. A queue seen in
+        // history but with no worker now is the interesting case, so the list
+        // is built from BOTH sources rather than from the workers alone.
+        $byQueue = $snapshots->groupBy('queue')->map(function (Collection $rows): array {
+            $latest = $rows->first();
+
+            return [
+                'latest' => $latest,
+                'peak_pending' => (int) $rows->max('pending'),
+                'samples' => $rows->count(),
+                'trend' => $rows->sortBy('captured_at')->pluck('pending')->all(),
+            ];
+        });
+
+        $workers = $this->workers();
+
+        foreach ($workers as $worker) {
+            foreach (explode(',', QueueWorkerClassifier::queueNameFrom($worker->command) ?? 'default') as $queue) {
+                $queue = trim($queue);
+
+                if ($queue !== '' && ! $byQueue->has($queue)) {
+                    // Declared by a worker but never sampled — the sweep has not
+                    // run yet, or it could not read this site.
+                    $byQueue->put($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+                }
+            }
+        }
+
+        return view('livewire.sites.workspace-queue', [
+            // Managed worker servers are part of "is my queue healthy", so they
+            // render here rather than only under Worker Servers.
+            'pools' => $this->site->attachedWorkerPools(),
+            'queueSuggestions' => SiteDaemonAdvisor::onlyForSurface(
+                SiteDaemonAdvisor::suggestions($this->site),
+                SiteDaemonAdvisor::SURFACE_QUEUE,
+            ),
+            'queues' => $byQueue->sortKeys(),
+            'workers' => $workers,
+            'failedTotal' => $snapshots->first()?->failed_total,
+            'lastCapturedAt' => $snapshots->first()?->captured_at,
+        ]);
+    }
+}

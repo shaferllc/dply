@@ -19,7 +19,13 @@
     />
 
     @if ($contextSiteModel ?? null)
-        @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel); @endphp
+        {{-- Workers shows only what it owns. Horizon and queue:work belong to
+             Queue, the scheduler to Schedule — a Set-up button has to create the
+             thing on the page you will look for it on. --}}
+        @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::onlyForSurface(
+            \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel),
+            \App\Support\Sites\SiteDaemonAdvisor::SURFACE_WORKERS,
+        ); @endphp
         @php $daemonSuggestionsDismissed = \App\Support\Sites\SiteDaemonAdvisor::dismissedCount($contextSiteModel); @endphp
         @if ($daemonSuggestions !== [] || $daemonSuggestionsDismissed > 0)
             <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">

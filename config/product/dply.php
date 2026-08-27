@@ -115,6 +115,10 @@ return [
     */
     'site_health_check_enabled' => filter_var(true, FILTER_VALIDATE_BOOL),
 
+    // Queue-depth history. One SSH per server every five minutes; off
+    // switches the sweep without touching the pages that read it.
+    'site_queue_snapshots_enabled' => env('DPLY_SITE_QUEUE_SNAPSHOTS', true),
+    'site_queue_snapshot_retention_days' => (int) env('DPLY_SITE_QUEUE_SNAPSHOT_RETENTION_DAYS', 14),
     'deploy_notifications' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     // Queued notifications (UniversalEventNotification, deploy mail, …) —
@@ -337,7 +341,6 @@ return [
     // Optional override for the in-browser CLI console. When unset, CliConsole
     // uses packages/dply-cli/bin/dply.mjs via Node. Point at a .mjs or binary.
     'cli_binary' => env('DPLY_CLI_BINARY'),
-
 
     'local_workspace_prune' => [
         'enabled' => filter_var(true, FILTER_VALIDATE_BOOL),

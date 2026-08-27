@@ -18,6 +18,9 @@ return [
         'repository' => ['label' => 'Repository'],
         'runtime' => ['label' => 'Runtime'],
         'system-user' => ['label' => 'System user'],
+        // Settings::mount() 404s any section missing from this list, so a new
+        // workspace section is unreachable until it is registered here.
+        'queue' => ['label' => 'Queue'],
         'worker-fleet' => ['label' => 'Worker Servers'],
         'laravel-stack' => ['label' => 'Laravel'],
         'rails-stack' => ['label' => 'Rails'],

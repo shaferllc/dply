@@ -26,6 +26,12 @@ use Illuminate\Support\Collection;
  */
 final class SiteDaemonAdvisor
 {
+    public const SURFACE_QUEUE = 'queue';
+
+    public const SURFACE_SCHEDULE = 'schedule';
+
+    public const SURFACE_WORKERS = 'workers';
+
     /**
      * @return list<array{key: string, label: string, reason: string, kind: string, preset: ?string, command: string, priority: string}>
      */
@@ -95,6 +101,7 @@ final class SiteDaemonAdvisor
                 'laravel-horizon',
                 'php artisan horizon',
                 'high',
+                self::SURFACE_QUEUE,
             );
         }
 
@@ -109,6 +116,7 @@ final class SiteDaemonAdvisor
                 'laravel-queue',
                 'php artisan queue:work',
                 'high',
+                self::SURFACE_QUEUE,
             );
         }
 
@@ -137,6 +145,7 @@ final class SiteDaemonAdvisor
                 'laravel-schedule',
                 'php artisan schedule:work',
                 'medium',
+                self::SURFACE_SCHEDULE,
             );
         }
 
@@ -247,7 +256,14 @@ final class SiteDaemonAdvisor
     /**
      * @return array{key: string, label: string, reason: string, kind: string, preset: ?string, command: string, priority: string}
      */
-    private static function make(string $key, string $label, string $reason, string $kind, ?string $preset, string $command, string $priority): array
+    /**
+     * @param  string  $surface  Which page owns this suggestion — 'queue',
+     *                           'schedule' or 'workers'. A suggestion has to
+     *                           appear where the thing it creates will live, or
+     *                           you set up Horizon on Workers and then look for
+     *                           it on Queue.
+     */
+    private static function make(string $key, string $label, string $reason, string $kind, ?string $preset, string $command, string $priority, string $surface = self::SURFACE_WORKERS): array
     {
         return [
             'key' => $key,
@@ -257,6 +273,21 @@ final class SiteDaemonAdvisor
             'preset' => $preset,
             'command' => $command,
             'priority' => $priority,
+            'surface' => $surface,
         ];
+    }
+
+    /**
+     * The suggestions one page is responsible for.
+     *
+     * @param  list<array<string, mixed>>  $suggestions
+     * @return list<array<string, mixed>>
+     */
+    public static function onlyForSurface(array $suggestions, string $surface): array
+    {
+        return array_values(array_filter(
+            $suggestions,
+            static fn (array $s): bool => ($s['surface'] ?? self::SURFACE_WORKERS) === $surface,
+        ));
     }
 }
