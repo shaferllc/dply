@@ -537,7 +537,16 @@
                 @else
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($jobRuns as $run)
-                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="run-{{ $run->id }}">
+                            <li wire:key="run-{{ $run->id }}">
+                              {{-- The whole row is the control: every field below is
+                                   already on the record, so this discloses rather than
+                                   fetches. --}}
+                              <button
+                                type="button"
+                                wire:click="toggleHistoryRow(@js((string) $run->id))"
+                                aria-expanded="{{ $history_open === (string) $run->id ? 'true' : 'false' }}"
+                                class="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-brand-sand/25 dply-focus sm:px-5"
+                              >
                                 <div class="min-w-0">
                                     <p class="font-mono text-xs font-semibold {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-ink' }}">{{ $run->name }}</p>
                                     @if ($run->status === 'failed' && $run->message)
@@ -568,7 +577,51 @@
                                     @if ($run->queue){{ $run->queue }} &middot; @endif
                                     @if ($run->duration_ms !== null){{ $run->duration_ms }} ms &middot; @endif
                                     {{ $run->ran_at->diffForHumans() }}
+                                    <x-heroicon-m-chevron-down class="ml-1 inline-block h-3 w-3 align-middle transition {{ $history_open === (string) $run->id ? 'rotate-180' : '' }}" aria-hidden="true" />
                                 </p>
+                              </button>
+
+                              @if ($history_open === (string) $run->id)
+                                <div class="border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:px-5">
+                                    <p class="break-all font-mono text-2xs text-brand-moss">{{ $run->name }}</p>
+                                    <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-2xs sm:grid-cols-4">
+                                        @foreach ([
+                                            __('Status') => $run->status,
+                                            __('Queue') => $run->queue ?: '—',
+                                            __('Connection') => $run->connection ?: '—',
+                                            __('Attempts') => $run->attempts ?? '—',
+                                            __('Duration') => $run->duration_ms !== null ? $run->duration_ms.' ms' : '—',
+                                            __('Reported by') => $run->source ?: 'agent',
+                                            __('Ran at') => $run->ran_at->toDayDateTimeString(),
+                                            __('Job id') => $run->job_id ?: '—',
+                                        ] as $label => $value)
+                                            <div>
+                                                <dt class="uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                                <dd class="mt-0.5 break-all font-mono text-brand-ink">{{ $value }}</dd>
+                                            </div>
+                                        @endforeach
+                                    </dl>
+
+                                    @if ($run->exception || $run->message)
+                                        <div class="mt-3 rounded-lg border {{ $run->status === 'failed' ? 'border-rose-200 bg-rose-50/60' : 'border-brand-ink/10 bg-white' }} px-3 py-2">
+                                            @if ($run->exception)
+                                                <p class="font-mono text-2xs font-semibold {{ $run->status === 'failed' ? 'text-rose-800' : 'text-brand-ink' }}">{{ $run->exception }}</p>
+                                            @endif
+                                            @if ($run->message)
+                                                <p class="mt-0.5 whitespace-pre-wrap break-words text-2xs {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-moss' }}">{{ $run->message }}</p>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    @if ($run->status === 'taken')
+                                        {{-- Say it once more where someone is looking closely:
+                                             leaving the queue is not the same as succeeding. --}}
+                                        <p class="mt-2 text-2xs text-brand-mist">{{ __('A worker took this off the queue. Whether it then succeeded needs the in-app agent — a failed job leaves the queue too.') }}</p>
+                                    @elseif ($run->status === 'queued')
+                                        <p class="mt-2 text-2xs text-brand-mist">{{ __('Still on the queue at the last check. It runs when a worker picks it up.') }}</p>
+                                    @endif
+                                </div>
+                              @endif
                             </li>
                         @endforeach
                     </ul>

@@ -97,6 +97,9 @@ class WorkspaceQueue extends Component
     /** Raw command, shown and editable under Advanced while editing. */
     public string $edit_command = '';
 
+    /** History row expanded to show its detail, by run id. */
+    public string $history_open = '';
+
     /** Job whose payload was explicitly requested, by envelope uuid. */
     public string $payload_uuid = '';
 
@@ -1249,6 +1252,18 @@ class WorkspaceQueue extends Component
         }
 
         $this->site->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * Expand one history row.
+     *
+     * Everything shown is already on the record — connection, attempts, job id,
+     * the exception — so this is a disclosure, not a fetch. The list stays
+     * scannable and the detail is one click away instead of absent.
+     */
+    public function toggleHistoryRow(string $id): void
+    {
+        $this->history_open = $this->history_open === $id ? '' : $id;
     }
 
     /**
