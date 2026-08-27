@@ -225,6 +225,13 @@ return [
                 'site.ssl.expiring' => 'SSL certificate expiring',
             ],
         ],
+        'site_queue' => [
+            'label' => 'Site queue health',
+            'events' => [
+                'site.queue.no_worker' => 'Jobs waiting with no worker',
+                'site.queue.backlog' => 'Backlog and stale jobs',
+            ],
+        ],
         'site_errors' => [
             'label' => 'Site error stream notifications',
             'events' => [

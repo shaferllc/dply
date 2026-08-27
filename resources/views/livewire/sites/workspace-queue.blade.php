@@ -14,11 +14,11 @@
         >
             <x-slot:actions>
                 @can('update', $site)
-                    <x-secondary-button size="sm" type="button" wire:click="runCanary" wire:loading.attr="disabled" wire:target="runCanary">
+                    <x-secondary-button size="xs" type="button" wire:click="runCanary" wire:loading.attr="disabled" wire:target="runCanary">
                         <span wire:loading.remove wire:target="runCanary">{{ __('Test queue') }}</span>
                         <span wire:loading wire:target="runCanary">{{ __('Starting…') }}</span>
                     </x-secondary-button>
-                    <x-primary-button size="sm" type="button" wire:click="refreshSnapshot" wire:loading.attr="disabled" wire:target="refreshSnapshot">
+                    <x-primary-button size="xs" type="button" wire:click="refreshSnapshot" wire:loading.attr="disabled" wire:target="refreshSnapshot">
                         <span wire:loading.remove wire:target="refreshSnapshot">{{ __('Refresh') }}</span>
                         <span wire:loading wire:target="refreshSnapshot">{{ __('Queueing…') }}</span>
                     </x-primary-button>
@@ -40,7 +40,7 @@
                 </div>
                 @can('update', $site)
                     @if ($suggested !== null)
-                        <x-primary-button size="sm" type="button" class="shrink-0" wire:click="switchQueueDriver" wire:loading.attr="disabled" wire:target="switchQueueDriver">
+                        <x-primary-button size="xs" type="button" class="shrink-0" wire:click="switchQueueDriver" wire:loading.attr="disabled" wire:target="switchQueueDriver">
                             <span wire:loading.remove wire:target="switchQueueDriver">{{ __('Switch to :d', ['d' => $suggested]) }}</span>
                             <span wire:loading wire:target="switchQueueDriver">{{ __('Switching…') }}</span>
                         </x-primary-button>
@@ -156,6 +156,16 @@
             </div>
         @endif
 
+        @can('update', $site)
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+                <p class="text-xs text-brand-moss">
+                    {{ __('Alerts fire from the five-minute sweep.') }}
+                    <span class="text-brand-mist">{{ __('By default: jobs waiting with nothing draining them.') }}</span>
+                </p>
+                <x-secondary-button size="xs" type="button" wire:click="editAlerts">{{ __('Alert rules') }}</x-secondary-button>
+            </div>
+        @endcan
+
         @if ($queues->isEmpty())
             <div class="px-4 py-5 text-center sm:px-5">
                 {{-- Creation lives on THIS page now, so pointing at Workers was
@@ -211,17 +221,20 @@
                         @can('update', $site)
                             @php($isPaused = in_array($queueName, $this->pausedQueues(), true))
                             <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($queueName))">{{ __('Inspect') }}</x-secondary-button>
+                                <x-secondary-button size="xs" type="button" wire:click="inspectQueue(@js($queueName))">{{ __('Inspect') }}</x-secondary-button>
                                 @if ($isPaused)
                                     {{-- Resume restores the worker's ORIGINAL command, so a
                                          queue that was paused out of a multi-queue worker goes
                                          back with every flag it had. --}}
-                                    <x-secondary-button size="sm" type="button" wire:click="resumeQueue(@js($queueName))">{{ __('Resume') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="resumeQueue(@js($queueName))">{{ __('Resume') }}</x-secondary-button>
                                     <span class="text-2xs font-semibold text-amber-800">{{ __('paused — jobs are piling up') }}</span>
                                 @else
-                                    <x-secondary-button size="sm" type="button" wire:click="pauseQueue(@js($queueName))">{{ __('Pause') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="pauseQueue(@js($queueName))">{{ __('Pause') }}</x-secondary-button>
                                 @endif
-                                <x-danger-button size="sm" type="button" wire:click="confirmPurge(@js($queueName))">{{ __('Purge') }}</x-danger-button>
+                                <x-secondary-button size="xs" type="button" wire:click="editAlerts(@js($queueName))">
+                                    {{ in_array($queueName, $this->overriddenAlertQueues(), true) ? __('Alerts ·') : __('Alerts') }}
+                                </x-secondary-button>
+                                <x-danger-button size="xs" type="button" wire:click="confirmPurge(@js($queueName))">{{ __('Purge') }}</x-danger-button>
                             </div>
                         @endcan
                     </li>
@@ -234,7 +247,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                     <p class="text-xs text-brand-moss">{{ __('Supervisor programs on this site that consume jobs.') }}</p>
                     @can('update', $site)
-                        <x-primary-button size="sm" type="button" wire:click="openCreate">
+                        <x-primary-button size="xs" type="button" wire:click="openCreate">
                             <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add worker') }}
                         </x-primary-button>
@@ -344,13 +357,13 @@
                     @endif
 
                     <div class="flex flex-wrap items-center gap-2">
-                        <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="createWorker,saveWorker">
+                        <x-primary-button size="xs" type="submit" wire:loading.attr="disabled" wire:target="createWorker,saveWorker">
                             <span wire:loading.remove wire:target="createWorker,saveWorker">
                                 {{ $editing ? __('Save and restart') : ($new_placement === 'server' ? __('Create worker') : __('Add a machine')) }}
                             </span>
                             <span wire:loading wire:target="createWorker,saveWorker">{{ $editing ? __('Saving…') : __('Creating…') }}</span>
                         </x-primary-button>
-                        <x-secondary-button size="sm" type="button" wire:click="{{ $editing ? 'cancelEdit' : 'closeCreate' }}">{{ __('Cancel') }}</x-secondary-button>
+                        <x-secondary-button size="xs" type="button" wire:click="{{ $editing ? 'cancelEdit' : 'closeCreate' }}">{{ __('Cancel') }}</x-secondary-button>
                     </div>
                 </form>
             </div>
@@ -381,13 +394,13 @@
                         @can('update', $site)
                             <div class="mt-2 flex flex-wrap items-center gap-1.5" wire:loading.class="opacity-60" wire:target="startWorker,stopWorker,restartWorker,deleteWorker">
                                 @if ($worker->is_active)
-                                    <x-secondary-button size="sm" type="button" wire:click="stopWorker('{{ $worker->id }}')">{{ __('Stop') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="stopWorker('{{ $worker->id }}')">{{ __('Stop') }}</x-secondary-button>
                                 @else
-                                    <x-secondary-button size="sm" type="button" wire:click="startWorker('{{ $worker->id }}')">{{ __('Start') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="startWorker('{{ $worker->id }}')">{{ __('Start') }}</x-secondary-button>
                                 @endif
-                                <x-secondary-button size="sm" type="button" wire:click="restartWorker('{{ $worker->id }}')">{{ __('Restart') }}</x-secondary-button>
-                                <x-secondary-button size="sm" type="button" wire:click="editWorker('{{ $worker->id }}')">{{ __('Edit') }}</x-secondary-button>
-                                <x-danger-button size="sm" type="button"
+                                <x-secondary-button size="xs" type="button" wire:click="restartWorker('{{ $worker->id }}')">{{ __('Restart') }}</x-secondary-button>
+                                <x-secondary-button size="xs" type="button" wire:click="editWorker('{{ $worker->id }}')">{{ __('Edit') }}</x-secondary-button>
+                                <x-danger-button size="xs" type="button"
                                     wire:click="deleteWorker('{{ $worker->id }}')"
                                     wire:confirm="{{ __('Remove this worker? Jobs on its queue will sit unprocessed until another worker drains them.') }}">
                                     {{ __('Remove') }}
@@ -456,11 +469,11 @@
                     <div class="flex shrink-0 items-center gap-2">
                         @can('update', $site)
                             @if ($failed && $failed['jobs'] !== [])
-                                <x-secondary-button size="sm" type="button" wire:click="confirmFailedBulk('retry_all')">{{ __('Retry all') }}</x-secondary-button>
-                                <x-secondary-button size="sm" type="button" wire:click="confirmFailedBulk('flush')">{{ __('Delete all') }}</x-secondary-button>
+                                <x-secondary-button size="xs" type="button" wire:click="confirmFailedBulk('retry_all')">{{ __('Retry all') }}</x-secondary-button>
+                                <x-secondary-button size="xs" type="button" wire:click="confirmFailedBulk('flush')">{{ __('Delete all') }}</x-secondary-button>
                             @endif
                         @endcan
-                        <x-secondary-button size="sm" type="button" wire:click="refreshFailedJobs">{{ __('Re-read') }}</x-secondary-button>
+                        <x-secondary-button size="xs" type="button" wire:click="refreshFailedJobs">{{ __('Re-read') }}</x-secondary-button>
                     </div>
                 </div>
 
@@ -494,8 +507,8 @@
                                     </div>
                                     @can('update', $site)
                                         <div class="flex shrink-0 items-center gap-2">
-                                            <x-secondary-button size="sm" type="button" wire:click="retryFailed(@js($job['uuid']))">{{ __('Retry') }}</x-secondary-button>
-                                            <x-secondary-button size="sm" type="button" wire:click="forgetFailed(@js($job['uuid']))">{{ __('Delete') }}</x-secondary-button>
+                                            <x-secondary-button size="xs" type="button" wire:click="retryFailed(@js($job['uuid']))">{{ __('Retry') }}</x-secondary-button>
+                                            <x-secondary-button size="xs" type="button" wire:click="forgetFailed(@js($job['uuid']))">{{ __('Delete') }}</x-secondary-button>
                                         </div>
                                     @endcan
                                 </div>
@@ -575,7 +588,7 @@
                         @endif
                     </p>
                     @if ($inspect_queue !== '')
-                        <x-secondary-button size="sm" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
+                        <x-secondary-button size="xs" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
                     @endif
                 </div>
 
@@ -628,7 +641,7 @@
                                             @if ($job->uuid)
                                                 {{-- Arguments are NOT in the list: they are read from
                                                      the box on this click, for this job only. --}}
-                                                <x-secondary-button size="sm" type="button" wire:click="revealPayload(@js($job->uuid))">
+                                                <x-secondary-button size="xs" type="button" wire:click="revealPayload(@js($job->uuid))">
                                                     {{ $payload_uuid === $job->uuid ? __('Hide') : __('Payload') }}
                                                 </x-secondary-button>
                                             @endif
@@ -674,7 +687,7 @@
                         @if ($catalog && $catalog['jobs'] !== [])
                             <x-text-input type="search" wire:model.live.debounce.300ms="catalog_filter" class="h-8 w-40 text-xs" :placeholder="__('Filter…')" :aria-label="__('Filter job classes')" />
                         @endif
-                        <x-secondary-button size="sm" type="button" wire:click="refreshJobCatalog">{{ __('Re-scan') }}</x-secondary-button>
+                        <x-secondary-button size="xs" type="button" wire:click="refreshJobCatalog">{{ __('Re-scan') }}</x-secondary-button>
                     </div>
                 </div>
 
@@ -734,7 +747,7 @@
                                             {{-- The confirm lives in the modal below: this runs real
                                                  production work, and the browser's own dialog cannot
                                                  carry the argument field that decision needs. --}}
-                                            <x-secondary-button size="sm" type="button" wire:click="confirmDispatch(@js($job['class']))">
+                                            <x-secondary-button size="xs" type="button" wire:click="confirmDispatch(@js($job['class']))">
                                                 {{ $needsArgs ? __('Run…') : __('Run') }}
                                             </x-secondary-button>
                                         @endif
@@ -799,7 +812,7 @@
                     </p>
                 </div>
                 @can('update', $site)
-                    <x-secondary-button size="sm" type="button" wire:click="toggleQueueAgent" class="shrink-0">
+                    <x-secondary-button size="xs" type="button" wire:click="toggleQueueAgent" class="shrink-0">
                         {{ $this->queueAgentEnabled() ? __('Disable agent') : __('Install on next deploy') }}
                     </x-secondary-button>
                 @endcan
@@ -810,6 +823,72 @@
             <x-cli-snippet tone="stub" />
         </div>
     </section>
+
+    {{-- Alert rules: site defaults, or one queue's override. Thresholds are
+         opt-in because a depth that is fine at 3pm is alarming at 3am, and a
+         number dply invented would be wrong on most sites. --}}
+    <x-modal name="queue-alerts" max-width="lg" focusable :label="__('Alert rules')">
+        <div class="p-6">
+            <h3 class="text-base font-semibold text-brand-ink">
+                {{ $alert_queue === '' ? __('Alert rules for this site') : __('Alert rules for :q', ['q' => $alert_queue]) }}
+            </h3>
+            <p class="mt-1 text-xs text-brand-moss">
+                {{ $alert_queue === ''
+                    ? __('Every queue on this site uses these unless it has its own.')
+                    : __('These replace the site defaults for this queue only.') }}
+            </p>
+
+            <div class="mt-4 space-y-4">
+                @if ($alert_queue === '')
+                    <label for="alerts_enabled" class="flex items-start gap-2.5">
+                        <input id="alerts_enabled" type="checkbox" wire:model="alerts_enabled" class="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40" />
+                        <span class="text-xs leading-5 text-brand-ink">
+                            {{ __('Alert on queue health') }}
+                            <span class="mt-0.5 block text-2xs text-brand-moss">{{ __('Off silences every rule for every queue on this site.') }}</span>
+                        </span>
+                    </label>
+                @endif
+
+                <label for="alert_no_worker" class="flex items-start gap-2.5">
+                    <input id="alert_no_worker" type="checkbox" wire:model="alert_no_worker" class="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40" />
+                    <span class="text-xs leading-5 text-brand-ink">
+                        {{ __('Jobs waiting with no worker') }}
+                        <span class="mt-0.5 block text-2xs text-brand-moss">{{ __('The failure that is wrong at any depth and any hour. Needs no threshold.') }}</span>
+                    </span>
+                </label>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <x-input-label for="alert_pending_over" :value="__('Alert above N waiting')" />
+                        <x-text-input id="alert_pending_over" type="number" min="1" wire:model="alert_pending_over" class="mt-1 block w-full text-sm" :placeholder="__('off')" />
+                        <p class="mt-1 text-2xs text-brand-mist">{{ __('Blank leaves depth alone.') }}</p>
+                        <x-input-error :messages="$errors->get('alert_pending_over')" class="mt-1" />
+                    </div>
+                    <div>
+                        <x-input-label for="alert_sustained_minutes" :value="__('…for this many minutes')" />
+                        <x-text-input id="alert_sustained_minutes" type="number" :min="\App\Support\Sites\SiteQueueAlertRules::MIN_SUSTAINED_MINUTES" max="1440" wire:model="alert_sustained_minutes" class="mt-1 block w-full text-sm" />
+                        <p class="mt-1 text-2xs text-brand-mist">{{ __('A burst that drains never alerts.') }}</p>
+                        <x-input-error :messages="$errors->get('alert_sustained_minutes')" class="mt-1" />
+                    </div>
+                </div>
+
+                <div>
+                    <x-input-label for="alert_oldest_over_s" :value="__('Alert when the oldest job waits longer than (seconds)')" />
+                    <x-text-input id="alert_oldest_over_s" type="number" min="1" wire:model="alert_oldest_over_s" class="mt-1 block w-full text-sm sm:max-w-xs" :placeholder="__('off')" />
+                    <p class="mt-1 text-2xs text-brand-mist">{{ __('Catches a poison job or a worker stuck on one item while the queue keeps moving.') }}</p>
+                    <x-input-error :messages="$errors->get('alert_oldest_over_s')" class="mt-1" />
+                </div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                @if ($alert_queue !== '' && in_array($alert_queue, $this->overriddenAlertQueues(), true))
+                    <x-secondary-button size="sm" type="button" wire:click="clearAlertOverride" class="mr-auto">{{ __('Use site defaults') }}</x-secondary-button>
+                @endif
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-alerts')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button size="sm" type="button" wire:click="saveAlerts" wire:loading.attr="disabled">{{ __('Save rules') }}</x-primary-button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- Purge. queue:clear does not stop at what is waiting — delayed and
          reserved jobs go with it — and nothing comes back, so it costs typing

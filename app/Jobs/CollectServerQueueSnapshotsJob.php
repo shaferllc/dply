@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Sites\SiteQueueAlertEvaluator;
 use App\Support\Sites\QueueWorkerClassifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -210,7 +211,7 @@ PHP;
         if (preg_match_all('/DPLY_Q_START(.*?)DPLY_Q_END/s', $buffer, $matches) !== false) {
             return array_values(array_filter(array_map(
                 static fn (string $json): mixed => json_decode(trim($json), true),
-                $matches[1] ?? [],
+                $matches[1],
             ), 'is_array'));
         }
 
@@ -223,6 +224,7 @@ PHP;
     private function store(array $payloads): void
     {
         $capturedAt = now();
+        $touchedSiteIds = [];
 
         foreach ($payloads as $payload) {
             $siteId = (string) ($payload['site_id'] ?? '');
@@ -230,6 +232,8 @@ PHP;
             if ($siteId === '') {
                 continue;
             }
+
+            $touchedSiteIds[] = $siteId;
 
             foreach ((array) ($payload['queues'] ?? []) as $row) {
                 if (! is_array($row) || ! is_string($row['queue'] ?? null)) {
@@ -248,6 +252,35 @@ PHP;
                     'failed_total' => $this->int($payload['failed_total'] ?? null),
                     'captured_at' => $capturedAt,
                 ]);
+            }
+        }
+
+        $this->evaluateAlerts($touchedSiteIds);
+    }
+
+    /**
+     * Judge what was just measured.
+     *
+     * Here rather than in its own scheduled pass: a separate job would re-read
+     * these same rows minutes later and alert on a state that had already
+     * changed. Never lets an alert failure lose the snapshot — the reading is
+     * the product, the notification is a courtesy on top of it.
+     *
+     * @param  list<string>  $siteIds
+     */
+    private function evaluateAlerts(array $siteIds): void
+    {
+        if ($siteIds === []) {
+            return;
+        }
+
+        $evaluator = app(SiteQueueAlertEvaluator::class);
+
+        foreach (Site::query()->whereIn('id', array_unique($siteIds))->get() as $site) {
+            try {
+                $evaluator->evaluate($site);
+            } catch (\Throwable $e) {
+                Log::info('queue alerts: evaluation failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
             }
         }
     }

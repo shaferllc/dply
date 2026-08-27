@@ -128,6 +128,13 @@ return [
         'constraint' => env('DPLY_QUEUE_INSIGHTS_CONSTRAINT', '^1.0'),
     ],
     'site_queue_snapshot_retention_days' => (int) env('DPLY_SITE_QUEUE_SNAPSHOT_RETENTION_DAYS', 14),
+
+    // How long a fired queue alert stays quiet before it may fire again for the
+    // same queue and rule. A backlog that lasts an hour is one problem, not one
+    // notification per five-minute sweep.
+    'queue_alerts' => [
+        'cooldown_minutes' => (int) env('DPLY_QUEUE_ALERT_COOLDOWN_MINUTES', 60),
+    ],
     'deploy_notifications' => filter_var(true, FILTER_VALIDATE_BOOL),
 
     // Queued notifications (UniversalEventNotification, deploy mail, …) —

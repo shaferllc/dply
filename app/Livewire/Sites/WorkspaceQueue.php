@@ -32,6 +32,7 @@ use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
 use App\Support\Sites\QueueWorkerCommand;
 use App\Support\Sites\SiteDaemonAdvisor;
+use App\Support\Sites\SiteQueueAlertRules;
 use App\Support\Sites\SiteQueueConfiguration;
 use App\Support\Sites\SiteQueueReadiness;
 use Illuminate\Contracts\View\View;
@@ -98,6 +99,20 @@ class WorkspaceQueue extends Component
 
     /** Job whose payload was explicitly requested, by envelope uuid. */
     public string $payload_uuid = '';
+
+    /** Queue whose alert rules are open, or '' for the site defaults. */
+    public string $alert_queue = '';
+
+    public bool $alerts_enabled = true;
+
+    /** Blank disables the rule — a threshold dply invented is worse than none. */
+    public string $alert_pending_over = '';
+
+    public int $alert_sustained_minutes = 10;
+
+    public string $alert_oldest_over_s = '';
+
+    public bool $alert_no_worker = true;
 
     /** Queue the purge modal is asking about. */
     public string $purge_queue = '';
@@ -1234,6 +1249,101 @@ class WorkspaceQueue extends Component
         }
 
         $this->site->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * Open the alert rules — the site's defaults, or one queue's override.
+     *
+     * Loaded through the same resolver the evaluator uses, so the form shows
+     * what would actually fire rather than what is stored: a queue with no
+     * override displays the defaults it inherits.
+     */
+    public function editAlerts(string $queue = ''): void
+    {
+        $this->authorize('update', $this->site);
+        $this->resetValidation();
+
+        $this->alert_queue = $queue;
+
+        $rules = $queue === ''
+            ? SiteQueueAlertRules::fromArray(
+                (array) data_get($this->site->meta, 'queue_alerts.defaults', []),
+                (bool) data_get($this->site->meta, 'queue_alerts.enabled', true),
+            )
+            : SiteQueueAlertRules::for($this->site, $queue);
+
+        $this->alerts_enabled = $rules->enabled;
+        $this->alert_pending_over = $rules->pendingOver === null ? '' : (string) $rules->pendingOver;
+        $this->alert_sustained_minutes = $rules->sustainedMinutes;
+        $this->alert_oldest_over_s = $rules->oldestOverSeconds === null ? '' : (string) $rules->oldestOverSeconds;
+        $this->alert_no_worker = $rules->noWorker;
+
+        $this->dispatch('open-modal', 'queue-alerts');
+    }
+
+    public function saveAlerts(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->validate([
+            'alert_pending_over' => ['nullable', 'integer', 'min:1', 'max:10000000'],
+            'alert_oldest_over_s' => ['nullable', 'integer', 'min:1', 'max:604800'],
+            'alert_sustained_minutes' => ['required', 'integer', 'min:'.SiteQueueAlertRules::MIN_SUSTAINED_MINUTES, 'max:1440'],
+        ]);
+
+        $stored = (array) data_get($this->site->meta, 'queue_alerts', []);
+        $values = [
+            'pending_over' => $this->alert_pending_over === '' ? null : (int) $this->alert_pending_over,
+            'sustained_minutes' => $this->alert_sustained_minutes,
+            'oldest_over_s' => $this->alert_oldest_over_s === '' ? null : (int) $this->alert_oldest_over_s,
+            'no_worker' => $this->alert_no_worker,
+        ];
+
+        if ($this->alert_queue === '') {
+            $stored['enabled'] = $this->alerts_enabled;
+            $stored['defaults'] = $values;
+        } else {
+            $stored['queues'][$this->alert_queue] = $values;
+        }
+
+        // Changing a threshold clears what already fired: leaving the old marker
+        // would keep a queue silent under a rule that no longer describes it.
+        unset($stored['state']);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['queue_alerts'] = $stored;
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        $this->dispatch('close-modal', 'queue-alerts');
+        $this->toastSuccess($this->alert_queue === ''
+            ? __('Alert rules saved for this site.')
+            : __('Alert rules saved for :q.', ['q' => $this->alert_queue]));
+    }
+
+    /** Drop a queue's override so it follows the site defaults again. */
+    public function clearAlertOverride(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->alert_queue === '') {
+            return;
+        }
+
+        $stored = (array) data_get($this->site->meta, 'queue_alerts', []);
+        unset($stored['queues'][$this->alert_queue], $stored['state']);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['queue_alerts'] = $stored;
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        $this->dispatch('close-modal', 'queue-alerts');
+        $this->toastSuccess(__(':q follows the site defaults again.', ['q' => $this->alert_queue]));
+    }
+
+    /** Queues carrying their own rules, so the list can say which are special. */
+    public function overriddenAlertQueues(): array
+    {
+        return array_keys((array) data_get($this->site->meta, 'queue_alerts.queues', []));
     }
 
     /** Open the purge modal for one queue. */
