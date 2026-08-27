@@ -1,13 +1,13 @@
 <?php
 
-use App\Http\Controllers\Api\CapabilitiesApiController;
-use App\Http\Controllers\Api\VmSiteCreateApiController;
 use App\Http\Controllers\Api\AccountApiController;
 use App\Http\Controllers\Api\Auth\DeviceAuthorizationController;
 use App\Http\Controllers\Api\BundleEntitlementsController;
+use App\Http\Controllers\Api\CapabilitiesApiController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
+use App\Http\Controllers\Api\NotificationApiController;
 use App\Http\Controllers\Api\OperatorReadmeController;
 use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ProjectApiController;
@@ -19,8 +19,9 @@ use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
 use App\Http\Controllers\Api\SiteEnvApiController;
-use App\Http\Controllers\Api\NotificationApiController;
+use App\Http\Controllers\Api\SiteQueueEventController;
 use App\Http\Controllers\Api\SiteResourceApiController;
+use App\Http\Controllers\Api\VmSiteCreateApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use App\Modules\Billing\Http\Controllers\Api\BillingApiController;
 use App\Modules\Cache\Http\Controllers\DynamoDbCompatibilityController;
@@ -46,7 +47,11 @@ Route::post('/metrics', [MetricsController::class, 'store'])
 // worker-pool dashboard. High-frequency but tiny; throttled generously.
 Route::post('/worker-pools/{pool}/job-events', [WorkerPoolJobEventController::class, 'store'])
     ->middleware('throttle:600,1');
-
+// The in-app queue agent reports here. Per-site bearer token; no session, no
+// CSRF — it is called from a customer's worker process, not a browser.
+Route::post('/sites/{site}/queue-events', [SiteQueueEventController::class, 'store'])
+    ->middleware('throttle:600,1')
+    ->name('sites.queue-events');
 Route::prefix('v1')->group(function (): void {
     // OAuth-style device-flow login for the dply CLI. The CLI calls
     // /auth/device/start (unauthenticated) to mint a code pair, points

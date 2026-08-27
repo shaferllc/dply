@@ -13,11 +13,14 @@ use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteQueueJobRun;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\Servers\SupervisorProvisioner;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\QueueInsightsInstaller;
 use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
@@ -490,13 +493,51 @@ class WorkspaceQueue extends Component
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $enabled = ! (bool) data_get($meta, 'queue_insights.enabled', false);
-        $meta['queue_insights'] = ['enabled' => $enabled];
+
+        // A token that survives toggling off and on: rotating it would orphan
+        // any worker still running with the old one, and those keep reporting
+        // until the next deploy restarts them.
+        $token = (string) data_get($meta, 'queue_insights.token', '') ?: (string) Str::random(48);
+        $meta['queue_insights'] = ['enabled' => $enabled, 'token' => $token];
 
         $this->site->forceFill(['meta' => $meta])->save();
+
+        // Without the endpoint and token in the app's env the package installs
+        // and then registers no listeners at all — silently, by design. Writing
+        // them here means the same deploy that installs it also switches it on.
+        $this->writeAgentEnv($enabled, $token);
 
         $this->toastSuccess($enabled
             ? __('The queue agent installs on the next deploy.')
             : __('The queue agent will not be installed. It stays in place until the next deploy removes it.'));
+    }
+
+    /**
+     * Put the agent's endpoint and token into the site's env, or take them out.
+     *
+     * Written to dply's copy; the next deploy or env push carries it to the box.
+     * Removing the keys is how "disable" works — the package stays installed
+     * until a deploy removes it, and an agent with no endpoint is inert.
+     */
+    private function writeAgentEnv(bool $enabled, string $token): void
+    {
+        $parser = app(DotEnvFileParser::class);
+        $writer = app(DotEnvFileWriter::class);
+
+        $existing = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $variables = $existing['variables'];
+
+        if ($enabled) {
+            $variables['DPLY_QUEUE_INSIGHTS_ENDPOINT'] = route('sites.queue-events', ['site' => $this->site->id]);
+            $variables['DPLY_QUEUE_INSIGHTS_TOKEN'] = $token;
+        } else {
+            unset($variables['DPLY_QUEUE_INSIGHTS_ENDPOINT'], $variables['DPLY_QUEUE_INSIGHTS_TOKEN']);
+        }
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($variables, $existing['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
     }
 
     public function queueAgentEnabled(): bool
@@ -638,6 +679,13 @@ class WorkspaceQueue extends Component
                     ->orderByDesc('created_at')
                     ->first(),
             'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers, $pools, $snapshots->first()),
+            // Jobs that actually RAN. Only the in-app agent can supply these:
+            // a processed job leaves nothing behind in the store.
+            'jobRuns' => SiteQueueJobRun::query()
+                ->where('site_id', $this->site->id)
+                ->orderByDesc('ran_at')
+                ->limit(100)
+                ->get(),
             // Managed worker servers are part of "is my queue healthy", so they
             // render here rather than only under Worker Servers.
             'pools' => $pools,

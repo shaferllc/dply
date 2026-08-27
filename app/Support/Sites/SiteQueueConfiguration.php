@@ -35,6 +35,17 @@ final class SiteQueueConfiguration
 
     public static function for(Site $site): self
     {
+        // What the APP said about itself, if a canary has ever run. dply's copy
+        // of the .env can be stale — someone edits it on the box, or a deploy
+        // pushed a value dply never recorded — and a readiness panel insisting
+        // on `sync` while a green round trip says `redis` is worse than no
+        // panel. An observation beats a record.
+        $observed = strtolower(trim((string) data_get($site->meta, 'queue_observed.driver', '')));
+
+        if ($observed !== '') {
+            return new self($observed, in_array($observed, self::ASYNC_DRIVERS, true), $observed === 'sync');
+        }
+
         $env = self::parse($site->effectiveEnvFileContent());
         $connection = strtolower(trim((string) ($env['QUEUE_CONNECTION'] ?? '')));
 

@@ -80,3 +80,24 @@ test('database is the fallback, and nothing is offered when there is neither', f
         // Offering a button that cannot work is worse than offering none.
         ->and(SiteQueueConfiguration::suggestedDriverFor($without))->toBeNull();
 });
+
+test('what the app reported beats what dply recorded', function () {
+    // The real contradiction: a canary proved redis end to end while dply's
+    // stored .env still read sync. A panel arguing with a green round trip is
+    // worse than no panel.
+    $site = siteWithEnv("QUEUE_CONNECTION=sync\n");
+    $site->forceFill(['meta' => ['queue_observed' => ['driver' => 'redis', 'connection' => 'redis']]]);
+
+    $config = SiteQueueConfiguration::for($site);
+
+    expect($config->connection)->toBe('redis')
+        ->and($config->isSync)->toBeFalse()
+        ->and($config->warning())->toBeNull();
+});
+
+test('an observed sync still warns — the observation is trusted either way', function () {
+    $site = siteWithEnv("QUEUE_CONNECTION=redis\n");
+    $site->forceFill(['meta' => ['queue_observed' => ['driver' => 'sync']]]);
+
+    expect(SiteQueueConfiguration::for($site)->isSync)->toBeTrue();
+});

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -53,6 +55,7 @@ class RunSiteQueueCanaryJob implements ShouldQueue
 
         if ($site === null || $site->server === null) {
             $emit->error(__('This site has no server to test against.'), 'canary');
+            $this->finish(false, 'No server.');
 
             return;
         }
@@ -74,6 +77,7 @@ class RunSiteQueueCanaryJob implements ShouldQueue
             $out = $exec->runInlineBash($site->server, 'site:queue-canary', $bash, timeoutSeconds: 90, asRoot: false);
         } catch (\Throwable $e) {
             $emit->error(__('Could not run the test: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'canary');
+            $this->finish(false, Str::limit($e->getMessage(), 300));
 
             return;
         }
@@ -82,12 +86,14 @@ class RunSiteQueueCanaryJob implements ShouldQueue
 
         if ($result === null) {
             $emit->error(__('The site did not report a result. Is the app deployed and bootable?'), 'canary');
+            $this->finish(false, 'No result returned.');
 
             return;
         }
 
         if (($result['error'] ?? null) !== null) {
             $emit->error((string) $result['error'], 'canary');
+            $this->finish(false, (string) $result['error']);
 
             return;
         }
@@ -102,6 +108,7 @@ class RunSiteQueueCanaryJob implements ShouldQueue
                 'c' => (string) ($result['connection'] ?? '?'),
                 'd' => (string) ($result['driver'] ?? 'unknown'),
             ]));
+            $this->finish(false, 'Not consumed within '.self::WAIT_SECONDS.'s.');
 
             return;
         }
@@ -112,6 +119,38 @@ class RunSiteQueueCanaryJob implements ShouldQueue
             'd' => (string) ($result['driver'] ?? '?'),
             'q' => $this->queueName,
         ]));
+
+        // Record what the APP said about itself. dply's env copy can be stale —
+        // this run proved redis while the stored .env still read sync, and a
+        // readiness panel contradicting a green round trip is worse than no
+        // panel. An observation beats a record.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['queue_observed'] = [
+            'connection' => (string) ($result['connection'] ?? ''),
+            'driver' => (string) ($result['driver'] ?? ''),
+            'observed_at' => now()->toIso8601String(),
+        ];
+        $site->forceFill(['meta' => $meta])->save();
+
+        $this->finish(true, null);
+    }
+
+    /**
+     * Close the console run.
+     *
+     * Without this the row stays "running" until the stuck-action reaper marks
+     * it failed — which is how a canary reporting a 2,527 ms round trip
+     * displayed as "queue worker did not pick this up". The banner was telling
+     * the truth about the ROW, not about the queue.
+     */
+    private function finish(bool $ok, ?string $error): void
+    {
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => $ok ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => $ok ? null : $error,
+            'updated_at' => now(),
+        ]);
     }
 
     /**

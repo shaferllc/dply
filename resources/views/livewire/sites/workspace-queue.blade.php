@@ -128,6 +128,12 @@
                 <x-server-workspace-tab id="queue-tab-jobs" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'jobs'" wire:click="$set('queue_workspace_tab', 'jobs')">
                     {{ __('Jobs') }}
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-history" icon="heroicon-o-clock" :active="$queue_workspace_tab === 'history'" wire:click="$set('queue_workspace_tab', 'history')">
+                    {{ __('History') }}
+                    @if ($jobRuns->isNotEmpty())
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums">{{ $jobRuns->count() }}</span>
+                    @endif
+                </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-fleet" icon="heroicon-o-square-3-stack-3d" :active="$queue_workspace_tab === 'fleet'" wire:click="$set('queue_workspace_tab', 'fleet')">
                     {{ __('Managed servers') }}
                     @if ($queueStats['machines'] > 0)
@@ -353,6 +359,47 @@
             <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Workers') }}</a>{{ __('.') }}
         </div>
             </x-server-workspace-tab-panel>
+        @elseif ($queue_workspace_tab === 'history')
+            <x-server-workspace-tab-panel id="queue-panel-history" labelled-by="queue-tab-history" panel-class="min-w-0">
+                @if ($jobRuns->isEmpty())
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                            {{ __('A finished job leaves nothing behind in the queue store, so history can only come from inside the app.') }}
+                            @if (! $this->queueAgentEnabled())
+                                {{ __('Install the queue agent below and it records from the next deploy.') }}
+                            @else
+                                {{ __('The agent is on — history appears once it is deployed and a job runs.') }}
+                            @endif
+                        </p>
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($jobRuns as $run)
+                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="run-{{ $run->id }}">
+                                <div class="min-w-0">
+                                    <p class="font-mono text-xs font-semibold {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-ink' }}">{{ $run->name }}</p>
+                                    @if ($run->status === 'failed' && $run->message)
+                                        <p class="mt-0.5 truncate text-2xs text-rose-700">{{ $run->exception }}: {{ $run->message }}</p>
+                                    @endif
+                                </div>
+                                <p class="shrink-0 text-2xs text-brand-mist">
+                                    @if ($run->source === 'pool')
+                                        {{-- One history, two origins. Without the badge a job
+                                             that ran on a pool is indistinguishable from one
+                                             that ran on this box. --}}
+                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ __('pool') }}</span>
+                                        &middot;
+                                    @endif
+                                    @if ($run->queue){{ $run->queue }} &middot; @endif
+                                    @if ($run->duration_ms !== null){{ $run->duration_ms }} ms &middot; @endif
+                                    {{ $run->ran_at->diffForHumans() }}
+                                </p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </x-server-workspace-tab-panel>
         @elseif ($queue_workspace_tab === 'jobs')
             <x-server-workspace-tab-panel id="queue-panel-jobs" labelled-by="queue-tab-jobs" panel-class="min-w-0">
                 @php($inspected = $this->inspectedJobs())
@@ -388,7 +435,14 @@
                 @elseif ($inspected['jobs'] === [])
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('Nothing waiting.') }}</p>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Only jobs still queued are listed — one that already ran leaves no row behind.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">
+                            {{ __('Only jobs still WAITING are listed. A job that already ran deletes its own row, so a fast queue looks empty — that is health, not absence.') }}
+                        </p>
+                        @if (! ($this->queueAgentEnabled()))
+                            <p class="mt-1 text-2xs text-brand-mist">
+                                {{ __('Completed jobs, durations and throughput need the in-app agent — nothing outside the app can see them.') }}
+                            </p>
+                        @endif
                     </div>
                 @else
                     <ul class="divide-y divide-brand-ink/10">
