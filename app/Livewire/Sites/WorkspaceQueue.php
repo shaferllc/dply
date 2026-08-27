@@ -9,6 +9,7 @@ use App\Jobs\CollectSiteQueueJobsJob;
 use App\Jobs\RunSiteQueueCanaryJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteQueueSnapshot;
@@ -559,6 +560,18 @@ class WorkspaceQueue extends Component
             // The check nothing on the box can make: a worker against `sync`
             // consumes nothing while every other reading looks healthy.
             'queueConfigWarning' => SiteQueueConfiguration::for($this->site)->warning(),
+            // The banner partial reads both unconditionally. Omitting them is an
+            // undefined-variable warning locally and an ErrorException — a 500 —
+            // in production, where Laravel promotes warnings.
+            'sectionConsoleActionKinds' => $kinds = (array) config('console_actions.section_kinds.queue', []),
+            'sectionConsoleActionRun' => $kinds === []
+                ? null
+                : ConsoleAction::query()
+                    ->forSubject($this->site)
+                    ->whereIn('kind', $kinds)
+                    ->notDismissed()
+                    ->orderByDesc('created_at')
+                    ->first(),
             'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers, $pools, $snapshots->first()),
             // Managed worker servers are part of "is my queue healthy", so they
             // render here rather than only under Worker Servers.

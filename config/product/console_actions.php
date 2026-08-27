@@ -429,6 +429,9 @@ return [
         // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
         'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
         'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
+        // Queue section: the canary and the depth sweep both report here, so
+        // the banner has to know their kinds or the page renders no console.
+        'queue' => ['queue_canary', 'queue_setup'],
     ],
 
     /*
