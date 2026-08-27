@@ -21,11 +21,16 @@ use App\Models\Site;
 use App\Models\SiteQueueJobRun;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
+use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Models\ManagedQueueFleet;
+use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Services\QueueFailedJobReader;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\ManagedQueueConnector;
 use App\Services\Sites\QueueInsightsInstaller;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\Sites\QueueJobPayload;
@@ -38,6 +43,7 @@ use App\Support\Sites\SiteQueueReadiness;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -96,6 +102,9 @@ class WorkspaceQueue extends Component
 
     /** Raw command, shown and editable under Advanced while editing. */
     public string $edit_command = '';
+
+    /** The managed-queue token, held for exactly one render after connecting. */
+    public string $managed_token = '';
 
     /** History row expanded to show its detail, by run id. */
     public string $history_open = '';
@@ -755,7 +764,10 @@ class WorkspaceQueue extends Component
      */
     public function failedJobs(): ?array
     {
-        return CollectSiteFailedJobsJob::cached((string) $this->site->id);
+        // A managed site's failures are in dply's own tables, so reading them
+        // costs a query rather than an SSH round trip — and works on a site
+        // whose workers are dply's, where there is no box to read.
+        return $this->managedFailedJobs() ?? CollectSiteFailedJobsJob::cached((string) $this->site->id);
     }
 
     /** Put one failed job back on its queue. */
@@ -1255,6 +1267,173 @@ class WorkspaceQueue extends Component
     }
 
     /**
+     * Move this site onto dply's managed queue.
+     *
+     * Everything the app needs is environment: the package registers the
+     * connection, so there is no code change to review and no AWS SDK. It takes
+     * effect on the next deploy, when the package is installed and the env is
+     * pushed — nothing is switched underneath a running worker.
+     */
+    public function upgradeToManagedQueue(ManagedQueueConnector $connector): void
+    {
+        $this->authorize('update', $this->site);
+
+        try {
+            $result = $connector->connect($this->site, (string) auth()->id() ?: null);
+        } catch (\Throwable $e) {
+            // Entitlements, namespace limits and the platform kill switch all
+            // report through here; each message is written to be read.
+            $this->toastError(Str::limit($e->getMessage(), 200));
+
+            return;
+        }
+
+        $this->site->refresh();
+
+        // Held for this render only. dply stores a hash; if the operator loses
+        // this, the answer is a new credential, not a lookup.
+        $this->managed_token = $result['token'];
+
+        $this->dispatch('open-modal', 'managed-queue-token');
+    }
+
+    public function managedQueueNamespace(): ?QueueNamespace
+    {
+        return app(ManagedQueueConnector::class)->namespaceFor($this->site);
+    }
+
+    /**
+     * Live depth per queue, straight from dply's own store.
+     *
+     * No SSH and no five-minute sampling: the jobs are in dply's database, so
+     * the number is exact and current. A managed site reads this instead of the
+     * sweep — a sampled figure would be the worse of two answers dply holds.
+     *
+     * @return array<string, array{pending: int, delayed: int, reserved: int}>
+     */
+    public function managedQueueDepths(): array
+    {
+        $namespace = $this->managedQueueNamespace();
+
+        if ($namespace === null) {
+            return [];
+        }
+
+        $store = app(QueueStore::class);
+        $depths = [];
+
+        foreach ($this->managedQueueNames($namespace) as $queue) {
+            $depth = $store->depth($namespace, $queue);
+            $depths[$queue] = [
+                'pending' => $depth->pending,
+                'delayed' => $depth->delayed,
+                'reserved' => $depth->reserved,
+            ];
+        }
+
+        return $depths;
+    }
+
+    /**
+     * Queue names seen on the managed namespace.
+     *
+     * From the store rather than from a worker's --queue flag: on a managed
+     * queue the producer decides what exists, and a queue nothing drains yet is
+     * exactly the one worth showing.
+     *
+     * @return list<string>
+     */
+    private function managedQueueNames(QueueNamespace $namespace): array
+    {
+        $names = DB::table('dply_queue_jobs')
+            ->where('namespace_id', $namespace->id)
+            ->distinct()
+            ->limit(50)
+            ->pluck('queue')
+            ->map(fn ($q): string => (string) $q)
+            ->all();
+
+        return $names === [] ? ['default'] : $names;
+    }
+
+    /**
+     * Failed jobs recorded against the managed namespace.
+     *
+     * The same shape the SSH reader returns, so the Failed tab renders one way
+     * regardless of where the jobs live.
+     *
+     * @return array{jobs: list<array<string, mixed>>, total: int, driver: ?string, error: ?string, read_at: ?string}|null
+     */
+    public function managedFailedJobs(): ?array
+    {
+        $namespace = $this->managedQueueNamespace();
+
+        if ($namespace === null) {
+            return null;
+        }
+
+        $rows = app(QueueFailedJobReader::class)->recent($namespace, 50);
+
+        return [
+            'jobs' => array_map(static fn (array $row): array => [
+                'uuid' => (string) ($row['uuid'] ?? $row['id']),
+                'name' => (string) $row['name'],
+                'queue' => (string) $row['queue'],
+                'connection' => 'dply',
+                'attempts' => (int) $row['attempts'],
+                'exception' => (string) $row['exception_summary'],
+                'failed_at' => $row['failed_at']?->toDateTimeString() ?? '',
+            ], $rows),
+            'total' => count($rows),
+            'driver' => 'dply',
+            'error' => null,
+            'read_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * dply's own workers on this site's managed queue, if any.
+     *
+     * Reported, not managed, from here: fleets are created and scaled on the
+     * namespace page, and a second set of controls for one fleet is the same
+     * mistake as listing a queue worker under both Queue and Daemons.
+     *
+     * @return array{fleets: int, workers: int, paused: bool}|null
+     */
+    public function managedQueueFleet(): ?array
+    {
+        $namespace = $this->managedQueueNamespace();
+
+        if ($namespace === null) {
+            return null;
+        }
+
+        $fleets = ManagedQueueFleet::query()
+            ->where('namespace_id', $namespace->id)
+            ->get();
+
+        if ($fleets->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'fleets' => $fleets->count(),
+            'workers' => (int) $fleets->sum('desired_workers'),
+            'paused' => $fleets->every(fn ($f): bool => $f->status === ManagedQueueFleet::STATUS_PAUSED),
+        ];
+    }
+
+    public function managedQueueAvailable(): bool
+    {
+        return ManagedQueueConnector::available();
+    }
+
+    public function managedQueueEndpoint(): string
+    {
+        return ManagedQueueConnector::endpoint();
+    }
+
+    /**
      * Expand one history row.
      *
      * Everything shown is already on the record — connection, attempts, job id,
@@ -1430,6 +1609,43 @@ class WorkspaceQueue extends Component
             ->values();
     }
 
+    /**
+     * Overlay live managed depths onto the sampled per-queue rows.
+     *
+     * Keeps one rendering path: the Queues tab does not need to know which kind
+     * of queue it is looking at, only that `latest` holds the freshest reading
+     * available for that queue.
+     *
+     * Collection generics are deliberately omitted: the template is invariant,
+     * so annotating the exact inferred shape would break on any change to what
+     * render() groups.
+     *
+     * @param  array<string, array{pending: int, delayed: int, reserved: int}>  $managed
+     */
+    private function mergeManagedDepths(Collection $byQueue, array $managed): Collection
+    {
+        foreach ($managed as $queue => $depth) {
+            $existing = (array) $byQueue->get($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+
+            $existing['latest'] = new SiteQueueSnapshot([
+                'site_id' => $this->site->id,
+                'queue' => $queue,
+                'source' => 'managed',
+                'pending' => $depth['pending'],
+                'worker_processes' => null,
+                'oldest_pending_age_s' => null,
+                'failed_total' => null,
+                'captured_at' => now(),
+            ]);
+            $existing['managed'] = $depth;
+            $existing['peak_pending'] = max((int) $existing['peak_pending'], $depth['pending']);
+
+            $byQueue->put($queue, $existing);
+        }
+
+        return $byQueue;
+    }
+
     public function render(): View
     {
         $since = now()->subHours(max(1, $this->window_hours));
@@ -1513,7 +1729,10 @@ class WorkspaceQueue extends Component
                 SiteDaemonAdvisor::suggestions($this->site),
                 SiteDaemonAdvisor::SURFACE_QUEUE,
             ),
-            'queues' => $byQueue->sortKeys(),
+            // A managed site's depth is exact and live; the sampled sweep is the
+            // fallback for queues that still run on the box.
+            'managedDepths' => $managed = $this->managedQueueDepths(),
+            'queues' => $this->mergeManagedDepths($byQueue, $managed)->sortKeys(),
             'workers' => $workers,
             'failedTotal' => $snapshots->first()?->failed_total,
             'lastCapturedAt' => $snapshots->first()?->captured_at,

@@ -125,12 +125,48 @@ the Pusher wire protocol, so `laravel-echo` works unmodified and dply injects
     for the companion package. The "no package" claim survives; the "nothing
     but env vars" claim does not, and should not be made for external apps.
 
+    **Resolved, 2026-08-27.** The companion package ships the connection, so
+    neither workaround is needed: `dply/queue-insights` v1.1.0 registers a
+    `dply` connection from `DPLY_QUEUE_URL` and a **native driver** —
+    `Transport\DplyQueue` — speaking the endpoint's protocol over plain HTTP
+    with a bearer token. No `aws/aws-sdk-php`, no request signing, no
+    AWS-shaped variables, and an app that declares its own `dply` connection
+    keeps it. The endpoint already accepted bearer auth
+    (`AuthenticateQueueCredential`), so nothing on the server changed to allow
+    this. "Nothing but env vars" is now true for every app, dply-deployed or
+    not, at the cost of one composer package.
+
+13. **Failed jobs move with the queue, but only when asked.**
+    `Transport\DplyFailedJobProvider` binds as `queue.failer` when
+    `QUEUE_FAILED_DRIVER=dply`, recording failures through the dply-native
+    `/failed-jobs` endpoints instead of the app's `failed_jobs` table. Opt-in
+    rather than assumed: Laravel defaults that driver to `database-uuids`, apps
+    depend on that table, and a package silently redirecting failure records
+    because a queue moved would be a surprise in the worst possible place. dply
+    writes the variable when connecting a site; changing one line puts it back.
+
+    What it buys: dply's Failed tab reads a managed site's failures with a query
+    rather than an SSH round trip, and an app whose work runs entirely on dply
+    worker fleets needs no database of its own to remember what broke.
+
+14. **A site connects from its own Queue page.**
+    `App\Services\Sites\ManagedQueueConnector` creates the namespace for the
+    site, mints its token, and writes `QUEUE_CONNECTION`, `DPLY_QUEUE_URL`,
+    `DPLY_QUEUE_TOKEN` and `QUEUE_FAILED_DRIVER` into the env dply already
+    manages — live on the next deploy, which also installs the package. The org
+    Queues page still creates namespaces; it is simply no longer the only door,
+    and a site no longer has to be wired by hand afterwards.
+
+    Depth for a connected site is read live from `dply_queue_jobs` rather than
+    sampled by the five-minute SSH sweep. The jobs are in dply's own database;
+    a sampled number would be the worse of two answers dply holds.
+
 ## Boundaries
 
 | Concern | Backed by | Owner |
 |---|---|---|
 | Job transport | `dply_queue_jobs` | dply Queue |
-| Failed jobs | app DB by default | app, until the companion package |
+| Failed jobs | app DB by default; `dply_queue_failed_jobs` when `QUEUE_FAILED_DRIVER=dply` | app, or dply on opt-in |
 | `WithoutOverlapping`, `ShouldBeUnique`, `RateLimited` | cache | app — **not** the queue |
 | Batches | app DB (`job_batches`) | app |
 | Horizon | hard-wired to `RedisQueue` | unavailable on a non-Redis driver |

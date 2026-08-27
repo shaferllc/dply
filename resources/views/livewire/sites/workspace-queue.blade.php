@@ -156,6 +156,51 @@
             </div>
         @endif
 
+        @php($managedNamespace = $this->managedQueueNamespace())
+        @if ($this->managedQueueAvailable())
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 {{ $managedNamespace ? 'bg-brand-sand/20' : 'bg-brand-forest/[0.04]' }} px-4 py-3 sm:px-5">
+                <div class="min-w-0">
+                    @if ($managedNamespace)
+                        <p class="text-xs font-semibold text-brand-ink">
+                            {{ __('Managed queue') }}
+                            <span class="ml-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-800 ring-1 ring-emerald-200/70">{{ $managedNamespace->status }}</span>
+                        </p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Jobs go to dply, not to this box — nothing to run out of memory, nothing to restart.') }}
+                            <span class="font-mono text-brand-mist">{{ $managedNamespace->name }}</span>
+                        </p>
+                        @php($fleet = $this->managedQueueFleet())
+                        <p class="mt-0.5 text-2xs text-brand-mist">
+                            @if ($fleet)
+                                {{ trans_choice(':count dply worker draining it|:count dply workers draining it', $fleet['workers'], ['count' => $fleet['workers']]) }}
+                                @if ($fleet['paused'])<span class="font-semibold text-amber-800">· {{ __('paused') }}</span>@endif
+                            @else
+                                {{-- The upsell that matters: the queue is off the box, but
+                                     something still has to run the jobs. --}}
+                                {{ __('Your own workers still drain it. Add a dply worker fleet and the box stops mattering for queues entirely.') }}
+                            @endif
+                        </p>
+                    @else
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('Run this queue on dply instead') }}</p>
+                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
+                            {{ __('A managed queue lives on dply: no Redis to size, no worker memory to babysit, FIFO ordering, and depth that is exact rather than sampled. Your app keeps using Laravel queues exactly as it does now.') }}
+                        </p>
+                    @endif
+                </div>
+                @can('update', $site)
+                    @if ($managedNamespace)
+                        <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
+                           class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
+                    @else
+                        <x-primary-button size="xs" type="button" class="shrink-0" wire:click="upgradeToManagedQueue" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
+                            <span wire:loading.remove wire:target="upgradeToManagedQueue">{{ __('Use managed queue') }}</span>
+                            <span wire:loading wire:target="upgradeToManagedQueue">{{ __('Connecting…') }}</span>
+                        </x-primary-button>
+                    @endif
+                @endcan
+            </div>
+        @endif
+
         @can('update', $site)
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
                 <p class="text-xs text-brand-moss">
@@ -182,7 +227,17 @@
                             <button type="button" wire:click="inspectQueue(@js($queueName))" class="font-mono text-sm font-semibold text-brand-ink hover:text-brand-forest hover:underline">
                                 {{ $queueName }}
                             </button>
-                            @if ($latest)
+                            @if (($data['managed'] ?? null) !== null)
+                                {{-- Exact, not sampled: these jobs are in dply's own
+                                     database, so there is nothing to poll and nothing to
+                                     be five minutes stale about. --}}
+                                <p class="text-xs text-brand-mist">
+                                    <span class="rounded-full bg-brand-forest/10 px-1.5 py-0.5 text-2xs font-semibold text-brand-forest">{{ __('managed') }}</span>
+                                    · {{ __(':d delayed', ['d' => $data['managed']['delayed']]) }}
+                                    · {{ __(':r in flight', ['r' => $data['managed']['reserved']]) }}
+                                    · {{ __('live') }}
+                                </p>
+                            @elseif ($latest)
                                 <p class="text-xs text-brand-mist">
                                     {{ __('source') }} {{ $latest->source }} ·
                                     {{ trans_choice(':count sample|:count samples', $data['samples'], ['count' => $data['samples']]) }}
@@ -876,6 +931,44 @@
             <x-cli-snippet tone="stub" />
         </div>
     </section>
+
+    {{-- The token, once. dply stores a hash of it, so this render is the only
+         time it exists anywhere the operator can read it. --}}
+    <x-modal name="managed-queue-token" max-width="lg" focusable :label="__('Managed queue connected')">
+        <div class="p-6">
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Managed queue connected') }}</h3>
+            <p class="mt-1 text-xs text-brand-moss">
+                {{ __('dply has written the connection into this site\'s environment. It goes live on the next deploy, which also installs the package that registers the driver.') }}
+            </p>
+
+            @if ($managed_token !== '')
+                <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5">
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-amber-900">{{ __('Token — shown once') }}</p>
+                    <div class="mt-1.5 flex items-center gap-2" x-data="{ copied: false }">
+                        <input type="text" readonly value="{{ $managed_token }}" class="dply-input w-full font-mono text-2xs" />
+                        <x-secondary-button size="xs" type="button" class="shrink-0"
+                            x-on:click="navigator.clipboard.writeText(@js($managed_token)); copied = true; setTimeout(() => copied = false, 2000)">
+                            <span x-show="!copied">{{ __('Copy') }}</span>
+                            <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                        </x-secondary-button>
+                    </div>
+                    <p class="mt-1.5 text-2xs text-amber-900">{{ __('dply keeps only a hash. It is already in this site\'s env — you need this copy only for something else that talks to the queue.') }}</p>
+                </div>
+            @endif
+
+            <div class="mt-4">
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('What was written') }}</p>
+                <pre class="mt-1 overflow-x-auto rounded-lg border border-brand-ink/10 bg-white px-3 py-2 font-mono text-2xs leading-5 text-brand-ink">QUEUE_CONNECTION=dply
+DPLY_QUEUE_URL={{ $this->managedQueueEndpoint() }}
+DPLY_QUEUE_TOKEN=•••</pre>
+                <p class="mt-1 text-2xs text-brand-mist">{{ __('No AWS SDK and no AWS variables: the package registers a dply connection that speaks HTTP with this token.') }}</p>
+            </div>
+
+            <div class="mt-5 flex justify-end gap-2">
+                <x-primary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'managed-queue-token')">{{ __('Done') }}</x-primary-button>
+            </div>
+        </div>
+    </x-modal>
 
     {{-- Alert rules: site defaults, or one queue's override. Thresholds are
          opt-in because a depth that is fine at 3pm is alarming at 3am, and a
