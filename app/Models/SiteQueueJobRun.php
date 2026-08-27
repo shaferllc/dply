@@ -38,6 +38,12 @@ class SiteQueueJobRun extends Model
     /** A managed worker server running the same app. */
     public const SOURCE_POOL = 'pool';
 
+    /** dply's own round-trip probe — a job it dispatched to prove the pipe works. */
+    public const SOURCE_CANARY = 'canary';
+
+    /** One of the app's own job classes, dispatched from the Job classes tab. */
+    public const SOURCE_MANUAL = 'manual';
+
     protected $fillable = [
         'site_id', 'job_id', 'name', 'queue', 'connection',
         'status', 'source', 'worker_pool_id', 'duration_ms', 'attempts', 'exception', 'message', 'ran_at',

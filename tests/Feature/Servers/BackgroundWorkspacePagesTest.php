@@ -4,28 +4,29 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers\BackgroundWorkspacePagesTest;
 
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
-use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspaceSchedule;
+use App\Livewire\Sites\WorkspaceQueue;
 use App\Models\AuditLog;
 use App\Models\BackupDownloadStaging;
+use App\Models\BackupSchedule;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\BackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Models\User;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Modules\Backups\Jobs\StageBackupDownloadJob;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use App\Services\Servers\SupervisorProvisioner;
@@ -239,7 +240,7 @@ test('backups route renders via http', function () {
         ->set('backups_workspace_tab', 'history')
         ->assertSee('Recent database backups', false);
 });
-test('legacy site queue workers route redirects to site daemons', function () {
+test('legacy site queue workers route redirects to the site queue section', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $site = Site::factory()->create([
@@ -250,7 +251,7 @@ test('legacy site queue workers route redirects to site daemons', function () {
 
     $this->actingAs($user)
         ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
-        ->assertRedirect(route('sites.daemons', ['server' => $server, 'site' => $site]));
+        ->assertRedirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue']));
 });
 /** Helper: install a stack_summary artifact so ServerInstalledServices stops failing-open. */
 function setExpectedServices(Server $server, array $services): void
@@ -1417,12 +1418,14 @@ test('site daemons page scopes programs to site by default', function () {
         'organization_id' => $server->organization_id,
     ]);
 
+    // NOT queue workers: those moved to the site's Queue page and are filtered
+    // out here on purpose (see the queue-worker case below).
     $aProgram = SupervisorProgram::create([
         'server_id' => $server->id,
         'site_id' => $siteA->id,
-        'slug' => 'a-queue',
-        'program_type' => 'queue',
-        'command' => 'php artisan queue:work',
+        'slug' => 'a-listener',
+        'program_type' => 'custom',
+        'command' => 'node /srv/a/listener.js',
         'directory' => '/srv/a',
         'user' => 'dply',
         'numprocs' => 1,
@@ -1431,9 +1434,9 @@ test('site daemons page scopes programs to site by default', function () {
     SupervisorProgram::create([
         'server_id' => $server->id,
         'site_id' => $siteB->id,
-        'slug' => 'b-queue',
-        'program_type' => 'queue',
-        'command' => 'php artisan queue:work',
+        'slug' => 'b-listener',
+        'program_type' => 'custom',
+        'command' => 'node /srv/b/listener.js',
         'directory' => '/srv/b',
         'user' => 'dply',
         'numprocs' => 1,
@@ -1446,6 +1449,53 @@ test('site daemons page scopes programs to site by default', function () {
 
     $programs = $component->viewData('filteredSupervisorPrograms');
     expect($programs->pluck('id')->all())->toBe([$aProgram->id], 'Site A page must only show site A programs.');
+});
+test('site daemons page leaves queue workers to the queue page', function () {
+    // One process, one page. A queue worker listed in both places gives two
+    // Stop buttons for the same program and no answer to which one is real.
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+    ]);
+
+    $worker = SupervisorProgram::create([
+        'server_id' => $server->id,
+        'site_id' => $site->id,
+        'slug' => 'site-queue',
+        'program_type' => 'queue',
+        'command' => 'php artisan queue:work --queue=default',
+        'directory' => '/srv/a',
+        'user' => 'dply',
+        'numprocs' => 1,
+        'is_active' => true,
+    ]);
+    $daemon = SupervisorProgram::create([
+        'server_id' => $server->id,
+        'site_id' => $site->id,
+        'slug' => 'site-listener',
+        'program_type' => 'custom',
+        'command' => 'node /srv/a/listener.js',
+        'directory' => '/srv/a',
+        'user' => 'dply',
+        'numprocs' => 1,
+        'is_active' => true,
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site]);
+    $component->assertOk();
+
+    $ids = $component->viewData('filteredSupervisorPrograms')->pluck('id')->all();
+    expect($ids)->toContain($daemon->id);
+    expect($ids)->not->toContain($worker->id);
+
+    // The same program IS the Queue page's business.
+    $queue = Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site]);
+    expect($queue->viewData('workers')->pluck('id')->all())->toBe([$worker->id]);
 });
 test('site daemons can import programs from another site on the same server', function () {
     $user = actingOrgUser();

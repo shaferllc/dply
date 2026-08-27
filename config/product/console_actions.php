@@ -348,6 +348,27 @@ return [
             'failed' => 'Test jobs did not all process.',
             'stale' => 'Test job run did not finish.',
         ],
+        // dply's round-trip probe on a site's own queue, and the "run one of my
+        // app's jobs" dispatch from the Job classes tab. Both are short SSH runs
+        // that end in a verdict, so they read like a test, not like a deploy.
+        'queue_canary' => [
+            'running' => 'Testing the queue on :host …',
+            'completed' => 'The queue processed a test job.',
+            'failed' => 'The test job was not processed.',
+            'stale' => 'The queue test did not finish.',
+        ],
+        'queue_setup' => [
+            'running' => 'Setting up queueing on :host …',
+            'completed' => 'Queueing configured.',
+            'failed' => 'Queue setup failed.',
+            'stale' => 'Queue setup did not finish.',
+        ],
+        'queue_dispatch' => [
+            'running' => 'Dispatching a job on :host …',
+            'completed' => 'A worker took the job off the queue.',
+            'failed' => 'The job was not picked up.',
+            'stale' => 'The dispatch did not finish.',
+        ],
         // Live per-member host/worker/Redis probe — streams raw probe output so
         // operators can see exactly what each box reported (incl. Redis errors).
         'worker_pool_stats' => [
@@ -431,7 +452,7 @@ return [
         'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
         // Queue section: the canary and the depth sweep both report here, so
         // the banner has to know their kinds or the page renders no console.
-        'queue' => ['queue_canary', 'queue_setup'],
+        'queue' => ['queue_canary', 'queue_setup', 'queue_dispatch'],
     ],
 
     /*

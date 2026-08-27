@@ -128,6 +128,9 @@
                 <x-server-workspace-tab id="queue-tab-jobs" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'jobs'" wire:click="$set('queue_workspace_tab', 'jobs')">
                     {{ __('Jobs') }}
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-catalog" icon="heroicon-o-squares-2x2" :active="$queue_workspace_tab === 'catalog'" wire:click="showJobCatalog">
+                    {{ __('Job classes') }}
+                </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-history" icon="heroicon-o-clock" :active="$queue_workspace_tab === 'history'" wire:click="$set('queue_workspace_tab', 'history')">
                     {{ __('History') }}
                     @if ($jobRuns->isNotEmpty())
@@ -384,11 +387,12 @@
                                     @endif
                                 </div>
                                 <p class="shrink-0 text-2xs text-brand-mist">
-                                    @if ($run->source === 'pool')
-                                        {{-- One history, two origins. Without the badge a job
-                                             that ran on a pool is indistinguishable from one
-                                             that ran on this box. --}}
-                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ __('pool') }}</span>
+                                    @if ($run->source && $run->source !== 'agent')
+                                        {{-- One history, four origins. Without the badge a job
+                                             that ran on a pool — or a probe dply dispatched
+                                             itself — is indistinguishable from the app's own
+                                             work on this box. --}}
+                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ $run->source }}</span>
                                         &middot;
                                     @endif
                                     @if ($run->queue){{ $run->queue }} &middot; @endif
@@ -465,6 +469,118 @@
                     @if ($inspected['truncated'])
                         <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
                             {{ __('Showing the first :n. The backlog is longer.', ['n' => \App\Jobs\CollectSiteQueueJobsJob::LIMIT]) }}
+                        </div>
+                    @endif
+                @endif
+            </x-server-workspace-tab-panel>
+        @elseif ($queue_workspace_tab === 'catalog')
+            <x-server-workspace-tab-panel id="queue-panel-catalog" labelled-by="queue-tab-catalog" panel-class="min-w-0">
+                @php($catalog = $this->jobCatalog())
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <p class="min-w-0 text-xs text-brand-moss">
+                        {{ __('Every queued job class in the deployed code.') }}
+                        @if ($catalog && $catalog['read_at'])
+                            <span class="text-brand-mist">· {{ __('scanned :when', ['when' => \Illuminate\Support\Carbon::parse($catalog['read_at'])->diffForHumans()]) }}</span>
+                        @endif
+                    </p>
+                    <div class="flex shrink-0 items-center gap-2">
+                        @if ($catalog && $catalog['jobs'] !== [])
+                            <x-text-input type="search" wire:model.live.debounce.300ms="catalog_filter" class="h-8 w-40 text-xs" :placeholder="__('Filter…')" :aria-label="__('Filter job classes')" />
+                        @endif
+                        <x-secondary-button size="sm" type="button" wire:click="refreshJobCatalog">{{ __('Re-scan') }}</x-secondary-button>
+                    </div>
+                </div>
+
+                @if ($catalog === null)
+                    {{-- A queued SSH read: "scanning" is the honest state, not "empty". --}}
+                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
+                        <x-spinner size="sm" /> {{ __('Reading the application…') }}
+                    </div>
+                @elseif ($catalog['error'])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Could not read the application.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $catalog['error'] }}</p>
+                    </div>
+                @elseif ($catalog['jobs'] === [])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">
+                            {{ $catalog_filter !== '' ? __('Nothing matches that filter.') : __('No queued job classes found.') }}
+                        </p>
+                        @if ($catalog_filter === '')
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Only classes implementing ShouldQueue in the app\'s own namespaces count — vendor code is excluded on purpose.') }}</p>
+                        @endif
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($catalog['jobs'] as $job)
+                            @php($dispatchable = ! in_array($job['kind'], ['mail', 'notification', 'broadcast'], true))
+                            @php($needsArgs = (int) $job['required_args'] > 0)
+                            {{-- scalar_args is absent from catalogues scanned before it
+                                 existed; treat a missing flag as "askable" so an old
+                                 cache degrades to the remote guard rather than to a
+                                 disabled button. --}}
+                            @php($askable = $dispatchable && ($job['scalar_args'] ?? true))
+                            <li class="px-4 py-2.5 sm:px-5" wire:key="jc-{{ md5($job['class']) }}">
+                              <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="truncate font-mono text-xs font-semibold text-brand-ink" title="{{ $job['class'] }}">{{ class_basename($job['class']) }}</p>
+                                    <p class="mt-0.5 truncate text-2xs text-brand-mist">
+                                        {{ $job['class'] }}
+                                        @if ($job['signature'])<span class="text-brand-moss">({{ $job['signature'] }})</span>@endif
+                                    </p>
+                                </div>
+                                <div class="flex shrink-0 items-center gap-2 text-2xs text-brand-mist">
+                                    @if ($job['kind'] !== 'job')
+                                        <span class="rounded-full bg-brand-sand/70 px-1.5 py-0.5 font-semibold text-brand-forest">{{ $job['kind'] }}</span>
+                                    @endif
+                                    @if ($job['queue'])<span class="font-mono">{{ $job['queue'] }}</span>@endif
+                                    @if ($job['tries'] !== null)<span>{{ __(':n tries', ['n' => $job['tries']]) }}</span>@endif
+                                    @if ($job['unique'])<span>{{ __('unique') }}</span>@endif
+                                    @can('update', $site)
+                                        @if (! $dispatchable)
+                                            <span class="text-brand-mist">{{ __('not dispatchable') }}</span>
+                                        @elseif (! $askable)
+                                            {{-- A job wanting an Order cannot be reached from here at
+                                                 all: dply can pass numbers and strings, not models. --}}
+                                            <span class="text-brand-mist">{{ __('needs objects') }}</span>
+                                        @elseif ($needsArgs)
+                                            <x-secondary-button size="sm" type="button" wire:click="promptDispatchArgs(@js($job['class']))">
+                                                {{ $dispatch_class === $job['class'] ? __('Cancel') : __('Run with args…') }}
+                                            </x-secondary-button>
+                                        @else
+                                            {{-- This runs the real job. The confirm is the only thing
+                                                 between a curious click and real production work. --}}
+                                            <x-secondary-button size="sm" type="button"
+                                                wire:click="dispatchTestJob(@js($job['class']))"
+                                                wire:confirm="{{ __('Dispatch :class for real? Whatever this job does in production, it will do now.', ['class' => class_basename($job['class'])]) }}">
+                                                {{ __('Run') }}
+                                            </x-secondary-button>
+                                        @endif
+                                    @endcan
+                                </div>
+                              </div>
+
+                              @if ($dispatch_class === $job['class'])
+                                <div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-brand-sand/30 px-3 py-2">
+                                    <x-text-input wire:model="dispatch_args" class="h-8 min-w-0 flex-1 font-mono text-xs"
+                                        placeholder='[12, "now"]' :aria-label="__('Constructor arguments as JSON')" />
+                                    <x-secondary-button size="sm" type="button"
+                                        wire:click="dispatchTestJob(@js($job['class']))"
+                                        wire:confirm="{{ __('Dispatch :class for real? Whatever this job does in production, it will do now.', ['class' => class_basename($job['class'])]) }}">
+                                        {{ __('Run') }}
+                                    </x-secondary-button>
+                                    <p class="w-full text-2xs text-brand-mist">
+                                        {{ __('Positional, JSON: :sig', ['sig' => $job['signature'] ?: '—']) }}
+                                    </p>
+                                    @error('dispatch_args')<p class="w-full text-2xs font-semibold text-rose-700">{{ $message }}</p>@enderror
+                                </div>
+                              @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($catalog['truncated'])
+                        <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
+                            {{ __('Showing the first :n classes.', ['n' => \App\Jobs\CollectSiteJobClassesJob::LIMIT]) }}
                         </div>
                     @endif
                 @endif

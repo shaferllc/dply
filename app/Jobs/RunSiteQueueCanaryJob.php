@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Models\SiteQueueJobRun;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Bus\Queueable;
@@ -108,6 +109,7 @@ class RunSiteQueueCanaryJob implements ShouldQueue
                 'c' => (string) ($result['connection'] ?? '?'),
                 'd' => (string) ($result['driver'] ?? 'unknown'),
             ]));
+            $this->record($site, false, null, (string) ($result['connection'] ?? ''), __('No worker picked it up within :n seconds.', ['n' => self::WAIT_SECONDS]));
             $this->finish(false, 'Not consumed within '.self::WAIT_SECONDS.'s.');
 
             return;
@@ -132,7 +134,33 @@ class RunSiteQueueCanaryJob implements ShouldQueue
         ];
         $site->forceFill(['meta' => $meta])->save();
 
+        $this->record($site, true, (int) ($result['ms'] ?? 0), (string) ($result['connection'] ?? ''), null);
+
         $this->finish(true, null);
+    }
+
+    /**
+     * File the probe in the site's job history.
+     *
+     * The test WAS a job on this site's queue, so leaving it out of history
+     * meant the one run an operator triggered themselves — the only one whose
+     * timing they can vouch for — was the one run they could never look back
+     * at. `source` keeps it distinguishable from the app's own work.
+     */
+    private function record(Site $site, bool $ok, ?int $ms, string $connection, ?string $message): void
+    {
+        SiteQueueJobRun::query()->create([
+            'site_id' => $site->id,
+            'name' => __('dply queue canary'),
+            'queue' => $this->queueName,
+            'connection' => $connection !== '' ? $connection : null,
+            'status' => $ok ? SiteQueueJobRun::STATUS_PROCESSED : SiteQueueJobRun::STATUS_FAILED,
+            'source' => SiteQueueJobRun::SOURCE_CANARY,
+            'duration_ms' => $ms,
+            'attempts' => 1,
+            'message' => $message,
+            'ran_at' => now(),
+        ]);
     }
 
     /**

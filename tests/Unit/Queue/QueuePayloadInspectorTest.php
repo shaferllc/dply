@@ -35,7 +35,15 @@ test('it reads the fields Laravel serializes in plaintext', function () {
         'job_max_tries' => 5,
         'batch_id' => 'batch-9',
         'display_name' => 'App\\Jobs\\SendInvoice',
+        'group_key' => null,
     ]);
+});
+
+test('the FIFO group key is read from either spelling', function () {
+    // dply's own producers set groupKey; SQS clients send messageGroupId. Both
+    // mean "these run in order", so both have to land in the same column.
+    expect(inspector()->inspect((string) json_encode(['data' => ['groupKey' => 'tenant-7']]))['group_key'])->toBe('tenant-7');
+    expect(inspector()->inspect((string) json_encode(['messageGroupId' => 'tenant-8']))['group_key'])->toBe('tenant-8');
 });
 
 test('a non-JSON payload yields nulls rather than throwing', function () {
@@ -46,6 +54,7 @@ test('a non-JSON payload yields nulls rather than throwing', function () {
         'job_max_tries' => null,
         'batch_id' => null,
         'display_name' => null,
+        'group_key' => null,
     ]);
 });
 

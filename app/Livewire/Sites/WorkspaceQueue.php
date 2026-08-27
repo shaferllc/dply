@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Jobs\CollectSiteJobClassesJob;
 use App\Jobs\CollectSiteQueueJobsJob;
+use App\Jobs\DispatchSiteTestJobJob;
 use App\Jobs\RunSiteQueueCanaryJob;
 use App\Jobs\SetUpSiteQueueingJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -22,6 +24,7 @@ use App\Services\Servers\SupervisorProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\QueueInsightsInstaller;
+use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
 use App\Support\Sites\SiteDaemonAdvisor;
@@ -64,6 +67,15 @@ class WorkspaceQueue extends Component
 
     /** Queue whose waiting jobs the Jobs tab is showing. */
     public string $inspect_queue = '';
+
+    /** Substring filter over the job catalogue — an app with 300 jobs needs one. */
+    public string $catalog_filter = '';
+
+    /** Job class whose argument row is open, if any. */
+    public string $dispatch_class = '';
+
+    /** Constructor arguments for that job, as a JSON array: [12, "now"]. */
+    public string $dispatch_args = '';
 
     public bool $showCreate = false;
 
@@ -441,15 +453,7 @@ class WorkspaceQueue extends Component
         // queue.
         $queue = $queue !== '' ? $queue : $this->firstDrainedQueue();
 
-        $run = method_exists($this, 'seedQueuedConsoleAction')
-            ? $this->seedQueuedConsoleAction('queue_canary', __('Testing the queue'))
-            : null;
-
-        if ($run === null) {
-            $this->toastError(__('Could not start the test.'));
-
-            return;
-        }
+        $run = $this->seedQueuedConsoleAction('queue_canary', __('Testing the queue'));
 
         RunSiteQueueCanaryJob::dispatch((string) $run->id, (string) $this->site->id, $queue);
 
@@ -607,6 +611,150 @@ class WorkspaceQueue extends Component
             'error' => $cached['error'] ?? null,
             'read_at' => $cached['read_at'] ?? null,
         ];
+    }
+
+    /**
+     * Show the catalogue, scanning the release the first time.
+     *
+     * Scanning on tab-open rather than on page load: it is SSH work, and most
+     * visits to this page are about depth and workers, not about what the app
+     * could run.
+     */
+    public function showJobCatalog(): void
+    {
+        $this->queue_workspace_tab = 'catalog';
+
+        if (CollectSiteJobClassesJob::cached((string) $this->site->id) === null) {
+            $this->refreshJobCatalog();
+        }
+    }
+
+    public function refreshJobCatalog(): void
+    {
+        $this->authorize('view', $this->site);
+
+        CollectSiteJobClassesJob::dispatch((string) $this->site->id);
+    }
+
+    /**
+     * The cached catalogue, filtered.
+     *
+     * @return array{jobs: list<array<string, mixed>>, truncated: bool, error: ?string, read_at: ?string}|null
+     */
+    public function jobCatalog(): ?array
+    {
+        $cached = CollectSiteJobClassesJob::cached((string) $this->site->id);
+
+        if ($cached === null) {
+            return null;
+        }
+
+        $filter = trim(mb_strtolower($this->catalog_filter));
+
+        if ($filter !== '') {
+            $cached['jobs'] = array_values(array_filter(
+                $cached['jobs'],
+                static fn (array $job): bool => str_contains(mb_strtolower((string) $job['class']), $filter),
+            ));
+        }
+
+        return $cached;
+    }
+
+    /**
+     * Run one of the app's own jobs, for real.
+     *
+     * The class is checked against the catalogue rather than trusted from the
+     * request: this is a class name from the browser that ends up as `new $class`
+     * on the customer's box, and the catalogue is the only list of names that
+     * were ever offered. {@see DispatchSiteTestJobJob} re-checks it remotely too
+     * — the catalogue can be a deploy out of date.
+     */
+    public function dispatchTestJob(string $class): void
+    {
+        $this->authorize('update', $this->site);
+
+        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
+        $entry = collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $class);
+
+        if ($entry === null) {
+            $this->toastError(__('That job is not in this site\'s catalogue. Re-scan and try again.'));
+
+            return;
+        }
+
+        if (in_array($entry['kind'] ?? 'job', ['mail', 'notification', 'broadcast'], true)) {
+            $this->toastError(__('This is not dispatched on its own — it needs a recipient or an event.'));
+
+            return;
+        }
+
+        $args = $this->parsedDispatchArgs($class);
+
+        if ($args === null) {
+            $this->addError('dispatch_args', __('Arguments must be a JSON array of numbers, strings or booleans — for example [12, "now"].'));
+
+            return;
+        }
+
+        if (count($args) < (int) ($entry['required_args'] ?? 0)) {
+            $this->addError('dispatch_args', __('This job needs :n argument(s).', ['n' => (int) $entry['required_args']]));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('queue_dispatch', __('Running :class', ['class' => class_basename($class)]));
+
+        DispatchSiteTestJobJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            $class,
+            (string) ($entry['queue'] ?? '') ?: $this->firstDrainedQueue(),
+            $args,
+        );
+
+        $this->dispatch_class = '';
+        $this->dispatch_args = '';
+
+        $this->toastSuccess(__('Dispatched — progress shows in the console above.'));
+    }
+
+    /** Open (or close) the argument row for one job. */
+    public function promptDispatchArgs(string $class): void
+    {
+        $this->resetValidation();
+        $this->dispatch_args = '';
+        $this->dispatch_class = $this->dispatch_class === $class ? '' : $class;
+    }
+
+    /**
+     * The typed arguments, or null when they are not a flat JSON array.
+     *
+     * Scalars only, and that is the whole boundary: an argument that arrives as
+     * an array or object would be handed to `newInstanceArgs` on the customer's
+     * box, and dply has no business shipping structures it cannot type-check.
+     *
+     * @return list<scalar|null>|null
+     */
+    private function parsedDispatchArgs(string $class): ?array
+    {
+        if ($this->dispatch_class !== $class || trim($this->dispatch_args) === '') {
+            return [];
+        }
+
+        $decoded = json_decode(trim($this->dispatch_args), true);
+
+        if (! is_array($decoded) || ! array_is_list($decoded)) {
+            return null;
+        }
+
+        foreach ($decoded as $value) {
+            if ($value !== null && ! is_scalar($value)) {
+                return null;
+            }
+        }
+
+        return $decoded;
     }
 
     /** Supervisor programs on this site that actually consume jobs. */
