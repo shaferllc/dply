@@ -25,6 +25,7 @@ use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\QueueFailedJobReader;
+use App\Modules\Queue\Support\QueueEntitlements;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\Servers\SupervisorProvisioner;
@@ -1426,6 +1427,28 @@ class WorkspaceQueue extends Component
     public function managedQueueAvailable(): bool
     {
         return ManagedQueueConnector::available();
+    }
+
+    /**
+     * Whether this org's plan allows another managed queue.
+     *
+     * Checked for display, not only on the click: "press the button to find out
+     * it is not on your plan" is a worse answer than saying so up front, and
+     * the entitlement is a cheap read.
+     */
+    public function managedQueueEntitled(): bool
+    {
+        $organization = $this->site->organization;
+
+        if ($organization === null) {
+            return false;
+        }
+
+        try {
+            return app(QueueEntitlements::class)->for($organization)->available;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function managedQueueEndpoint(): string

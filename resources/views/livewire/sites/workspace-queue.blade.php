@@ -191,11 +191,14 @@
                     @if ($managedNamespace)
                         <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
                            class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
-                    @else
+                    @elseif ($this->managedQueueEntitled())
                         <x-primary-button size="xs" type="button" class="shrink-0" wire:click="upgradeToManagedQueue" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
                             <span wire:loading.remove wire:target="upgradeToManagedQueue">{{ __('Use managed queue') }}</span>
                             <span wire:loading wire:target="upgradeToManagedQueue">{{ __('Connecting…') }}</span>
                         </x-primary-button>
+                    @else
+                        {{-- Say it here rather than behind a click that fails. --}}
+                        <a href="{{ route('billing.show', ['organization' => $site->organization_id]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Not on this plan — upgrade') }}</a>
                     @endif
                 @endcan
             </div>
