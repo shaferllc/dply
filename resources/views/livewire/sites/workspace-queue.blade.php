@@ -128,6 +128,12 @@
                 <x-server-workspace-tab id="queue-tab-jobs" icon="heroicon-o-list-bullet" :active="$queue_workspace_tab === 'jobs'" wire:click="$set('queue_workspace_tab', 'jobs')">
                     {{ __('Jobs') }}
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="queue-tab-failed" icon="heroicon-o-exclamation-triangle" :active="$queue_workspace_tab === 'failed'" wire:click="showFailed">
+                    {{ __('Failed') }}
+                    @if ($queueStats['failed'] > 0)
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-rose-100 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-rose-800">{{ $queueStats['failed'] }}</span>
+                    @endif
+                </x-server-workspace-tab>
                 <x-server-workspace-tab id="queue-tab-catalog" icon="heroicon-o-squares-2x2" :active="$queue_workspace_tab === 'catalog'" wire:click="showJobCatalog">
                     {{ __('Job classes') }}
                 </x-server-workspace-tab>
@@ -368,7 +374,7 @@
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
-                            {{ __('A finished job leaves nothing behind in the queue store, so history can only come from inside the app.') }}
+                            {{ __('Jobs you run from the Job classes tab appear here immediately. The app\'s own traffic leaves nothing behind in the queue store once it finishes, so that can only come from inside the app.') }}
                             @if (! $this->queueAgentEnabled())
                                 {{ __('Install the queue agent below and it records from the next deploy.') }}
                             @else
@@ -384,9 +390,21 @@
                                     <p class="font-mono text-xs font-semibold {{ $run->status === 'failed' ? 'text-rose-700' : 'text-brand-ink' }}">{{ $run->name }}</p>
                                     @if ($run->status === 'failed' && $run->message)
                                         <p class="mt-0.5 truncate text-2xs text-rose-700">{{ $run->exception }}: {{ $run->message }}</p>
+                                    @elseif ($run->status !== 'processed' && $run->message)
+                                        <p class="mt-0.5 truncate text-2xs text-brand-moss">{{ $run->message }}</p>
                                     @endif
                                 </div>
                                 <p class="shrink-0 text-2xs text-brand-mist">
+                                    {{-- What dply can prove, said plainly. 'taken' is NOT success:
+                                         a failed job leaves the queue too, and only the agent can
+                                         tell the two apart. --}}
+                                    @if ($run->status === 'queued')
+                                        <span class="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-900">{{ __('queued') }}</span>
+                                        &middot;
+                                    @elseif ($run->status === 'taken')
+                                        <span class="rounded-full bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-900" title="{{ __('A worker took it off the queue. Success needs the agent.') }}">{{ __('taken') }}</span>
+                                        &middot;
+                                    @endif
                                     @if ($run->source && $run->source !== 'agent')
                                         {{-- One history, four origins. Without the badge a job
                                              that ran on a pool — or a probe dply dispatched
@@ -473,6 +491,72 @@
                     @endif
                 @endif
             </x-server-workspace-tab-panel>
+        @elseif ($queue_workspace_tab === 'failed')
+            <x-server-workspace-tab-panel id="queue-panel-failed" labelled-by="queue-tab-failed" panel-class="min-w-0">
+                @php($failed = $this->failedJobs())
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+                    <p class="min-w-0 text-xs text-brand-moss">
+                        {{ __('Jobs that gave up. Each one is still retryable until you clear it.') }}
+                        @if ($failed && $failed['read_at'])
+                            <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($failed['read_at'])->diffForHumans()]) }}</span>
+                        @endif
+                    </p>
+                    <div class="flex shrink-0 items-center gap-2">
+                        @can('update', $site)
+                            @if ($failed && $failed['jobs'] !== [])
+                                <x-secondary-button size="sm" type="button" wire:click="confirmFailedBulk('retry_all')">{{ __('Retry all') }}</x-secondary-button>
+                                <x-secondary-button size="sm" type="button" wire:click="confirmFailedBulk('flush')">{{ __('Delete all') }}</x-secondary-button>
+                            @endif
+                        @endcan
+                        <x-secondary-button size="sm" type="button" wire:click="refreshFailedJobs">{{ __('Re-read') }}</x-secondary-button>
+                    </div>
+                </div>
+
+                @if ($failed === null)
+                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
+                        <x-spinner size="sm" /> {{ __('Reading failed jobs…') }}
+                    </div>
+                @elseif ($failed['error'])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list failed jobs.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $failed['error'] }}</p>
+                    </div>
+                @elseif ($failed['jobs'] === [])
+                    <div class="px-4 py-5 text-center sm:px-5">
+                        <p class="text-sm font-medium text-brand-ink">{{ __('Nothing has failed.') }}</p>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Failed jobs stay here until they are retried or deleted, so an empty list means the app has none stored.') }}</p>
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($failed['jobs'] as $job)
+                            <li class="px-4 py-2.5 sm:px-5" wire:key="fj-{{ md5((string) $job['uuid']) }}">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-mono text-xs font-semibold text-rose-700">{{ class_basename($job['name']) }}</p>
+                                        <p class="mt-0.5 break-words text-2xs text-brand-moss">{{ $job['exception'] }}</p>
+                                        <p class="mt-0.5 text-2xs text-brand-mist">
+                                            @if ($job['queue'])<span class="font-mono">{{ $job['queue'] }}</span> · @endif
+                                            @if ($job['attempts']){{ __(':n attempts', ['n' => $job['attempts']]) }} · @endif
+                                            @if ($job['failed_at']){{ \Illuminate\Support\Carbon::parse($job['failed_at'])->diffForHumans() }}@endif
+                                        </p>
+                                    </div>
+                                    @can('update', $site)
+                                        <div class="flex shrink-0 items-center gap-2">
+                                            <x-secondary-button size="sm" type="button" wire:click="retryFailed(@js($job['uuid']))">{{ __('Retry') }}</x-secondary-button>
+                                            <x-secondary-button size="sm" type="button" wire:click="forgetFailed(@js($job['uuid']))">{{ __('Delete') }}</x-secondary-button>
+                                        </div>
+                                    @endcan
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if ($failed['total'] > count($failed['jobs']))
+                        <div class="border-t border-brand-ink/10 px-4 py-2 text-2xs text-brand-mist sm:px-5">
+                            {{ __('Showing :n of :total. Retry all and Delete all still act on every one.', ['n' => count($failed['jobs']), 'total' => $failed['total']]) }}
+                        </div>
+                    @endif
+                @endif
+            </x-server-workspace-tab-panel>
         @elseif ($queue_workspace_tab === 'catalog')
             <x-server-workspace-tab-panel id="queue-panel-catalog" labelled-by="queue-tab-catalog" panel-class="min-w-0">
                 @php($catalog = $this->jobCatalog())
@@ -543,38 +627,17 @@
                                             {{-- A job wanting an Order cannot be reached from here at
                                                  all: dply can pass numbers and strings, not models. --}}
                                             <span class="text-brand-mist">{{ __('needs objects') }}</span>
-                                        @elseif ($needsArgs)
-                                            <x-secondary-button size="sm" type="button" wire:click="promptDispatchArgs(@js($job['class']))">
-                                                {{ $dispatch_class === $job['class'] ? __('Cancel') : __('Run with args…') }}
-                                            </x-secondary-button>
                                         @else
-                                            {{-- This runs the real job. The confirm is the only thing
-                                                 between a curious click and real production work. --}}
-                                            <x-secondary-button size="sm" type="button"
-                                                wire:click="dispatchTestJob(@js($job['class']))"
-                                                wire:confirm="{{ __('Dispatch :class for real? Whatever this job does in production, it will do now.', ['class' => class_basename($job['class'])]) }}">
-                                                {{ __('Run') }}
+                                            {{-- The confirm lives in the modal below: this runs real
+                                                 production work, and the browser's own dialog cannot
+                                                 carry the argument field that decision needs. --}}
+                                            <x-secondary-button size="sm" type="button" wire:click="confirmDispatch(@js($job['class']))">
+                                                {{ $needsArgs ? __('Run…') : __('Run') }}
                                             </x-secondary-button>
                                         @endif
                                     @endcan
                                 </div>
                               </div>
-
-                              @if ($dispatch_class === $job['class'])
-                                <div class="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-brand-sand/30 px-3 py-2">
-                                    <x-text-input wire:model="dispatch_args" class="h-8 min-w-0 flex-1 font-mono text-xs"
-                                        placeholder='[12, "now"]' :aria-label="__('Constructor arguments as JSON')" />
-                                    <x-secondary-button size="sm" type="button"
-                                        wire:click="dispatchTestJob(@js($job['class']))"
-                                        wire:confirm="{{ __('Dispatch :class for real? Whatever this job does in production, it will do now.', ['class' => class_basename($job['class'])]) }}">
-                                        {{ __('Run') }}
-                                    </x-secondary-button>
-                                    <p class="w-full text-2xs text-brand-mist">
-                                        {{ __('Positional, JSON: :sig', ['sig' => $job['signature'] ?: '—']) }}
-                                    </p>
-                                    @error('dispatch_args')<p class="w-full text-2xs font-semibold text-rose-700">{{ $message }}</p>@enderror
-                                </div>
-                              @endif
                             </li>
                         @endforeach
                     </ul>
@@ -644,4 +707,95 @@
             <x-cli-snippet tone="stub" />
         </div>
     </section>
+
+    {{-- Bulk failed-job actions. Retry-all can put thousands of jobs back on a
+         queue in one go, and delete-all destroys the only record of what broke;
+         neither belongs behind a bare button. --}}
+    <x-modal name="queue-failed-confirm" max-width="lg" focusable :label="__('Failed jobs')">
+        @php($failedForModal = $this->failedJobs())
+        @php($failedCount = (int) ($failedForModal['total'] ?? 0))
+        <div class="p-6">
+            <h3 class="text-base font-semibold text-brand-ink">
+                {{ $failed_action === 'flush'
+                    ? __('Delete all :n failed jobs?', ['n' => $failedCount])
+                    : __('Retry all :n failed jobs?', ['n' => $failedCount]) }}
+            </h3>
+            <p class="mt-2 text-sm text-brand-moss">
+                @if ($failed_action === 'flush')
+                    {{ __('This runs queue:flush. The records are gone — the exceptions, the payloads, the evidence — and nothing runs again.') }}
+                @else
+                    {{ __('This runs queue:retry all. Every failed job goes back on its queue at once, so whatever caused them to fail will be attempted again at that volume.') }}
+                @endif
+            </p>
+            <div class="mt-5 flex justify-end gap-2">
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-failed-confirm')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button size="sm" type="button" wire:click="runFailedBulk" wire:loading.attr="disabled">
+                    {{ $failed_action === 'flush' ? __('Delete them') : __('Retry them') }}
+                </x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- Run one of the app's own jobs. Deliberately a dply modal: the operator
+         needs the class, its queue and an argument field in front of them, and a
+         browser confirm shows none of that under a "JavaScript from dply.io"
+         heading. --}}
+    <x-modal name="queue-dispatch-confirm" max-width="lg" focusable :label="__('Run a job')">
+        @php($entry = $this->confirmEntry())
+        <div class="p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h3 class="text-base font-semibold text-brand-ink">
+                        {{ __('Run :class?', ['class' => $entry ? class_basename($entry['class']) : __('this job')]) }}
+                    </h3>
+                    @if ($entry)
+                        <p class="mt-1 truncate font-mono text-xs text-brand-mist">{{ $entry['class'] }}</p>
+                    @endif
+                </div>
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'queue-dispatch-confirm')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                    <x-heroicon-o-x-mark class="h-5 w-5" />
+                </button>
+            </div>
+
+            <div class="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-900">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{{ __('This is not a simulation. Whatever the job does in production — send mail, charge a card, write to your database — it does now.') }}</span>
+            </div>
+
+            @if ($entry)
+                <dl class="mt-4 grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                        <dt class="font-semibold uppercase tracking-wide text-brand-moss">{{ __('Queue') }}</dt>
+                        <dd class="mt-0.5 font-mono text-brand-ink">{{ $entry['queue'] ?: __('the app default') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-semibold uppercase tracking-wide text-brand-moss">{{ __('Retries') }}</dt>
+                        <dd class="mt-0.5 text-brand-ink">{{ $entry['tries'] ?? __('app default') }}</dd>
+                    </div>
+                </dl>
+
+                @if ($entry['signature'])
+                    <div class="mt-4">
+                        <x-input-label for="dispatch_args" :value="__('Constructor arguments')" />
+                        <x-text-input id="dispatch_args" wire:model="dispatch_args" class="mt-1 block w-full font-mono text-xs"
+                            placeholder='[12, "now"]' />
+                        <p class="mt-1 text-2xs text-brand-mist">
+                            {{ __('Positional JSON for :sig', ['sig' => $entry['signature']]) }}
+                            @if ((int) $entry['required_args'] === 0)
+                                · {{ __('all optional — leave blank to use the defaults') }}
+                            @endif
+                        </p>
+                        <x-input-error :messages="$errors->get('dispatch_args')" class="mt-1" />
+                    </div>
+                @endif
+            @endif
+
+            <div class="mt-5 flex justify-end gap-2">
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-dispatch-confirm')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button size="sm" type="button" wire:click="dispatchTestJob(@js($confirm_class))" wire:loading.attr="disabled">
+                    {{ __('Run it') }}
+                </x-primary-button>
+            </div>
+        </div>
+    </x-modal>
 </div>

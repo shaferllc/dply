@@ -65,9 +65,35 @@ class SiteQueueEventController
                 continue;
             }
 
+            $jobId = $this->str($row['id'] ?? null, 191);
+
+            // A run dply dispatched is already in the table as queued/taken,
+            // keyed by the id the worker reports here. Updating it closes that
+            // row instead of filing a second one for the same execution.
+            $opened = $jobId === null ? null : SiteQueueJobRun::query()
+                ->where('site_id', $siteModel->id)
+                ->where('job_id', $jobId)
+                ->whereIn('status', [SiteQueueJobRun::STATUS_QUEUED, SiteQueueJobRun::STATUS_TAKEN])
+                ->latest('ran_at')
+                ->first();
+
+            if ($opened !== null) {
+                $opened->forceFill([
+                    'status' => $status,
+                    'duration_ms' => is_numeric($row['duration_ms'] ?? null) ? max(0, (int) $row['duration_ms']) : $opened->duration_ms,
+                    'attempts' => is_numeric($row['attempts'] ?? null) ? max(0, (int) $row['attempts']) : $opened->attempts,
+                    'exception' => $this->str($row['exception'] ?? null, 191),
+                    'message' => $this->str($row['message'] ?? null, 500),
+                ])->save();
+
+                $accepted++;
+
+                continue;
+            }
+
             SiteQueueJobRun::query()->create([
                 'site_id' => $siteModel->id,
-                'job_id' => $this->str($row['id'] ?? null, 191),
+                'job_id' => $jobId,
                 'name' => $this->shortName((string) $row['name']),
                 'queue' => $this->str($row['queue'] ?? null, 191),
                 'connection' => $this->str($row['connection'] ?? null, 191),

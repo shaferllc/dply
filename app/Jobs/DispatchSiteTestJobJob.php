@@ -31,10 +31,10 @@ use Illuminate\Support\Str;
  * dply's own 252 job classes found not one that takes zero arguments, which is
  * why passing them is supported at all.
  *
- * "Drained" is measured by queue depth returning to its pre-dispatch level, not
- * by the job reporting success — nothing outside the app can see an outcome
- * without the agent installed. A job that FAILED also leaves the queue, so the
- * wording stays "a worker took it", never "it worked".
+ * The run is recorded the moment it is dispatched, as `queued`, and promoted to
+ * `taken` if queue depth returns to its pre-dispatch level. Neither means
+ * success: a job that FAILED leaves the queue too, and only the in-app agent
+ * can close that gap — it reports against the same job id captured here.
  */
 class DispatchSiteTestJobJob implements ShouldQueue
 {
@@ -117,18 +117,41 @@ class DispatchSiteTestJobJob implements ShouldQueue
         }
 
         $queue = (string) ($result['queue'] ?? $this->queueName);
+        $drained = (bool) ($result['drained'] ?? false);
+        $ms = $drained ? (int) ($result['ms'] ?? 0) : null;
 
-        if (! ($result['drained'] ?? false)) {
-            $emit->error(__('Dispatched onto :q, but nothing took it within :n seconds. It is still queued — a worker will run it when one starts.', [
+        // The row goes in either way. The dispatch SUCCEEDED — the job is on the
+        // queue — and a run that leaves no trace because nothing drained it
+        // within half a minute is the exact hole that made this page look
+        // broken: press Run, watch nothing appear anywhere.
+        SiteQueueJobRun::query()->create([
+            'site_id' => $site->id,
+            'job_id' => (string) ($result['job_id'] ?? '') ?: null,
+            'name' => $this->jobClass,
+            'queue' => $queue,
+            'connection' => (string) ($result['connection'] ?? '') ?: null,
+            'status' => $drained ? SiteQueueJobRun::STATUS_TAKEN : SiteQueueJobRun::STATUS_QUEUED,
+            'source' => SiteQueueJobRun::SOURCE_MANUAL,
+            'duration_ms' => $ms,
+            'attempts' => 1,
+            'message' => $drained
+                ? __('Dispatched from dply; a worker took it off the queue.')
+                : __('Dispatched from dply; still waiting for a worker.'),
+            'ran_at' => now(),
+        ]);
+
+        if (! $drained) {
+            // Not an error: the job is queued, which is what Run promised. The
+            // history row now carries the state, so the console says what
+            // happened rather than failing the run.
+            $emit->success(__('Dispatched onto :q. Nothing took it within :n seconds — it stays queued, and History tracks it.', [
                 'q' => $queue,
                 'n' => self::WAIT_SECONDS,
             ]), 'dispatch');
-            $this->finish(false, 'Not drained within '.self::WAIT_SECONDS.'s.');
+            $this->finish(true, null);
 
             return;
         }
-
-        $ms = (int) ($result['ms'] ?? 0);
 
         $emit->success(__('A worker took :class off :q after :ms ms.', [
             'class' => class_basename($this->jobClass),
@@ -136,19 +159,6 @@ class DispatchSiteTestJobJob implements ShouldQueue
             'ms' => $ms,
         ]), 'dispatch');
         $emit->step('dispatch', __('Whether it SUCCEEDED is only visible with the queue agent installed — a failed job leaves the queue too.'));
-
-        SiteQueueJobRun::query()->create([
-            'site_id' => $site->id,
-            'name' => $this->jobClass,
-            'queue' => $queue,
-            'connection' => (string) ($result['connection'] ?? '') ?: null,
-            'status' => SiteQueueJobRun::STATUS_PROCESSED,
-            'source' => SiteQueueJobRun::SOURCE_MANUAL,
-            'duration_ms' => $ms,
-            'attempts' => 1,
-            'message' => __('Dispatched from dply; a worker took it off the queue.'),
-            'ran_at' => now(),
-        ]);
 
         $this->finish(true, null);
     }
@@ -228,10 +238,22 @@ if ($job === null) { $done(['error' => 'Could not construct '.$class.' from the 
 // as a failure.
 $declared = $T(fn () => is_string($job->queue ?? null) && $job->queue !== '' ? $job->queue : null);
 $queue = $declared ?? (string) $in['queue'];
-$out = ['connection' => $conn, 'driver' => $driver, 'queue' => $queue, 'drained' => false];
+$out = ['connection' => $conn, 'driver' => $driver, 'queue' => $queue, 'drained' => false, 'job_id' => null];
 $size = function () use ($T, $conn, $queue) { return (int) $T(fn () => \Illuminate\Support\Facades\Queue::connection($conn)->size($queue), -1); };
 $before = $size();
 $started = microtime(true);
+// The id the WORKER will report for this job. JobQueued carries the same id
+// the agent later keys processed/failed by, so capturing it here is what lets
+// one history row be opened at dispatch and closed by the agent, instead of
+// two rows describing one run.
+// NOT wrapped in $T: an arrow function captures by VALUE, so the listener would
+// bind its reference to a copy and the id would be captured into a variable
+// that no longer exists. Event::listen does not throw anyway.
+$jobId = null;
+\Illuminate\Support\Facades\Event::listen(
+    \Illuminate\Queue\Events\JobQueued::class,
+    function ($e) use (&$jobId) { $jobId = $jobId ?? (is_scalar($e->id ?? null) ? (string) $e->id : null); }
+);
 try {
     if (method_exists($job, 'onConnection')) { $job->onConnection($conn); }
     if (method_exists($job, 'onQueue')) { $job->onQueue($queue); }
@@ -240,6 +262,7 @@ try {
     $out['error'] = 'Dispatch failed: '.get_class($e).': '.mb_substr($e->getMessage(), 0, 400);
     $done($out); return;
 }
+$out['job_id'] = $jobId;
 $deadline = time() + (int) $in['wait'];
 while (time() < $deadline) {
     usleep(400000);

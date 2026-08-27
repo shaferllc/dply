@@ -32,6 +32,24 @@ class SiteQueueJobRun extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    /**
+     * Handed to the queue, nothing observed since.
+     *
+     * A run dply triggered is recorded the moment it is dispatched, not when an
+     * outcome is proven — a job that takes a minute, or fails, used to leave no
+     * trace at all, so the page said nothing had happened.
+     */
+    public const STATUS_QUEUED = 'queued';
+
+    /**
+     * A worker took it off the queue; whether it SUCCEEDED is unknown.
+     *
+     * The most dply can prove from outside the app: queue depth returned to
+     * where it started. A failed job leaves the queue too, so this must never
+     * be rendered as success — only the in-app agent can close that gap.
+     */
+    public const STATUS_TAKEN = 'taken';
+
     /** In-app agent on the site's own server. */
     public const SOURCE_AGENT = 'agent';
 

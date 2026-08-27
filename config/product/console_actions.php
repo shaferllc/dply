@@ -452,7 +452,10 @@ return [
         'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
         // Queue section: the canary and the depth sweep both report here, so
         // the banner has to know their kinds or the page renders no console.
-        'queue' => ['queue_canary', 'queue_setup', 'queue_dispatch'],
+        // 'systemd' rides along because retry/delete/flush go through
+        // ControlWorkerDaemonJob, which streams under that kind — without it the
+        // Failed tab's actions would report into a banner this page never shows.
+        'queue' => ['queue_canary', 'queue_setup', 'queue_dispatch', 'systemd'],
     ],
 
     /*

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Jobs\CollectSiteFailedJobsJob;
 use App\Jobs\CollectSiteJobClassesJob;
 use App\Jobs\CollectSiteQueueJobsJob;
+use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\DispatchSiteTestJobJob;
 use App\Jobs\RunSiteQueueCanaryJob;
 use App\Jobs\SetUpSiteQueueingJob;
@@ -71,8 +73,11 @@ class WorkspaceQueue extends Component
     /** Substring filter over the job catalogue — an app with 300 jobs needs one. */
     public string $catalog_filter = '';
 
-    /** Job class whose argument row is open, if any. */
-    public string $dispatch_class = '';
+    /** Job class the confirm modal is asking about, if any. */
+    public string $confirm_class = '';
+
+    /** Bulk failed-job action awaiting confirmation: 'retry_all' or 'flush'. */
+    public string $failed_action = '';
 
     /** Constructor arguments for that job, as a JSON array: [12, "now"]. */
     public string $dispatch_args = '';
@@ -713,18 +718,42 @@ class WorkspaceQueue extends Component
             $args,
         );
 
-        $this->dispatch_class = '';
+        $this->confirm_class = '';
         $this->dispatch_args = '';
+        $this->dispatch('close-modal', 'queue-dispatch-confirm');
 
         $this->toastSuccess(__('Dispatched — progress shows in the console above.'));
     }
 
-    /** Open (or close) the argument row for one job. */
-    public function promptDispatchArgs(string $class): void
+    /**
+     * Ask before running someone's production job.
+     *
+     * A modal rather than `wire:confirm`: the browser's dialog renders as
+     * "JavaScript from https://dply.io" above text the operator cannot read
+     * beside the job it belongs to, and it cannot carry the argument field this
+     * confirm needs anyway.
+     */
+    public function confirmDispatch(string $class): void
     {
+        $this->authorize('update', $this->site);
         $this->resetValidation();
+
         $this->dispatch_args = '';
-        $this->dispatch_class = $this->dispatch_class === $class ? '' : $class;
+        $this->confirm_class = $class;
+
+        $this->dispatch('open-modal', 'queue-dispatch-confirm');
+    }
+
+    /** The catalogue row the confirm modal is describing. */
+    public function confirmEntry(): ?array
+    {
+        if ($this->confirm_class === '') {
+            return null;
+        }
+
+        $catalog = CollectSiteJobClassesJob::cached((string) $this->site->id);
+
+        return collect((array) ($catalog['jobs'] ?? []))->firstWhere('class', $this->confirm_class);
     }
 
     /**
@@ -738,7 +767,7 @@ class WorkspaceQueue extends Component
      */
     private function parsedDispatchArgs(string $class): ?array
     {
-        if ($this->dispatch_class !== $class || trim($this->dispatch_args) === '') {
+        if ($this->confirm_class !== $class || trim($this->dispatch_args) === '') {
             return [];
         }
 
@@ -755,6 +784,106 @@ class WorkspaceQueue extends Component
         }
 
         return $decoded;
+    }
+
+    /**
+     * Show the failed jobs, reading them the first time.
+     *
+     * Same shape as the catalogue: SSH work happens when the tab is opened, not
+     * on every page load.
+     */
+    public function showFailed(): void
+    {
+        $this->queue_workspace_tab = 'failed';
+
+        if (CollectSiteFailedJobsJob::cached((string) $this->site->id) === null) {
+            $this->refreshFailedJobs();
+        }
+    }
+
+    public function refreshFailedJobs(): void
+    {
+        $this->authorize('view', $this->site);
+
+        CollectSiteFailedJobsJob::dispatch((string) $this->site->id);
+    }
+
+    /**
+     * @return array{jobs: list<array<string, mixed>>, total: int, driver: ?string, error: ?string, read_at: ?string}|null
+     */
+    public function failedJobs(): ?array
+    {
+        return CollectSiteFailedJobsJob::cached((string) $this->site->id);
+    }
+
+    /** Put one failed job back on its queue. */
+    public function retryFailed(string $uuid): void
+    {
+        $this->runFailedCommand('queue:retry', $uuid, __('Retrying the job — the list refreshes shortly.'));
+    }
+
+    /** Delete one failed job without running it again. */
+    public function forgetFailed(string $uuid): void
+    {
+        $this->runFailedCommand('queue:forget', $uuid, __('Deleting the record — the list refreshes shortly.'));
+    }
+
+    /** Open the confirm modal for a bulk action ('retry_all' or 'flush'). */
+    public function confirmFailedBulk(string $action): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! in_array($action, ['retry_all', 'flush'], true)) {
+            return;
+        }
+
+        $this->failed_action = $action;
+        $this->dispatch('open-modal', 'queue-failed-confirm');
+    }
+
+    /**
+     * Run the confirmed bulk action.
+     *
+     * Retrying everything can put thousands of jobs back on a queue at once and
+     * flushing destroys the only record of what broke — neither belongs behind a
+     * bare button, which is why both come through the modal.
+     */
+    public function runFailedBulk(): void
+    {
+        $action = $this->failed_action;
+        $this->failed_action = '';
+        $this->dispatch('close-modal', 'queue-failed-confirm');
+
+        match ($action) {
+            'retry_all' => $this->runFailedCommand('queue:retry', 'all', __('Retrying every failed job.')),
+            'flush' => $this->runFailedCommand('queue:flush', null, __('Deleting every failed job.')),
+            default => null,
+        };
+    }
+
+    /**
+     * Hand a failed-job command to the app over SSH.
+     *
+     * {@see ControlWorkerDaemonJob} already runs these for worker pools, with the
+     * argument allowlisted to a uuid or "all" — a job identifier from a browser
+     * ends up in a shell line, so that allowlist is the point.
+     */
+    private function runFailedCommand(string $command, ?string $arg, string $message): void
+    {
+        $this->authorize('update', $this->site);
+
+        ControlWorkerDaemonJob::dispatch(
+            (string) $this->site->id,
+            $command,
+            (string) auth()->id() ?: null,
+            $arg,
+        );
+
+        // Re-read after the command has had time to land. Without it the list
+        // still shows a job that was just retried, which reads as a no-op.
+        CollectSiteFailedJobsJob::dispatch((string) $this->site->id)->delay(now()->addSeconds(10));
+
+        $this->toastSuccess($message);
     }
 
     /** Supervisor programs on this site that actually consume jobs. */
