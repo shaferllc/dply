@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Sites\SiteEnvWriteGuardTest;
 
+use App\Models\Site;
 use App\Services\Sites\SiteEnvValidator;
 use App\Services\Sites\SiteEnvWriteGuard;
 use App\Services\SshConnection;
@@ -74,7 +75,7 @@ test('APP_DEBUG=true in production warns but does not block the write', function
     // request-path danger that refuses the push.
     $vars = ['APP_KEY' => appKey(), 'APP_ENV' => 'production', 'APP_DEBUG' => 'true'];
 
-    $findings = (new \App\Services\Sites\SiteEnvValidator)->validate($vars);
+    $findings = (new SiteEnvValidator)->validate($vars);
     expect(collect($findings)->firstWhere('key', 'APP_DEBUG')['level'] ?? null)->toBe('warn');
 
     expect(guard()->dangers($vars))->toBe([]);
@@ -100,4 +101,42 @@ test('the live boot test passes on OK and on any skip marker', function () {
     }
 
     expect(true)->toBeTrue(); // reached here = no throw
+});
+
+test('the live boot test runs the site PHP, not the box default', function () {
+    // A site pinned above the distro default: bare `php` (8.3 on Ubuntu 24.04)
+    // dies on Composer's platform check before the framework boots, which the
+    // guard would otherwise report as a broken .env.
+    $site = new Site(['runtime' => 'php', 'runtime_version' => '8.5']);
+
+    $captured = '';
+    $ssh = \Mockery::mock(SshConnection::class);
+    $ssh->shouldReceive('exec')->once()->andReturnUsing(function (string $command) use (&$captured): string {
+        $captured = $command;
+
+        return 'DPLY_ENVTEST_OK';
+    });
+
+    guard()->assertBootsOnServer($ssh, '/home/dply/example.com/current', '/tmp/dply-env-x', $site);
+
+    expect($captured)
+        ->toContain('/usr/bin/php8.5')
+        ->toContain('"$DPLY_PHP" artisan config:cache')
+        ->not->toContain(' php artisan config:cache');
+});
+
+test('the live boot test falls back to bare php when the site pins no version', function () {
+    $captured = '';
+    $ssh = \Mockery::mock(SshConnection::class);
+    $ssh->shouldReceive('exec')->once()->andReturnUsing(function (string $command) use (&$captured): string {
+        $captured = $command;
+
+        return 'DPLY_ENVTEST_OK';
+    });
+
+    guard()->assertBootsOnServer($ssh, '/home/dply/example.com/current', '/tmp/dply-env-x');
+
+    expect($captured)
+        ->toContain('php artisan config:cache')
+        ->not->toContain('DPLY_PHP');
 });

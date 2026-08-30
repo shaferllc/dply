@@ -6,16 +6,16 @@ namespace App\Livewire\Databases;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
-use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
-use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseBackend;
 use App\Modules\Database\Backends\DatabaseRouter;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Database\Jobs\ResizeManagedDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Modules\Database\Services\ManagedDatabaseBackups;
 use App\Modules\Database\Services\ManagedDatabaseMetrics;
 use App\Modules\Database\Services\ManagedDatabaseUsers;
 use App\Modules\Database\Services\TrustedSourceManager;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\ManagedDatabaseSizeCatalog;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
@@ -103,6 +103,8 @@ class DatabaseShow extends Component
 
     public function createUser(ManagedDatabaseUsers $users): void
     {
+        $this->authorize('update', $this->database);
+
         $this->dismissSecret();
 
         try {
@@ -121,6 +123,8 @@ class DatabaseShow extends Component
 
     public function rotatePassword(ManagedDatabaseUsers $users, string $name): void
     {
+        $this->authorize('update', $this->database);
+
         $this->dismissSecret();
 
         try {
@@ -148,6 +152,8 @@ class DatabaseShow extends Component
 
     public function deleteUser(ManagedDatabaseUsers $users, string $name): void
     {
+        $this->authorize('update', $this->database);
+
         try {
             $users->delete($this->database, $name);
         } catch (Throwable $e) {
@@ -169,6 +175,8 @@ class DatabaseShow extends Component
 
     public function scale(DatabaseRouter $router): void
     {
+        $this->authorize('update', $this->database);
+
         $size = trim($this->targetSize);
         if ($size === '' || $size === $this->database->backendSizeSlug()) {
             $this->toastError(__('Choose a different plan.'));
@@ -202,6 +210,8 @@ class DatabaseShow extends Component
 
     public function allowIp(TrustedSourceManager $sources): void
     {
+        $this->authorize('update', $this->database);
+
         $user = auth()->user();
         if ($user === null) {
             return;
@@ -223,6 +233,8 @@ class DatabaseShow extends Component
 
     public function revokeIp(TrustedSourceManager $sources, string $recordId): void
     {
+        $this->authorize('update', $this->database);
+
         $record = $sources->liveFor($this->database)->firstWhere('id', $recordId);
         if ($record === null) {
             $this->toastError(__('That grant is no longer active.'));
@@ -245,6 +257,8 @@ class DatabaseShow extends Component
 
     public function detachSite(string $siteId): void
     {
+        $this->authorize('update', $this->database);
+
         $site = $this->database->sites()->firstWhere('sites.id', $siteId);
         if ($site === null) {
             $this->toastError(__('That app is not attached to this database.'));
@@ -263,6 +277,8 @@ class DatabaseShow extends Component
 
     public function restore(ManagedDatabaseBackups $backups): void
     {
+        $this->authorize('update', $this->database);
+
         try {
             $restored = $backups->restore($this->database, $this->restoreName, $this->restoreBackupAt);
         } catch (Throwable $e) {
@@ -292,6 +308,9 @@ class DatabaseShow extends Component
 
     public function tearDown(): void
     {
+        // Unrecoverable: deletes the provider cluster and its data. Admin only.
+        $this->authorize('delete', $this->database);
+
         TeardownCloudDatabaseJob::dispatch((string) $this->database->id);
         $this->database->forceFill(['status' => CloudDatabase::STATUS_DELETING])->save();
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\RemoteCli\Services;
 
 use App\Models\Site;
+use App\Support\Sites\SitePhpCli;
 
 /**
  * php artisan adapter on top of {@see RemoteCli}.
@@ -130,6 +131,10 @@ class Artisan extends RemoteCli
      * `cd <site-root> && php artisan <command> <args>` so artisan
      * picks up the site's own .env / vendor / config.
      *
+     * `php` here is the SITE's PHP ({@see SitePhpCli}), not the box default —
+     * on a site pinned above the distro version every artisan call would
+     * otherwise die on Composer's platform check before booting.
+     *
      * @param  list<string>  $args
      */
     protected function buildShellCommand(Site $site, string $command, array $args): string
@@ -142,10 +147,13 @@ class Artisan extends RemoteCli
             ?: preg_replace('#/public/?$#', '', (string) $site->document_root)
             ?: '/home/dply/'.$site->slug;
         $escaped = array_map(escapeshellarg(...), $args);
+        $php = SitePhpCli::for($site);
 
         return sprintf(
-            'cd %s && php artisan %s %s',
+            'cd %s && %s%s artisan %s %s',
             escapeshellarg($path),
+            $php->prelude,
+            $php->binary,
             $command,
             implode(' ', $escaped),
         );

@@ -83,6 +83,8 @@ trait ManagesSiteCreateStore
             }
         }
 
+        $rules += $this->databaseCreationRules();
+
         $this->form->validate($rules, [
             'php_version.required' => __('Choose a PHP version for this site.'),
             'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
@@ -284,6 +286,10 @@ trait ManagesSiteCreateStore
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
         ProvisionSiteJob::dispatch($site->id);
+
+        // Give the site its database (and the .env wiring to reach it) unless
+        // the user opted out or the server has no engine to put one on.
+        $this->provisionInitialDatabase($site);
 
         if ($this->server->organization) {
             audit_log(

@@ -68,7 +68,10 @@ trait ResolvesSiteRuntime
             return $this->runtime;
         }
 
-        return $this->type->value;
+        // Null-safe: the return type is already `?string`, and a row with
+        // neither `runtime` nor `type` set (an unsaved model, a partially
+        // hydrated one) must answer "unknown", not fatal.
+        return $this->type?->value;
     }
 
     /**

@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\CloudDatabaseIndexPageTest;
 
-use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Livewire\Databases\DatabaseIndex as CloudDatabaseIndex;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\User;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
@@ -160,3 +160,40 @@ function ownerWithOrg(): User
 
     return $user;
 }
+
+test('plain member cannot tear down a database', function () {
+    Queue::fake();
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+    $database = CloudDatabase::factory()->active()->create(['organization_id' => $org->id]);
+
+    $member = User::factory()->create();
+    $org->users()->attach($member->id, ['role' => 'member']);
+    session(['current_organization_id' => $org->id]);
+
+    Livewire::actingAs($member)
+        ->test(CloudDatabaseIndex::class)
+        ->call('tearDown', $database->id)
+        ->assertForbidden();
+
+    Queue::assertNotPushed(TeardownCloudDatabaseJob::class);
+    expect($database->fresh()->status)->not->toBe(CloudDatabase::STATUS_DELETING);
+});
+
+test('tear down control is hidden from a non-admin member', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+    CloudDatabase::factory()->active()->create([
+        'organization_id' => $org->id,
+        'name' => 'orders-primary',
+    ]);
+
+    $member = User::factory()->create();
+    $org->users()->attach($member->id, ['role' => 'member']);
+    session(['current_organization_id' => $org->id]);
+
+    $this->actingAs($member)->get(route('cloud.databases.index'))
+        ->assertOk()
+        ->assertSee('orders-primary')
+        ->assertDontSee('Tear down');
+});

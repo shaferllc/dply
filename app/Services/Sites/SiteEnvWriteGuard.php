@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Models\Site;
 use App\Services\SshConnection;
+use App\Support\Sites\SitePhpCli;
 use Illuminate\Support\Str;
 
 /**
@@ -42,12 +44,12 @@ final class SiteEnvWriteGuard
     /**
      * The danger-level findings (only) for a composed env map.
      *
-     * @param  array<string, mixed> $vars
+     * @param  array<string, mixed>  $vars
      * @return list<array{level: string, key: ?string, message: string}>
      */
     /**
+     * @param  array<string, mixed>  $vars
      * @return list<mixed>
-     * @param  array<string, mixed> $vars
      */
     public function dangers(array $vars): array
     {
@@ -62,7 +64,7 @@ final class SiteEnvWriteGuard
      * The message lists every offending key so the operator can fix it in the
      * editor and retry.
      *
-     * @param  array<string, mixed> $vars
+     * @param  array<string, mixed>  $vars
      */
     public function assertSafeToWrite(array $vars): void
     {
@@ -99,11 +101,21 @@ final class SiteEnvWriteGuard
      * vendor/, or the docroot isn't writable by the SSH user. The static gate
      * still applies in those cases.
      *
+     * Boots under the SITE's PHP ({@see SitePhpCli}), not the box default. A
+     * site pinned to 8.5 on an Ubuntu box whose bare `php` is 8.3 would
+     * otherwise fail Composer's platform check and read as a bad .env.
+     *
      * @throws \RuntimeException if the app fails to boot/build config with the
      *                           candidate env (the captured artisan output is included).
      */
-    public function assertBootsOnServer(SshConnection $ssh, string $activeDir, string $stagedTmpPath): void
-    {
+    public function assertBootsOnServer(
+        SshConnection $ssh,
+        string $activeDir,
+        string $stagedTmpPath,
+        ?Site $site = null,
+    ): void {
+        $php = SitePhpCli::for($site);
+
         $token = Str::lower(Str::random(12));
         $envName = 'dplyvalidate-'.$token;
         $cfgPath = '/tmp/dply-cfgtest-'.$token.'.php';
@@ -118,7 +130,8 @@ final class SiteEnvWriteGuard
             // Docroot not writable by the SSH user (e.g. root:www-data flat layout) → skip.
             'cp '.escapeshellarg($stagedTmpPath).' '.escapeshellarg($envFile).' 2>/dev/null || { echo DPLY_ENVTEST_SKIP_STAGE; exit 0; };',
             // Boot the framework + build config under the throwaway env and cache path.
-            'APP_CONFIG_CACHE='.escapeshellarg($cfgPath).' php artisan config:cache --env='.escapeshellarg($envName).' > '.escapeshellarg($outPath).' 2>&1;',
+            $php->prelude,
+            'APP_CONFIG_CACHE='.escapeshellarg($cfgPath).' '.$php->binary.' artisan config:cache --env='.escapeshellarg($envName).' > '.escapeshellarg($outPath).' 2>&1;',
             'RC=$?;',
             'rm -f '.escapeshellarg($envFile).' '.escapeshellarg($cfgPath).';',
             'if [ "$RC" -ne 0 ]; then echo DPLY_ENVTEST_FAIL; cat '.escapeshellarg($outPath).' 2>/dev/null; rm -f '.escapeshellarg($outPath).'; exit 0; fi;',

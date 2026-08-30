@@ -86,6 +86,14 @@
     @elseif ($tab === 'backups')
         @include('livewire.databases.partials.backups')
     @elseif ($tab === 'danger')
-        @include('livewire.databases.partials.danger')
+        {{-- Tear-down is admin-only (CloudDatabasePolicy::delete). tearDown()
+             authorizes as well; this keeps a card nobody can use off the page. --}}
+        @can('delete', $database)
+            @include('livewire.databases.partials.danger')
+        @else
+            <p class="rounded-2xl border border-brand-ink/10 bg-white px-5 py-4 text-sm text-brand-moss shadow-sm">
+                {{ __('Tearing down a database requires organization admin access.') }}
+            </p>
+        @endcan
     @endif
 </div>

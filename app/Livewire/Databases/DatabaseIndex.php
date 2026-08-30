@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Databases;
 
-use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\CloudDatabase;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
@@ -38,7 +38,8 @@ class DatabaseIndex extends Component
 
     /**
      * Queue teardown of a managed database. Org-scoped — a database
-     * belonging to another org is silently ignored.
+     * belonging to another org is silently ignored — and gated on
+     * CloudDatabasePolicy::delete, which requires org admin access.
      */
     public function tearDown(string $databaseId): void
     {
@@ -55,6 +56,9 @@ class DatabaseIndex extends Component
 
             return;
         }
+
+        // Unrecoverable: deletes the provider cluster and its data. Admin only.
+        $this->authorize('delete', $database);
 
         TeardownCloudDatabaseJob::dispatch($database->id);
         $database->forceFill(['status' => CloudDatabase::STATUS_DELETING])->save();

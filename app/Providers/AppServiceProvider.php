@@ -16,11 +16,12 @@ use App\Livewire\Pulse\DatabaseServersCard;
 use App\Livewire\Pulse\RedisServersCard;
 use App\Livewire\Pulse\WorkerServersCard;
 use App\Models\BackupConfiguration;
+use App\Models\CloudDatabase;
+use App\Models\GitProviderToken;
 use App\Models\ImportServerMigration;
 use App\Models\Incident;
 use App\Models\LookoutProject;
 use App\Models\NotificationChannel;
-use App\Models\GitProviderToken;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Script;
@@ -38,10 +39,10 @@ use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Observers\BackupAutoResumeObserver;
 use App\Modules\Backups\Observers\BackupFailureNotifyObserver;
 use App\Modules\Backups\Policies\BackupConfigurationPolicy;
-use App\Policies\GitProviderTokenPolicy;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Models\SubscriptionItem;
 use App\Modules\Billing\Observers\SiteBillingObserver;
+use App\Modules\Cache\Support\CacheRequestContext;
 use App\Modules\Certificates\Services\CaddyAutomaticHttpsCertificateEngine;
 use App\Modules\Certificates\Services\CertificateEngineResolver;
 use App\Modules\Certificates\Services\CertificateRequestService;
@@ -71,7 +72,6 @@ use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
 use App\Modules\Queue\Support\QueueAction;
-use App\Modules\Cache\Support\CacheRequestContext;
 use App\Modules\Queue\Support\QueueRequestContext;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
@@ -84,6 +84,8 @@ use App\Observers\ServerObserver;
 use App\Observers\SiteWorkerFleetObserver;
 use App\Observers\SupervisorProgramObserver;
 use App\Observers\TaskRunnerTaskObserver;
+use App\Policies\CloudDatabasePolicy;
+use App\Policies\GitProviderTokenPolicy;
 use App\Policies\IncidentPolicy;
 use App\Policies\NotificationChannelPolicy;
 use App\Policies\OrganizationPolicy;
@@ -151,9 +153,9 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 use Livewire\Blaze\Blaze;
 use Livewire\Livewire;
-use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -409,6 +411,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(JobFailed::class, [ForwardWorkerPoolJobEvent::class, 'handleFailed']);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
+        Gate::policy(CloudDatabase::class, CloudDatabasePolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
         Gate::policy(Site::class, SitePolicy::class);
         Gate::policy(ProviderCredential::class, ProviderCredentialPolicy::class);
@@ -633,7 +636,6 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($token ? 'api:'.$token->id : $request->ip());
         });
 
-
         // Creating and tearing down sites that provision infrastructure.
         // Keyed by ORGANIZATION rather than token so a create/delete loop
         // cannot churn provider APIs under a per-token ceiling.
@@ -828,5 +830,4 @@ class AppServiceProvider extends ServiceProvider
         Livewire::component('pulse.database-servers', DatabaseServersCard::class);
         Livewire::component('pulse.worker-servers', WorkerServersCard::class);
     }
-
 }

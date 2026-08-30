@@ -102,12 +102,18 @@
                             <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ $database->sites_count }}</td>
                             <td class="px-4 py-3 text-right">
                                 @if ($database->status !== \App\Models\CloudDatabase::STATUS_DELETING)
+                                    {{-- Tear-down is admin-only (CloudDatabasePolicy::delete); the
+                                         action authorizes too, this just stops offering it. --}}
+                                    @can('delete', $database)
                                     <button type="button"
                                         wire:click="tearDown('{{ $database->id }}')"
                                         wire:confirm="{{ __('Tear down :name? The database cluster will be permanently deleted on the backend and detached from all apps.', ['name' => $database->name]) }}"
                                         class="text-xs font-medium text-rose-700 hover:text-rose-900">
                                         {{ __('Tear down') }}
                                     </button>
+                                    @else
+                                        <span class="text-xs text-slate-400">{{ __('—') }}</span>
+                                    @endcan
                                 @else
                                     <span class="text-xs text-slate-400">{{ __('Deleting…') }}</span>
                                 @endif

@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Services\SshConnectionFactory;
+use App\Support\Sites\SitePhpCli;
 
 /**
  * After a site's .env is (re)written on the server, make the change actually
@@ -82,10 +83,18 @@ final class SiteEnvRuntimeApplier
             );
         }
 
+        // The site's PHP, not the box default — a site pinned to a newer
+        // version than /usr/bin/php fatals on Composer's platform check
+        // before artisan can rebuild anything. {@see SitePhpCli}
+        $php = SitePhpCli::for($site);
+
         $log = "[dply] env apply: rebuilding cached config + reloading runtime\n";
         $log .= $ssh->exec(sprintf(
-            'cd %s && php artisan config:clear 2>&1; php artisan config:cache 2>&1',
-            $activeEsc
+            'cd %s && %s%s artisan config:clear 2>&1; %s artisan config:cache 2>&1',
+            $activeEsc,
+            $php->prelude,
+            $php->binary,
+            $php->binary,
         ), 120);
 
         $restart = $this->pipelineRunner->runManagedRestart($ssh, $site, $active);

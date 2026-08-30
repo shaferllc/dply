@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Livewire\Sites\Concerns\ManagesSiteCreateDatabase;
 use Livewire\Form;
 
 class SiteCreateForm extends Form
@@ -98,6 +99,20 @@ class SiteCreateForm extends Form
      * server when the user picks a non-default engine.
      */
     public string $database_engine = '';
+
+    /**
+     * Provision a database for this site as part of creating it, and wire the
+     * DB_* vars into its .env. Defaults on, and is forced off by
+     * {@see ManagesSiteCreateDatabase} when the
+     * target server exposes no database engines.
+     */
+    public bool $create_database = true;
+
+    /**
+     * Name for the database created alongside the site. Pre-filled from the
+     * site name and kept in step with it until the user edits it directly.
+     */
+    public string $database_name = '';
 
     /**
      * Framework hint chosen by the user in the workspace "Add site" modal.

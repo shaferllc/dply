@@ -216,7 +216,7 @@ class SiteEnvPusher
         // there's no built app to boot. Operator pushes only — the deploy
         // seeding path has no built release to test against yet.
         if ($operatorPush && $activeDir !== '') {
-            $this->guard->assertBootsOnServer($ssh, $activeDir, $tmp);
+            $this->guard->assertBootsOnServer($ssh, $activeDir, $tmp, $site);
         }
 
         // Unified flow: ALWAYS sudo. Whether the destination is inside the

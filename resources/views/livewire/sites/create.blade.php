@@ -325,16 +325,47 @@
                             </div>
                         @endif
 
-                        @if (count($availableDatabaseEngines) > 1 && $form->type !== 'static')
-                            <div>
-                                <x-input-label for="database_engine" :value="__('Database engine')" />
-                                <select id="database_engine" wire:model="form.database_engine" class="mt-1 block w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                    @foreach ($availableDatabaseEngines as $engine)
-                                        <option value="{{ $engine['id'] }}">{{ $engine['label'] }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="mt-2 text-sm text-slate-600">{{ __('This server has multiple engines installed. Pick which one this site connects to — defaults to the server\'s default engine.') }}</p>
-                                <x-input-error :messages="$errors->get('form.database_engine')" class="mt-1" />
+                        @if ($databaseCreationAvailable)
+                            <div class="rounded-xl border border-slate-200 bg-white p-4">
+                                <div class="flex flex-wrap items-start justify-between gap-4">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-slate-900">{{ __('Database') }}</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ __('Create a database for this site and write its connection details into the site environment.') }}</p>
+                                    </div>
+                                    <label class="inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
+                                        <input type="checkbox" wire:model.live="form.create_database" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+                                        {{ __('Create a database') }}
+                                    </label>
+                                </div>
+
+                                @if ($form->create_database)
+                                    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                                        <div>
+                                            <x-input-label for="database_name" :value="__('Database name')" />
+                                            <x-text-input id="database_name" wire:model.blur="form.database_name" type="text" class="mt-1 block w-full" autocomplete="off" />
+                                            <p class="mt-2 text-sm text-slate-600">{{ __('Letters, numbers and underscores. Suggested from the site name until you change it.') }}</p>
+                                            <x-input-error :messages="$errors->get('form.database_name')" class="mt-1" />
+                                        </div>
+
+                                        @if (count($availableDatabaseEngines) > 1)
+                                            <div>
+                                                <x-input-label for="database_engine" :value="__('Database engine')" />
+                                                <select id="database_engine" wire:model="form.database_engine" class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                    @foreach ($availableDatabaseEngines as $engine)
+                                                        <option value="{{ $engine['id'] }}">{{ $engine['label'] }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <p class="mt-2 text-sm text-slate-600">{{ __('This server has multiple engines installed. Pick which one this site connects to — defaults to the server\'s default engine.') }}</p>
+                                                <x-input-error :messages="$errors->get('form.database_engine')" class="mt-1" />
+                                            </div>
+                                        @else
+                                            <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Engine') }}</dt>
+                                                <dd class="mt-2 font-mono text-sm text-slate-900">{{ $availableDatabaseEngines[0]['label'] ?? '' }}</dd>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>
