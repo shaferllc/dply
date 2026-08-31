@@ -11,6 +11,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesDatabaseAdminCredentials;
 use App\Livewire\Servers\Concerns\ManagesDatabaseBackups;
+use App\Livewire\Servers\Concerns\ManagesDatabaseConnectPanel;
 use App\Livewire\Servers\Concerns\ManagesDatabaseCredentialModals;
 use App\Livewire\Servers\Concerns\ManagesDatabaseCrud;
 use App\Livewire\Servers\Concerns\ManagesDatabaseEdit;
@@ -55,6 +56,7 @@ class WorkspaceDatabases extends Component
     use InteractsWithServerWorkspace;
     use ManagesDatabaseAdminCredentials;
     use ManagesDatabaseBackups;
+    use ManagesDatabaseConnectPanel;
     use ManagesDatabaseCredentialModals;
     use ManagesDatabaseCrud;
     use ManagesDatabaseEdit;

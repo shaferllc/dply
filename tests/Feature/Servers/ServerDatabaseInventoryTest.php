@@ -257,3 +257,72 @@ test('a database with known credentials still attaches as a binding', function (
     expect(app(SiteBindingManager::class)->adoptServerDatabase($site, $db))
         ->not->toBeNull();
 });
+
+test('the server connect panel emits a tunnel through this server', function () {
+    $server = inventoryServer();
+    $user = User::factory()->create();
+    $server->organization->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $server->organization_id]);
+    $db = trackDb($server, 'databio');
+    $db->forceFill(['password' => 'sup3r-s3cret-value'])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openDatabaseConnect', (string) $db->id);
+
+    $panel = $component->instance()->databaseConnectPanel();
+
+    expect($panel)->not->toBeNull()
+        ->and($panel['target']->database)->toBe('databio')
+        ->and($panel['target']->port)->toBe(5432)
+        ->and($panel['commands']['tunnel'])->toContain('-L 15432:127.0.0.1:5432')
+        ->and($panel['commands']['tunnel'])->toContain('203.0.113.10');
+
+    // The password never reaches the panel — it travels only through the
+    // one-time credential-share link.
+    expect(json_encode($panel['commands']))->not->toContain('sup3r-s3cret-value');
+    $component->assertDontSee('sup3r-s3cret-value');
+});
+
+test('the connect panel flags an adopted database as password-unknown', function () {
+    $server = inventoryServer();
+    $user = User::factory()->create();
+    $server->organization->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $server->organization_id]);
+    $db = app(ServerDatabaseInventory::class)->adopt($server, 'postgres', 'orders_legacy');
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openDatabaseConnect', (string) $db->id);
+
+    expect($component->instance()->databaseConnectPanel()['credentials_known'])->toBeFalse();
+});
+
+test('sqlite has no connect panel — a file path is not a tunnel target', function () {
+    $server = inventoryServer();
+    $user = User::factory()->create();
+    $server->organization->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $server->organization_id]);
+    $db = trackDb($server, 'notes', 'sqlite');
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openDatabaseConnect', (string) $db->id);
+
+    expect($component->get('connectDatabaseId'))->toBeNull()
+        ->and($component->instance()->databaseConnectPanel())->toBeNull();
+});
+
+test('the local tunnel port is clamped to a usable range', function () {
+    $server = inventoryServer();
+    $user = User::factory()->create();
+    $server->organization->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $server->organization_id]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->set('connectLocalPort', 80)
+        ->assertSet('connectLocalPort', 1024)
+        ->set('connectLocalPort', 999999)
+        ->assertSet('connectLocalPort', 65535);
+});

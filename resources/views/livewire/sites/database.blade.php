@@ -181,7 +181,7 @@
                                                      else lives in the kebab so a row never carries six
                                                      buttons. Mirrors the resource-row actions on the
                                                      Environment tab. --}}
-                                                <x-overflow-menu :label="__('More database actions')" wire:key="db-actions-{{ $db->id }}">
+                                                <x-overflow-menu fixed :label="__('More database actions')" wire:key="db-actions-{{ $db->id }}">
                                                     @if ($supportsUsers)
                                                         <button type="button" wire:click="openAddUserModal('{{ $db->id }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                                             <x-heroicon-o-user-plus class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />

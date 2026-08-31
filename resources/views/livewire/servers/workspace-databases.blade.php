@@ -24,6 +24,7 @@
              result, and keeping it separate means a slow scan never delays the
              engine badges. --}}
         <div wire:init="loadDatabaseInventory" class="hidden" aria-hidden="true"></div>
+        @include('livewire.servers.partials.databases._connect-modal')
     @endif
 
     @if ($opsReady && $databaseConsoleBannerRun)

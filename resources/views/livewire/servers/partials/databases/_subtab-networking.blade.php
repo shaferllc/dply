@@ -270,7 +270,17 @@
                             <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
                             <p class="truncate font-mono text-xs text-brand-mist">{{ $db->username }}</p>
                         @endif
-                        <span class="ml-auto shrink-0">
+                        {{-- Connection details + an ssh -L tunnel for this database.
+                             Loopback-only is exactly when an operator needs the
+                             tunnel command, so it belongs on this row. --}}
+                        @if (\App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine) !== 'sqlite')
+                            <button type="button" wire:click="openDatabaseConnect(@js((string) $db->id))"
+                                class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <x-heroicon-o-bolt class="h-3.5 w-3.5 text-brand-sage" aria-hidden="true" />
+                                {{ __('Connect') }}
+                            </button>
+                        @endif
+                        <span class="{{ \App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine) !== 'sqlite' ? 'shrink-0' : 'ml-auto shrink-0' }}">
                             @if ($dbRemote)
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold text-amber-800 ring-1 ring-amber-200">
                                     <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-amber-500"></span>
