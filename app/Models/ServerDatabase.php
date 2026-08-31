@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use Database\Factories\ServerDatabaseFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -21,6 +23,7 @@ use Illuminate\Support\Str;
  * @property ?string $mysql_collation
  * @property string $name
  * @property string $password
+ * @property bool $credentials_known
  * @property bool $remote_access
  * @property ?string $server_id
  * @property ?string $site_id
@@ -29,12 +32,12 @@ use Illuminate\Support\Str;
  * @property-read Collection<int, ServerDatabaseExtraUser> $extraUsers
  * @property-read Collection<int, ServerDatabaseCredentialShare> $credentialShares
  * @property-read Collection<int, ServerDatabaseBackup> $backups
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerDatabase extends Model
 {
-    /** @use HasFactory<\Database\Factories\ServerDatabaseFactory> */
+    /** @use HasFactory<ServerDatabaseFactory> */
     use HasFactory;
 
     use HasUlids;
@@ -48,6 +51,7 @@ class ServerDatabase extends Model
         'engine',
         'username',
         'password',
+        'credentials_known',
         'host',
         'description',
         'mysql_charset',
@@ -56,13 +60,47 @@ class ServerDatabase extends Model
         'allowed_from',
     ];
 
+    /**
+     * Mirrors the column default so a freshly created row reports usable
+     * credentials in memory too. Without this the attribute is null until the
+     * model is refreshed from the database, which reads as falsy and would gate
+     * .env wiring on a database dply had just created itself.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'credentials_known' => true,
+    ];
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'password' => 'encrypted',
+            'credentials_known' => 'boolean',
             'remote_access' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether dply holds a usable password for this database.
+     *
+     * False for an ADOPTED database — one found on the server by the inventory
+     * scan rather than created by dply. Admin-path operations still work
+     * (dump/restore as superuser, drop, add-user, metrics), but anything that
+     * has to hand the password onward must be gated: writing DB_PASSWORD into
+     * a site's .env, the one-time credential link, and the Connect panel's
+     * handoff. Injecting an empty password is worse than offering nothing.
+     */
+    public function hasUsableCredentials(): bool
+    {
+        // sqlite has no credentials by design — the file path IS the connection —
+        // so it is never "missing" them.
+        if (DatabaseWorkspaceEngines::family((string) $this->engine) === 'sqlite') {
+            return true;
+        }
+
+        return (bool) $this->credentials_known;
     }
 
     /** @return BelongsTo<Server, $this> */

@@ -425,7 +425,7 @@
                                 <x-heroicon-o-link class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <div class="min-w-0">
                                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
-                                    <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
+                                    <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet — including ones dply doesn’t track yet.') }}</p>
                                 </div>
                             </div>
                             <div class="flex flex-wrap items-end gap-3 px-5 py-4 sm:px-6">
@@ -435,6 +435,13 @@
                                         <option value="">{{ __('Choose a database…') }}</option>
                                         @foreach ($linkable as $db)
                                             <option value="{{ $db->id }}">{{ $db->name }} ({{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }})</option>
+                                        @endforeach
+                                        {{-- Databases found on the server that dply does not track yet.
+                                             Read from the cached inventory, so this list is only as
+                                             fresh as the last scan on the server Databases page.
+                                             Choosing one adopts it and links it in a single step. --}}
+                                        @foreach ($this->adoptableDatabases as $row)
+                                            <option value="{{ $row['value'] }}">{{ $row['label'] }}</option>
                                         @endforeach
                                     </select>
                                     @error('link_database_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

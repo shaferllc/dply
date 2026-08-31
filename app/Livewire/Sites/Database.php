@@ -26,6 +26,7 @@ use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
+use App\Services\Servers\ServerDatabaseInventory;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Sites\SiteDatabaseWorkspace;
@@ -279,6 +280,13 @@ class Database extends Component
         return in_array((string) $db->id, $this->boundDatabaseIds(), true);
     }
 
+    /**
+     * Prefix marking a picker option that is not a ServerDatabase row yet —
+     * an untracked database found by the server scan. Linking one adopts it
+     * first. Distinguishable from a ULID, which cannot contain a colon.
+     */
+    private const ADOPT_PREFIX = 'untracked:';
+
     /** Engines whose extra-user management this tab supports. */
     private const EXTRA_USER_ENGINES = ['mysql', 'mariadb', 'postgres'];
 
@@ -298,6 +306,30 @@ class Database extends Component
             ->whereNotIn('id', $this->boundDatabaseIds())
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Databases sitting on this server that dply does not track yet.
+     *
+     * Read from the CACHED inventory (server.meta) written by the server
+     * workspace's deferred scan — this tab must never SSH on a render path.
+     * An empty list therefore means "not scanned yet or nothing found", and the
+     * picker says so rather than implying the server has none.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    #[Computed]
+    public function adoptableDatabases(): array
+    {
+        $out = [];
+        foreach (app(ServerDatabaseInventory::class)->untracked($this->server) as $row) {
+            $out[] = [
+                'value' => self::ADOPT_PREFIX.$row['engine'].':'.$row['name'],
+                'label' => $row['name'].' ('.DatabaseWorkspaceEngines::label($row['engine']).' — '.__('not tracked yet').')',
+            ];
+        }
+
+        return $out;
     }
 
     public function updatedNewDbName(string $value): void
@@ -441,8 +473,18 @@ class Database extends Component
     {
         $this->authorize('update', $this->site);
         $this->validate([
-            'link_database_id' => 'required|ulid',
+            'link_database_id' => 'required|string|max:200',
         ]);
+
+        // An untracked database has no row yet: adopt it onto this server first,
+        // linked straight to this site. No SiteBinding is created — dply holds
+        // no password for it, and a binding would inject DB_PASSWORD='' into a
+        // live app. See ServerDatabaseInventory::adopt().
+        if (str_starts_with($this->link_database_id, self::ADOPT_PREFIX)) {
+            $this->adoptAndLinkDatabase(substr($this->link_database_id, strlen(self::ADOPT_PREFIX)));
+
+            return;
+        }
 
         // Only adopt databases that aren't already owned by another site —
         // the dropdown only lists unlinked ones, but re-check on submit so a
@@ -462,6 +504,40 @@ class Database extends Component
         $this->link_database_id = '';
         unset($this->linkedDatabases, $this->linkableDatabases);
         $this->toastSuccess(__('Linked :name to this site.', ['name' => $db->name]));
+    }
+
+    /**
+     * Adopt an untracked database from the server scan and link it to this site
+     * in one step. $spec is "<engine>:<name>" from the picker.
+     */
+    private function adoptAndLinkDatabase(string $spec): void
+    {
+        [$engine, $name] = array_pad(explode(':', $spec, 2), 2, '');
+        $inventory = app(ServerDatabaseInventory::class);
+
+        // Re-check against the scan rather than trusting the posted value.
+        $seen = collect($inventory->untracked($this->server))
+            ->contains(fn (array $row): bool => $row['engine'] === $engine && $row['name'] === $name);
+
+        if (! $seen) {
+            $this->addError('link_database_id', __('That database is no longer listed on this server.'));
+
+            return;
+        }
+
+        try {
+            $db = $inventory->adopt($this->server, $engine, $name, $this->site);
+        } catch (\Throwable $e) {
+            $this->addError('link_database_id', Str::limit($e->getMessage(), 200));
+
+            return;
+        }
+
+        $this->link_database_id = '';
+        unset($this->linkedDatabases, $this->linkableDatabases, $this->adoptableDatabases);
+        $this->toastSuccess(__('Now tracking :name and linked it to this site. dply does not hold its password — rotate it to enable environment wiring.', [
+            'name' => $db->name,
+        ]));
     }
 
     public function unlinkDatabase(string $id): void
@@ -515,6 +591,15 @@ class Database extends Component
         if (DatabaseWorkspaceEngines::family((string) $db->engine) === 'sqlite') {
             // A file on disk has no username or password to share.
             $this->toastError(__('SQLite databases have no credentials — the file path is the connection.'));
+
+            return;
+        }
+
+        if (! $db->hasUsableCredentials()) {
+            // Adopted from the server: dply never held this password, so there
+            // is nothing to hand over. Rotating it would give dply a known one,
+            // at the cost of breaking whatever currently uses the database.
+            $this->toastError(__('dply does not hold the password for :name — it was adopted from this server. Rotate the password to take ownership of it.', ['name' => $db->name]));
 
             return;
         }

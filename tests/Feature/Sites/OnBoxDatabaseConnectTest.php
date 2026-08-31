@@ -12,6 +12,7 @@ use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
+use App\Services\Servers\ServerDatabaseInventory;
 use App\Support\Servers\DatabaseConnectionTarget;
 use App\Support\Servers\DatabaseConnectionTargetResolver;
 use App\Support\Servers\DatabaseWorkspaceEngines;
@@ -276,4 +277,85 @@ test('an unbound row shows Credentials inline and no duplicate in the menu', fun
         ->html();
 
     expect(substr_count($html, 'shareCredentials('))->toBe(1);
+});
+
+/** Seed a cached server scan — the site tab reads meta, never SSH. */
+function seedServerInventory(Server $server, array $engines): void
+{
+    $meta = is_array($server->meta) ? $server->meta : [];
+    $meta[ServerDatabaseInventory::META_KEY] = [
+        'scanned_at' => now()->toIso8601String(),
+        'engines' => $engines,
+    ];
+    $server->forceFill(['meta' => $meta])->save();
+    $server->refresh();
+}
+
+test('untracked databases appear in the site link picker', function () {
+    [$user, $server, $site, , $binding] = onBoxFixture();
+    $binding->delete();
+    withInstalledPostgres();
+    seedServerInventory($server, ['postgres' => ['ok' => true, 'databases' => ['databio', 'orders_legacy']]]);
+
+    $component = Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->call('loadDatabaseCapabilities');
+
+    // databio is already tracked; only orders_legacy is offered for adoption.
+    expect($component->instance()->adoptableDatabases)
+        ->toHaveCount(1)
+        ->and($component->instance()->adoptableDatabases[0]['value'])
+        ->toBe('untracked:postgres:orders_legacy');
+});
+
+test('choosing an untracked database adopts and links it in one step', function () {
+    [$user, $server, $site] = onBoxFixture();
+    withInstalledPostgres();
+    seedServerInventory($server, ['postgres' => ['ok' => true, 'databases' => ['databio', 'orders_legacy']]]);
+
+    Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->set('link_database_id', 'untracked:postgres:orders_legacy')
+        ->call('linkDatabase')
+        ->assertHasNoErrors();
+
+    $db = ServerDatabase::query()->where('name', 'orders_legacy')->first();
+
+    expect($db)->not->toBeNull()
+        ->and($db->site_id)->toBe($site->id)
+        ->and($db->credentials_known)->toBeFalse();
+
+    // No binding targets the adopted database: a binding injects DB_* at
+    // deploy, and an empty DB_PASSWORD must never reach a live .env. (The
+    // fixture's own databio binding is untouched.)
+    expect($site->bindings()->where('type', 'database')->where('target_id', $db->id)->exists())
+        ->toBeFalse();
+});
+
+test('adopt-and-link rejects a name the scan did not report', function () {
+    [$user, $server, $site] = onBoxFixture();
+    withInstalledPostgres();
+    seedServerInventory($server, ['postgres' => ['ok' => true, 'databases' => ['databio']]]);
+
+    Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->set('link_database_id', 'untracked:postgres:not_really_there')
+        ->call('linkDatabase')
+        ->assertHasErrors('link_database_id');
+
+    expect(ServerDatabase::query()->where('name', 'not_really_there')->exists())->toBeFalse();
+});
+
+test('an adopted database cannot hand out a credential link', function () {
+    [$user, $server, $site] = onBoxFixture();
+    $adopted = app(ServerDatabaseInventory::class)
+        ->adopt($server, 'postgres', 'orders_legacy', $site);
+
+    Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->call('shareCredentials', (string) $adopted->id)
+        ->assertSet('share_link_url', null);
+
+    // dply never held this password, so there is nothing to share.
+    expect($adopted->credentialShares()->count())->toBe(0);
 });

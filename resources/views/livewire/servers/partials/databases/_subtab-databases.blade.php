@@ -90,5 +90,7 @@
                 'databases' => $engineDatabases,
             ])
         @endif
+
+        @include('livewire.servers.partials.databases._untracked-databases')
     </div>
 @endif

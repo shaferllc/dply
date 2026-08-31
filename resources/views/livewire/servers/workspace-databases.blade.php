@@ -20,6 +20,10 @@
         {{-- Probe installed engines off the render path so the workspace paints
              instantly; badges + create buttons appear once loadCapabilities() returns. --}}
         <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
+        {{-- Second deferred loader: the database scan needs the capability
+             result, and keeping it separate means a slow scan never delays the
+             engine badges. --}}
+        <div wire:init="loadDatabaseInventory" class="hidden" aria-hidden="true"></div>
     @endif
 
     @if ($opsReady && $databaseConsoleBannerRun)

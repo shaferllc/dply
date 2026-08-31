@@ -16,6 +16,7 @@ use App\Livewire\Servers\Concerns\ManagesDatabaseCrud;
 use App\Livewire\Servers\Concerns\ManagesDatabaseEdit;
 use App\Livewire\Servers\Concerns\ManagesDatabaseEngineLifecycle;
 use App\Livewire\Servers\Concerns\ManagesDatabaseExtras;
+use App\Livewire\Servers\Concerns\ManagesDatabaseInventory;
 use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
 use App\Livewire\Servers\Concerns\ManagesDatabaseSqliteConsole;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
@@ -59,6 +60,7 @@ class WorkspaceDatabases extends Component
     use ManagesDatabaseEdit;
     use ManagesDatabaseEngineLifecycle;
     use ManagesDatabaseExtras;
+    use ManagesDatabaseInventory;
     use ManagesDatabaseNotifications;
     use ManagesDatabaseSqliteConsole;
     use RendersWorkspacePlaceholder;

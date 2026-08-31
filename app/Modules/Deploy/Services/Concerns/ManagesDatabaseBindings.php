@@ -265,6 +265,15 @@ trait ManagesDatabaseBindings
      */
     public function adoptServerDatabase(Site $site, ServerDatabase $db): ?SiteBinding
     {
+        // A binding OWNS DB_* and injects it at deploy. For a database dply
+        // adopted from the server it holds no password, so a binding would
+        // write DB_PASSWORD='' into a live app's .env — worse than injecting
+        // nothing. The site link (site_id) still records the association; the
+        // binding is offered once the operator supplies or rotates a password.
+        if (! $db->hasUsableCredentials()) {
+            return null;
+        }
+
         $site->loadMissing('bindings');
 
         $existingPrimary = $site->bindings->first(

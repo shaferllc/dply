@@ -6,6 +6,8 @@ use App\Jobs\ValidateBindingConnectivityJob;
 use App\Models\Server;
 use App\Models\ServerDatabaseAdminCredential;
 use App\Models\ServerDatabaseEngine;
+use App\Support\Servers\DatabaseCatalog;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
 
 class ServerDatabaseRemoteExec
@@ -410,7 +412,7 @@ BASH;
         // hit this because those don't error.
         if ($exit !== null && $exit !== 0) {
             throw new \RuntimeException(
-                \Illuminate\Support\Str::limit(trim((string) $out), 800) ?: 'PostgreSQL command failed.'
+                Str::limit(trim((string) $out), 800) ?: 'PostgreSQL command failed.'
             );
         }
 
@@ -503,6 +505,74 @@ BASH;
             .' psql'.$this->postgresHostFlag($host).' -U '.escapeshellarg($username).' -d '.escapeshellarg($database).' 2>&1';
 
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * List the databases each engine actually holds.
+     *
+     * Authenticates exactly like {@see probeAllCapabilities()} — via the
+     * server's {@see ServerDatabaseAdminCredential}, with the same
+     * `sudo -u postgres` fallback — so it works on a database dply never
+     * created and holds no password for.
+     *
+     * The `ok` flag per engine is the important part: FALSE means the query did
+     * not run (engine unreachable, auth rejected, client missing), which is NOT
+     * the same as "this engine has no databases". Callers must treat a failed
+     * engine as unknown and never infer that tracked databases have vanished —
+     * otherwise one SSH blip marks every database on the box as missing.
+     *
+     * @param  list<string>  $engines  engines already known present on the box
+     * @return array<string, array{ok: bool, databases: list<string>, error: ?string}>
+     */
+    public function enumerateDatabases(Server $server, array $engines, int $timeout = 60): array
+    {
+        $out = [];
+
+        foreach (array_unique($engines) as $engine) {
+            $family = DatabaseWorkspaceEngines::family((string) $engine);
+            $sql = DatabaseCatalog::listStatementFor($family);
+            if ($sql === null) {
+                continue;
+            }
+
+            if (! $server->isReady() || empty($server->ssh_private_key)) {
+                $out[$family] = ['ok' => false, 'databases' => [], 'error' => 'Server is not reachable over SSH.'];
+
+                continue;
+            }
+
+            try {
+                [$raw, $exit] = match ($family) {
+                    'postgres' => $this->postgresTuples($server, $sql, $timeout),
+                    'mysql', 'mariadb' => $this->mysqlRunWithExit($server, $sql, $timeout),
+                    'mongodb' => $this->mongoshRunWithExit($server, $sql, $timeout),
+                    'clickhouse' => $this->clickhouseRunWithExit($server, $sql, $timeout),
+                    default => ['', 1],
+                };
+            } catch (\Throwable $e) {
+                $out[$family] = ['ok' => false, 'databases' => [], 'error' => Str::limit($e->getMessage(), 300)];
+
+                continue;
+            }
+
+            if ($exit !== null && $exit !== 0) {
+                $out[$family] = [
+                    'ok' => false,
+                    'databases' => [],
+                    'error' => Str::limit(trim((string) $raw), 300) ?: 'Query failed.',
+                ];
+
+                continue;
+            }
+
+            $out[$family] = [
+                'ok' => true,
+                'databases' => DatabaseCatalog::parseNames($family, (string) $raw),
+                'error' => null,
+            ];
+        }
+
+        return $out;
     }
 
     /**
