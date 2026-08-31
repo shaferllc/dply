@@ -14,6 +14,8 @@ use App\Models\SiteBinding;
 use App\Models\User;
 use App\Support\Servers\DatabaseConnectionTarget;
 use App\Support\Servers\DatabaseConnectionTargetResolver;
+use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -209,4 +211,69 @@ test('sharing credentials refuses a database belonging to another site', functio
         ->assertSet('share_link_url', null);
 
     expect($theirs->credentialShares()->count())->toBe(0);
+});
+
+/**
+ * Renders the actual row list, which the other tests skip: it is gated behind
+ * the deferred capability probe, so nothing else here compiles that markup.
+ */
+function withInstalledPostgres(): void
+{
+    $caps = \Mockery::mock(ServerDatabaseHostCapabilities::class);
+    $caps->shouldReceive('forServer')->andReturn(array_merge(
+        DatabaseWorkspaceEngines::defaultCapabilities(),
+        ['postgres' => true],
+    ));
+    app()->instance(ServerDatabaseHostCapabilities::class, $caps);
+}
+
+test('row actions collapse into an overflow menu with Connect left inline', function () {
+    [$user, $server, $site] = onBoxFixture();
+    withInstalledPostgres();
+
+    Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->call('loadDatabaseCapabilities')
+        ->assertOk()
+        ->assertSee('databio')
+        // Primary action stays visible…
+        ->assertSee(__('Connect'))
+        // …the rest move behind the kebab.
+        ->assertSee(__('More database actions'))
+        ->assertSee(__('Add user'))
+        ->assertSee(__('Rotate password'))
+        ->assertSee(__('Back up now'))
+        ->assertSee(__('Drop'));
+});
+
+test('a bound row offers the credential link in the menu and Connect inline', function () {
+    [$user, $server, $site] = onBoxFixture();
+    withInstalledPostgres();
+
+    $html = Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->call('loadDatabaseCapabilities')
+        ->assertSee(__('Credential link'))
+        ->html();
+
+    // Exactly one handoff entry point per row: the menu item here, the inline
+    // button on an unbound row — never both. Counted structurally because the
+    // label "Credentials" also appears inside the wire:click method name.
+    expect(substr_count($html, 'shareCredentials('))->toBe(1);
+});
+
+test('an unbound row shows Credentials inline and no duplicate in the menu', function () {
+    [$user, $server, $site, , $binding] = onBoxFixture();
+    $binding->delete();
+    withInstalledPostgres();
+
+    $html = Livewire::actingAs($user)
+        ->test(DatabaseTab::class, ['server' => $server, 'site' => $site])
+        ->call('loadDatabaseCapabilities')
+        ->assertSee(__('Credentials'))
+        ->assertDontSee(__('Credential link'))
+        ->assertSee(__('More database actions'))
+        ->html();
+
+    expect(substr_count($html, 'shareCredentials('))->toBe(1);
 });

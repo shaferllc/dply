@@ -177,52 +177,79 @@
                                                         {{ __('Credentials') }}
                                                     </x-secondary-button>
                                                 @endif
-                                                @if ($supportsUsers)
-                                                    <x-secondary-button size="xs" type="button" wire:click="openAddUserModal('{{ $db->id }}')">
-                                                        <x-heroicon-o-user-plus class="h-4 w-4" />
-                                                        {{ __('Add user') }}
-                                                    </x-secondary-button>
-                                                    <x-secondary-button
-                                                        size="xs"
+                                                {{-- Connect stays inline as the primary action; everything
+                                                     else lives in the kebab so a row never carries six
+                                                     buttons. Mirrors the resource-row actions on the
+                                                     Environment tab. --}}
+                                                <x-overflow-menu :label="__('More database actions')" wire:key="db-actions-{{ $db->id }}">
+                                                    @if ($supportsUsers)
+                                                        <button type="button" wire:click="openAddUserModal('{{ $db->id }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-user-plus class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Add user') }}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="rotatePassword('{{ $db->id }}')"
+                                                            wire:confirm="{{ __('Rotate the password for :user on :name? You’ll get a new one-time credential link; update the app’s .env afterwards.', ['user' => $db->username, 'name' => $db->name]) }}"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                                        >
+                                                            <x-heroicon-o-key class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Rotate password') }}
+                                                        </button>
+                                                    @endif
+
+                                                    {{-- A bound database already shows Connect inline; an
+                                                         unbound one shows Credentials there instead, so the
+                                                         handoff is reachable from exactly one place either way. --}}
+                                                    @if ($connectBindingId && $family !== 'sqlite')
+                                                        <button type="button" wire:click="shareCredentials('{{ $db->id }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-key class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Credential link') }}
+                                                        </button>
+                                                    @endif
+
+                                                    <button
                                                         type="button"
-                                                        wire:click="rotatePassword('{{ $db->id }}')"
-                                                        wire:confirm="{{ __('Rotate the password for :user on :name? You’ll get a new one-time credential link; update the app’s .env afterwards.', ['user' => $db->username, 'name' => $db->name]) }}"
+                                                        wire:click="backupDatabase('{{ $db->id }}')"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="backupDatabase('{{ $db->id }}')"
+                                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                                     >
-                                                        <x-heroicon-o-key class="h-4 w-4" />
-                                                        {{ __('Rotate password') }}
-                                                    </x-secondary-button>
-                                                @endif
-                                                <x-secondary-button size="xs" type="button" wire:click="backupDatabase('{{ $db->id }}')" wire:loading.attr="disabled" wire:target="backupDatabase('{{ $db->id }}')">
-                                                    <x-heroicon-o-archive-box-arrow-down class="h-4 w-4" />
-                                                    {{ __('Back up now') }}
-                                                </x-secondary-button>
-                                                @unless ($bindingManaged)
-                                                    <x-secondary-button
-                                                        size="xs"
+                                                        <x-heroicon-o-archive-box-arrow-down class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                        {{ __('Back up now') }}
+                                                    </button>
+
+                                                    @unless ($bindingManaged)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="unlinkDatabase('{{ $db->id }}')"
+                                                            wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                                        >
+                                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Detach') }}
+                                                        </button>
+                                                    @else
+                                                        {{-- Detaching a bound resource has to remove its injected
+                                                             DB_* too, which only the Environment tab does. --}}
+                                                        <a href="{{ route('sites.environment', [$server, $site]) }}" wire:navigate class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Detach on Environment') }}
+                                                        </a>
+                                                    @endunless
+
+                                                    <div class="my-1 border-t border-brand-ink/10"></div>
+
+                                                    <button
                                                         type="button"
-                                                        wire:click="unlinkDatabase('{{ $db->id }}')"
-                                                        wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
+                                                        wire:click="dropDatabase('{{ $db->id }}')"
+                                                        wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
+                                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700"
                                                     >
-                                                        <x-heroicon-o-link-slash class="h-4 w-4" />
-                                                        {{ __('Detach') }}
-                                                    </x-secondary-button>
-                                                @else
-                                                    {{-- Detaching a bound resource has to remove its injected
-                                                         DB_* too, which only the Environment tab does. --}}
-                                                    <a href="{{ route('sites.environment', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40">
-                                                        <x-heroicon-o-link-slash class="h-4 w-4" />
-                                                        {{ __('Detach on Environment') }}
-                                                    </a>
-                                                @endunless
-                                                <button
-                                                    type="button"
-                                                    wire:click="dropDatabase('{{ $db->id }}')"
-                                                    wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
-                                                >
-                                                    <x-heroicon-o-trash class="h-4 w-4" />
-                                                    {{ __('Drop') }}
-                                                </button>
+                                                        <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                        {{ __('Drop') }}
+                                                    </button>
+                                                </x-overflow-menu>
                                             </div>
                                         </div>
 
