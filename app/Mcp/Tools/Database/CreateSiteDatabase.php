@@ -11,9 +11,11 @@ use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
@@ -34,7 +36,7 @@ class CreateSiteDatabase extends AbstractDplyTool
     protected string $ability = 'database.write';
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -105,13 +107,27 @@ class CreateSiteDatabase extends AbstractDplyTool
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
         ]);
 
+        // Adopt it as a resource binding so the database shows on the
+        // Environment tab and the resource map, not only the Database tab.
+        // Null when the site already has a primary database binding elsewhere.
+        $binding = $writeEnv
+            ? app(SiteBindingManager::class)->adoptServerDatabase($site, $db)
+            : null;
+
+        if ($binding !== null) {
+            app(SiteBindingManager::class)->stripAdoptedEnvKeys($site, $binding);
+        }
+
         CreateSiteDatabaseJob::dispatch(
             $db->id,
             $site->id,
-            $writeEnv,
+            // The binding owns DB_* once adopted; writing them to the editable
+            // cache as well leaves inert overrides behind.
+            $writeEnv && $binding === null,
             $writeEnv && $pushEnv,
             $this->token()->user_id,
             (string) $run->id,
+            $binding?->id,
         );
 
         return Response::json([

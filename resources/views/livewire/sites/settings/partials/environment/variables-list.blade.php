@@ -220,7 +220,7 @@
                 <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
                     <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                     <p class="text-sm font-semibold text-brand-ink">{{ __('Managed by connected resources') }}</p>
-                    <span class="text-xs text-brand-moss">{{ __('Injected at deploy · editable as an override') }}</span>
+                    <span class="text-xs text-brand-moss">{{ __('Injected at deploy · rename or replace per key via Mapping') }}</span>
                 </div>
 
                 @foreach ($bindingManagedGroups as $gBindingId => $group)
@@ -229,6 +229,10 @@
                         $gConn = is_array($group['connectivity'] ?? null) ? $group['connectivity'] : null;
                         $gManageable = in_array($group['type'], ['database', 'redis', 'queue', 'session', 'storage', 'mail'], true);
                         $gGroupOverrides = $overrideGroups[(string) $gBindingId] ?? null;
+                        // Ask the binding which of its keys are secret rather than
+                        // pattern-matching the name below: an alias like POSTGRES_URL
+                        // carries the password but matches no obvious pattern.
+                        $gSensitiveKeys = $this->site->bindings->firstWhere('id', $gBindingId)?->sensitiveEnvKeys() ?? [];
                         $gHasEditing = ($editing_env_key ?? null) !== null
                             && (array_key_exists((string) $editing_env_key, $group['vars'])
                                 || ($gGroupOverrides && array_key_exists((string) $editing_env_key, $gGroupOverrides['keys'])));
@@ -297,6 +301,12 @@
                                                 {{ __('Update') }}
                                             </button>
                                         @endif
+                                        @if (method_exists($this, 'openEnvMapping'))
+                                            <button type="button" wire:click="openEnvMapping(@js((string) $gBindingId))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Inject these variables under extra names, or replace a value.') }}">
+                                                <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5 text-brand-moss" />
+                                                {{ __('Mapping') }}
+                                            </button>
+                                        @endif
                                         @if (method_exists($this, 'openBindingInfoModal'))
                                             <button type="button" wire:click="openBindingInfoModal(@js((string) $gBindingId))" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                                 <x-heroicon-o-information-circle class="h-3.5 w-3.5 text-brand-moss" />
@@ -324,7 +334,8 @@
                             @foreach ($group['vars'] as $mKey => $mValue)
                                 @php
                                     $mEditing = ($editing_env_key ?? null) === $mKey;
-                                    $mSensitive = (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|URL|DSN)/i', (string) $mKey);
+                                    $mSensitive = in_array((string) $mKey, $gSensitiveKeys, true)
+                                        || (bool) preg_match('/(PASSWORD|SECRET|TOKEN|KEY|URL|DSN)/i', (string) $mKey);
                                 @endphp
                                 <li class="px-5 py-2.5 sm:px-6" wire:key="managed-env-{{ md5($mKey) }}">
                                     @if ($mEditing)

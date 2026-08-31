@@ -91,13 +91,43 @@ test('a single-engine server creates the database on that engine without asking'
 
     Queue::assertPushed(ProvisionSiteJob::class);
     Queue::assertPushed(CreateSiteDatabaseJob::class, function (CreateSiteDatabaseJob $job) use ($db, $site): bool {
-        // write-env on (the site is wired to the database), push-env off so we
+        // The database is adopted as a resource binding, so the BINDING owns
+        // DB_* and supplies them at push/deploy — writing them to the editable
+        // cache as well would leave inert overrides. push-env stays off so we
         // don't race the provisioner into the site directory.
         return $job->serverDatabaseId === $db->id
             && $job->siteId === $site->id
-            && $job->writeEnv === true
-            && $job->pushEnv === false;
+            && $job->writeEnv === false
+            && $job->pushEnv === false
+            && $job->siteBindingId !== null;
     });
+});
+
+test('the new site database is also attached as a resource binding', function () {
+    Queue::fake();
+
+    [$user, $server] = serverWithEngines([
+        ['engine' => 'postgres', 'version' => '17', 'default' => true],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SitesCreate::class, ['server' => $server])
+        ->set('form.name', 'Bound App')
+        ->set('form.primary_hostname', 'bound.example.test')
+        ->set('form.type', 'php')
+        ->set('form.php_version', '8.4')
+        ->call('store')
+        ->assertHasNoErrors();
+
+    $site = Site::query()->where('name', 'Bound App')->firstOrFail();
+    $db = ServerDatabase::query()->where('site_id', $site->id)->firstOrFail();
+    $binding = $site->bindings()->where('type', 'database')->first();
+
+    // Both surfaces agree from the moment the site exists: the Database tab
+    // sees it via site_id, the resource map via the binding.
+    expect($binding)->not->toBeNull()
+        ->and((string) $binding->target_id)->toBe((string) $db->id)
+        ->and($binding->connectionEnv())->toHaveKey('DB_DATABASE', 'bound_app');
 });
 
 test('a multi-engine server honours the engine and name the user picks', function () {

@@ -584,6 +584,58 @@ class SiteBindingManager
      *
      * @param  array<string, mixed>  $attributes
      */
+    /**
+     * Env key NAMES this binding contributes, usable before it has any values.
+     *
+     * A configured binding answers from what it actually injected. A binding
+     * still coming up (a dedicated DB VM takes minutes; injected_env is [] until
+     * the provisioning job wires it) answers from the per-type key list that
+     * lives beside its generator — so the environment-mapping editor can render
+     * mappable rows during exactly the window when you want to set them up.
+     *
+     * Types with no key list fall back to whatever is already injected, which
+     * is complete for every configured binding and empty for a pending one.
+     * The editor then tells the operator to wait, which is honest.
+     *
+     * Lives here rather than on {@see SiteBinding} because the answer needs the
+     * generators, which are module code — and the model is kernel.
+     *
+     * @return list<string>
+     */
+    public function expectedEnvKeys(SiteBinding $binding): array
+    {
+        $injected = array_keys($binding->connectionEnv());
+        if ($injected !== []) {
+            return array_map(strval(...), $injected);
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $connection = (string) ($config['connection'] ?? '');
+
+        return match ($binding->type) {
+            'database' => $this->databaseEnvKeys((string) ($config['engine'] ?? ''), $connection),
+            'redis' => $this->redisEnvKeys($connection),
+            default => [],
+        };
+    }
+
+    /**
+     * @see ManagesRedisBindings — mirrors the key set built when a cache service
+     *      is attached. Redis has a pending window too (the dedicated cache-VM
+     *      placement wires injected_env from a job).
+     *
+     * @return list<string>
+     */
+    private function redisEnvKeys(string $connection): array
+    {
+        $primary = $this->connectionIsPrimary($connection);
+        $p = $primary ? 'REDIS_' : 'REDIS_'.strtoupper($connection).'_';
+
+        $keys = [$p.'HOST', $p.'PORT', $p.'PASSWORD'];
+
+        return $primary ? array_merge(['REDIS_CLIENT'], $keys) : $keys;
+    }
+
     private function persistInstanceBinding(Site $site, string $type, array $attributes, bool $primary, string $editingId): SiteBinding
     {
         $name = (string) ($attributes['name'] ?? '');

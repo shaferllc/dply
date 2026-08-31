@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Sites\EnvImportSources;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +20,7 @@ use Illuminate\Support\Carbon;
  *                      kept out of the editable Variables list so the binding stays the source of
  *                      truth for them.
  * @property array<string, mixed>|null $config
+ * @property array<string, mixed>|null $env_customization
  * @property array<string, mixed> $injected_env
  * @property string|null $last_error
  * @property string $mode
@@ -119,6 +121,7 @@ class SiteBinding extends Model
         'target_id',
         'injected_env',
         'config',
+        'env_customization',
         'last_error',
     ];
 
@@ -128,6 +131,9 @@ class SiteBinding extends Model
         return [
             'injected_env' => 'encrypted:array',
             'config' => 'array',
+            // Encrypted: `overrides` can hold a DB_PASSWORD, or a DATABASE_URL
+            // that embeds one. See the migration for why this isn't in `config`.
+            'env_customization' => 'encrypted:array',
         ];
     }
 
@@ -138,7 +144,87 @@ class SiteBinding extends Model
     }
 
     /**
+     * Operator-configured aliases: extra env names that should carry the value
+     * of a key this binding already injects. Keyed by the canonical key.
+     *
+     * Absent (null) and empty ([]) mean different things: absent is "never
+     * configured", which lets stack detection seed a default on attach; empty
+     * is "the operator cleared it", which detection must not undo.
+     *
+     * @return array<string, list<string>>
+     */
+    public function envAliases(): array
+    {
+        $raw = data_get($this->env_customization, 'aliases');
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $canonical => $aliases) {
+            $canonical = (string) $canonical;
+            if ($canonical === '' || ! is_array($aliases)) {
+                continue;
+            }
+            $names = [];
+            foreach ($aliases as $alias) {
+                $alias = trim((string) $alias);
+                if ($alias !== '' && $alias !== $canonical && ! in_array($alias, $names, true)) {
+                    $names[] = $alias;
+                }
+            }
+            if ($names !== []) {
+                $out[$canonical] = $names;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Whether stack detection has ever written an alias map for this binding.
+     * Distinguishes "never seeded" from "seeded then cleared by the operator",
+     * which {@see envAliases()} flattens away.
+     */
+    public function hasEnvAliasMap(): bool
+    {
+        return is_array(data_get($this->env_customization, 'aliases'));
+    }
+
+    /**
+     * Operator-set values that replace what this binding would otherwise
+     * inject for a key it owns. The binding layer stays authoritative over the
+     * editable .env (that merge order is deliberate — it exists to beat stale
+     * scaffold values); this is the escape hatch INSIDE that layer.
+     *
+     * @return array<string, string>
+     */
+    public function envOverrides(): array
+    {
+        $raw = data_get($this->env_customization, 'overrides');
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $key => $value) {
+            $key = (string) $key;
+            if ($key !== '' && (is_scalar($value) || $value === null)) {
+                $out[$key] = (string) $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Connection variables this binding contributes at deploy time.
+     *
+     * Applied in order: the generated base, then operator overrides (which only
+     * ever replace a key the binding already owns), then aliases (which only
+     * ever ADD names, never remove or replace). An alias whose name is already
+     * taken is skipped rather than clobbering — the same guard the hardcoded
+     * stack-detection aliases have always used.
      *
      * @return array<string, string>
      */
@@ -169,7 +255,83 @@ class SiteBinding extends Model
             }
         }
 
-        return $clean;
+        return $this->applyEnvCustomization($clean);
+    }
+
+    /**
+     * Keys in {@see connectionEnv()} whose value must be masked.
+     *
+     * Callers must NOT infer this from the key name: masking elsewhere is a
+     * name-pattern match, and an operator is free to alias DATABASE_URL (which
+     * embeds the password) to POSTGRES_URL, which matches no pattern. The
+     * binding knows which of its keys are sensitive and which names mirror
+     * them, so it is the only thing that can answer correctly.
+     *
+     * @return list<string>
+     */
+    public function sensitiveEnvKeys(): array
+    {
+        $aliases = $this->envAliases();
+
+        $keys = [];
+        foreach (array_keys($this->connectionEnv()) as $key) {
+            $key = (string) $key;
+            // A name that already looks sensitive is sensitive regardless of
+            // provenance; an alias inherits from the key it mirrors.
+            $canonical = self::canonicalForAlias($aliases, $key) ?? $key;
+            if (EnvImportSources::isSecretKey($key) || EnvImportSources::isSecretKey($canonical)) {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * The canonical key an alias mirrors, or null when $key isn't an alias.
+     *
+     * @param  array<string, list<string>>  $aliases
+     */
+    private static function canonicalForAlias(array $aliases, string $key): ?string
+    {
+        foreach ($aliases as $canonical => $names) {
+            if (in_array($key, $names, true)) {
+                return (string) $canonical;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Apply operator overrides then aliases to a generated env map.
+     *
+     * @param  array<string, string>  $env
+     * @return array<string, string>
+     */
+    private function applyEnvCustomization(array $env): array
+    {
+        foreach ($this->envOverrides() as $key => $value) {
+            // Only keys this binding actually owns — an override is a
+            // replacement, not a way to smuggle arbitrary vars into the
+            // authoritative layer where the editable .env can't reach them.
+            if (array_key_exists($key, $env)) {
+                $env[$key] = $value;
+            }
+        }
+
+        foreach ($this->envAliases() as $canonical => $names) {
+            if (! array_key_exists($canonical, $env)) {
+                continue;
+            }
+            foreach ($names as $alias) {
+                if (! array_key_exists($alias, $env)) {
+                    $env[$alias] = $env[$canonical];
+                }
+            }
+        }
+
+        return $env;
     }
 
     public function wasProvisionedByDply(): bool

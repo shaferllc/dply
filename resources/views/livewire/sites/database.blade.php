@@ -129,6 +129,10 @@
                                     @php
                                         $family = \App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine);
                                         $supportsUsers = in_array($db->engine, ['mysql', 'mariadb', 'postgres'], true);
+                                        // Managed by a resource binding? Then its DB_* are
+                                        // injected at deploy and detaching belongs on the
+                                        // Environment tab, which removes those too.
+                                        $bindingManaged = $this->bindingManagesDatabase($db);
                                     @endphp
                                     <li class="px-5 py-2.5 sm:px-6" wire:key="linked-{{ $db->id }}">
                                         <div class="flex flex-wrap items-center gap-3">
@@ -138,6 +142,11 @@
                                                     <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                         {{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }}
                                                     </span>
+                                                    @if ($bindingManaged)
+                                                        <span class="rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest" title="{{ __('Attached on the Environment tab as a connected resource. It injects DB_* at deploy; detach it there.') }}">
+                                                            {{ __('Connected resource') }}
+                                                        </span>
+                                                    @endif
                                                 </div>
                                                 <p class="mt-1 truncate font-mono text-xs text-brand-moss">
                                                     @if ($family === 'sqlite')
@@ -167,15 +176,24 @@
                                                     <x-heroicon-o-archive-box-arrow-down class="h-4 w-4" />
                                                     {{ __('Back up now') }}
                                                 </x-secondary-button>
-                                                <x-secondary-button
-                                                    size="xs"
-                                                    type="button"
-                                                    wire:click="unlinkDatabase('{{ $db->id }}')"
-                                                    wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
-                                                >
-                                                    <x-heroicon-o-link-slash class="h-4 w-4" />
-                                                    {{ __('Detach') }}
-                                                </x-secondary-button>
+                                                @unless ($bindingManaged)
+                                                    <x-secondary-button
+                                                        size="xs"
+                                                        type="button"
+                                                        wire:click="unlinkDatabase('{{ $db->id }}')"
+                                                        wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
+                                                    >
+                                                        <x-heroicon-o-link-slash class="h-4 w-4" />
+                                                        {{ __('Detach') }}
+                                                    </x-secondary-button>
+                                                @else
+                                                    {{-- Detaching a bound resource has to remove its injected
+                                                         DB_* too, which only the Environment tab does. --}}
+                                                    <a href="{{ route('sites.environment', [$server, $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40">
+                                                        <x-heroicon-o-link-slash class="h-4 w-4" />
+                                                        {{ __('Detach on Environment') }}
+                                                    </a>
+                                                @endunless
                                                 <button
                                                     type="button"
                                                     wire:click="dropDatabase('{{ $db->id }}')"

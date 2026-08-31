@@ -345,6 +345,8 @@
 
     @include('livewire.sites.settings.partials.environment.fix-binding-modal')
 
+    @include('livewire.sites.settings.partials.environment.binding-env-mapping-modal')
+
     @include('livewire.sites.settings.partials.environment.ignored-vars')
 
     @include('livewire.sites.settings.partials.environment.advanced-path')

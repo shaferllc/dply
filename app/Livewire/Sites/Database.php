@@ -22,6 +22,7 @@ use App\Models\Site;
 use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Services\DatabaseBackupDownloader;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
@@ -185,16 +186,72 @@ class Database extends Component
     }
 
     /**
-     * Databases owned by this site.
+     * Databases this site uses — by EITHER route.
+     *
+     * There are two independent ways a database ends up on a site, and this tab
+     * used to see only one of them:
+     *
+     *   1. OWNED — `server_databases.site_id` points at this site. Set when the
+     *      database is created from this tab, from site create, or via the MCP
+     *      tool, and by "Link" below.
+     *   2. ATTACHED — a `database` SiteBinding targets it (the Environment tab's
+     *      resource picker). This never touched `site_id`, so a database
+     *      attached there rendered "No databases are linked to this site yet"
+     *      here while the resource map showed it as configured.
+     *
+     * `site_id` cannot replace bindings: it is a single column, and two sites
+     * legitimately share one database (an app and its worker both bind the same
+     * row). So the two coexist and this reads the union.
      *
      * @return Collection<int, ServerDatabase>
      */
     #[Computed]
     public function linkedDatabases()
     {
-        return $this->site->serverDatabases()
+        return ServerDatabase::query()
+            ->where(function ($q): void {
+                $q->where('site_id', $this->site->id)
+                    ->orWhereIn('id', $this->boundDatabaseIds());
+            })
             ->with(['extraUsers', 'backups' => fn ($q) => $q->orderByDesc('created_at')])
+            ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Ids of server databases attached to this site through a `database`
+     * binding. A derived worker inherits its parent app's resources, so the
+     * lookup follows the same source site the deploy env does.
+     *
+     * @return list<string>
+     */
+    private function boundDatabaseIds(): array
+    {
+        $source = $this->site->resourceSourceSite();
+        $source->loadMissing('bindings');
+
+        return $source->bindings
+            ->where('type', 'database')
+            ->where('target_type', 'server_database')
+            ->pluck('target_id')
+            ->filter(fn ($id): bool => filled($id))
+            ->map(strval(...))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whether a resource binding manages this database.
+     *
+     * Drives whether detaching is offered HERE. When a binding references the
+     * row, detaching has to remove its injected DB_* too — which only the
+     * Environment tab does. That is true whether or not `site_id` also points
+     * at this site: the two are independent, and a database can be both owned
+     * and bound (every one created since databases started adopting a binding).
+     */
+    public function bindingManagesDatabase(ServerDatabase $db): bool
+    {
+        return in_array((string) $db->id, $this->boundDatabaseIds(), true);
     }
 
     /** Engines whose extra-user management this tab supports. */
@@ -211,6 +268,9 @@ class Database extends Component
         return ServerDatabase::query()
             ->where('server_id', $this->server->id)
             ->whereNull('site_id')
+            // Already reachable through a binding — offering to "link" it would
+            // list a database the row above is already showing.
+            ->whereNotIn('id', $this->boundDatabaseIds())
             ->orderBy('name')
             ->get();
     }
@@ -309,13 +369,30 @@ class Database extends Component
             'name' => $db->name,
         ]));
 
+        // Give it a resource binding so the Environment tab and the resource
+        // map see it too — a database created here used to exist only as
+        // server_databases.site_id, invisible everywhere but this tab. Null
+        // when the site already has a primary database binding elsewhere; that
+        // case keeps the old loose-.env behaviour rather than repointing the
+        // running app at a database the operator just made.
+        $binding = $this->write_env
+            ? app(SiteBindingManager::class)->adoptServerDatabase($this->site, $db)
+            : null;
+
+        if ($binding !== null) {
+            app(SiteBindingManager::class)->stripAdoptedEnvKeys($this->site, $binding);
+        }
+
         CreateSiteDatabaseJob::dispatch(
             $db->id,
             $this->site->id,
-            $this->write_env,
+            // The binding owns DB_* once adopted — writing them to the cache as
+            // well would render them as overrides that never apply.
+            $this->write_env && $binding === null,
             $this->write_env && $this->push_env,
             (string) (auth()->id() ?? ''),
             (string) $run->id,
+            $binding?->id,
         );
 
         $this->watchConsoleAction(
@@ -371,6 +448,15 @@ class Database extends Component
             ->where('site_id', $this->site->id)
             ->find($id);
 
+        // A bound database is never detached from here — clearing site_id would
+        // leave the binding (and its injected DB_*) in place, so the app would
+        // still be pointed at a database this tab claims is gone.
+        if (in_array($id, $this->boundDatabaseIds(), true)) {
+            $this->toastError(__('This database is attached as a connected resource. Detach it from the Environment tab so its connection variables are removed too.'));
+
+            return;
+        }
+
         if (! $db instanceof ServerDatabase) {
             return;
         }
@@ -382,12 +468,21 @@ class Database extends Component
         $this->toastSuccess(__('Detached :name. The database was not dropped on the server.', ['name' => $db->name]));
     }
 
-    /** Resolve one of this site's databases by id, or null. */
+    /**
+     * Resolve a database this site may act on, or null.
+     *
+     * Same union as {@see linkedDatabases()} — otherwise every row that got
+     * here through a binding would render with buttons that silently no-op,
+     * which is worse than not showing it at all.
+     */
     private function ownedDatabase(string $id): ?ServerDatabase
     {
         return ServerDatabase::query()
             ->where('server_id', $this->server->id)
-            ->where('site_id', $this->site->id)
+            ->where(function ($q): void {
+                $q->where('site_id', $this->site->id)
+                    ->orWhereIn('id', $this->boundDatabaseIds());
+            })
             ->with('extraUsers')
             ->find($id);
     }

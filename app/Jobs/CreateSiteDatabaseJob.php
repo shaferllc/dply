@@ -10,12 +10,12 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
-use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -33,8 +33,11 @@ use Illuminate\Support\Str;
  * owns the slow, SSH-bound work — per the always-queue rule, none of it runs
  * inline in the request:
  *   1. CREATE DATABASE / USER on the host.
- *   2. (writeEnv) merge DB_* into the site's .env cache.
- *   3. (writeEnv && pushEnv) dispatch {@see PushSiteEnvJob} to write it live.
+ *   2. (writeEnv) merge DB_* into the site's .env cache. Skipped when a site
+ *      binding owns those keys — it supplies them at push time instead, and
+ *      duplicating them would leave inert "overrides" in the editable list.
+ *   3. (pushEnv) dispatch {@see PushSiteEnvJob} to write the .env live —
+ *      independent of step 2, since a binding-owned set still needs pushing.
  *   4. (PHP sites) chain {@see EnsureSitePhpDatabaseDriverJob} so the app can
  *      actually speak the engine it was just handed.
  *
@@ -116,6 +119,16 @@ class CreateSiteDatabaseJob implements ShouldQueue
 
             if ($this->writeEnv) {
                 $this->injectEnv($emit, $site, $db, $parser, $writer);
+            }
+
+            // Pushing is independent of writing the CACHE. When a site binding
+            // owns the DB_* keys the caller passes writeEnv=false — the binding
+            // supplies them at push time via SiteEnvPusher::bindingEnv(), so
+            // there is still a .env to write even though the cache was left
+            // alone. Keeping the dispatch inside injectEnv() made pushEnv
+            // silently mean "push only if we also duplicated the keys".
+            if ($this->pushEnv) {
+                $this->pushEnvToServer($emit, $site);
             }
 
             $this->maybeEnsurePhpDriver($emit, $site, $db);
@@ -206,12 +219,17 @@ class CreateSiteDatabaseJob implements ShouldQueue
 
         if (! $this->pushEnv) {
             $emit->info(__('Push the .env from the Environment tab to apply it on the server.'), 'db');
-
-            return;
         }
+    }
 
+    /**
+     * Queue the .env write to the server. Runs whenever pushEnv is set,
+     * whether the keys came from the cache or from a binding.
+     */
+    private function pushEnvToServer(ConsoleEmitter $emit, Site $site): void
+    {
         if (! $site->server?->hostCapabilities()->supportsEnvPushToHost()) {
-            $emit->info(__('This host does not support pushing a .env over SSH — wrote the cache only.'), 'db');
+            $emit->info(__('This host does not support pushing a .env over SSH — skipped the push.'), 'db');
 
             return;
         }

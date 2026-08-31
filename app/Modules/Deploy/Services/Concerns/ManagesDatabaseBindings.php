@@ -13,13 +13,16 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Database\Backends\DatabaseRouter;
 use App\Modules\Database\Jobs\ProvisionDockerDatabaseJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
 use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\SiteEnvPusher;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ManagedDatabaseCatalogAuth;
 use App\Support\Servers\ManagedDatabaseRegionCatalog;
@@ -227,6 +230,10 @@ trait ManagesDatabaseBindings
 
         $binding = $this->persistDatabaseBinding($site, $attributes, $primary, $editingId);
 
+        if ($primary) {
+            $this->seedDetectedEnvAliases($binding, $site);
+        }
+
         // The app server may have been provisioned for a different DB engine
         // than the one just attached (e.g. MySQL server, Postgres attached).
         // Install the matching PHP client driver so the app doesn't deploy into
@@ -234,6 +241,98 @@ trait ManagesDatabaseBindings
         EnsureSitePhpDatabaseDriverJob::dispatch((string) $site->id, (string) $db->engine);
 
         return $binding;
+    }
+
+    /**
+     * Give a site-scoped ServerDatabase a `database` binding, so the resource
+     * map and the Environment tab see it — not just the Database tab.
+     *
+     * Databases created from the Database tab (or at site create) only ever set
+     * `server_databases.site_id`; the connection vars were written straight into
+     * the editable .env cache and no binding existed. The two surfaces therefore
+     * disagreed in the opposite direction from an Environment-tab attach, which
+     * sets a binding but no site_id.
+     *
+     * Returns the binding, or NULL when the site already has a primary database
+     * binding pointing somewhere else. That case is deliberately left alone:
+     * only one primary can exist, and quietly re-pointing it at a
+     * just-created second database would repoint the running app. The second
+     * database keeps today's behaviour (site_id + a loose .env write).
+     *
+     * When a binding IS adopted it becomes the single source for DB_*, so the
+     * caller must NOT also write those keys into the editable cache — see
+     * {@see stripAdoptedEnvKeys()} for the ones already sitting there.
+     */
+    public function adoptServerDatabase(Site $site, ServerDatabase $db): ?SiteBinding
+    {
+        $site->loadMissing('bindings');
+
+        $existingPrimary = $site->bindings->first(
+            fn (SiteBinding $b): bool => $b->type === 'database'
+                && $this->databaseConnectionIsPrimary((string) (is_array($b->config) ? ($b->config['connection'] ?? '') : '')),
+        );
+
+        if ($existingPrimary instanceof SiteBinding
+            && (string) $existingPrimary->target_id !== (string) $db->id) {
+            return null;
+        }
+
+        $binding = $this->persistDatabaseBinding($site, [
+            'mode' => 'provision_new',
+            // The CREATE DATABASE is still queued; CreateSiteDatabaseJob flips
+            // this to configured (or error) via its $siteBindingId.
+            'status' => SiteBinding::STATUS_PROVISIONING,
+            'name' => 'primary',
+            'target_type' => 'server_database',
+            'target_id' => (string) $db->id,
+            'injected_env' => $this->databaseEnv($db, $site),
+            'config' => array_filter([
+                'engine' => $db->engine,
+                'connection' => '',
+                'database_name' => (string) $db->name,
+            ], fn ($v): bool => $v !== null),
+        ], true, (string) ($existingPrimary?->id ?? ''));
+
+        $this->seedDetectedEnvAliases($binding, $site);
+
+        $site->load('bindings');
+
+        return $binding;
+    }
+
+    /**
+     * Remove keys a freshly adopted binding now owns from the site's editable
+     * .env cache.
+     *
+     * Without this they linger as loose variables that the binding silently
+     * beats at push time ({@see SiteEnvPusher}), and the
+     * Environment tab renders every one of them as a phantom "override" that
+     * does nothing. Same adopt-and-strip the FILESYSTEM_DISK / BROADCAST_CONNECTION
+     * migration performed when those keys moved under a binding.
+     *
+     * Non-destructive in substance: the values live on in the binding's
+     * encrypted injected_env, and the pushed .env still carries them.
+     */
+    public function stripAdoptedEnvKeys(Site $site, SiteBinding $binding): void
+    {
+        $content = (string) ($site->env_file_content ?? '');
+        if ($content === '') {
+            return;
+        }
+
+        $parser = app(DotEnvFileParser::class);
+        $parsed = $parser->parse($content);
+
+        $owned = array_keys($binding->connectionEnv());
+        $remaining = array_diff_key($parsed['variables'], array_flip($owned));
+
+        if (count($remaining) === count($parsed['variables'])) {
+            return;
+        }
+
+        $site->forceFill([
+            'env_file_content' => app(DotEnvFileWriter::class)->render($remaining, $parsed['comments']),
+        ])->save();
     }
 
     /**
@@ -330,6 +429,13 @@ trait ManagesDatabaseBindings
 
         $db = ServerDatabase::query()->create([
             'server_id' => $server->id,
+            // Stamp the owning site. This flow used to leave it null, which is
+            // how a database provisioned here showed as CONFIGURED on the
+            // resource map while the Database tab said "no databases are linked
+            // to this site yet" — that tab reads ownership, not bindings.
+            // (It reads both now, but the row should still be owned: it was
+            // created for this site and nothing else can claim it.)
+            'site_id' => $site->id,
             'name' => $name,
             'engine' => $engine,
             'username' => $username,
@@ -759,6 +865,64 @@ trait ManagesDatabaseBindings
         ])->save();
     }
 
+    /**
+     * Seed the binding's editable alias map from stack detection, once.
+     *
+     * Only when the map has never been written: {@see SiteBinding::hasEnvAliasMap()}
+     * distinguishes "never seeded" from "seeded, then cleared by the operator".
+     * Without that distinction, re-pointing the resource would resurrect an
+     * alias someone deliberately deleted.
+     *
+     * Existing bindings from before this column predate the map entirely, so
+     * their next attach/refresh seeds them — and until then the alias is still
+     * baked into their stored injected_env, so nothing breaks in the gap.
+     */
+    private function seedDetectedEnvAliases(SiteBinding $binding, Site $site): void
+    {
+        if ($binding->hasEnvAliasMap()) {
+            return;
+        }
+
+        $aliases = self::databaseUrlAliasesFor($site);
+        if ($aliases === []) {
+            return;
+        }
+
+        $customization = is_array($binding->env_customization) ? $binding->env_customization : [];
+        $customization['aliases'] = ['DATABASE_URL' => $aliases];
+
+        $binding->forceFill(['env_customization' => $customization])->save();
+    }
+
+    /**
+     * Env key NAMES a database binding injects, without needing a provisioned
+     * database to read them off. Lets the environment-mapping editor render
+     * rows for a binding that is still coming up (a dedicated DB VM takes
+     * minutes) so the mapping is in place before the first deploy.
+     *
+     * Lives beside {@see databaseEnv()} on purpose: adding a key there without
+     * adding it here is visible in the same diff.
+     *
+     * @return list<string>
+     */
+    public function databaseEnvKeys(string $engine, string $connection = ''): array
+    {
+        $slug = $this->databaseConnectionSlug($connection);
+        $primary = $this->databaseConnectionIsPrimary($slug);
+        $p = $primary ? 'DB_' : 'DB_'.strtoupper($slug).'_';
+
+        if (DatabaseWorkspaceEngines::family($engine) === 'sqlite') {
+            return $primary
+                ? ['DB_CONNECTION', $p.'DATABASE', 'DATABASE_URL']
+                : [$p.'DATABASE', $p.'URL'];
+        }
+
+        $keys = [$p.'HOST', $p.'PORT', $p.'DATABASE', $p.'USERNAME', $p.'PASSWORD'];
+
+        return $primary
+            ? array_merge(['DB_CONNECTION'], $keys, ['DATABASE_URL'])
+            : array_merge($keys, [$p.'URL']);
+    }
 
     /**
      * Extra env names that should carry the primary connection URL, chosen from
@@ -851,19 +1015,12 @@ trait ManagesDatabaseBindings
             // DB_CONNECTION selects the app's DEFAULT connection — only the
             // primary owns it; a named instance is registered separately.
             $env = ['DB_CONNECTION' => $driver] + $env;
-            $url = (string) $db->connectionUrl($host);
-            $env['DATABASE_URL'] = $url;
+            $env['DATABASE_URL'] = (string) $db->connectionUrl($host);
 
-            // DATABASE_URL is a Laravel/Rails convention. Other stacks read the
-            // same connection string under a different name, so a linked
-            // database produced a correct URL that the app could not see —
-            // Payload looks for DATABASE_URI and its migrate step failed with
-            // no database configured. Alias it for the stack we detected.
-            foreach (self::databaseUrlAliasesFor($site) as $alias) {
-                if ($url !== '' && ! array_key_exists($alias, $env)) {
-                    $env[$alias] = $url;
-                }
-            }
+            // Stack-specific aliases (Payload's DATABASE_URI, …) are NOT baked
+            // in here any more. They seed SiteBinding::envAliases() on attach
+            // instead — see seedDetectedEnvAliases() — so the operator can see
+            // what dply decided and change it. connectionEnv() expands them.
         } elseif (($url = (string) $db->connectionUrl($host)) !== '') {
             $env[$p.'URL'] = $url;
         }

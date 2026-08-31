@@ -399,7 +399,7 @@
                                 </tbody>
                             </table>
                         </div>
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy and can be overridden per-key in the variables list.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Secrets are masked. These values are injected at deploy; use Mapping in the variables list to inject them under another name or replace a value.') }}</p>
                     @endif
                 </div>
             </div>

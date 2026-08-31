@@ -15,6 +15,7 @@ use App\Models\Server;
 trait ManagesSiteBindings
 {
     use BuildsSiteBindingFormDefaults;
+    use ManagesBindingEnvMapping;
     use ManagesSiteBindingActions;
     use ManagesSiteBindingCloudflareEmail;
     use ManagesSiteBindingCredentials;

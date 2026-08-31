@@ -58,15 +58,23 @@ final class DeploymentSecretInventory
 
         // Managed resource bindings contribute their connection variables here,
         // between workspace inheritance and the site .env blob. They are a
-        // separate layer kept out of the editable Variables list — but an
-        // explicit site .env key still overrides a binding-provided value
-        // (parsed below), so operators retain a manual escape hatch.
+        // separate layer kept out of the editable Variables list, and they are
+        // AUTHORITATIVE for the keys they own — SiteEnvPusher merges them over
+        // the site .env, so a .env key of the same name does not win. The
+        // per-key escape hatch is the binding's own override map
+        // ({@see SiteBinding::envOverrides()}), which is applied inside
+        // connectionEnv() below.
         // A derived worker inherits its parent app's resource bindings, so the
         // secret inventory (and the required-env gate it feeds) sees the parent's
         // connection vars, not the worker's empty own.
         $bindingSource = $site->resourceSourceSite();
         $bindingSource->loadMissing('bindings');
         foreach ($bindingSource->bindings as $binding) {
+            // Ask the binding which of its keys are sensitive rather than
+            // pattern-matching the name: an operator can alias DATABASE_URL
+            // (which embeds the password) to POSTGRES_URL, and no name pattern
+            // catches that. See SiteBinding::sensitiveEnvKeys().
+            $sensitive = $binding->sensitiveEnvKeys();
             foreach ($binding->connectionEnv() as $key => $value) {
                 $inventory[] = new DeploymentSecret(
                     key: (string) $key,
@@ -75,7 +83,8 @@ final class DeploymentSecretInventory
                     source: 'site_binding:'.$binding->type,
                     environment: $environment,
                     classification: $this->classify((string) $key),
-                    isSecret: $this->looksSensitiveKey((string) $key),
+                    isSecret: in_array((string) $key, $sensitive, true)
+                        || $this->looksSensitiveKey((string) $key),
                 );
             }
         }

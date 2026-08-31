@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
 use App\Support\Redis\RedisConnectionTls;
@@ -21,12 +22,18 @@ class SiteEnvPusher
     /**
      * Writes the site's `.env` to the server, composed from the editable env
      * cache PLUS the connection variables of any attached resource bindings
-     * (database, redis, …). The bindings inject under the cache: a real .env
-     * key the operator set still wins (that's the per-key override), but keys a
-     * binding owns and the cache doesn't carry (because "adopt" moved them out
-     * of the editable list) are written here so the deployed app actually
-     * receives DB_HOST/REDIS_HOST/… — otherwise the binding would only ever
-     * live in the deploy contract and never reach a VM's on-disk .env.
+     * (database, redis, …).
+     *
+     * Bindings compose OVER the cache — for a key a binding owns, the binding
+     * wins and a same-named .env key does not. That is deliberate: it is what
+     * stops a scaffold's leftover DB_USERNAME=root from beating a real attached
+     * database. The per-key escape hatch is therefore NOT a .env key of the same
+     * name; it is the binding's own override map, applied inside
+     * {@see SiteBinding::connectionEnv()}.
+     *
+     * (This docblock used to claim the opposite — that an operator .env key
+     * wins. It never did. If you are here to "fix" the merge order below to
+     * match some other comment, read this paragraph first.)
      *
      * Validates the blob via DotEnvFileParser before SSHing. Rejecting
      * malformed input here keeps the operator from pushing a file that

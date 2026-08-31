@@ -9,6 +9,7 @@ use App\Livewire\Sites\Database;
 use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -153,20 +154,25 @@ trait ManagesSiteCreateDatabase
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
         ]);
 
-        // write-env, but do NOT push: the DB_* vars land in the site's env
-        // cache immediately (which is what "connect it" means here — the site
-        // knows how to reach its database from the moment it exists), and the
-        // first deploy writes them to the box. Pushing now would race
-        // ProvisionSiteJob, which runs on a different queue and hasn't laid
-        // out the site directory yet; the push would sudo-mkdir it as root
-        // ahead of the provisioner.
+        // Attach it as a resource binding, so the new site's Environment tab and
+        // resource map show the database alongside the Database tab. The binding
+        // then owns DB_* and supplies them at push/deploy time.
+        $binding = app(SiteBindingManager::class)->adoptServerDatabase($site, $db);
+
+        // Still no push: the DB_* vars reach the box on the first deploy.
+        // Pushing now would race ProvisionSiteJob, which runs on a different
+        // queue and hasn't laid out the site directory yet; the push would
+        // sudo-mkdir it as root ahead of the provisioner.
         CreateSiteDatabaseJob::dispatch(
             $db->id,
             $site->id,
-            true,
+            // Cache write only when nothing adopted the keys — otherwise they
+            // would be duplicated into the editable list and inertly overridden.
+            $binding === null,
             false,
             (string) (auth()->id() ?? ''),
             (string) $run->id,
+            $binding?->id,
         );
     }
 
