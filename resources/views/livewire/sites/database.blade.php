@@ -133,6 +133,10 @@
                                         // injected at deploy and detaching belongs on the
                                         // Environment tab, which removes those too.
                                         $bindingManaged = $this->bindingManagesDatabase($db);
+                                        // Same Connect panel the Hosted databases section uses. It
+                                        // is addressed by binding id, so it only appears for rows a
+                                        // binding attaches.
+                                        $connectBindingId = $this->connectBindingIdFor($db);
                                     @endphp
                                     <li class="px-5 py-2.5 sm:px-6" wire:key="linked-{{ $db->id }}">
                                         <div class="flex flex-wrap items-center gap-3">
@@ -157,6 +161,22 @@
                                                 </p>
                                             </div>
                                             <div class="flex flex-wrap items-center gap-2">
+                                                @if ($connectBindingId && $family !== 'sqlite')
+                                                    <livewire:sites.database-connect
+                                                        :site="$site"
+                                                        :server="$server"
+                                                        :binding-id="$connectBindingId"
+                                                        :key="'db-connect-'.$connectBindingId"
+                                                    />
+                                                @elseif ($family !== 'sqlite')
+                                                    {{-- No binding to address the Connect panel with (a
+                                                         linked or pre-bindings database). The password
+                                                         handoff still works on its own. --}}
+                                                    <x-secondary-button size="xs" type="button" wire:click="shareCredentials('{{ $db->id }}')">
+                                                        <x-heroicon-o-key class="h-4 w-4" />
+                                                        {{ __('Credentials') }}
+                                                    </x-secondary-button>
+                                                @endif
                                                 @if ($supportsUsers)
                                                     <x-secondary-button size="xs" type="button" wire:click="openAddUserModal('{{ $db->id }}')">
                                                         <x-heroicon-o-user-plus class="h-4 w-4" />
@@ -436,10 +456,12 @@
         <div class="p-6">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ $share_context === 'rotated' ? __('Password rotated') : __('Database created') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ ['rotated' => __('Password rotated'), 'shared' => __('Connection credentials')][$share_context] ?? __('Database created') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">
                         @if ($share_context === 'rotated')
                             {{ __('The new password is being applied on the server — the banner confirms when it’s done.', ['name' => $share_link_db_name]) }}
+                        @elseif ($share_context === 'shared')
+                            {{ __('Open the link below to reveal the username and password for :name.', ['name' => $share_link_db_name]) }}
                         @else
                             {{ __(':name is being provisioned in the background — the banner confirms when it’s ready.', ['name' => $share_link_db_name]) }}
                         @endif

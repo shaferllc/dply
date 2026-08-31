@@ -28,6 +28,25 @@ final class DatabaseConnectionTargetResolver
 
     public function forBinding(SiteBinding $binding): ?DatabaseConnectionTarget
     {
+        // sqlite is a file on disk: there is no daemon, no port, and nothing to
+        // tunnel to. Guarded here rather than in each arm because the remote arm
+        // would otherwise resolve the host server's IP and offer a connection
+        // that cannot work.
+        if ($this->bindingIsSqlite($binding)) {
+            return null;
+        }
+
+        // An ON-BOX database (loopback, on the site's own server) is not
+        // "remote configurable" — dply owns no provider firewall for it — but it
+        // is still perfectly connectable, and in fact the simplest case: the
+        // jump host and the database host are the same machine, so `ssh -L`
+        // straight to 127.0.0.1 works. Resolve it before the remote gate, which
+        // rejects loopback by design.
+        $onBox = $this->onBoxTarget($binding);
+        if ($onBox instanceof DatabaseConnectionTarget) {
+            return $onBox;
+        }
+
         if (! $binding->isRemoteConfigurableDatabase()) {
             return null;
         }
@@ -72,6 +91,50 @@ final class DatabaseConnectionTargetResolver
         }
 
         return $this->fromBindingEnvelope($binding);
+    }
+
+    private function bindingIsSqlite(SiteBinding $binding): bool
+    {
+        $config = is_array($binding->config) ? $binding->config : [];
+        $engine = (string) ($config['engine'] ?? $binding->connectionEnv()['DB_CONNECTION'] ?? '');
+
+        return $engine !== '' && DatabaseWorkspaceEngines::family($engine) === 'sqlite';
+    }
+
+    /**
+     * A database living on the site's own server, dialled over loopback.
+     *
+     * Null unless the binding targets a ServerDatabase whose server IS the
+     * site's server and whose host is loopback — the peer-server case
+     * (a dedicated database VM) is handled by the remote arm, which can reach
+     * it over the private network.
+     */
+    private function onBoxTarget(SiteBinding $binding): ?DatabaseConnectionTarget
+    {
+        if ($binding->type !== 'database' || $binding->target_type !== 'server_database' || blank($binding->target_id)) {
+            return null;
+        }
+
+        $db = ServerDatabase::query()->find($binding->target_id);
+        if (! $db instanceof ServerDatabase) {
+            return null;
+        }
+
+        $host = strtolower(trim((string) $db->host));
+        if (! in_array($host, ['', '127.0.0.1', 'localhost', '::1'], true)) {
+            return null;
+        }
+
+        $site = $binding->site;
+        if ($site === null || (string) $site->server_id !== (string) $db->server_id) {
+            return null;
+        }
+
+        return DatabaseConnectionTarget::fromServerDatabase(
+            $db,
+            '127.0.0.1',
+            DatabaseConnectionTarget::defaultPortFor((string) $db->engine),
+        );
     }
 
     /**

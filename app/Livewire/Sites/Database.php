@@ -219,25 +219,50 @@ class Database extends Component
     }
 
     /**
-     * Ids of server databases attached to this site through a `database`
-     * binding. A derived worker inherits its parent app's resources, so the
-     * lookup follows the same source site the deploy env does.
+     * Server-database id => the id of the `database` binding that attaches it.
+     * A derived worker inherits its parent app's resources, so the lookup
+     * follows the same source site the deploy env does.
+     *
+     * @return array<string, string>
+     */
+    private function boundBindingIdByDatabaseId(): array
+    {
+        $source = $this->site->resourceSourceSite();
+        $source->loadMissing('bindings');
+
+        $map = [];
+        foreach ($source->bindings as $binding) {
+            if ($binding->type !== 'database' || $binding->target_type !== 'server_database') {
+                continue;
+            }
+            if (filled($binding->target_id)) {
+                $map[(string) $binding->target_id] = (string) $binding->id;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Ids of server databases attached to this site through a `database` binding.
      *
      * @return list<string>
      */
     private function boundDatabaseIds(): array
     {
-        $source = $this->site->resourceSourceSite();
-        $source->loadMissing('bindings');
+        return array_keys($this->boundBindingIdByDatabaseId());
+    }
 
-        return $source->bindings
-            ->where('type', 'database')
-            ->where('target_type', 'server_database')
-            ->pluck('target_id')
-            ->filter(fn ($id): bool => filled($id))
-            ->map(strval(...))
-            ->values()
-            ->all();
+    /**
+     * The binding that attaches a database, if any — the key the Connect panel
+     * ({@see DatabaseConnect}) and its credential-link,
+     * URI and terminal routes are all addressed by. Null for a database owned
+     * only through `site_id`, which predates databases adopting a binding; those
+     * rows get no Connect action rather than a broken one.
+     */
+    public function connectBindingIdFor(ServerDatabase $db): ?string
+    {
+        return $this->boundBindingIdByDatabaseId()[(string) $db->id] ?? null;
     }
 
     /**
@@ -466,6 +491,44 @@ class Database extends Component
         $db->forceFill(['site_id' => null])->save();
         unset($this->linkedDatabases, $this->linkableDatabases);
         $this->toastSuccess(__('Detached :name. The database was not dropped on the server.', ['name' => $db->name]));
+    }
+
+    /**
+     * Issue a one-time credential link for a database, without changing
+     * anything about it.
+     *
+     * The rich Connect panel is addressed by binding id, so a database that
+     * predates bindings — or one attached with "Link", which deliberately does
+     * not touch the app's environment — cannot use it. Those rows still need a
+     * way to hand out the password, which is what this is: the same share
+     * channel create and rotate already use, on demand.
+     */
+    public function shareCredentials(string $id, ServerDatabaseAuditLogger $auditLogger): void
+    {
+        $this->authorize('update', $this->site);
+
+        $db = $this->ownedDatabase($id);
+        if (! $db instanceof ServerDatabase) {
+            return;
+        }
+
+        if (DatabaseWorkspaceEngines::family((string) $db->engine) === 'sqlite') {
+            // A file on disk has no username or password to share.
+            $this->toastError(__('SQLite databases have no credentials — the file path is the connection.'));
+
+            return;
+        }
+
+        $this->share_context = 'shared';
+        $this->issueCredentialShare($db, $auditLogger);
+
+        if ($this->share_link_url === null) {
+            $this->toastError(__('Credential sharing is turned off for this organization.'));
+
+            return;
+        }
+
+        $this->dispatch('open-modal', 'site-db-credentials-modal');
     }
 
     /**
