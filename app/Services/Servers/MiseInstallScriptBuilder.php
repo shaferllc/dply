@@ -76,7 +76,13 @@ class MiseInstallScriptBuilder
             'chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
             'echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
             'dply_wait_for_apt_locks',
-            'apt-get update -y',
+            // dply_apt_update, not a bare `apt-get update`: under the
+            // provisioner's `set -e` any unusable third-party repo already on
+            // the box (an expired signing key, say) makes apt exit non-zero and
+            // kills the whole provision at this step. The helper retries, then
+            // continues — the install below still fails loudly if mise's own
+            // repo is the broken one.
+            'dply_apt_update',
             'dply_wait_for_apt_locks',
             'apt-get install -y --no-install-recommends mise',
         ];

@@ -13,8 +13,6 @@ use App\Models\ServerProvisionRun;
  */
 trait BuildsProvisionScriptPreamble
 {
-
-
     private function provisionScriptPreamble(string $taskId, ServerProvisionRun $run): string
     {
         $runId = (string) $run->id;
@@ -319,8 +317,15 @@ dply_repair_dpkg_state() {
 # that. Retries on lock contention and on E:/Err: output, then returns success
 # regardless so the following install step (which has its own retry and fails
 # hard on genuinely-missing packages) decides the real outcome.
+# Callers that need to know whether the update actually worked read
+# \${DPLY_APT_UPDATE_STATUS} afterwards: 0 = clean, 1 = still erroring. The
+# return value stays 0 on every path (see above) because most steps run bare
+# under `set -e` and must not abort on a third-party repo blip.
+DPLY_APT_UPDATE_STATUS=0
+
 dply_apt_update() {
   local attempt log marker=/var/lib/dply/apt-updated.stamp
+  DPLY_APT_UPDATE_STATUS=0
   # Skip the network round-trip when no apt source has changed since the last
   # successful update. apt-get update re-fetches EVERY configured source each
   # call, so 5-7 sequential updates (one per third-party repo) re-download the
@@ -333,7 +338,7 @@ dply_apt_update() {
     return 0
   fi
   for attempt in 1 2 3 4; do
-    dply_wait_for_apt_locks || return 1
+    dply_wait_for_apt_locks || { DPLY_APT_UPDATE_STATUS=1; return 1; }
     log=\$(apt-get update -y 2>&1) || true
     echo "\${log}"
     if echo "\${log}" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then
@@ -349,6 +354,7 @@ dply_apt_update() {
     sleep 10
   done
   echo "[dply] WARNING: apt-get update still failing after retries; continuing — package installs will retry or fail explicitly." >&2
+  DPLY_APT_UPDATE_STATUS=1
   return 0
 }
 

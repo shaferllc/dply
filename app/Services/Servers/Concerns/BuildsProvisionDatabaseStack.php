@@ -394,11 +394,26 @@ trait BuildsProvisionDatabaseStack
                 .'if curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --batch --yes --dearmor -o /usr/share/keyrings/dply-mysql.gpg; then '
                     .'. /etc/os-release; '
                     .'echo "deb [signed-by=/usr/share/keyrings/dply-mysql.gpg] https://repo.mysql.com/apt/ubuntu ${VERSION_CODENAME} '.$component.'" > /etc/apt/sources.list.d/dply-mysql.list; '
-                    .'if ! dply_apt_update; then '
-                        .'echo "[dply] WARNING: MySQL apt repo unusable on ${VERSION_CODENAME} — falling back to the distro mysql-server." >&2; '
-                        .'rm -f /etc/apt/sources.list.d/dply-mysql.list; '
+                    // dply_apt_update returns 0 even when the repo is
+                    // unusable (an expired MySQL signing key reads as
+                    // `EXPKEYSIG` / "is not signed"), so test the status
+                    // sentinel it sets. Testing the return value left the
+                    // dead repo in sources.list.d, where it broke every
+                    // later apt-get update on the box.
+                    .'dply_apt_update; '
+                    .'if [ "${DPLY_APT_UPDATE_STATUS:-0}" != "0" ]; then '
+                        .'echo "[dply] WARNING: MySQL apt repo unusable on ${VERSION_CODENAME} — removing it and falling back to the distro mysql-server." >&2; '
+                        .'rm -f /etc/apt/sources.list.d/dply-mysql.list /usr/share/keyrings/dply-mysql.gpg; '
                         .'dply_apt_update || true; '
                     .'fi; '
+                    // Even a repo that verifies can lack the component for
+                    // this suite. Either way the install below silently takes
+                    // the distro package, so say so while the reason is still
+                    // on screen.
+                    .'DPLY_MYSQL_CANDIDATE=$(apt-cache policy mysql-server 2>/dev/null | awk \'/Candidate:/ {print $2}\'); '
+                    .'case "${DPLY_MYSQL_CANDIDATE:-}" in '.$series.'*) : ;; '
+                        .'*) echo "[dply] WARNING: MySQL '.$series.' is not installable here (candidate: ${DPLY_MYSQL_CANDIDATE:-unavailable}) — installing the distro mysql-server instead." >&2 ;; '
+                    .'esac; '
                 .'else '
                     .'echo "[dply] WARNING: could not fetch the MySQL signing key — falling back to the distro mysql-server." >&2; '
                 .'fi; '
