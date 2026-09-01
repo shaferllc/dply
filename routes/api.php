@@ -255,6 +255,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/sites/{site}/commits', [SiteResourceApiController::class, 'commits'])->middleware('ability:'.$apiAbilities['sites.commits']);
         Route::get('/sites/{site}/system-user', [SiteResourceApiController::class, 'systemUser'])->middleware('ability:'.$apiAbilities['sites.system_user']);
 
+        // php artisan on a site, over the RemoteCli engine (risk gate + audit
+        // trail). Non-instant commands queue and are polled by run id.
+        Route::post('/sites/{site}/artisan', [SiteResourceApiController::class, 'runArtisan'])->middleware('ability:'.$apiAbilities['sites.artisan']);
+        Route::get('/sites/{site}/artisan/runs/{run}', [SiteResourceApiController::class, 'artisanRun'])->middleware('ability:'.$apiAbilities['sites.artisan_run'])->where('run', '[0-9]+');
+
         Route::get('/insights/summary', [InsightsController::class, 'organizationSummary'])->middleware('ability:'.$apiAbilities['insights.org_summary']);
         Route::get('/servers/{server}/insights', [InsightsController::class, 'serverFindings'])->middleware('ability:'.$apiAbilities['insights.server_findings']);
 

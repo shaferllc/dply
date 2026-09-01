@@ -125,6 +125,9 @@ return [
         'sites.domains_write' => 'sites.write',
         'sites.databases' => 'database.read',
         'sites.commits' => 'sites.read',
+        // Artisan runs work on the live host — same call as run-command.
+        'sites.artisan' => 'commands.run',
+        'sites.artisan_run' => 'commands.run',
         'sites.system_user' => 'system_users.read',
         'firewall.show' => 'network.read',
         'firewall.apply' => 'network.write',

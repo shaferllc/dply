@@ -355,6 +355,13 @@ export function parse(tokens) {
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
+    // Everything after a bare `--` is a positional, so a remote command
+    // keeps its own flags: `dply site artisan -- migrate --force`.
+    if (token === '--') {
+      args.push(...tokens.slice(i + 1));
+
+      break;
+    }
     if (token.startsWith('--')) {
       const eq = token.indexOf('=');
       if (eq !== -1) {

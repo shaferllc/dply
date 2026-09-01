@@ -39,6 +39,8 @@ export async function siteCommand(args, flags) {
       return siteDeploymentShow(args.slice(1), flags);
     case 'env':
       return siteEnv(args.slice(1), flags);
+    case 'artisan':
+      return siteArtisan(args.slice(1), flags);
     default:
       throw cliError(`Unknown site command: ${sub}. Run \`dply site help\`.`, 2);
   }
@@ -453,6 +455,7 @@ function printSiteHelp() {
   info(`  ${'deployments'.padEnd(16)} ${c.dim('[site] — recent deploy runs')}`);
   info(`  ${'deployment'.padEnd(16)} ${c.dim('<id> [--site …] — one deploy + logs')}`);
   info(`  ${'env'.padEnd(16)} ${c.dim('[site] list | set KEY=val | rm KEY | push --file .env')}`);
+  info(`  ${'artisan'.padEnd(16)} ${c.dim('[--site …] -- migrate --force — php artisan on the site')}`);
   info('');
   info(c.dim('Flags: --sync · --follow/--wait · --interval ms · --idempotency-key · --site · --json'));
   info(c.dim('CI: `dply deploy --sync --wait` · dev: `dply deploy --follow` after `dply link --byo <id>`'));
@@ -464,6 +467,151 @@ function printSiteHelp() {
  * @param {string} message
  * @param {number} [exitCode]
  */
+/**
+ * `php artisan` on the site, through the dply engine — risk-gated, audited,
+ * and queued server-side for anything that is not an instant inspect command.
+ * The site comes from `--site` or the link file, never a positional: the flag
+ * parser flattens `--`, so a positional could not be told from the command.
+ *
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+async function siteArtisan(args, flags) {
+  const { client, siteId } = await requireByoSiteContext(flags, undefined);
+  const base = `/sites/${encodeURIComponent(siteId)}/artisan`;
+
+  // `--run <id>` just reads back a run left behind by --no-wait.
+  const pollOnly = String(flags.run || '').trim();
+  if (pollOnly) {
+    const existing = (await client.get(`${base}/runs/${encodeURIComponent(pollOnly)}`))?.data;
+
+    return printArtisanRun(existing, flags);
+  }
+
+  const command = args.join(' ').trim() || String(flags.command || '').trim();
+
+  if (!command) {
+    throw cliError('Usage: dply site artisan [--site <id>] -- migrate --force', 2);
+  }
+
+  // The site comes from --site, so a stray positional would land where the
+  // artisan verb belongs. Say that here rather than round-tripping for it.
+  if (!/^[A-Za-z][A-Za-z0-9:_.-]*$/.test(command.split(/\s+/)[0])) {
+    throw cliError(`"${command.split(/\s+/)[0]}" is not an artisan command. Pick the site with --site: dply site artisan --site <id> -- migrate`, 2);
+  }
+
+  const preConfirmed = flags.yes === true || flags.y === true;
+  let run;
+
+  try {
+    run = (await client.post(base, { command, confirm: preConfirmed }))?.data;
+  } catch (err) {
+    // Destructive commands need an explicit ack — the API cannot prompt, so
+    // it hands the decision back here, same shape as the firewall lockout ack.
+    if (err?.status === 422 && err?.body?.code === 'confirmation_required') {
+      if (!(await confirmDestructive(command, err.body.risk))) {
+        warn('Aborted.');
+
+        return 1;
+      }
+      run = (await client.post(base, { command, confirm: true }))?.data;
+    } else {
+      throw err;
+    }
+  }
+
+  if (run?.status === 'queued' && flags['no-wait'] !== true) {
+    run = await waitForArtisanRun(client, base, run.run_id, flags);
+  }
+
+  return printArtisanRun(run, flags);
+}
+
+/**
+ * @param {Record<string, any>|undefined} run
+ * @param {Record<string, unknown>} flags
+ */
+function printArtisanRun(run, flags) {
+  if (flags.json) {
+    printJson(run);
+
+    return run?.exit_code ? run.exit_code : 0;
+  }
+
+  if (run?.stdout) {
+    process.stdout.write(run.stdout.endsWith('\n') ? run.stdout : `${run.stdout}\n`);
+  }
+  if (run?.stderr) {
+    process.stderr.write(run.stderr.endsWith('\n') ? run.stderr : `${run.stderr}\n`);
+  }
+
+  const label = `php artisan ${[run?.command, ...(run?.args ?? [])].filter(Boolean).join(' ')}`.trim();
+
+  if (run?.status === 'queued' || run?.status === 'running') {
+    info(c.dim(`Run ${run.run_id} is ${run.status} — read it later with \`dply site artisan --run ${run.run_id}\`.`));
+
+    return 0;
+  }
+
+  if (run?.status === 'completed' && (run.exit_code ?? 0) === 0) {
+    ok(label === 'php artisan' ? `Run ${run.run_id} completed.` : label);
+
+    return 0;
+  }
+
+  warn(`${label || 'Artisan run'} exited ${run?.exit_code ?? 'non-zero'} (run ${run?.run_id}).`);
+
+  return run?.exit_code || 1;
+}
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} base
+ * @param {string} runId
+ * @param {Record<string, unknown>} flags
+ */
+async function waitForArtisanRun(client, base, runId, flags) {
+  const intervalMs = Number(flags.interval) > 0 ? Number(flags.interval) : 2000;
+  const timeoutMs = (Number(flags.timeout) > 0 ? Number(flags.timeout) : 600) * 1000;
+  const deadline = Date.now() + timeoutMs;
+
+  info(c.dim(`Queued as run ${runId} — waiting…`));
+
+  let run = { run_id: runId, status: 'queued' };
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    run = (await client.get(`${base}/runs/${encodeURIComponent(runId)}`))?.data ?? run;
+
+    if (run.status !== 'queued' && run.status !== 'running') {
+      return run;
+    }
+  }
+
+  warn(`Still running after ${timeoutMs / 1000}s — run ${runId} continues on the server.`);
+
+  return run;
+}
+
+/**
+ * @param {string} command
+ * @param {string|undefined} risk
+ */
+async function confirmDestructive(command, risk) {
+  if (!process.stdin.isTTY) {
+    throw cliError(`php artisan ${command} is ${risk ?? 'destructive'} — pass --yes to run it non-interactively.`, 2);
+  }
+
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  try {
+    const answer = (await rl.question(`${c.bold(`[${risk ?? 'destructive'}]`)} php artisan ${command} — continue? [y/N] `)).trim();
+
+    return /^y(es)?$/i.test(answer);
+  } finally {
+    rl.close();
+  }
+}
+
 function cliError(message, exitCode = 1) {
   const err = new Error(message);
   err.exitCode = exitCode;

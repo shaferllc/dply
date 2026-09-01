@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\ErrorEvent;
+use App\Models\RemoteCliRun;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\Site;
@@ -16,7 +17,12 @@ use App\Models\SiteDeploymentSchedule;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
+use App\Modules\RemoteCli\Services\Artisan as ArtisanService;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
+use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\SiteUptimeHistorySummary;
 use App\Support\Errors\ErrorEventActions;
 use Illuminate\Database\Eloquent\Builder;
@@ -592,6 +598,125 @@ class SiteResourceApiController extends Controller
                 'server_name' => $site->server?->name,
             ],
         ]);
+    }
+
+    /**
+     * `php artisan <command>` against the site, through the same RemoteCli
+     * engine the workspace and `php artisan dply:artisan` use: risk
+     * classification, the two-tier permission gate, a RemoteCliRun row and
+     * an audit event. Instant commands settle inline; everything else comes
+     * back queued and is polled via {@see artisanRun()}.
+     */
+    public function runArtisan(
+        Request $request,
+        Site $site,
+        ArtisanService $artisan,
+        LaravelConsoleExecutor $console,
+    ): JsonResponse {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'command' => ['required', 'string', 'max:1000'],
+            'confirm' => ['nullable', 'boolean'],
+        ]);
+
+        $parts = preg_split('/\s+/', trim((string) $data['command'])) ?: [];
+        $command = (string) array_shift($parts);
+        $args = array_values(array_map('strval', $parts));
+
+        // Artisan::buildShellCommand() escapes the args but interpolates the
+        // verb raw. That is safe for operator argv (dply:artisan); an API
+        // token is not, so the verb has to look like an artisan command name
+        // and nothing else.
+        if (! preg_match('/^[A-Za-z][A-Za-z0-9:_.-]*$/', $command)) {
+            return response()->json([
+                'message' => 'Invalid artisan command name.',
+                'code' => 'invalid_command',
+            ], 422);
+        }
+
+        // The engine shells into the site root over SSH — a container or
+        // non-Laravel site would queue a run that dies on the box.
+        if ($console->executionProfile($site) !== 'vm_ssh') {
+            return response()->json([
+                'message' => 'Artisan is available for SSH-managed Laravel sites only. Use your container tooling for this runtime.',
+                'code' => 'artisan_unsupported_runtime',
+            ], 422);
+        }
+
+        $risk = $artisan->classifyRisk($command);
+
+        // The env family prints the site's .env (DB password, APP_KEY) and
+        // classifies as Read, which the RemoteCli gate lets through on
+        // SitePolicy::view — a workspace viewer. Secrets need write access.
+        if (in_array($command, ['env', 'env:show', 'env:decrypt', 'tinker'], true)
+            && ! $request->user()?->can('update', $site)) {
+            return response()->json([
+                'message' => "php artisan {$command} exposes site secrets and needs write access to this site.",
+                'code' => 'permission_denied',
+            ], 403);
+        }
+
+        // No prompt over HTTP, so destructive commands take the same
+        // acknowledge-and-retry shape as the firewall SSH-lockout ack.
+        if ($risk === RiskLevel::Destructive && ! ($data['confirm'] ?? false)) {
+            return response()->json([
+                'message' => "php artisan {$command} is classified destructive — resend with confirm=true to run it.",
+                'code' => 'confirmation_required',
+                'risk' => $risk->value,
+            ], 422);
+        }
+
+        try {
+            $result = $artisan->run(site: $site, command: $command, args: $args, queuedBy: $request->user());
+        } catch (RemoteCliPermissionDeniedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'permission_denied',
+            ], 403);
+        }
+
+        return response()->json(['data' => $this->artisanRunPayload($result->run)]);
+    }
+
+    /**
+     * Poll one artisan run. Scoped to the site so a run id from another
+     * organization cannot be read back through a site this token owns.
+     */
+    public function artisanRun(Request $request, Site $site, string $run): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $row = RemoteCliRun::query()
+            ->where('site_id', $site->getKey())
+            ->where('kind', Kind::Artisan)
+            ->find($run);
+
+        if ($row === null) {
+            return response()->json(['message' => 'No artisan run with that id on this site.'], 404);
+        }
+
+        return response()->json(['data' => $this->artisanRunPayload($row)]);
+    }
+
+    /**
+     * Same envelope `dply:artisan --json` prints, so both surfaces agree.
+     *
+     * @return array<string, mixed>
+     */
+    private function artisanRunPayload(RemoteCliRun $run): array
+    {
+        return [
+            'run_id' => $run->id,
+            'command' => $run->command,
+            'args' => $run->args ?? [],
+            'status' => $run->status,
+            'mode' => $run->mode,
+            'risk' => $run->risk->value,
+            'exit_code' => $run->exit_code,
+            'stdout' => (string) $run->stdout,
+            'stderr' => (string) $run->stderr,
+        ];
     }
 
     /**
