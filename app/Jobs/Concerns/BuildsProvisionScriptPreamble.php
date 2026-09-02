@@ -317,6 +317,55 @@ dply_repair_dpkg_state() {
 # that. Retries on lock contention and on E:/Err: output, then returns success
 # regardless so the following install step (which has its own retry and fails
 # hard on genuinely-missing packages) decides the real outcome.
+# Drop a third-party apt source whose signature cannot be verified. An expired
+# or revoked signing key never heals on retry: from then on EVERY apt-get
+# update on the box exits non-zero, which under `set -e` kills whatever step
+# runs next (that is how a stale repo.mysql.com list killed the mise install).
+#
+# Deliberately narrow:
+#   - signature failures only (EXPKEYSIG / KEYEXPIRED / NO_PUBKEY / "is not
+#     signed") — an unreachable mirror is transient and keeps its source file;
+#   - files under sources.list.d only, never /etc/apt/sources.list;
+#   - never the distro mirrors — if THOSE stop verifying we want a loud
+#     failure, not a box that silently installs from nowhere.
+#
+# \${DPLY_APT_ROOT} is a test seam; empty in production, so paths are /etc/apt.
+dply_prune_unverifiable_apt_sources() {
+  local log=\$1 dir="\${DPLY_APT_ROOT:-}/etc/apt/sources.list.d" pruned=0
+  local origin file base
+
+  [ -d "\${dir}" ] || return 1
+
+  for origin in \$(echo "\${log}" \\
+    | grep -E "EXPKEYSIG|KEYEXPIRED|NO_PUBKEY|is not signed|signatures were invalid" \\
+    | grep -oE "https?://[^ '\\"]+" \\
+    | sed -E 's#(https?://[^/]+).*#\\1#' \\
+    | sort -u); do
+    case "\${origin}" in
+      *archive.ubuntu.com*|*security.ubuntu.com*|*ports.ubuntu.com*|*mirrors.digitalocean.com*)
+        echo "[dply] WARNING: the distro mirror \${origin} failed signature verification — leaving it in place; this needs a human." >&2
+        continue
+        ;;
+    esac
+
+    while IFS= read -r file; do
+      [ -n "\${file}" ] || continue
+      base=\$(basename "\${file}")
+      # `[ … ] && continue` would be a failing AND-list under `set -e`.
+      if [ "\${base}" = "ubuntu.sources" ]; then
+        continue
+      fi
+      echo "[dply] WARNING: \${origin} cannot be verified (expired or missing signing key) — removing \${file} so it stops breaking apt." >&2
+      rm -f "\${file}"
+      pruned=1
+    done <<EOF
+\$(grep -rlF "\${origin}" "\${dir}" 2>/dev/null)
+EOF
+  done
+
+  [ "\${pruned}" = "1" ]
+}
+
 # Callers that need to know whether the update actually worked read
 # \${DPLY_APT_UPDATE_STATUS} afterwards: 0 = clean, 1 = still erroring. The
 # return value stays 0 on every path (see above) because most steps run bare
@@ -353,6 +402,18 @@ dply_apt_update() {
     echo "[dply] apt-get update reported errors (attempt \${attempt}/4) — retrying in 10s."
     sleep 10
   done
+  # Retries are exhausted. If the cause is a source that can never verify,
+  # drop it and try once more — otherwise it poisons every later apt call.
+  if dply_prune_unverifiable_apt_sources "\${log}"; then
+    dply_wait_for_apt_locks || true
+    log=\$(apt-get update -y 2>&1) || true
+    echo "\${log}"
+    if ! echo "\${log}" | grep -qE "^(E:|Err:)"; then
+      echo "[dply] apt-get update is clean after pruning the unverifiable source(s)."
+      mkdir -p /var/lib/dply && touch "\${marker}"
+      return 0
+    fi
+  fi
   echo "[dply] WARNING: apt-get update still failing after retries; continuing — package installs will retry or fail explicitly." >&2
   DPLY_APT_UPDATE_STATUS=1
   return 0
