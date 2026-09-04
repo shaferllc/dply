@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "runCommand checks the commands.run ability and organization equality but never invokes the Server policy, never records who ran what, and returns raw exception messages to the caller. Add the policy call, persist an actor-linked run record with the exit code, and normalize errors so internal detail does not leak. This is a prerequisite for making the endpoint async, not a follow-up.",
+  "id": "T-008",
+  "order": 10,
+  "phase": "access-control",
+  "status": "open",
+  "title": "Server policy check and actor-linked audit record for arbitrary server commands",
+  "type": "task"
+}

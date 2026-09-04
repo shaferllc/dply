@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-004"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "The artisan command has parser coverage only. There are no tests for submission, the destructive-confirmation retry, --no-wait plus --run polling, the wait loop's timeout, --json output shape, or exit-code propagation from the run's exit_code. Add mocked-HTTP contract tests in packages/dply-cli/test covering each path. Without these the command's behaviour is unprotected against the response-shape change T-007 will make.",
+  "id": "T-005",
+  "order": 20,
+  "phase": "cli-api-parity",
+  "status": "open",
+  "title": "CLI contract tests for dply site artisan",
+  "type": "task"
+}

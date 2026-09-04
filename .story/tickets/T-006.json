@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "The GitHub workflow runs the Laravel suite and dply-core but never installs Node or runs the CLI's own node:test suite, so CLI regressions reach users unchallenged. Add a job that installs Node and runs npm test in packages/dply-cli. A catalog parity check alone does not protect behaviour.",
+  "id": "T-006",
+  "order": 30,
+  "phase": "cli-api-parity",
+  "status": "open",
+  "title": "Run the packages/dply-cli node:test suite in CI",
+  "type": "chore"
+}

@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-013"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "The App suite collects every *Test.php beneath app/Actions; roughly 16 files fail on behaviour or API drift after the crash case is separated out. Work them in batches with a fixed file list per batch and an explicit test command, rather than as one open-ended 'make it green' effort.",
+  "id": "T-014",
+  "order": 30,
+  "phase": "test-debt",
+  "status": "open",
+  "title": "App suite behaviour and API drift batches",
+  "type": "task"
+}

@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "BuildsProvisionDatabaseStack::pinMysqlSeries() downloads repo.mysql.com/RPM-GPG-KEY-mysql-2023, which apt now rejects as expired (EXPKEYSIG B7B3B788A8D3785C), so every MySQL 8.4 pin silently falls back to the distro 8.0 package. MySQL publishes RPM-GPG-KEY-mysql-2025, but swapping the URL alone just reschedules the same failure. Fetch to a temporary keyring, verify the expected fingerprint AND that the signing key is not expired, then install atomically before writing the source file; remove stale source and key files on every failure path. Tests: expired key, wrong fingerprint, fetch failure, unsupported suite, successful 8.4 candidate.",
+  "displayId": "T-001",
+  "id": "T-001",
+  "order": 10,
+  "phase": "provisioning-reliability",
+  "status": "inprogress",
+  "title": "Replace the expired MySQL signing key source in pinMysqlSeries",
+  "type": "task"
+}

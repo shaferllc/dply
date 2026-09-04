@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "tests/Unit/ModuleBoundaryTest.php's BASELINE currently permits Feedback module code to depend on a presentation-layer admin concern, which is exactly the arrow the boundary rule forbids. Move the authorization contract into an allowed shared boundary (kernel or a module-owned concern), update the module, delete that BASELINE line, and run the boundary test - a companion test fails on stale entries, so the line must go in the same change.",
+  "id": "T-017",
+  "order": 30,
+  "phase": "access-control",
+  "status": "open",
+  "title": "Remove the Feedback to shell BASELINE exemption",
+  "type": "task"
+}

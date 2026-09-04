@@ -1,0 +1,37 @@
+{
+  "blockers": [],
+  "date": "2026-09-04",
+  "phases": [
+    {
+      "description": "Server provision path: apt/repo resilience, MySQL series pinning, rollback diagnostics.",
+      "id": "provisioning-reliability",
+      "label": "PHASE 0",
+      "name": "Provisioning reliability"
+    },
+    {
+      "description": "dply CLI and /api/v1 coverage: site-scoped operations, async runs, exit codes, catalog and help parity, CLI test coverage in CI.",
+      "id": "cli-api-parity",
+      "label": "PHASE 1",
+      "name": "CLI / API parity"
+    },
+    {
+      "description": "Token abilities and policy gates on SSH-backed and secret-bearing endpoints, plus module boundary debt.",
+      "id": "access-control",
+      "label": "PHASE 2",
+      "name": "Access control"
+    },
+    {
+      "description": "Get the Modules and App suites green and move them into the default run; the largest remaining coverage lever.",
+      "id": "test-debt",
+      "label": "PHASE 3",
+      "name": "Test debt"
+    },
+    {
+      "description": "Decide the boundary of a standalone managed WordPress product surface against the VM WordPress support that already exists.",
+      "id": "wordpress-surface",
+      "label": "PHASE 4",
+      "name": "WordPress surface"
+    }
+  ],
+  "title": "dply"
+}

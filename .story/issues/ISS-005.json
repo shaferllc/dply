@@ -1,0 +1,19 @@
+{
+  "components": [
+    "README.md"
+  ],
+  "createdBy": "claude-code/story-setup",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-005",
+  "impact": "The product-status table says WordPress is planned and not yet implemented, but WP-CLI, hardening, cron switching, runtime detection and a workspace UI all ship today. The stale status misleads anyone scoping the work.",
+  "location": [],
+  "phase": "wordpress-surface",
+  "relatedTickets": [
+    "T-018"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "README states WordPress is unimplemented while substantial VM support exists"
+}

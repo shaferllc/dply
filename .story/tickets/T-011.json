@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "Build a matrix over registered /api/v1 routes with separate columns for authentication, token ability, tenant ownership, role/policy authorization, secret exposure, host-side execution, audit logging and throttling. Conflating those produces ambiguous results: sites.env.content intentionally uses sites.write rather than commands.run, and organization checks are hand-written per controller rather than policy-driven. Output is the matrix plus one issue per gap; remediation is separate tickets. Include cross-tenant tests for nested resources.",
+  "id": "T-011",
+  "order": 20,
+  "phase": "access-control",
+  "status": "open",
+  "title": "API v1 authorization matrix",
+  "type": "task"
+}

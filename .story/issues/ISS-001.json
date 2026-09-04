@@ -1,0 +1,20 @@
+{
+  "components": [
+    "app/Services/Servers/Concerns/BuildsProvisionDatabaseStack.php"
+  ],
+  "createdBy": "claude-code/story-setup",
+  "discoveredDate": "2026-09-04",
+  "displayId": "ISS-001",
+  "id": "ISS-001",
+  "impact": "apt rejects the repo dply adds (EXPKEYSIG B7B3B788A8D3785C), so the requested MySQL series is never installed and the distro package is used instead. Before the pruner landed, the dead source also broke every later apt-get update on the box, which killed the provision at the mise step.",
+  "location": [],
+  "phase": "provisioning-reliability",
+  "relatedTickets": [
+    "T-001"
+  ],
+  "resolution": "Silent-failure half fixed (T-001): keys are now fetched to a temp keyring, checked for expiry/revocation/signing-capability (and an optional pinned fingerprint) via dply_install_apt_key, and only then installed atomically; a refused key leaves no keyring and no source file, and the fallback to the distro package is announced. NOT yet verified: that https://repo.mysql.com/RPM-GPG-KEY-mysql-2025 is the correct current key URL, and its fingerprint - both need confirming against MySQL's documentation from a networked machine, then pinning in server_provision.mysql_repo_key_fingerprints. Until that is confirmed, 8.4 may still fall back to distro 8.0 - loudly now, rather than silently. Keep open.",
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "MySQL 8.4 pin silently unreachable - repo.mysql.com signing key expired"
+}

@@ -1,0 +1,30 @@
+{
+  "features": {
+    "handovers": true,
+    "issues": true,
+    "reviews": true,
+    "roadmap": true,
+    "tickets": true
+  },
+  "language": "typescript",
+  "project": "dply",
+  "type": "webapp",
+  "version": 2,
+  "recipeOverrides": {
+    "stages": {
+      "WRITE_TESTS": {
+        "enabled": false
+      },
+      "TEST": {
+        "enabled": true,
+        "command": "composer test"
+      },
+      "VERIFY": {
+        "enabled": false
+      },
+      "BUILD": {
+        "enabled": false
+      }
+    }
+  }
+}

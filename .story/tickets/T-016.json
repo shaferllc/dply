@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-014"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "Symmetric with the Modules move: without it the App suite can be fixed and still stay out of composer test and CI, where it will rot again.",
+  "id": "T-016",
+  "order": 50,
+  "phase": "test-debt",
+  "status": "open",
+  "title": "Move App into the default test suite once green",
+  "type": "chore"
+}

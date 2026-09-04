@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "README lists WordPress as planned and not implemented, but the repo already carries WP-CLI support through RemoteCli, runtime detection, a large workspace component, hardening and cron actions, snapshots and extensive feature tests. What is actually missing is a standalone managed product surface. Inventory the existing VM WordPress capability, then define the boundary: tenancy, infrastructure model, provisioning, billing, routing, migration and what gets reused. File implementation epics only after that decision lands.",
+  "id": "T-018",
+  "order": 10,
+  "phase": "wordpress-surface",
+  "status": "open",
+  "title": "ADR: standalone managed WordPress surface",
+  "type": "feature"
+}

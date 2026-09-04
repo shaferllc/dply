@@ -1,0 +1,14 @@
+{
+  "blockedBy": [
+    "T-012"
+  ],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "phpunit.xml's defaultTestSuite is Unit,Feature, so the module-local tests never run in a bare artisan test. Adding them takes measured coverage from 43.5% to 44.2%, with TaskRunner going 6.0% to 22.0%. Blocked on every remediation issue that the failure-cluster ticket produces, not just on the report itself. Re-measure rather than reusing the recorded percentages.",
+  "id": "T-015",
+  "order": 40,
+  "phase": "test-debt",
+  "status": "open",
+  "title": "Move Modules into the default test suite once green",
+  "type": "chore"
+}

@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "composer test:modules collects 124 module-local test files - all 73 of the substantial ones are TaskRunner's - and fails in bulk. Group the failures by root cause into clusters, each with a reproducible test command and an independent fix path, and file one child issue per cluster. This ticket produces the report and the issues; fixing a cluster is the child issue's job. Verify the failure count at HEAD rather than trusting the number recorded in CLAUDE.md.",
+  "id": "T-012",
+  "order": 10,
+  "phase": "test-debt",
+  "status": "open",
+  "title": "Cluster the TaskRunner module-test failures into an ordered report",
+  "type": "task"
+}

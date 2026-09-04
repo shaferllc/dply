@@ -1,0 +1,19 @@
+{
+  "components": [
+    "tests/Unit/ModuleBoundaryTest.php"
+  ],
+  "createdBy": "claude-code/story-setup",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-004",
+  "impact": "The boundary test's BASELINE permits a Feedback module dependency on a presentation-layer admin concern. Each exemption is a live violation of the one enforced architectural rule.",
+  "location": [],
+  "phase": "access-control",
+  "relatedTickets": [
+    "T-017"
+  ],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Module to shell BASELINE carries tracked debt"
+}
