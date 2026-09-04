@@ -187,11 +187,12 @@ $connections = $connectionManager->createFromModelQuery(
     ['created_at' => 'desc']
 );
 
-// Create from group
-$connections = $connectionManager->createFromGroup('web-servers', 'servers');
+// Create from group. The table is required and must have a `group` column;
+// dply's own `servers` table has none, so name a table that does.
+$connections = $connectionManager->createFromGroup('web-servers', 'task_runner_hosts');
 
-// Create from tags
-$connections = $connectionManager->createFromTags(['web', 'production'], 'servers');
+// Create from tags. Same rule: the named table must have a `tags` column.
+$connections = $connectionManager->createFromTags(['web', 'production'], 'task_runner_hosts');
 
 // Create from environment variables
 $connections = $connectionManager->createFromEnvironment(['SSH_']);

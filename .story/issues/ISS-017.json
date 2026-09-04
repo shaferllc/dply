@@ -5,14 +5,20 @@
   ],
   "createdBy": "claude-code/ISS-016",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-017",
   "id": "ISS-017",
   "impact": "ConnectionManager::createFromGroup($group, $table = 'servers') and createFromTags($tags, $table = 'servers') query 'group' and 'tags' columns on a table named servers. dply's servers table has neither column, so both throw 'column does not exist' when called with their defaults - as does DispatchesTaskRunnerToServers::dispatchToGroup/dispatchToTaggedServers, which pass the same default through. The default is inherited from the upstream task-runner package, whose servers schema had those columns. No production code calls them with the default today, so nothing is broken in practice, but the signature advertises a capability that cannot work as written. Either drop the default so callers must name a table, or map group/tags onto something dply's servers table actually has.",
   "location": [],
   "phase": "test-debt",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed by dropping the `$table = 'servers'` default rather than mapping group/tags onto dply's schema — dply's servers table has neither a `group` nor a `tags` column, so no mapping exists to make the default meaningful.\n\n`ConnectionManager::createFromGroup(string $groupName, string $table)` and `createFromTags(array $tags, string $table)` now require the table, with a docblock on createFromGroup recording why the default was removed (inherited from the upstream package's schema; could only ever throw here). `DispatchesTaskRunnerToServers::dispatchToGroup()` and `dispatchToTaggedServers()` likewise require `string $table` and pass it through, so the defect cannot re-enter via the dispatch path. Callers must now name a table that actually carries the column.\n\nThe code change landed in commit 94ea1c4f5 (\"Require the table for group/tag dispatch, and stop orphaning parked webservers\"); this session verified it against HEAD and closed the ledger entry.\n\nAlso corrected in this session: app/Modules/TaskRunner/md/CONNECTION_FEATURES.md still demonstrated both calls against `'servers'`, i.e. the exact call that throws on dply. The examples now name a hypothetical `task_runner_hosts` and state the column requirement, so the docs no longer advertise the capability the signature change just withdrew.\n\nVerified: `vendor/bin/pest app/Modules/TaskRunner/Tests/ConnectionManagerTest.php` — 100 passed, 134 assertions. Run directly rather than via `composer test`, since the Modules suite is excluded from defaultTestSuite and a default run would not have executed this code at all.",
+  "resolutionEpoch": {
+    "establishedAt": "2026-09-04T22:17:34.923Z",
+    "issueId": "ISS-017",
+    "sessionId": "d3782ff0-d297-4478-ac9d-d53724e3fca6"
+  },
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "createFromGroup/createFromTags default to a servers table dply does not have"
 }
