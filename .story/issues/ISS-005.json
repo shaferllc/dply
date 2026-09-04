@@ -4,6 +4,7 @@
   ],
   "createdBy": "claude-code/story-setup",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-005",
   "id": "ISS-005",
   "impact": "The product-status table says WordPress is planned and not yet implemented, but WP-CLI, hardening, cron switching, runtime detection and a workspace UI all ship today. The stale status misleads anyone scoping the work.",
   "location": [],
@@ -11,9 +12,9 @@
   "relatedTickets": [
     "T-018"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed in T-018: README now describes what ships (WordPress managed on BYO servers) and points at docs/adr/managed-wordpress-surface.md for the dply-hosted surface, which is scoped but not built.",
+  "resolvedDate": "2026-09-04",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "README states WordPress is unimplemented while substantial VM support exists"
 }
