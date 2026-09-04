@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "POST /servers/{server}/run-command opens an SSH connection inside the HTTP request, which the house rule forbids and which caps a command at the web request timeout regardless of SshConnection's own 120s exec timeout. Use ConsoleAction rather than RemoteCliRun: it already supports Server subjects, queued/running/failed states, bounded output, stalled-worker detection and actor ids, while RemoteCliRun requires a site_id. Add a scoped poll endpoint mirroring the artisan runs/{run} shape and keep a synchronous response for fast commands. Tests: tenant isolation, authorization, failure, timeout/stall, CLI polling.",
+  "displayId": "T-007",
   "id": "T-007",
   "order": 40,
   "phase": "cli-api-parity",
-  "status": "open",
+  "status": "complete",
   "title": "Make server run async via a server-scoped ConsoleAction",
   "type": "task"
 }

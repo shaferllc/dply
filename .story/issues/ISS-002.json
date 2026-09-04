@@ -4,6 +4,7 @@
   ],
   "createdBy": "claude-code/story-setup",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-002",
   "id": "ISS-002",
   "impact": "ServerController::runCommand opens an SshConnection in the request path, which the house rule forbids and which caps any command at the web request timeout. Long operations are truncated with no run record to poll.",
   "location": [],
@@ -12,9 +13,9 @@
     "T-007",
     "T-008"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed in T-007: the command runs in RunServerCommandJob against a server-scoped ConsoleAction; the request waits on the run record rather than a socket, so the old response shape survives for fast commands and slow ones return queued with a poll endpoint.",
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "run-command runs SSH synchronously inside an HTTP request"
 }

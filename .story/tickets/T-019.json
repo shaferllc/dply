@@ -1,0 +1,12 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "Inventory from T-003. These build standalone scripts that run under 'set -e' with no provision preamble, so one unverifiable third-party repo aborts the whole action - the same failure that killed provisioning at the mise step: DatabaseEngineInstallScripts (9 call sites), CacheServiceInstallScripts (6), AddEdgeProxyJob (2), CaddyModulesManager (2), DplyCliInstaller (2), SiteFixers (2), InstallFail2banFixAction (2), HttpCacheDaemonInstallScripts (1), InstallServerWebserverJob (1), ControlWorkerDaemonJob (1), PostgresExtensionManager (1). Give them the retry-and-prune behaviour dply_apt_update has, without requiring the preamble: extend AptSourceRepairScript with a self-contained tolerant-update snippet these scripts embed. Do not simply append '|| true' - that hides a genuinely missing package index and the install then fails further along with a worse message.",
+  "id": "T-019",
+  "order": 40,
+  "phase": "provisioning-reliability",
+  "status": "open",
+  "title": "Tolerant apt update in day-two install scripts that run under set -e",
+  "type": "task"
+}

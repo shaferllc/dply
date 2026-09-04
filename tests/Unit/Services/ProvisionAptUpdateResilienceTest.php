@@ -114,3 +114,37 @@ test('with no key urls configured the repo is not attempted at all', function ()
     // No verifiable key means no repo; the distro package is the honest result.
     expect(mysqlProvisionScript())->not->toContain('sources.list.d/dply-mysql.list');
 });
+
+test('no stack permutation emits a bare apt-get update', function () {
+    // The mise step was the last one, but "the stack I happened to test" is not
+    // the same as "every stack we can provision": each webserver, database and
+    // cache contributes its own install lines.
+    $builder = app(ServerProvisionCommandBuilder::class);
+    $offenders = [];
+
+    foreach (['nginx', 'caddy', 'openresty', 'none'] as $webserver) {
+        foreach (['mysql84', 'mysql80', 'postgres16', 'none'] as $database) {
+            foreach (['redis', 'valkey', 'keydb', 'dragonfly', 'memcached', 'none'] as $cache) {
+                $server = Server::factory()->make([
+                    'provider' => ServerProvider::DigitalOcean,
+                    'meta' => [
+                        'server_role' => 'application',
+                        'webserver' => $webserver,
+                        'php_version' => '8.3',
+                        'database' => $database,
+                        'cache_service' => $cache,
+                    ],
+                ]);
+
+                foreach (preg_split('/\R/', implode("\n", $builder->build($server))) ?: [] as $line) {
+                    if (preg_match('/(^\s*|[;&|]\s*|\|\|\s*|&&\s*)apt-get update/', $line) === 1
+                        && ! str_contains($line, 'dply_apt_update')) {
+                        $offenders[] = "{$webserver}/{$database}/{$cache}: ".trim($line);
+                    }
+                }
+            }
+        }
+    }
+
+    expect($offenders)->toBe([], implode("\n", array_slice($offenders, 0, 5)));
+});
