@@ -3,10 +3,11 @@
   "completedDate": null,
   "createdDate": "2026-09-04",
   "description": "Inventory from T-003, build-time group: DockerRuntimeDockerfileBuilder, SnapshotBakeScript, BootHeadStartScript. Different semantics from both other groups - there is no dply preamble, failure means a bad image rather than a broken host, and a Dockerfile RUN should usually fail loudly. Decide per script whether tolerance is right at all; BootHeadStartScript already guards its update inside an if. Possibly a no-op ticket that records the decision.",
+  "displayId": "T-021",
   "id": "T-021",
   "order": 60,
   "phase": "provisioning-reliability",
-  "status": "open",
+  "status": "inprogress",
   "title": "Decide the apt-update policy for image-bake and cloud-init scripts",
   "type": "chore"
 }
