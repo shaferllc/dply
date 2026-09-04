@@ -1,0 +1,19 @@
+{
+  "components": [
+    "app/Http/Controllers/Api/ServerLogShippingController.php",
+    "app/Http/Controllers/Api/ServerMetricsApiController.php",
+    "app/Http/Controllers/Api/SiteResourceApiController.php"
+  ],
+  "createdBy": "claude-code/T-011",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-009",
+  "impact": "8 of the 10 /api/v1 routes gated on commands.run verify the token's ability and the caller's organization membership, then execute on the host without ever calling the Server or Site policy: log-shipping enable/resync/disable, metrics install/probe/thresholds, and errors retry/remediate. An organization member holding a commands.run token can therefore install agents, enable log shipping, change alert thresholds and trigger remediations on a server their workspace role does not let them touch - org membership is not server access, which is exactly the distinction SitePolicy and ServerPolicy exist to make. run-command was the ninth and was fixed in T-008; that fix is the pattern for the rest. Verified by a full matrix over all 104 api/v1 routes: tenancy checks are present everywhere (no route is missing one), so this is specifically the policy layer.",
+  "location": [],
+  "phase": "access-control",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "high",
+  "status": "open",
+  "title": "Host-executing API routes check the token ability but never the user's authorization"
+}

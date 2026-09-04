@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesHostExecution;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\ErrorEvent;
@@ -31,6 +32,8 @@ use Illuminate\Http\Request;
 
 class SiteResourceApiController extends Controller
 {
+    use AuthorizesHostExecution;
+
     public function show(Request $request, Site $site): JsonResponse
     {
         $this->checkOwnership($request, $site);
@@ -205,7 +208,9 @@ class SiteResourceApiController extends Controller
     /** Re-dispatch the operation behind a failed error event, when its category is retryable. */
     public function retryError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
     {
-        $this->checkOwnership($request, $site);
+        // Runs work on the box, so the caller's own authorization is checked
+        // too, not just the token ability and org ownership.
+        $this->authorizeSiteExecution($request, $site);
 
         $error = $this->scopedErrors($site)->whereKey($event)->first();
 
@@ -225,7 +230,9 @@ class SiteResourceApiController extends Controller
     /** Queue the catalogued fix for an error (defaults to the recommended action). */
     public function remediateError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
     {
-        $this->checkOwnership($request, $site);
+        // Runs work on the box, so the caller's own authorization is checked
+        // too, not just the token ability and org ownership.
+        $this->authorizeSiteExecution($request, $site);
 
         $data = $request->validate(['action' => ['nullable', 'string', 'max:64']]);
         $error = $this->scopedErrors($site)->whereKey($event)->first();
@@ -685,7 +692,7 @@ class SiteResourceApiController extends Controller
      */
     public function artisanRun(Request $request, Site $site, string $run): JsonResponse
     {
-        $this->checkOwnership($request, $site);
+        $this->authorizeSiteRead($request, $site);
 
         $row = RemoteCliRun::query()
             ->where('site_id', $site->getKey())

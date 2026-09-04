@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesHostExecution;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Server;
@@ -24,6 +25,8 @@ use Illuminate\Support\Carbon;
  */
 class ServerMonitoringController extends Controller
 {
+    use AuthorizesHostExecution;
+
     /** Snapshot rows per request. A 1-minute agent cadence makes 1000 ≈ 17 hours. */
     private const DEFAULT_SNAPSHOT_LIMIT = 1000;
 
@@ -79,7 +82,10 @@ class ServerMonitoringController extends Controller
      */
     public function probe(Request $request, Server $server, ServerMonitoringProbeQueuer $queuer): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         if (! $this->opsReady($server)) {
             return response()->json([
@@ -102,7 +108,10 @@ class ServerMonitoringController extends Controller
      */
     public function install(Request $request, Server $server, ServerManageScriptQueuer $queuer): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         if (! $this->opsReady($server)) {
             return response()->json([
@@ -134,7 +143,10 @@ class ServerMonitoringController extends Controller
      */
     public function thresholds(Request $request, Server $server): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         $validated = $request->validate([
             'cpu' => ['required', 'numeric', 'min:1', 'max:99'],

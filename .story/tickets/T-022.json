@@ -1,0 +1,13 @@
+{
+  "blockedBy": [],
+  "completedDate": null,
+  "createdDate": "2026-09-04",
+  "description": "Remediation for ISS-009, from the T-011 matrix. Each route already verifies the token ability and organization membership; add the missing policy call so the user's own authorization is checked too, following the pattern established in T-008 ($request->user()?->cannot('update', $server) -> 403). Routes: log-shipping enable/resync/disable, metrics install/probe/thresholds, sites errors retry/remediate. Tests should cover a member of the right org whose workspace role does not permit the server, which is the case org-membership checks let through.",
+  "displayId": "T-022",
+  "id": "T-022",
+  "order": 40,
+  "phase": "access-control",
+  "status": "inprogress",
+  "title": "Add policy checks to the 8 host-executing API routes",
+  "type": "task"
+}

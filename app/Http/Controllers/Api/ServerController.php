@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesHostExecution;
 use App\Http\Controllers\Controller;
 use App\Jobs\RunServerCommandJob;
 use App\Models\ConsoleAction;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 
 class ServerController extends Controller
 {
+    use AuthorizesHostExecution;
+
     private const COMMAND_RUN_KIND = 'server:run-command';
 
     /**
@@ -173,11 +176,7 @@ class ServerController extends Controller
      */
     public function commandRun(Request $request, Server $server, string $action): JsonResponse
     {
-        $organization = $request->attributes->get('api_organization');
-
-        if ($server->organization_id !== $organization->id) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        $this->authorizeServerRead($request, $server);
 
         $row = ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
