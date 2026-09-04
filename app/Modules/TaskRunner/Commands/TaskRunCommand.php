@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\TaskRunner\Commands;
 
 use App\Modules\TaskRunner\AnonymousTask;
+use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Facades\TaskRunner;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\ParallelTaskExecutor;
 use App\Modules\TaskRunner\PendingTask;
 use App\Modules\TaskRunner\TaskChain;
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 
 class TaskRunCommand extends Command
 {
@@ -27,9 +29,17 @@ class TaskRunCommand extends Command
                             {--data=* : Data to pass to view (key=value format)}
                             {--follow : Follow task output in real-time}
                             {--format=table : Output format (table, json)}
+                            {--background : Queue the task and return immediately}
+                            {--dry-run : Report what would run, and run nothing}
+                            {--instance= : Record the instance this run belongs to}
+                            {--option=* : Extra task options (key=value, repeatable)}
+                            {--force : Run even when the stored task is already running}
+                            {--user= : System user to run the task as}
+                            {--wait : Wait for completion before returning (default for a foreground run)}
+                            {--show-output : Print the output when the task finishes}
                             {--no-output : Suppress output}';
 
-    protected $description = 'Run a task or command';
+    protected $description = 'Run a task by ID or name, or run a new command';
 
     public function handle(): int
     {
@@ -63,6 +73,22 @@ class TaskRunCommand extends Command
                 return 1;
             }
 
+            // A terminal or in-flight task is not re-run by accident: --force
+            // is what says "yes, run it again".
+            if (! $this->option('force')) {
+                if ($stored->status === TaskStatus::Running) {
+                    $this->error('Task is already running. Pass --force to run it again.');
+
+                    return 1;
+                }
+
+                if ($stored->status === TaskStatus::Finished) {
+                    $this->error('Task is already finished. Pass --force to run it again.');
+
+                    return 1;
+                }
+            }
+
             $this->info("Running task: {$stored->name}");
             $this->input->setOption('name', $this->option('name') ?: $stored->name);
 
@@ -72,12 +98,61 @@ class TaskRunCommand extends Command
         }
 
         if (! is_string($command) || trim($command) === '') {
-            $this->error('Provide a command to run, or --task=<id-or-name> to re-run a stored one.');
+            // Symfony's own phrasing: `cmd` is optional at the parser level
+            // now that --task exists, so this is the check that replaces it.
+            $this->error('Not enough arguments: provide a command, or --task=<id-or-name> to re-run a stored one.');
 
             return 1;
         }
 
         $name = $this->option('name') ?: $command;
+
+        // Reject bad input before anything is created or run: an empty --user
+        // or --instance would be recorded as a blank on the task, and a
+        // non-numeric timeout silently became "no timeout".
+        $rawTimeoutOption = $this->option('timeout');
+        if ($rawTimeoutOption !== null && (! is_numeric($rawTimeoutOption) || (int) $rawTimeoutOption <= 0)) {
+            $this->error('Timeout must be a positive integer');
+
+            return 1;
+        }
+
+        foreach (['user' => 'User', 'instance' => 'Instance'] as $option => $label) {
+            $value = $this->option($option);
+            if ($value !== null && trim((string) $value) === '') {
+                $this->error("{$label} cannot be empty");
+
+                return 1;
+            }
+        }
+
+        // Before anything is executed: a dry run reports and stops, and a
+        // backgrounded run hands off without waiting for output.
+        if ($this->option('dry-run')) {
+            $this->info('Dry run mode - task would be executed');
+            $this->line("Task: {$name}");
+            $this->line("Command: {$command}");
+
+            return 0;
+        }
+
+        if ($this->option('background')) {
+            $queued = Task::create([
+                'name' => $name,
+                'script' => $command,
+                'script_content' => $command,
+                'status' => TaskStatus::Pending,
+                'timeout' => is_numeric($this->option('timeout')) ? (int) $this->option('timeout') : null,
+                'instance' => $this->option('instance'),
+                'user' => $this->option('user'),
+                'options' => $this->parseOptionPairs(),
+            ]);
+
+            $this->info('Task queued for background execution');
+            $this->line("Task id: {$queued->id}");
+
+            return 0;
+        }
         $rawTimeout = $this->option('timeout');
         $timeout = is_string($rawTimeout) && $rawTimeout !== '' ? (int) $rawTimeout : null;
         $connection = $this->option('connection');
@@ -137,6 +212,26 @@ class TaskRunCommand extends Command
         } finally {
             $this->lastRunSeconds = microtime(true) - $startedAt;
         }
+    }
+
+    /**
+     * `--option key=value` pairs, same shape as the existing --data handling.
+     *
+     * @return array<string, string>
+     */
+    protected function parseOptionPairs(): array
+    {
+        $parsed = [];
+
+        foreach ((array) $this->option('option') as $pair) {
+            if (! is_string($pair) || ! str_contains($pair, '=')) {
+                throw new InvalidArgumentException('Invalid option format: '.(is_string($pair) ? $pair : get_debug_type($pair)));
+            }
+            [$key, $value] = explode('=', $pair, 2);
+            $parsed[trim($key)] = $value;
+        }
+
+        return $parsed;
     }
 
     protected function resolveStoredTask(string $identifier, bool &$ambiguous = false): ?Task

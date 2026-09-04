@@ -7,11 +7,12 @@
   "id": "ISS-013",
   "impact": "app/Modules/TaskRunner/Tests/ParallelTaskRunnerTest.php contains a single byte. It matches the suite's *Test.php pattern and is collected, but defines nothing - so parallel task running has a test file and no test. Either the tests were lost or the file is a leftover stub. Not deleted here: removing test files needs the owner's approval.",
   "location": [],
+  "order": 0,
   "phase": "test-debt",
   "relatedTickets": [],
   "resolution": null,
   "resolvedDate": null,
   "severity": "low",
-  "status": "open",
+  "status": "inprogress",
   "title": "ParallelTaskRunnerTest.php is a 1-byte empty file"
 }
