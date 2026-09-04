@@ -26,7 +26,7 @@ describe('TaskShowCommand', function () {
             'output' => 'Task completed successfully',
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Test Task')
@@ -42,7 +42,7 @@ describe('TaskShowCommand', function () {
             'started_at' => now()->subMinutes(3),
         ]);
 
-        $this->artisan('task:show', ['name' => 'Unique Task Name'])
+        $this->artisan('task:show', ['task' => 'Unique Task Name'])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Unique Task Name')
@@ -50,13 +50,13 @@ describe('TaskShowCommand', function () {
     });
 
     it('shows error when task not found by ID', function () {
-        $this->artisan('task:show', ['id' => 99999])
+        $this->artisan('task:show', ['task' => 99999])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task not found');
     });
 
     it('shows error when task not found by name', function () {
-        $this->artisan('task:show', ['name' => 'Non-existent Task'])
+        $this->artisan('task:show', ['task' => 'Non-existent Task'])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task not found');
     });
@@ -67,7 +67,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:show', ['name' => 'Duplicate Task Name'])
+        $this->artisan('task:show', ['task' => 'Duplicate Task Name'])
             ->assertExitCode(1)
             ->expectsOutputToContain('Multiple tasks found with name: Duplicate Task Name');
     });
@@ -87,7 +87,7 @@ describe('TaskShowCommand', function () {
             'instance' => 'test-instance',
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Complete Task')
@@ -117,7 +117,7 @@ describe('TaskShowCommand', function () {
             'instance' => null,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Null Values Task')
@@ -138,7 +138,7 @@ describe('TaskShowCommand', function () {
             'output' => 'Some output before error',
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Error Task')
@@ -158,7 +158,7 @@ describe('TaskShowCommand', function () {
             'timeout' => 300,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Timeout Task')
@@ -174,7 +174,7 @@ describe('TaskShowCommand', function () {
             'exit_code' => 130,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Cancelled Task')
@@ -189,7 +189,7 @@ describe('TaskShowCommand', function () {
             'exit_code' => 2,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Upload Failed Task')
@@ -204,7 +204,7 @@ describe('TaskShowCommand', function () {
             'exit_code' => 3,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Connection Failed Task')
@@ -220,7 +220,7 @@ describe('TaskShowCommand', function () {
             'started_at' => now()->subMinutes(5),
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Partial Progress Task')
@@ -236,7 +236,7 @@ describe('TaskShowCommand', function () {
             'output' => $longOutput,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Long Output Task')
@@ -251,7 +251,7 @@ describe('TaskShowCommand', function () {
             'output' => $specialOutput,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Special Output Task')
@@ -265,7 +265,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Task with Special Chars !@#$%^&*()');
@@ -277,7 +277,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Task with Unicode こんにちは世界');
@@ -290,7 +290,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain($longName);
@@ -302,7 +302,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details');
     });
@@ -313,7 +313,7 @@ describe('TaskShowCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details');
     });
@@ -325,7 +325,7 @@ describe('TaskShowCommand', function () {
             'output' => '',
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Empty Output Task')
@@ -339,7 +339,7 @@ describe('TaskShowCommand', function () {
             'output' => null,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Null Output Task')
@@ -353,7 +353,7 @@ describe('TaskShowCommand', function () {
             'error' => '',
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Empty Error Task')
@@ -367,7 +367,7 @@ describe('TaskShowCommand', function () {
             'error' => null,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Null Error Task')
@@ -381,7 +381,7 @@ describe('TaskShowCommand', function () {
             'progress' => 0,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Zero Progress Task')
@@ -395,7 +395,7 @@ describe('TaskShowCommand', function () {
             'timeout' => 0,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Zero Timeout Task')
@@ -409,7 +409,7 @@ describe('TaskShowCommand', function () {
             'exit_code' => -1,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Negative Exit Code Task')
@@ -423,7 +423,7 @@ describe('TaskShowCommand', function () {
             'exit_code' => 255,
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('High Exit Code Task')
@@ -437,7 +437,7 @@ describe('TaskShowCommand', function () {
             'started_at' => now()->addMinutes(5),
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Future Start Task')
@@ -452,7 +452,7 @@ describe('TaskShowCommand', function () {
             'completed_at' => now()->addMinutes(5),
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Future Completion Task')
@@ -467,7 +467,7 @@ describe('TaskShowCommand', function () {
             'completed_at' => now()->subYears(1)->addMinutes(5),
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Old Start Task')
@@ -482,7 +482,7 @@ describe('TaskShowCommand', function () {
             'completed_at' => now()->subYears(1)->addMinutes(5),
         ]);
 
-        $this->artisan('task:show', ['id' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Old Completion Task')
@@ -519,7 +519,7 @@ describe('TaskShowCommand', function () {
                 'status' => $status,
             ]);
 
-            $this->artisan('task:show', ['id' => $task->id])
+            $this->artisan('task:show', ['task' => $task->id])
                 ->assertExitCode(0)
                 ->expectsOutputToContain('Task Details')
                 ->expectsOutputToContain("Task with {$status->value} status");
@@ -536,7 +536,7 @@ describe('TaskShowCommand', function () {
                 'exit_code' => $exitCode,
             ]);
 
-            $this->artisan('task:show', ['id' => $task->id])
+            $this->artisan('task:show', ['task' => $task->id])
                 ->assertExitCode(0)
                 ->expectsOutputToContain('Task Details')
                 ->expectsOutputToContain("Task with exit code {$exitCode}")
@@ -554,7 +554,7 @@ describe('TaskShowCommand', function () {
                 'progress' => $progress,
             ]);
 
-            $this->artisan('task:show', ['id' => $task->id])
+            $this->artisan('task:show', ['task' => $task->id])
                 ->assertExitCode(0)
                 ->expectsOutputToContain('Task Details')
                 ->expectsOutputToContain("Task with {$progress}% progress")
@@ -572,7 +572,7 @@ describe('TaskShowCommand', function () {
                 'timeout' => $timeout,
             ]);
 
-            $this->artisan('task:show', ['id' => $task->id])
+            $this->artisan('task:show', ['task' => $task->id])
                 ->assertExitCode(0)
                 ->expectsOutputToContain('Task Details')
                 ->expectsOutputToContain("Task with {$timeout}s timeout")

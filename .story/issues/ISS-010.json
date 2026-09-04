@@ -4,14 +4,15 @@
   ],
   "createdBy": "claude-code/T-012",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-010",
   "id": "ISS-010",
   "impact": "55 failures with 'The \"id\" argument does not exist' plus 6 with '\"name\" argument does not exist', concentrated in TaskRunner Tests/Commands. The tests invoke artisan commands with arguments the command signatures no longer declare, so either the commands lost arguments the tests still pass or the tests were never updated. Determines whether this is a test-only fix or a CLI regression.",
   "location": [],
   "phase": "test-debt",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Answered and half fixed. No CLI regression: task:show has declared one {task} argument (resolved as id, then name) since the only commit that ever touched it, and task:run has only ever declared {cmd}. The tests were never valid against these commands rather than drifting away from them.\n\ntask:show was a plain argument-name mismatch - 36 invocations passing ['id'] or ['name'] where the signature declares {task}. Fixed; 11 of its 38 tests now pass and the rest fall into ISS-011 (schema drift on the error and progress columns) and ordinary output-assertion drift.\n\ntask:run is not the same problem and is split into ISS-014: its 39 tests describe a 're-run a stored task by id' command that does not exist, so renaming the arguments would leave them asserting behaviour the command does not have. That one needs a product decision, not a mechanical fix.\n\nTaskListCommandTest is 24 skipped rather than failing; TaskMakeCommandTest passes 13.",
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "TaskRunner tests: console command signatures drifted from the commands"
 }
