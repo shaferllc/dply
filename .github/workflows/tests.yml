@@ -83,3 +83,41 @@ jobs:
       - name: Run tests (dply-core)
         if: matrix.directory == 'packages/dply-core'
         run: vendor/bin/phpunit
+
+  cli:
+    name: dply-cli (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '22']
+
+    defaults:
+      run:
+        working-directory: packages/dply-cli
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Lowest supported version (package.json engines: >=18) plus current LTS:
+      # the CLI ships to whatever Node a user already has, so a syntax or API
+      # feature newer than 18 has to fail here rather than on their machine.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # The package has no dependencies today and therefore no lockfile, so a
+      # bare `npm ci` would fail the job. Install only once one exists.
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "No package-lock.json — nothing to install."
+          fi
+
+      - name: Run tests (dply-cli)
+        run: npm test
