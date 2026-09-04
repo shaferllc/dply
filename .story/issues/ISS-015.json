@@ -1,0 +1,17 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php"
+  ],
+  "createdBy": "claude-code/ISS-011",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-015",
+  "impact": "25 of TaskShowCommandTest's remaining failures assert strings like 'Exit Code: 0', 'Timeout: 300' and 'Progress: 45%'. TaskShowCommand::outputTable() renders those as a two-column Symfony table - '| Exit Code | 0 |' - so the colon form never appears, though every value the tests want IS displayed. The command is not broken and no field is missing; the assertions describe a line-oriented renderer this code does not use. Fix is a decision about assertion style: match the table (assert the label and the value separately, or assert on the JSON output the command already supports via --format=json, which is what a value-checking test should probably use). Not done blindly here because asserting only the label would keep the tests green while checking nothing.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "TaskShowCommandTest asserts a line-oriented output the command renders as a table"
+}

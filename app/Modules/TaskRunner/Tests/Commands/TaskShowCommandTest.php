@@ -80,11 +80,10 @@ describe('TaskShowCommand', function () {
             'started_at' => now()->subMinutes(10),
             'completed_at' => now()->subMinutes(5),
             'output' => "Line 1\nLine 2\nLine 3",
-            'error' => null,
-            'progress' => 100,
             'timeout' => 300,
             'user' => 'testuser',
             'instance' => 'test-instance',
+            'options' => ['error' => null, 'progress' => 100],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -110,11 +109,10 @@ describe('TaskShowCommand', function () {
             'started_at' => null,
             'completed_at' => null,
             'output' => null,
-            'error' => null,
-            'progress' => null,
             'timeout' => null,
             'user' => null,
             'instance' => null,
+            'options' => ['error' => null, 'progress' => null],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -134,8 +132,8 @@ describe('TaskShowCommand', function () {
             'name' => 'Error Task',
             'status' => TaskStatus::Failed,
             'exit_code' => 1,
-            'error' => 'Task failed with error message',
             'output' => 'Some output before error',
+            'options' => ['error' => 'Task failed with error message'],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -216,8 +214,8 @@ describe('TaskShowCommand', function () {
         $task = Task::factory()->create([
             'name' => 'Partial Progress Task',
             'status' => TaskStatus::Running,
-            'progress' => 45,
             'started_at' => now()->subMinutes(5),
+            'options' => ['progress' => 45],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -350,7 +348,7 @@ describe('TaskShowCommand', function () {
         $task = Task::factory()->create([
             'name' => 'Empty Error Task',
             'status' => TaskStatus::Failed,
-            'error' => '',
+            'options' => ['error' => ''],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -364,7 +362,7 @@ describe('TaskShowCommand', function () {
         $task = Task::factory()->create([
             'name' => 'Null Error Task',
             'status' => TaskStatus::Failed,
-            'error' => null,
+            'options' => ['error' => null],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -378,7 +376,7 @@ describe('TaskShowCommand', function () {
         $task = Task::factory()->create([
             'name' => 'Zero Progress Task',
             'status' => TaskStatus::Running,
-            'progress' => 0,
+            'options' => ['progress' => 0],
         ]);
 
         $this->artisan('task:show', ['task' => $task->id])
@@ -551,7 +549,7 @@ describe('TaskShowCommand', function () {
             $task = Task::factory()->create([
                 'name' => "Task with {$progress}% progress",
                 'status' => TaskStatus::Running,
-                'progress' => $progress,
+                'options' => ['progress' => $progress],
             ]);
 
             $this->artisan('task:show', ['task' => $task->id])

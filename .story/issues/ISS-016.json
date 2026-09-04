@@ -1,0 +1,17 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests/ConnectionManagerTest.php"
+  ],
+  "createdBy": "claude-code/ISS-011",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-016",
+  "impact": "8 failures from raw DB::table('servers')->insert([...]) writing 'host' and 'group', which the servers table does not define - it has ip_address, and no group column. The tests were written against the upstream task-runner package's generic servers table, not dply's (the module is near-vendored). ConnectionManager::createFromModel() already reads $attributes['host'] ?? $attributes['ip_address'], so the product tolerates both shapes and nothing is broken; only the fixtures are wrong. Fix is to build servers through Server::factory() rather than raw inserts, which also satisfies the NOT NULL columns (organization_id, user_id) those inserts omit.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "ConnectionManagerTest inserts a servers schema dply does not have"
+}

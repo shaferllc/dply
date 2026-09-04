@@ -5,14 +5,15 @@
   ],
   "createdBy": "claude-code/T-012",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-011",
   "id": "ISS-011",
   "impact": "About 25 failures are SQLSTATE undefined-column errors naming host, error and progress on TaskRunner tables, plus a not-null violation and a string-truncation. The tests write columns the current migrations do not define. Needs a decision per column: restore it, or update the tests to the schema that shipped.",
   "location": [],
   "phase": "test-debt",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Answered and partly fixed. The schema is right and the tests are wrong - no columns were lost. 'error' and 'progress' are ACCESSORS on Task reading from the options JSON column (getErrorAttribute/getProgressAttribute), never columns and never in $fillable; TaskShowCommandTest wrote them as top-level attributes. Fixed by folding them into 'options' across 8 create() calls. The 'host'/'group' failures are a different table entirely (servers, not task_runner_tasks) and a different cause - split to ISS-016. The residue of TaskShowCommandTest is assertion-style drift, split to ISS-015.",
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "TaskRunner tests assert against a schema the migrations no longer have"
 }
