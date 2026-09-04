@@ -72,6 +72,7 @@ return [
     'http_route_abilities' => [
         'servers.index' => 'servers.read',
         'servers.run_command' => 'commands.run',
+        'servers.command_run' => 'commands.run',
         'servers.metrics.show' => 'servers.read',
         // Probe/install queue SSH work and thresholds change alerting on a live
         // host, so all three sit behind commands.run — same call the

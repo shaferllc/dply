@@ -163,24 +163,92 @@ export async function serverRun(args, flags) {
     throw cliError('Usage: dply server run --server <id> <command…> · or --command "…"', 2);
   }
 
-  const response = await client.post(`/servers/${encodeURIComponent(serverId)}/run-command`, { command });
+  const base = `/servers/${encodeURIComponent(serverId)}/run-command`;
+  const noWait = flags['no-wait'] === true;
+  const pollOnly = String(flags.run || '').trim();
 
-  if (flags.json) {
-    printJson(response);
+  // `--run <id>` reads back a run left behind by --no-wait.
+  if (pollOnly) {
+    const existing = await client.get(
+      `/servers/${encodeURIComponent(serverId)}/commands/${encodeURIComponent(pollOnly)}`,
+    );
 
-    return;
+    return printServerCommandRun(existing, flags);
   }
 
-  if (response.output) {
-    process.stdout.write(String(response.output));
-    if (!String(response.output).endsWith('\n')) {
+  // The server runs the command in a job now, so a slow one comes back queued
+  // rather than truncated at the request timeout.
+  let run = await client.post(base, { command, ...(noWait ? { wait_seconds: 0 } : {}) });
+
+  if (!noWait && (run?.status === 'queued' || run?.status === 'running')) {
+    run = await waitForServerCommand(client, serverId, run.run_id, flags);
+  }
+
+  return printServerCommandRun(run, flags);
+}
+
+/**
+ * @param {Record<string, any>|undefined} run
+ * @param {Record<string, unknown>} flags
+ */
+function printServerCommandRun(run, flags) {
+  if (flags.json) {
+    printJson(run);
+
+    return run?.exit_code ? run.exit_code : 0;
+  }
+
+  if (run?.output) {
+    process.stdout.write(String(run.output));
+    if (!String(run.output).endsWith('\n')) {
       process.stdout.write('\n');
     }
   }
 
-  ok(response?.message ?? 'Command completed.');
+  if (run?.status === 'queued' || run?.status === 'running') {
+    info(c.dim(`Run ${run.run_id} is ${run.status} — read it later with \`dply server run --run ${run.run_id}\`.`));
 
-  return 0;
+    return 0;
+  }
+
+  if (run?.status === 'failed') {
+    warn(run.error ?? 'Command failed.');
+
+    return 1;
+  }
+
+  ok(run?.message ?? 'Command completed.');
+
+  return run?.exit_code ? run.exit_code : 0;
+}
+
+/**
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} serverId
+ * @param {string} runId
+ * @param {Record<string, unknown>} flags
+ */
+async function waitForServerCommand(client, serverId, runId, flags) {
+  const intervalMs = Number(flags.interval) > 0 ? Number(flags.interval) : 2000;
+  const timeoutMs = (Number(flags.timeout) > 0 ? Number(flags.timeout) : 900) * 1000;
+  const deadline = Date.now() + timeoutMs;
+  const path = `/servers/${encodeURIComponent(serverId)}/commands/${encodeURIComponent(runId)}`;
+
+  info(c.dim(`Queued as run ${runId} — waiting…`));
+
+  let run = { run_id: runId, status: 'queued' };
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    run = (await client.get(path)) ?? run;
+
+    if (run.status !== 'queued' && run.status !== 'running') {
+      return run;
+    }
+  }
+
+  warn(`Still running after ${timeoutMs / 1000}s — run ${runId} continues on the server.`);
+
+  return run;
 }
 
 /**
@@ -422,6 +490,7 @@ function printFirewallHelp() {
   info('  show [--server ID]              List rules, org templates, bundled keys');
   info('  apply [--server ID]             Push dply rules to the VM (UFW)');
   info('      [--ack-ssh-lockout]         Confirm SSH lockout risk when required');
+  info('  run <id> -- <command…>        Run a command (queued; --no-wait, --run <id>, --json)');
   info('  apply-bundled <key>             Merge a bundled starter ruleset');
   info('  apply-template <template-id>    Merge an org firewall template');
 
@@ -604,3 +673,5 @@ function cliError(message, code = 1) {
 
   return err;
 }
+
+export const __testing = { serverRun, printServerCommandRun, waitForServerCommand };

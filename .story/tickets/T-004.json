@@ -1,12 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "POST /sites/{site}/artisan and GET /sites/{site}/artisan/runs/{run} behind commands.run, running through RemoteCli\\Services\\Artisan so risk classification, the permission gate, run rows and audit events all apply. Strict verb validation (the engine interpolates the verb into the remote shell string unescaped), a 422 confirmation_required handshake for destructive commands, a secret-verb gate requiring site update for the env family, and a runtime guard for non-vm_ssh sites. CLI side: dply site artisan with wait-by-default polling, --no-wait, --run, --yes, and `--` end-of-flags support in the shared parser. Completed 2026-09-02.",
+  "displayId": "T-004",
   "id": "T-004",
   "order": 10,
   "phase": "cli-api-parity",
-  "status": "open",
+  "status": "complete",
   "title": "dply site artisan - site-scoped artisan over the RemoteCli engine",
   "type": "feature"
 }
