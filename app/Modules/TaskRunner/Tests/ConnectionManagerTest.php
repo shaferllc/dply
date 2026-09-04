@@ -7,10 +7,38 @@ use App\Modules\TaskRunner\ConnectionManager;
 use App\Modules\TaskRunner\Exceptions\ConnectionNotFoundException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
+
+/**
+ * `table:id` lookup is deliberately generic — any table with connection-shaped
+ * columns. These fixtures were written against the upstream package's `servers`
+ * schema (host, port, username, private_key, group, tags), which is NOT dply's
+ * servers table: that one has ip_address, ssh_user, ssh_port, and no group or
+ * tags at all. Pointing them at a purpose-built table tests the feature instead
+ * of colliding with an unrelated production table.
+ *
+ * Mapping FROM dply's own servers table is covered separately, at the bottom of
+ * this file.
+ */
+beforeEach(function () {
+    Schema::dropIfExists('task_runner_test_hosts');
+    Schema::create('task_runner_test_hosts', function (Blueprint $table) {
+        $table->integer('id')->primary();
+        $table->string('name')->nullable();
+        $table->string('host')->nullable();
+        $table->integer('port')->nullable();
+        $table->string('username')->nullable();
+        $table->text('private_key')->nullable();
+        $table->string('script_path')->nullable();
+        $table->string('group')->nullable();
+        $table->text('tags')->nullable();
+    });
+});
 
 uses(TestCase::class);
 
@@ -77,7 +105,7 @@ KEY;
     });
 
     it('creates a connection from database string (table:id)', function () use ($validArray) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             'id' => 1,
             'name' => 'dbserver1',
             'host' => 'dbhost.example.com',
@@ -86,20 +114,20 @@ KEY;
             'private_key' => $validArray['private_key'],
             'script_path' => '/home/dbuser/.dply-task-runner',
         ]);
-        $conn = $this->manager->createConnection('servers:1');
+        $conn = $this->manager->createConnection('task_runner_test_hosts:1');
         expect($conn)->toBeInstanceOf(Connection::class)
             ->and($conn->host)->toBe('dbhost.example.com');
     });
 
     it('throws ConnectionNotFoundException for missing database record', function () {
-        expect(fn () => $this->manager->createConnection('servers:999'))
+        expect(fn () => $this->manager->createConnection('task_runner_test_hosts:999'))
             ->toThrow(ConnectionNotFoundException::class);
     });
 
     it('creates a connection from Eloquent model', function () use ($validPrivateKey) {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
@@ -116,11 +144,11 @@ KEY;
     });
 
     it('creates connections from query', function () use ($validPrivateKey) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             ['id' => 2, 'name' => 'q1', 'host' => 'q1.example.com', 'port' => 22, 'username' => 'q1', 'private_key' => $validPrivateKey, 'script_path' => '/home/q1/.dply-task-runner'],
             ['id' => 3, 'name' => 'q2', 'host' => 'q2.example.com', 'port' => 22, 'username' => 'q2', 'private_key' => $validPrivateKey, 'script_path' => '/home/q2/.dply-task-runner'],
         ]);
-        $connections = $this->manager->createFromQuery('servers', ['port' => 22]);
+        $connections = $this->manager->createFromQuery('task_runner_test_hosts', ['port' => 22]);
         expect($connections)->toHaveCount(2)
             ->and($connections->first())->toBeInstanceOf(Connection::class);
     });
@@ -128,13 +156,13 @@ KEY;
     it('creates connections from model query', function () use ($validPrivateKey) {
         $modelClass = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
             protected $guarded = [];
         };
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             ['id' => 4, 'name' => 'mq1', 'host' => 'mq1.example.com', 'port' => 22, 'username' => 'mq1', 'private_key' => $validPrivateKey, 'script_path' => '/home/mq1/.dply-task-runner'],
         ]);
         $connections = $this->manager->createFromModelQuery(get_class($modelClass), ['port' => 22]);
@@ -143,19 +171,19 @@ KEY;
     });
 
     it('creates connections from group', function () use ($validPrivateKey) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             ['id' => 5, 'name' => 'g1', 'host' => 'group1.example.com', 'port' => 22, 'username' => 'g1', 'private_key' => $validPrivateKey, 'script_path' => '/home/g1/.dply-task-runner', 'group' => 'web'],
         ]);
-        $connections = $this->manager->createFromGroup('web');
+        $connections = $this->manager->createFromGroup('web', 'task_runner_test_hosts');
         expect($connections)->toHaveCount(1)
             ->and($connections->first())->toBeInstanceOf(Connection::class);
     });
 
     it('creates connections from tags', function () use ($validPrivateKey) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             ['id' => 6, 'name' => 'tag1', 'host' => 'tag1.example.com', 'port' => 22, 'username' => 'tag1', 'private_key' => $validPrivateKey, 'script_path' => '/home/tag1/.dply-task-runner', 'tags' => json_encode(['web', 'prod'])],
         ]);
-        $connections = $this->manager->createFromTags(['web']);
+        $connections = $this->manager->createFromTags(['web'], 'task_runner_test_hosts');
         expect($connections)->toHaveCount(1)
             ->and($connections->first())->toBeInstanceOf(Connection::class);
     });
@@ -511,7 +539,7 @@ KEY;
     it('creates a connection from model with extra fields', function () use ($validPrivateKey) {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
@@ -530,7 +558,7 @@ KEY;
     it('throws when model is missing required fields', function () {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
@@ -542,23 +570,23 @@ KEY;
     });
 
     it('throws when database record is missing required fields', function () {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             'id' => 100,
             'name' => 'missingfields',
             'host' => 'missingfieldsdb.example.com',
         ]);
-        expect(fn () => (new ConnectionManager)->createConnection('servers:100'))
+        expect(fn () => (new ConnectionManager)->createConnection('task_runner_test_hosts:100'))
             ->toThrow(InvalidArgumentException::class);
     });
 
     it('returns empty collection for group with no matches', function () {
-        $connections = (new ConnectionManager)->createFromGroup('nonexistentgroup');
+        $connections = (new ConnectionManager)->createFromGroup('nonexistentgroup', 'task_runner_test_hosts');
         expect($connections)->toBeInstanceOf(Collection::class)
             ->and($connections)->toBeEmpty();
     });
 
     it('returns empty collection for tags with no matches', function () {
-        $connections = (new ConnectionManager)->createFromTags(['notag']);
+        $connections = (new ConnectionManager)->createFromTags(['notag'], 'task_runner_test_hosts');
         expect($connections)->toBeInstanceOf(Collection::class)
             ->and($connections)->toBeEmpty();
     });
@@ -853,7 +881,7 @@ KEY;
     it('accepts Eloquent model with all fields', function () use ($validPrivateKey) {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
@@ -871,7 +899,7 @@ KEY;
     it('throws on Eloquent model with missing host', function () use ($validPrivateKey) {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 
@@ -884,7 +912,7 @@ KEY;
     });
 
     it('accepts DB record with all fields', function () use ($validPrivateKey) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             'id' => 200,
             'name' => 'dball',
             'host' => 'dball.example.com',
@@ -893,12 +921,12 @@ KEY;
             'private_key' => $validPrivateKey,
             'script_path' => '/home/dball/.dply-task-runner',
         ]);
-        $conn = (new ConnectionManager)->createConnection('servers:200');
+        $conn = (new ConnectionManager)->createConnection('task_runner_test_hosts:200');
         expect($conn->host)->toBe('dball.example.com');
     });
 
     it('throws on DB record with missing username', function () use ($validPrivateKey) {
-        DB::table('servers')->insert([
+        DB::table('task_runner_test_hosts')->insert([
             'id' => 201,
             'name' => 'dbmissinguser',
             'host' => 'dbmissinguser.example.com',
@@ -906,7 +934,7 @@ KEY;
             'private_key' => $validPrivateKey,
             'script_path' => '/home/dbmissinguser/.dply-task-runner',
         ]);
-        expect(fn () => (new ConnectionManager)->createConnection('servers:201'))
+        expect(fn () => (new ConnectionManager)->createConnection('task_runner_test_hosts:201'))
             ->toThrow(InvalidArgumentException::class);
     });
 
@@ -1086,7 +1114,7 @@ KEY;
     it('creates a connection from an Eloquent model instance', function () use ($validPrivateKey) {
         $model = new class extends Model
         {
-            protected $table = 'servers';
+            protected $table = 'task_runner_test_hosts';
 
             public $timestamps = false;
 

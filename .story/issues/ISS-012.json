@@ -4,14 +4,15 @@
   ],
   "createdBy": "claude-code/T-012",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-012",
   "id": "ISS-012",
   "impact": "10 failures with 'Call to undefined method PHPUnit\\Framework\\TestCase::skip()'. The files are class-based PHPUnit tests using Pest's skip helper. Mechanical: markTestSkipped() is the class-based equivalent.",
   "location": [],
   "phase": "test-debt",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed: 10 test()->skip() calls in AdvancedTaskExampleTest became $this->markTestSkipped(). Inside a body test() is the PHPUnit TestCase, which has no skip(), so the intended skips were being counted as failures. The declaration-level })->skip() used elsewhere is correct and untouched.",
+  "resolvedDate": "2026-09-04",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "TaskRunner tests call $this->skip(), which is Pest-only, from PHPUnit classes"
 }

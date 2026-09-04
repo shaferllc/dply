@@ -176,11 +176,29 @@ class Connection
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     public static function fromArray(array $config): Connection
     {
         try {
+            // These arrive from database rows, CSV and config files, so a wrong
+            // type is bad input rather than a bug in the caller's code. Every
+            // other rejection here is an InvalidArgumentException; leaking a
+            // TypeError from deeper down would make the contract inconsistent.
+            foreach (['host', 'username', 'private_key', 'private_key_path', 'script_path', 'proxy_jump'] as $stringField) {
+                $value = $config[$stringField] ?? null;
+                // private_key may be a callable — lazy key resolution is a
+                // supported shape, covered by its own test.
+                if ($stringField === 'private_key' && is_callable($value)) {
+                    continue;
+                }
+                if ($value !== null && ! is_string($value)) {
+                    throw new InvalidArgumentException(
+                        "Connection field [{$stringField}] must be a string, ".get_debug_type($value).' given.'
+                    );
+                }
+            }
+
             $username = $config['username'] ?? '';
 
             $scriptPath = $config['script_path'] ?? null;
