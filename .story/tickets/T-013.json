@@ -1,13 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "phpunit.xml records a segfault in AsHydratableTest alongside the App suite's failing files. A crash is a different root-cause class from assertion drift and blocks running the rest of the suite cleanly, so it is diagnosed on its own before the behavioural batches.",
   "displayId": "T-013",
   "id": "T-013",
   "order": 20,
   "phase": "test-debt",
-  "status": "inprogress",
+  "status": "complete",
   "title": "Diagnose the AsHydratableTest segfault",
   "type": "task"
 }
