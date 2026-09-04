@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Jobs\SwitchServerWebserverJob;
-use App\Jobs\SyncServerSystemdServicesJob;
-
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
-use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\EnvoyEdgeConfigBuilder;
 use App\Services\Servers\EnvoyStaticConfigOptions;
 use App\Services\Servers\HAProxyEdgeConfigBuilder;
@@ -23,6 +20,7 @@ use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use App\Services\SshConnection;
+use App\Support\Servers\AptSourceRepairScript;
 use App\Support\Servers\CaddyEdgeBackendLayout;
 use App\Support\Servers\CaddyRuntimeOwnership;
 use App\Support\Servers\EnvoyAdminScript;
@@ -494,7 +492,7 @@ BASH;
         // Verbatim copy of the script in SwitchServerWebserverJob. They
         // could share a trait but the duplication is small and keeps the
         // job files self-contained for now.
-        return <<<'BASH'
+        return AptSourceRepairScript::withTolerantApt(<<<'BASH'
 set -euo pipefail
 if command -v caddy >/dev/null 2>&1; then
   echo "[dply] caddy already installed; skipping."
@@ -506,7 +504,7 @@ else
 deb [signed-by=/usr/share/keyrings/caddy-stable.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
 deb-src [signed-by=/usr/share/keyrings/caddy-stable.gpg] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main
 SOURCES
-  apt-get update -y
+  dply_apt_update
   apt-get install -y --no-install-recommends caddy
   systemctl stop caddy 2>/dev/null || true
 fi
@@ -518,7 +516,7 @@ mkdir -p /var/lib/caddy /var/log/caddy
 chown -R caddy:caddy /var/lib/caddy /var/log/caddy
 chmod 0755 /var/log/caddy
 chmod 0750 /var/lib/caddy
-BASH;
+BASH);
     }
 
     private function traefikInstallScript(): string
@@ -533,12 +531,12 @@ BASH;
 
     private function aptInstallIdempotent(string $package): string
     {
-        return sprintf(
+        return AptSourceRepairScript::tolerantUpdateFunction()."\n".sprintf(
             'set -euo pipefail; '
             .'if command -v %1$s >/dev/null 2>&1; then '
             .'  echo "[dply] %1$s already installed; skipping."; '
             .'else '
-            .'  apt-get update -y && apt-get install -y --no-install-recommends %1$s; '
+            .'  dply_apt_update && apt-get install -y --no-install-recommends %1$s; '
             .'  systemctl stop %1$s 2>/dev/null || true; '
             .'fi; '
             .'command -v %1$s >/dev/null 2>&1 || { echo "[dply] %1$s binary not on PATH after install" >&2; exit 127; }',

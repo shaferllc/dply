@@ -20,24 +20,24 @@ final class DatabaseEngineInstallScripts
 
     public static function installScript(string $engine): string
     {
-        return match ($engine) {
+        return AptSourceRepairScript::withTolerantApt(match ($engine) {
             'mysql' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+dply_apt_update
 apt-get install -y mysql-server
 systemctl enable --now mysql
 mysql --version
 BASH,
             'mariadb' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+dply_apt_update
 apt-get install -y mariadb-server
 systemctl enable --now mariadb || systemctl enable --now mysql
 (mariadb --version || mysql --version) 2>/dev/null
 BASH,
             'postgres' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+dply_apt_update
 apt-get install -y postgresql
 systemctl enable --now postgresql
 psql --version
@@ -45,14 +45,14 @@ BASH,
             'mongodb' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
 set -e
-apt-get update -y
+dply_apt_update
 apt-get install -y gnupg curl ca-certificates
 if [ -f /etc/os-release ]; then
   . /etc/os-release
   if [ "${ID}" = "ubuntu" ] && [ -n "${VERSION_CODENAME}" ]; then
     curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
     echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
-    apt-get update -y
+    dply_apt_update
     apt-get install -y mongodb-org || true
   fi
 fi
@@ -63,11 +63,11 @@ BASH,
             'clickhouse' => <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
 set -e
-apt-get update -y
+dply_apt_update
 apt-get install -y apt-transport-https ca-certificates curl gnupg
 curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list
-apt-get update -y
+dply_apt_update
 printf '%s\n%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
 chmod +x /usr/sbin/policy-rc.d
 apt-get install -y clickhouse-server clickhouse-client
@@ -124,7 +124,7 @@ systemctl is-active --quiet clickhouse-server
 clickhouse-client --version 2>/dev/null | head -n1
 BASH,
             default => throw new \InvalidArgumentException("Unsupported database engine: {$engine}"),
-        };
+        });
     }
 
     public static function uninstallScript(string $engine): string
@@ -612,13 +612,13 @@ BASH;
     {
         return <<<'BASH'
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+dply_apt_update
 apt-get install -y gnupg curl ca-certificates lsb-release
 curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/timescaledb.gpg
 ARCH=$(dpkg --print-architecture)
 CODENAME=$(lsb_release -cs 2>/dev/null || echo jammy)
 echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg arch=${ARCH}] https://packagecloud.io/timescale/timescaledb/ubuntu/ ${CODENAME} main" > /etc/apt/sources.list.d/timescaledb.list
-apt-get update -y
+dply_apt_update
 BASH;
     }
 }

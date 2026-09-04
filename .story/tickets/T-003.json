@@ -1,13 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "The provision path now routes every apt-get update through dply_apt_update (retry, then prune of unverifiable sources). Day-two scripts do not: DatabaseEngineInstallScripts, CacheServiceInstallScripts, HttpCacheDaemonInstallScripts, SnapshotBakeScript, webserver installers, edge proxy jobs, metrics, site fixers and certbot helpers all call apt-get update bare. Produce a complete inventory grouped by failure semantics (day-two job vs diagnostics vs operator command), then file child tickets. Output is the inventory plus tickets, not a blanket refactor.",
   "displayId": "T-003",
   "id": "T-003",
   "order": 30,
   "phase": "provisioning-reliability",
-  "status": "inprogress",
+  "status": "complete",
   "title": "Inventory bare apt-get update calls outside the provision preamble",
   "type": "chore"
 }

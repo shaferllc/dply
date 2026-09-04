@@ -1,0 +1,18 @@
+{
+  "components": [
+    "tests/Unit/Support/Servers/EdgeProxyWorkspaceViewDataTest.php",
+    "app/Support/Servers/WebserverWorkspaceViewData.php"
+  ],
+  "createdBy": "claude-code/T-019",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-007",
+  "impact": "tests/Unit/Support/Servers/EdgeProxyWorkspaceViewDataTest.php:29 asserts previousWebserverKey() returns 'apache' for meta.webserver='apache'. WebserverWorkspaceViewData::webserverCatalog() now contains only 'nginx', so the fallback correctly returns 'nginx' and the test fails. The test dates from 2026-05-30; the class last changed 2026-07-26 (f39a92fd). Pre-existing and unrelated to the apt work - confirmed by inspection, not by a suite run. Worth deciding which side is stale: a catalog holding only nginx is itself surprising given caddy, openresty, traefik and envoy all ship install paths.",
+  "location": [],
+  "phase": "cli-api-parity",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "EdgeProxyWorkspaceViewDataTest expects apache, which left the webserver catalog"
+}

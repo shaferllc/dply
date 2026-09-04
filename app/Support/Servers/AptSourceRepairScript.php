@@ -76,6 +76,57 @@ BASH;
     }
 
     /**
+     * A self-contained `dply_apt_update` for scripts that run outside a
+     * provision run, where the preamble's copy does not exist.
+     *
+     * Same contract as the preamble's: retries, prunes a source that can never
+     * verify, and returns 0 REGARDLESS. Day-two scripts run under `set -e`, so a
+     * non-zero return here aborts the whole action for one unrelated broken
+     * repo — which is exactly the failure this exists to stop. The install that
+     * follows still fails loudly if the package is genuinely unavailable, so
+     * nothing is swallowed that matters.
+     */
+    public static function tolerantUpdateFunction(): string
+    {
+        $prune = self::pruneFunction();
+
+        return <<<BASH
+{$prune}
+
+dply_apt_update() {
+  local attempt log
+  for attempt in 1 2 3; do
+    log=\$(apt-get update -y 2>&1) || true
+    echo "\${log}"
+    if ! echo "\${log}" | grep -qE "^(E:|Err:)"; then
+      return 0
+    fi
+    if echo "\${log}" | grep -qE "Could not get lock|is held by process"; then
+      sleep 5
+      continue
+    fi
+    if dply_prune_unverifiable_apt_sources "\${log}"; then
+      continue
+    fi
+    break
+  done
+  echo "[dply] WARNING: apt-get update is failing; continuing — the install below will fail explicitly if the package is missing." >&2
+
+  return 0
+}
+BASH;
+    }
+
+    /**
+     * Prepend that helper to a script whose `apt-get update` calls have been
+     * rewritten to `dply_apt_update`.
+     */
+    public static function withTolerantApt(string $script): string
+    {
+        return self::tolerantUpdateFunction()."\n\n".$script;
+    }
+
+    /**
      * Standalone day-two script: detect, optionally repair, report. Self-contained
      * — it carries its own copy of the function because nothing outside a
      * provision run has the preamble loaded.
