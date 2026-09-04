@@ -70,12 +70,18 @@ final class EdgeProxyWorkspaceViewData
     {
         $meta = is_array($server->meta) ? $server->meta : [];
         $previous = strtolower(trim((string) ($meta['edge_proxy_previous_webserver'] ?? '')));
-        $catalog = WebserverWorkspaceViewData::webserverCatalog();
+        $fallback = strtolower(trim((string) ($meta['webserver'] ?? 'nginx')));
+
+        // …Including(), not the plain catalog: parking an engine hides it from
+        // the picker, and this reports what a server was ALREADY running. With
+        // the plain catalog a server whose previous webserver was parked came
+        // back as nginx — restoring the wrong engine, which is exactly the
+        // orphaning webserverCatalogIncluding() exists to prevent.
+        $catalog = WebserverWorkspaceViewData::webserverCatalogIncluding([$previous, $fallback]);
+
         if ($previous !== '' && isset($catalog[$previous])) {
             return $previous;
         }
-
-        $fallback = strtolower(trim((string) ($meta['webserver'] ?? 'nginx')));
 
         return isset($catalog[$fallback]) ? $fallback : 'nginx';
     }

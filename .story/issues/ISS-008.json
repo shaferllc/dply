@@ -5,14 +5,15 @@
   ],
   "createdBy": "claude-code/T-009",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-008",
   "id": "ISS-008",
   "impact": "The CLI catalog, the CLI's own `dply ls` index and its shell completion list all offered `dply guide` ('Short getting-started guide in the terminal'). Running it printed 'Unknown command: guide'. Found by the catalog/CLI parity check added in T-009, which is the class of drift that check exists for. The advertisements are removed rather than the command implemented, because nothing records what it was meant to print - onboarding copy already exists in `dply init` and `dply help`. Reopen with a spec if a terminal guide is still wanted.",
   "location": [],
   "phase": "cli-api-parity",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed when filed, in T-009: the guide row was removed from DplyCliCommandCatalog and from the CLI's dply ls index and completion list. The catalog parity test now fails on any command advertised but not dispatched, so it cannot recur silently.",
+  "resolvedDate": "2026-09-04",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "dply guide was advertised in three places and dispatched in none"
 }

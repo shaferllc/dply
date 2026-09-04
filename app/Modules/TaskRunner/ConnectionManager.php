@@ -245,7 +245,13 @@ class ConnectionManager
      *
      * @return Collection<int, Connection>
      */
-    public function createFromGroup(string $groupName, string $table = 'servers'): Collection
+    /**
+     * $table is required rather than defaulting to 'servers': this queries a
+     * `group` column, and dply's servers table has none — the default was
+     * inherited from the upstream package's schema and could only ever throw
+     * here. Name the table that actually has the column.
+     */
+    public function createFromGroup(string $groupName, string $table): Collection
     {
         return $this->createFromQuery($table, ['group' => $groupName]);
     }
@@ -256,7 +262,7 @@ class ConnectionManager
      * @param  list<string>  $tags
      * @return Collection<int, Connection>
      */
-    public function createFromTags(array $tags, string $table = 'servers'): Collection
+    public function createFromTags(array $tags, string $table): Collection
     {
         $query = DB::table($table);
 

@@ -5,14 +5,15 @@
   ],
   "createdBy": "claude-code/T-019",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-007",
   "id": "ISS-007",
   "impact": "tests/Unit/Support/Servers/EdgeProxyWorkspaceViewDataTest.php:29 asserts previousWebserverKey() returns 'apache' for meta.webserver='apache'. WebserverWorkspaceViewData::webserverCatalog() now contains only 'nginx', so the fallback correctly returns 'nginx' and the test fails. The test dates from 2026-05-30; the class last changed 2026-07-26 (f39a92fd). Pre-existing and unrelated to the apt work - confirmed by inspection, not by a suite run. Worth deciding which side is stale: a catalog holding only nginx is itself surprising given caddy, openresty, traefik and envoy all ship install paths.",
   "location": [],
   "phase": "cli-api-parity",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "The test was right and the code had regressed. previousWebserverKey() validated against webserverCatalog(), which drops PARKED engines, so a server whose previous webserver was apache/caddy/openresty came back as nginx - restoring the wrong engine. That is precisely the orphaning webserverCatalogIncluding() exists to prevent, and it is what the docblock on the plain catalog warns about. Switched to webserverCatalogIncluding([previous, fallback]). The catalog holding only nginx is intentional (parking), not a bug.",
+  "resolvedDate": "2026-09-04",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "EdgeProxyWorkspaceViewDataTest expects apache, which left the webserver catalog"
 }

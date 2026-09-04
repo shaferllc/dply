@@ -100,7 +100,7 @@ trait DispatchesTaskRunnerToServers
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function dispatchToGroup(Task $task, string $groupName, string $table = 'servers', array $options = []): array
+    public function dispatchToGroup(Task $task, string $groupName, string $table, array $options = []): array
     {
         $connectionManager = app(ConnectionManager::class);
         $connections = $connectionManager->createFromGroup($groupName, $table);
@@ -115,7 +115,7 @@ trait DispatchesTaskRunnerToServers
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
-    public function dispatchToTaggedServers(Task $task, array $tags, string $table = 'servers', array $options = []): array
+    public function dispatchToTaggedServers(Task $task, array $tags, string $table, array $options = []): array
     {
         $connectionManager = app(ConnectionManager::class);
         $connections = $connectionManager->createFromTags($tags, $table);

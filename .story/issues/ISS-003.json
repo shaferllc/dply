@@ -5,6 +5,7 @@
   ],
   "createdBy": "claude-code/story-setup",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-003",
   "id": "ISS-003",
   "impact": "The module-local suite is excluded from the default run and has rotted. Its 73 TaskRunner test files are the single largest available coverage gain, and none of them run today.",
   "location": [],
@@ -12,9 +13,9 @@
   "relatedTickets": [
     "T-012"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Superseded. The bulk failure this described is gone: 463 -> 215 across T-012, ISS-010, ISS-011, ISS-012 and ISS-016, and the cause was never product code - the vendored module's tests were written against a different implementation. What remains is catalogued specifically in ISS-014 (five unimplemented task:run flags), ISS-015 (assertion residue), plus ordinary drift; leaving this open would keep implying the original 463.",
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "TaskRunner module tests fail in bulk, blocking the largest coverage lever"
 }
