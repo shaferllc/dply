@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Admin;
 
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ComingSoonAllowedIp;
 use Illuminate\Contracts\View\View;

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
 use App\Models\User;

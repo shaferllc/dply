@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin\Users;
 
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;

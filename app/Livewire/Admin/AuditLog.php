@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Models\AuditLog as AuditLogModel;
 use App\Models\Organization;
 use Illuminate\Contracts\View\View;
