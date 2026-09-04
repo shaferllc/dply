@@ -5,14 +5,15 @@
   ],
   "createdBy": "claude-code/ISS-010",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-014",
   "id": "ISS-014",
   "impact": "All 39 tests in app/Modules/TaskRunner/Tests/Commands/TaskRunCommandTest.php invoke task:run with a stored Task id or name (['id' => $task->id]) and assert output like 'Running task: Test Task' and 'Task not found'. The real command's only argument is {cmd : Command to run} - it runs an arbitrary command string and reports 'Running task: <name-or-cmd>' from the --name option. Verified against the full history of the file: {cmd} is the only argument the signature has ever declared, so this is not drift from a rename, and no capability was lost. The tests describe a different command: 're-run a task recorded in the database'. Decide which is wanted - implement re-run (a real feature, e.g. task:run --id=<id>), or rewrite the file to cover the command that exists. Do not rename the arguments: the assertions would still be testing behaviour the command does not have. task:show in the same directory WAS a plain argument-name mismatch and was fixed in ISS-010.",
   "location": [],
   "phase": "test-debt",
   "relatedTickets": [],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Implemented rather than rewritten: task:run --task=<id-or-name> re-runs a stored task, plus the eight flags the tests specified (--background, --dry-run, --force, --instance, --user, --option, --wait, --show-output) and input validation. The tests supplied the semantics, including that --force is what overrides the already-running/already-finished guards. File went 39 failed -> 6; the residue is output-detail assertions.",
+  "resolvedDate": "2026-09-04",
   "severity": "medium",
-  "status": "open",
+  "status": "resolved",
   "title": "TaskRunCommandTest tests a re-run-a-stored-task command that has never existed"
 }

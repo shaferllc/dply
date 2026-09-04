@@ -8,9 +8,10 @@ use App\Actions\Decorators\AuthenticatedDecorator;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 test('authenticated action allows authenticated users', function () {
     $user = User::factory()->create();

@@ -1,0 +1,18 @@
+{
+  "components": [
+    "app/Actions/Tests/AsAuthenticatedTest.php",
+    "config/auth.php"
+  ],
+  "createdBy": "claude-code/T-014",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-018",
+  "impact": "app/Actions/Tests/AsAuthenticatedTest.php exits 2 with no output at all - no test names, no failure, no summary - so it takes the App suite's reporting down with it. The file calls Auth::guard('api')->login($user), and auth.guards.api is not defined in this application (php artisan config:show auth.guards.api errors). Resolving an undefined guard throws during the test body in a way Pest cannot report, which is why the run dies mute rather than failing. Decide whether the Actions framework's authenticated decorator is meant to support a named guard at all: if yes, define auth.guards.api and keep the test; if no, the test should exercise the default guard. Separately, the file created users through User::factory() with no RefreshDatabase - added in this commit, since without it those rows leak into the testing database.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "AsAuthenticatedTest kills the runner silently: it logs into an 'api' guard that does not exist"
+}
