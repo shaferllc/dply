@@ -153,7 +153,11 @@ export async function serverHealth(args, flags) {
 export async function serverRun(args, flags) {
   const client = await requireClient(flags);
   const serverId = await resolveServerId(client, flags, undefined);
-  const command = args.join(' ').trim() || String(flags.command || flags.c || '').trim();
+  // Tokens after a bare `--` are the remote command; the parser keeps them out
+  // of args so they cannot be confused with this CLI's own positionals.
+  const rest = Array.isArray(flags['--']) ? flags['--'].map(String) : [];
+  const command = (rest.length > 0 ? rest.join(' ') : args.join(' ')).trim()
+    || String(flags.command || flags.c || '').trim();
 
   if (!command) {
     throw cliError('Usage: dply server run --server <id> <command…> · or --command "…"', 2);

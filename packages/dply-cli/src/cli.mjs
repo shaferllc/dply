@@ -355,10 +355,12 @@ export function parse(tokens) {
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
-    // Everything after a bare `--` is a positional, so a remote command
-    // keeps its own flags: `dply site artisan -- migrate --force`.
+    // Everything after a bare `--` is the remote command, kept out of both
+    // args and flag parsing so it keeps its own flags AND stays distinguishable
+    // from this CLI's own positionals: `dply site artisan shop -- migrate --force`
+    // is a site plus a command, which is unrecoverable once the two are merged.
     if (token === '--') {
-      args.push(...tokens.slice(i + 1));
+      flags['--'] = tokens.slice(i + 1);
 
       break;
     }

@@ -455,7 +455,7 @@ function printSiteHelp() {
   info(`  ${'deployments'.padEnd(16)} ${c.dim('[site] — recent deploy runs')}`);
   info(`  ${'deployment'.padEnd(16)} ${c.dim('<id> [--site …] — one deploy + logs')}`);
   info(`  ${'env'.padEnd(16)} ${c.dim('[site] list | set KEY=val | rm KEY | push --file .env')}`);
-  info(`  ${'artisan'.padEnd(16)} ${c.dim('[--site …] -- migrate --force — php artisan on the site')}`);
+  info(`  ${'artisan'.padEnd(16)} ${c.dim('[site] -- migrate --force — php artisan on the site')}`);
   info('');
   info(c.dim('Flags: --sync · --follow/--wait · --interval ms · --idempotency-key · --site · --json'));
   info(c.dim('CI: `dply deploy --sync --wait` · dev: `dply deploy --follow` after `dply link --byo <id>`'));
@@ -477,7 +477,36 @@ function printSiteHelp() {
  * @param {Record<string, unknown>} flags
  */
 async function siteArtisan(args, flags) {
-  const { client, siteId } = await requireByoSiteContext(flags, undefined);
+  // With a `--`, anything before it is ours, so a positional site works the way
+  // it does for every other `site` subcommand. Without one, the whole tail is
+  // the command and the site has to come from --site or the link file.
+  const rest = remoteCommandTokens(flags);
+  const siteRef = rest.length > 0 ? args[0] : undefined;
+  const { client, siteId } = await requireByoSiteContext(flags, siteRef);
+
+  return runSiteArtisan(client, siteId, rest.length > 0 ? rest : args, flags);
+}
+
+/**
+ * Tokens the parser kept after a bare `--`.
+ *
+ * @param {Record<string, unknown>} flags
+ * @returns {string[]}
+ */
+function remoteCommandTokens(flags) {
+  return Array.isArray(flags['--']) ? flags['--'].map(String) : [];
+}
+
+/**
+ * The flow, with the resolved context passed in: everything below is HTTP plus
+ * decisions, so tests can drive it with a fake client instead of a network.
+ *
+ * @param {import('./api.mjs').ApiClient} client
+ * @param {string} siteId
+ * @param {string[]} args
+ * @param {Record<string, unknown>} flags
+ */
+async function runSiteArtisan(client, siteId, args, flags) {
   const base = `/sites/${encodeURIComponent(siteId)}/artisan`;
 
   // `--run <id>` just reads back a run left behind by --no-wait.
@@ -491,13 +520,13 @@ async function siteArtisan(args, flags) {
   const command = args.join(' ').trim() || String(flags.command || '').trim();
 
   if (!command) {
-    throw cliError('Usage: dply site artisan [--site <id>] -- migrate --force', 2);
+    throw cliError('Usage: dply site artisan [site] -- migrate --force', 2);
   }
 
-  // The site comes from --site, so a stray positional would land where the
-  // artisan verb belongs. Say that here rather than round-tripping for it.
+  // Catch a verb the API would reject anyway, before spending a round trip and
+  // a run row on it.
   if (!/^[A-Za-z][A-Za-z0-9:_.-]*$/.test(command.split(/\s+/)[0])) {
-    throw cliError(`"${command.split(/\s+/)[0]}" is not an artisan command. Pick the site with --site: dply site artisan --site <id> -- migrate`, 2);
+    throw cliError(`"${command.split(/\s+/)[0]}" is not an artisan command. Usage: dply site artisan [site] -- migrate --force`, 2);
   }
 
   const preConfirmed = flags.yes === true || flags.y === true;
@@ -509,6 +538,12 @@ async function siteArtisan(args, flags) {
     // Destructive commands need an explicit ack — the API cannot prompt, so
     // it hands the decision back here, same shape as the firewall lockout ack.
     if (err?.status === 422 && err?.body?.code === 'confirmation_required') {
+      // Already confirmed and still refused: that is the server disagreeing,
+      // not a missing acknowledgement. Re-prompting would tell the user to
+      // pass the flag they just passed.
+      if (preConfirmed) {
+        throw err;
+      }
       if (!(await confirmDestructive(command, err.body.risk))) {
         warn('Aborted.');
 
@@ -618,3 +653,5 @@ function cliError(message, exitCode = 1) {
 
   return err;
 }
+
+export const __testing = { siteArtisan, runSiteArtisan, remoteCommandTokens, printArtisanRun, waitForArtisanRun, confirmDestructive };
