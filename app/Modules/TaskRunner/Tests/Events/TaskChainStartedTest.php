@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Events\TaskChainStarted;
-use App\Modules\TaskRunner\TestTask;
+use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use Tests\TestCase;
 
 uses(TestCase::class);

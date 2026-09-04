@@ -1,0 +1,17 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests"
+  ],
+  "createdBy": "claude-code/T-012",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-012",
+  "impact": "10 failures with 'Call to undefined method PHPUnit\\Framework\\TestCase::skip()'. The files are class-based PHPUnit tests using Pest's skip helper. Mechanical: markTestSkipped() is the class-based equivalent.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "TaskRunner tests call $this->skip(), which is Pest-only, from PHPUnit classes"
+}

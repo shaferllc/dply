@@ -1,13 +1,13 @@
 {
   "blockedBy": [],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "Matrix complete, over all 104 /api/v1 routes (51 mutating). Columns checked: token ability (EnsureApiTokenAbility middleware), tenant ownership, policy authorization, and host execution. Method bodies were expanded one level into same-class private helpers, because most controllers keep the org check in a guard method - without that expansion 31 routes read as gaps and every one was a false positive.\n\nResult: tenancy is universal. Every mutating route verifies the caller's organization owns the resource; no route is missing one.\n\nThe gap was the policy layer on host-executing routes: 8 of 10 commands.run routes checked ability and org membership and then did work on the box without asking whether the caller may change that server (ISS-009 -> fixed in T-022). Filed and fixed rather than left as a report, since the fix was one call per route.\n\nNot gaps, recorded so a future audit does not re-flag them: auth/device/start and auth/device/poll carry no ability by design (they are how a token is obtained); sites.env.* correctly uses sites.write rather than commands.run, because writing an env file is not host execution.",
   "displayId": "T-011",
   "id": "T-011",
   "order": 20,
   "phase": "access-control",
-  "status": "inprogress",
+  "status": "complete",
   "title": "API v1 authorization matrix",
   "type": "task"
 }

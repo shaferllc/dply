@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Traits\HandlesMonitoring;
 use Illuminate\Support\Facades\Log;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('HandlesMonitoring Trait (Complex)', function () {
     beforeEach(function () {

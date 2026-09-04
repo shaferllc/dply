@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create TaskExecutionException with default constructor', function () {
     $exception = new TaskExecutionException;

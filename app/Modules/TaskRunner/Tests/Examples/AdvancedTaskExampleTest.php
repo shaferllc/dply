@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Tests\Examples\AdvancedTaskExample;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 // --- AdvancedTaskExample ---
 test('AdvancedTaskExample::runBackupChain', function () {

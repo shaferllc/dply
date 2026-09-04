@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Modules\TaskRunner\TestTask;
+use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use App\Modules\TaskRunner\View\TaskViewRenderer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\View;

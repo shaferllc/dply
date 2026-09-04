@@ -8,6 +8,9 @@ use App\Modules\TaskRunner\Services\RollbackService;
 use App\Modules\TaskRunner\Traits\HandlesRollback;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('HandlesRollback Trait (Complex)', function () {
     beforeEach(function () {

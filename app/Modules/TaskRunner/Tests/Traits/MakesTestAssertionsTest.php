@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Traits\MakesTestAssertions;
 use PHPUnit\Framework\AssertionFailedError;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('MakesTestAssertions Trait (Complex)', function () {
     beforeEach(function () {

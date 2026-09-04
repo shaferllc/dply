@@ -6,7 +6,11 @@ use App\Models\User;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Livewire\TaskMetricsDashboard;
 use App\Modules\TaskRunner\Models\Task;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();

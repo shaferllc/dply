@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\TaskValidationException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create TaskValidationException with default constructor', function () {
     $exception = new TaskValidationException;

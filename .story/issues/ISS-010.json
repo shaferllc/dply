@@ -1,0 +1,17 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests/Commands"
+  ],
+  "createdBy": "claude-code/T-012",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-010",
+  "impact": "55 failures with 'The \"id\" argument does not exist' plus 6 with '\"name\" argument does not exist', concentrated in TaskRunner Tests/Commands. The tests invoke artisan commands with arguments the command signatures no longer declare, so either the commands lost arguments the tests still pass or the tests were never updated. Determines whether this is a test-only fix or a CLI regression.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "TaskRunner tests: console command signatures drifted from the commands"
+}

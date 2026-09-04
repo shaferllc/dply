@@ -1,0 +1,18 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests",
+    "app/Modules/TaskRunner/database"
+  ],
+  "createdBy": "claude-code/T-012",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-011",
+  "impact": "About 25 failures are SQLSTATE undefined-column errors naming host, error and progress on TaskRunner tables, plus a not-null violation and a string-truncation. The tests write columns the current migrations do not define. Needs a decision per column: restore it, or update the tests to the schema that shipped.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "TaskRunner tests assert against a schema the migrations no longer have"
+}

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\CouldNotUploadFileException;
 use App\Modules\TaskRunner\ProcessOutput;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create CouldNotUploadFileException with default constructor', function () {
     $output = ProcessOutput::make('test output')->setExitCode(1);
