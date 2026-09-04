@@ -2,14 +2,14 @@
   "blockedBy": [
     "T-004"
   ],
-  "completedDate": null,
+  "completedDate": "2026-09-04",
   "createdDate": "2026-09-04",
   "description": "The command, its confirmation handshake, the secret-verb gate and the queued-run polling model are undocumented. Add them to the CLI docs alongside server run, and note which artisan verbs are classified destructive and which require site write access.",
   "displayId": "T-010",
   "id": "T-010",
   "order": 60,
   "phase": "cli-api-parity",
-  "status": "inprogress",
+  "status": "complete",
   "title": "Document dply site artisan in docs/ and the CLI README",
   "type": "chore"
 }

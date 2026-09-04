@@ -1,0 +1,202 @@
+{
+  "commands": [
+    {
+      "id": "account",
+      "aliases": [],
+      "subcommands": [
+        "show",
+        "orgs",
+        "projects",
+        "sessions",
+        "refresh",
+        "revoke",
+        "logout",
+        "help"
+      ]
+    },
+    {
+      "id": "auth",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "billing",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "deploy",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "edge",
+      "aliases": [],
+      "subcommands": [
+        "deploy",
+        "deployments",
+        "status",
+        "lint",
+        "open",
+        "rollback",
+        "promote",
+        "previews",
+        "domains",
+        "aliases",
+        "purge",
+        "usage",
+        "logs",
+        "env",
+        "help"
+      ]
+    },
+    {
+      "id": "errors",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "help",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "init",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "link",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "login",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "logout",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "ls",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "menu",
+      "aliases": [
+        "m"
+      ],
+      "subcommands": []
+    },
+    {
+      "id": "monitor",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "notifications",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "notify",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "project",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "refresh",
+      "aliases": [
+        "r"
+      ],
+      "subcommands": []
+    },
+    {
+      "id": "server",
+      "aliases": [],
+      "subcommands": [
+        "list",
+        "show",
+        "health",
+        "run",
+        "firewall",
+        "shared-host",
+        "system-users",
+        "help"
+      ]
+    },
+    {
+      "id": "shell",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "site",
+      "aliases": [],
+      "subcommands": [
+        "list",
+        "ls",
+        "show",
+        "deploy",
+        "status",
+        "logs",
+        "deployments",
+        "deploys",
+        "deployment",
+        "env",
+        "artisan",
+        "help"
+      ]
+    },
+    {
+      "id": "sites",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "update",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "uptime",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "use",
+      "aliases": [],
+      "subcommands": []
+    },
+    {
+      "id": "whoami",
+      "aliases": [
+        "me",
+        "who"
+      ],
+      "subcommands": []
+    }
+  ],
+  "shortcuts": [
+    "bill",
+    "billing",
+    "create",
+    "new",
+    "orgs",
+    "p",
+    "projects",
+    "projs",
+    "server",
+    "servers",
+    "site",
+    "sv"
+  ]
+}

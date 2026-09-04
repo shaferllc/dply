@@ -3,10 +3,11 @@
   "completedDate": null,
   "createdDate": "2026-09-04",
   "description": "DplyCliCommandCatalog lists commands by hand, so nothing fails when packages/dply-cli gains a command or when the catalog advertises one that does not exist - both happened. A direct comparison is underspecified: the catalog holds examples, aliases and multiple rows per handler, while the CLI dispatches through nested switches. Define canonical command IDs and alias rules first, ideally exported as a machine-readable CLI manifest, then test both directions: every advertised command resolves, every public command is advertised or explicitly exempt.",
+  "displayId": "T-009",
   "id": "T-009",
   "order": 50,
   "phase": "cli-api-parity",
-  "status": "open",
+  "status": "inprogress",
   "title": "Canonical CLI command IDs, then a two-way catalog parity check",
   "type": "chore"
 }

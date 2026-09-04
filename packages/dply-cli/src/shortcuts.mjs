@@ -55,7 +55,7 @@ const SITE_SUBCOMMANDS = new Set([
 ]);
 
 /** Single-token shortcuts → argv prefix (rest appended when present). */
-const SINGLE_TOKEN = {
+export const SINGLE_TOKEN_SHORTCUTS = {
   r: ['refresh'],
   refresh: ['refresh'],
   projects: ['project', 'list'],
@@ -131,8 +131,8 @@ export function expandArgv(argv) {
 
   const key = first.toLowerCase();
 
-  if (rest.length === 0 && SINGLE_TOKEN[key]) {
-    return [...SINGLE_TOKEN[key]];
+  if (rest.length === 0 && SINGLE_TOKEN_SHORTCUTS[key]) {
+    return [...SINGLE_TOKEN_SHORTCUTS[key]];
   }
 
   if (key === 'billing' && rest.length > 0) {

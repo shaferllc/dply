@@ -15,7 +15,7 @@ import { readSiteLink } from './config.mjs';
 import { linkedSiteProduct } from './site-context.mjs';
 import { c, info } from './print.mjs';
 
-const TOP_LEVEL = {
+export const TOP_LEVEL = {
   login: { handler: commands.login, summary: 'Browser login, then drop into interactive shell.' },
   refresh: { handler: commands.refreshAuth, summary: 'Re-approve CLI scopes for more permissions (device flow).' },
   auth: { handler: runAuth, summary: 'CLI authentication (refresh scopes).' },
@@ -41,7 +41,7 @@ const TOP_LEVEL = {
   update: { handler: updateCommands.updateCommand, summary: 'Install the CLI build your instance is serving (--check).' },
 };
 
-const EDGE_COMMANDS = {
+export const EDGE_COMMANDS = {
   deploy: { handler: commands.deploy, summary: 'Queue a deploy (--commit / --branch / --prod).' },
   deployments: { handler: commands.deployments, summary: 'List recent deployments.' },
   status: { handler: commands.edgeStatus, summary: 'Edge site + latest deployment (--wait to block).' },
@@ -58,7 +58,7 @@ const EDGE_COMMANDS = {
   env: { handler: commands.env, summary: 'list | set KEY=val | rm KEY | push --file .env | pull' },
 };
 
-const SERVER_COMMANDS = {
+export const SERVER_COMMANDS = {
   list: { handler: serverCommands.serverList, summary: 'List servers in your organization.' },
   show: { handler: serverCommands.serverShow, summary: 'Show one server and its BYO sites.' },
   health: { handler: serverCommands.serverHealth, summary: 'Server status + open insight findings.' },
@@ -68,7 +68,7 @@ const SERVER_COMMANDS = {
   'system-users': { handler: serverCommands.serverSystemUsers, summary: 'list | sync | add | update | remove' },
 };
 
-const ACCOUNT_SUBCOMMANDS = ['show', 'orgs', 'projects', 'sessions', 'refresh', 'revoke', 'logout', 'help'];
+export const ACCOUNT_SUBCOMMANDS = ['show', 'orgs', 'projects', 'sessions', 'refresh', 'revoke', 'logout', 'help'];
 
 /**
  * @param {string[]} argv
@@ -483,7 +483,6 @@ export function allCommandLines() {
     'whoami',
     'ls',
     'help',
-    'guide',
     'update',
     'init',
     'use',
@@ -584,7 +583,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge');
   }
 
   if (!normalized || normalized === 'account') {
