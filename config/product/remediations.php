@@ -6,6 +6,7 @@ use App\Modules\Remediations\Services\Actions\InstallPhpExtensionAction;
 use App\Modules\Remediations\Services\Actions\RebuildWebserverConfigAction;
 use App\Modules\Remediations\Services\Actions\UpgradePhpAction;
 use App\Services\Servers\PhpRedisExtensionScripts;
+use App\Support\Servers\AptSourceRepairScript;
 
 /*
 |--------------------------------------------------------------------------
@@ -302,6 +303,34 @@ BASH,
                 'recommended' => true,
                 'auto_safe' => true,
                 'handler' => RebuildWebserverConfigAction::class,
+            ],
+        ],
+    ],
+
+    // A third-party apt repo whose signing key expired or was never trusted.
+    // apt fails the WHOLE update for one bad source, so a single stale repo
+    // (repo.mysql.com's expired 2023 key was the real case) breaks every
+    // package operation on the box afterwards — including steps that only ever
+    // wanted an unrelated package.
+    'apt_source_unverifiable' => [
+        'signature' => '/EXPKEYSIG|KEYEXPIRED|NO_PUBKEY|The following signatures were invalid|is not signed/i',
+        'title' => 'An apt repository on this server can no longer be verified',
+        'explanation' => 'A repository’s signing key has expired, been revoked, or was never installed, so apt refuses the whole update and every later package operation fails with it. Removing the unusable source restores apt; anything that repo provided falls back to the distro package. The distro’s own mirrors are never removed — if one of those fails to verify, that needs a human.',
+        'actions' => [
+            [
+                'key' => 'apt_repair_dry_run',
+                'label' => 'Show which sources would be removed',
+                'auto_safe' => false,
+                'script' => AptSourceRepairScript::repairScript(true),
+            ],
+            [
+                'key' => 'apt_repair',
+                'label' => 'Remove the unverifiable sources and re-run apt update',
+                'recommended' => true,
+                // Deletes a file, so it stays operator-invoked even though the
+                // distro-mirror guard makes it safe.
+                'auto_safe' => false,
+                'script' => AptSourceRepairScript::repairScript(false),
             ],
         ],
     ],

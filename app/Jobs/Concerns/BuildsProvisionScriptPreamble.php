@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Concerns;
 
 use App\Models\ServerProvisionRun;
+use App\Support\Servers\AptSourceRepairScript;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -16,6 +17,9 @@ trait BuildsProvisionScriptPreamble
     private function provisionScriptPreamble(string $taskId, ServerProvisionRun $run): string
     {
         $runId = (string) $run->id;
+        // One implementation of the prune policy, shared with the day-two
+        // repair script; see AptSourceRepairScript.
+        $pruneFunction = AptSourceRepairScript::pruneFunction();
 
         return <<<BASH
 #!/bin/bash
@@ -317,6 +321,104 @@ dply_repair_dpkg_state() {
 # that. Retries on lock contention and on E:/Err: output, then returns success
 # regardless so the following install step (which has its own retry and fails
 # hard on genuinely-missing packages) decides the real outcome.
+# Decide whether a dearmored keyring is fit to sign an apt repo, from gpg's
+# colon records on stdin. Split from the fetch so the logic is testable without
+# generating real keys: feed it `gpg --show-keys --with-colons` output.
+#
+# Usable = at least one signing-capable key that is neither expired, revoked,
+# invalid nor disabled. Colon format: field 2 validity, 7 expiry epoch (empty or
+# 0 = never), 12 capabilities. Both pub and sub records count, because plenty of
+# vendor keys sign with a subkey.
+#
+# With fingerprints passed as arguments, at least one fpr record must also match
+# (case-insensitive, spaces stripped). With none, no pin is enforced -- see
+# config/servers/provision.php for why that is the default.
+dply_gpg_records_usable() {
+  local records rec validity expiry caps fpr usable=0 want_fpr=0 fpr_ok=0 want
+  records=\$(cat)
+  [ -n "\${records}" ] || return 1
+  [ "\$#" -gt 0 ] && want_fpr=1
+
+  while IFS= read -r rec; do
+    case "\${rec}" in
+      pub:*|sub:*)
+        validity=\$(printf '%s' "\${rec}" | cut -d: -f2)
+        expiry=\$(printf '%s' "\${rec}" | cut -d: -f7)
+        caps=\$(printf '%s' "\${rec}" | cut -d: -f12)
+        case "\${validity}" in e|r|i|d) continue ;; esac
+        case "\${caps}" in *s*|*S*) ;; *) continue ;; esac
+        # A non-numeric expiry is unreadable, not "never" -- skip the key
+        # rather than round an unparseable value up to valid.
+        if [ -n "\${expiry}" ] && [ "\${expiry}" != "0" ]; then
+          case "\${expiry}" in
+            ''|*[!0-9]*) continue ;;
+            *) [ "\${expiry}" -le "\$(date +%s)" ] && continue ;;
+          esac
+        fi
+        usable=1
+        ;;
+      fpr:*)
+        if [ "\${want_fpr}" = "1" ]; then
+          fpr=\$(printf '%s' "\${rec}" | cut -d: -f10 | tr -d ' ' | tr 'A-Z' 'a-z')
+          for want in "\$@"; do
+            want=\$(printf '%s' "\${want}" | tr -d ' ' | tr 'A-Z' 'a-z')
+            if [ -n "\${fpr}" ] && [ "\${fpr}" = "\${want}" ]; then
+              fpr_ok=1
+            fi
+          done
+        fi
+        ;;
+    esac
+  done <<EOF
+\${records}
+EOF
+
+  [ "\${usable}" = "1" ] || return 1
+  if [ "\${want_fpr}" = "1" ] && [ "\${fpr_ok}" != "1" ]; then
+    return 1
+  fi
+
+  return 0
+}
+
+# Fetch an armored key into a dearmored keyring and keep it ONLY if it is fit to
+# sign (see above). Writes the keyring beside its destination and renames it, so
+# a half-written or rejected key is never visible to apt: an unusable key that
+# lands anyway is the failure this whole path exists to prevent.
+#
+#   dply_install_apt_key <url> <dest-keyring> [expected-fingerprint...]
+dply_install_apt_key() {
+  local url=\$1 dest=\$2
+  shift 2
+  local tmp="\${dest}.dply-tmp"
+
+  install -d "\$(dirname "\${dest}")"
+  rm -f "\${tmp}"
+
+  if ! curl -fsSL "\${url}" | gpg --batch --yes --no-tty --dearmor -o "\${tmp}" 2>/dev/null; then
+    echo "[dply] key fetch failed: \${url}" >&2
+    rm -f "\${tmp}"
+    return 1
+  fi
+
+  if ! gpg --show-keys --with-colons "\${tmp}" >/dev/null 2>&1; then
+    echo "[dply] could not read the key at \${url} (gpg --show-keys failed) — treating it as unusable." >&2
+    rm -f "\${tmp}"
+    return 1
+  fi
+
+  if ! gpg --show-keys --with-colons "\${tmp}" 2>/dev/null | dply_gpg_records_usable "\$@"; then
+    echo "[dply] key at \${url} is expired, revoked, non-signing, or does not match the pinned fingerprint." >&2
+    rm -f "\${tmp}"
+    return 1
+  fi
+
+  chmod 0644 "\${tmp}"
+  mv -f "\${tmp}" "\${dest}"
+
+  return 0
+}
+
 # Drop a third-party apt source whose signature cannot be verified. An expired
 # or revoked signing key never heals on retry: from then on EVERY apt-get
 # update on the box exits non-zero, which under `set -e` kills whatever step
@@ -330,41 +432,7 @@ dply_repair_dpkg_state() {
 #     failure, not a box that silently installs from nowhere.
 #
 # \${DPLY_APT_ROOT} is a test seam; empty in production, so paths are /etc/apt.
-dply_prune_unverifiable_apt_sources() {
-  local log=\$1 dir="\${DPLY_APT_ROOT:-}/etc/apt/sources.list.d" pruned=0
-  local origin file base
-
-  [ -d "\${dir}" ] || return 1
-
-  for origin in \$(echo "\${log}" \\
-    | grep -E "EXPKEYSIG|KEYEXPIRED|NO_PUBKEY|is not signed|signatures were invalid" \\
-    | grep -oE "https?://[^ '\\"]+" \\
-    | sed -E 's#(https?://[^/]+).*#\\1#' \\
-    | sort -u); do
-    case "\${origin}" in
-      *archive.ubuntu.com*|*security.ubuntu.com*|*ports.ubuntu.com*|*mirrors.digitalocean.com*)
-        echo "[dply] WARNING: the distro mirror \${origin} failed signature verification — leaving it in place; this needs a human." >&2
-        continue
-        ;;
-    esac
-
-    while IFS= read -r file; do
-      [ -n "\${file}" ] || continue
-      base=\$(basename "\${file}")
-      # `[ … ] && continue` would be a failing AND-list under `set -e`.
-      if [ "\${base}" = "ubuntu.sources" ]; then
-        continue
-      fi
-      echo "[dply] WARNING: \${origin} cannot be verified (expired or missing signing key) — removing \${file} so it stops breaking apt." >&2
-      rm -f "\${file}"
-      pruned=1
-    done <<EOF
-\$(grep -rlF "\${origin}" "\${dir}" 2>/dev/null)
-EOF
-  done
-
-  [ "\${pruned}" = "1" ]
-}
+{$pruneFunction}
 
 # Callers that need to know whether the update actually worked read
 # \${DPLY_APT_UPDATE_STATUS} afterwards: 0 = clean, 1 = still erroring. The

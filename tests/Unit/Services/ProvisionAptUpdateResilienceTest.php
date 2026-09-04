@@ -74,3 +74,43 @@ test('the generated provision script is valid bash', function () {
 
     expect($exitCode)->toBe(0, implode("\n", $output));
 });
+
+test('the mysql key is verified on the box before the repo is added', function () {
+    $joined = mysqlProvisionScript();
+
+    // The old script piped curl straight into the keyring: an expired key was
+    // installed and trusted, and the repo it signed broke apt from then on.
+    expect($joined)
+        ->toContain('dply_install_apt_key')
+        ->toContain('DPLY_MYSQL_KEY_OK')
+        ->not->toContain('curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg');
+});
+
+test('a refused key leaves behind neither a keyring nor a source', function () {
+    expect(mysqlProvisionScript())
+        ->toContain('no usable MySQL signing key')
+        ->toContain('rm -f /usr/share/keyrings/dply-mysql.gpg /etc/apt/sources.list.d/dply-mysql.list');
+});
+
+test('every configured key url is tried, newest first', function () {
+    config(['server_provision.mysql_repo_key_urls' => [
+        'https://example.test/KEY-A',
+        'https://example.test/KEY-B',
+    ]]);
+
+    expect(mysqlProvisionScript())
+        ->toContain("'https://example.test/KEY-A' 'https://example.test/KEY-B'");
+});
+
+test('a configured fingerprint is passed through to the key check', function () {
+    config(['server_provision.mysql_repo_key_fingerprints' => ['DEADBEEF']]);
+
+    expect(mysqlProvisionScript())->toContain("/usr/share/keyrings/dply-mysql.gpg 'DEADBEEF'");
+});
+
+test('with no key urls configured the repo is not attempted at all', function () {
+    config(['server_provision.mysql_repo_key_urls' => []]);
+
+    // No verifiable key means no repo; the distro package is the honest result.
+    expect(mysqlProvisionScript())->not->toContain('sources.list.d/dply-mysql.list');
+});

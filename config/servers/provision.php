@@ -13,6 +13,28 @@ return [
     | recent Debian/Ubuntu images from cloud providers).
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | MySQL apt repo signing keys
+    |--------------------------------------------------------------------------
+    | Tried in order when provisioning pins a MySQL series the distro does not
+    | ship. Each is fetched on the box, checked for expiry/revocation, and only
+    | then installed — MySQL's 2023 key expired and silently downgraded every
+    | 8.4 pin to the distro 8.0 package, so a single hardcoded URL is exactly
+    | the failure mode to avoid. Newest first; keep older ones as fallbacks.
+    |
+    | Fingerprints are an optional pin. Empty means "trust whatever the URL
+    | serves, as long as it verifies" — set them once you have confirmed the
+    | fingerprint from MySQL's own documentation, since a wrong value here
+    | blocks the repo entirely and falls the box back to the distro package.
+    */
+    'mysql_repo_key_urls' => [
+        'https://repo.mysql.com/RPM-GPG-KEY-mysql-2025',
+        'https://repo.mysql.com/RPM-GPG-KEY-mysql-2023',
+    ],
+
+    'mysql_repo_key_fingerprints' => [],
+
     'remote_script_path' => '/tmp/dply-provision.sh',
 
     'remote_script_timeout_seconds' => 3600,

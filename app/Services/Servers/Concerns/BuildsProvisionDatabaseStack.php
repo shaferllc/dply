@@ -376,6 +376,22 @@ trait BuildsProvisionDatabaseStack
 
         $series = $wizardDatabase === 'mysql84' ? '8.4' : '8.0';
 
+        $keyUrls = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mysql_repo_key_urls', [])))),
+        ));
+        $fingerprints = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mysql_repo_key_fingerprints', [])))),
+        ));
+
+        // No configured key means no verifiable repo; the distro package is the
+        // only honest outcome, and the caller already warns when the requested
+        // series is not what installs.
+        if ($keyUrls === '') {
+            return [];
+        }
+
         return [
             // debconf preseed: the community package prompts for a root
             // password and an auth-plugin choice that the distro package
@@ -391,7 +407,18 @@ trait BuildsProvisionDatabaseStack
             'if [ "$DPLY_MYSQL_PIN" = "1" ]; then '
                 .'echo "[dply] distro mysql-server is ${DPLY_MYSQL_CANDIDATE:-unavailable}; adding MySQL apt repo for '.$series.' ('.$component.')."; '
                 .'install -d /usr/share/keyrings; '
-                .'if curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2023 | gpg --batch --yes --dearmor -o /usr/share/keyrings/dply-mysql.gpg; then '
+                // Every candidate key is verified on the box before it is
+                // installed. The 2023 key expired, which apt reports as
+                // EXPKEYSIG and which silently downgraded every 8.4 pin to the
+                // distro package, so a hardcoded single URL is the bug.
+                .'DPLY_MYSQL_KEY_OK=0; '
+                .'for DPLY_MYSQL_KEY_URL in '.$keyUrls.'; do '
+                    .'if dply_install_apt_key "$DPLY_MYSQL_KEY_URL" /usr/share/keyrings/dply-mysql.gpg '.$fingerprints.'; then '
+                        .'echo "[dply] MySQL signing key accepted from ${DPLY_MYSQL_KEY_URL}."; '
+                        .'DPLY_MYSQL_KEY_OK=1; break; '
+                    .'fi; '
+                .'done; '
+                .'if [ "$DPLY_MYSQL_KEY_OK" = "1" ]; then '
                     .'. /etc/os-release; '
                     .'echo "deb [signed-by=/usr/share/keyrings/dply-mysql.gpg] https://repo.mysql.com/apt/ubuntu ${VERSION_CODENAME} '.$component.'" > /etc/apt/sources.list.d/dply-mysql.list; '
                     // dply_apt_update returns 0 even when the repo is
@@ -415,7 +442,9 @@ trait BuildsProvisionDatabaseStack
                         .'*) echo "[dply] WARNING: MySQL '.$series.' is not installable here (candidate: ${DPLY_MYSQL_CANDIDATE:-unavailable}) — installing the distro mysql-server instead." >&2 ;; '
                     .'esac; '
                 .'else '
-                    .'echo "[dply] WARNING: could not fetch the MySQL signing key — falling back to the distro mysql-server." >&2; '
+                    .'echo "[dply] WARNING: no usable MySQL signing key (every candidate failed to fetch or verify) — falling back to the distro mysql-server." >&2; '
+                    // Nothing may reference a key that was refused.
+                    .'rm -f /usr/share/keyrings/dply-mysql.gpg /etc/apt/sources.list.d/dply-mysql.list; '
                 .'fi; '
             .'fi',
         ];
