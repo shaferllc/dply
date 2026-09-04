@@ -80,11 +80,13 @@ class TaskShowCommand extends Command
             $this->line($task->getErrorAttribute());
         }
 
-        if ($showOutput && $task->output) {
+        if ($showOutput) {
             $this->newLine();
             $this->info('Task Output');
             $this->line('===========');
-            $this->line($task->output);
+            // Asking for output and getting silence is indistinguishable from
+            // the flag not working. Say the task produced none.
+            $this->line(($task->output ?? '') !== '' ? $task->output : 'No output available');
         }
 
         if (! $showOutput && ! $showError && ($task->output || $task->getErrorAttribute())) {

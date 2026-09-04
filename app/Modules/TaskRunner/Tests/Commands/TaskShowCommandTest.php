@@ -27,7 +27,7 @@ describe('TaskShowCommand', function () {
             'output' => 'Task completed successfully',
         ]);
 
-        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json', '--output' => true]);
         $output = Artisan::output();
 
         expect($exitCode)->toBe(0)
@@ -88,7 +88,7 @@ describe('TaskShowCommand', function () {
             'options' => ['error' => null, 'progress' => 100],
         ]);
 
-        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json', '--output' => true]);
         $output = Artisan::output();
 
         expect($exitCode)->toBe(0)
@@ -97,8 +97,8 @@ describe('TaskShowCommand', function () {
             ->and($output)->toContain('"exit_code": 0')
             ->and($output)->toContain('"progress": 100')
             ->and($output)->toContain('"timeout": 300')
-            ->and($output)->toContain('User: testuser')
-            ->and($output)->toContain('Instance: test-instance')
+            ->and($output)->toContain('"user": "testuser"')
+            ->and($output)->toContain('"instance": "test-instance"')
             ->and($output)->toContain('Line 1')
             ->and($output)->toContain('Line 2')
             ->and($output)->toContain('Line 3');
@@ -124,11 +124,14 @@ describe('TaskShowCommand', function () {
         expect($exitCode)->toBe(0)
             ->and($output)->toContain('Null Values Task')
             ->and($output)->toContain('"status": "pending"')
-            ->and($output)->toContain('"exit_code": -')
-            ->and($output)->toContain('"progress": -')
-            ->and($output)->toContain('"timeout": -')
-            ->and($output)->toContain('User: -')
-            ->and($output)->toContain('Instance: -');
+            ->and($output)->toContain('"exit_code": null')
+            // progress is derived, not stored: with no options['progress'],
+            // Task::getProgressAttribute() maps Pending to 0. Only the fields
+            // that really are nullable are asserted as null below.
+            ->and($output)->toContain('"progress": 0')
+            ->and($output)->toContain('"timeout": null')
+            ->and($output)->toContain('"user": null')
+            ->and($output)->toContain('"instance": null');
     });
 
     it('shows task with error information', function () {
@@ -140,14 +143,16 @@ describe('TaskShowCommand', function () {
             'options' => ['error' => 'Task failed with error message'],
         ]);
 
-        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+        $exitCode = Artisan::call('task:show', [
+            'task' => $task->id, '--format' => 'json', '--output' => true, '--error' => true,
+        ]);
         $output = Artisan::output();
 
         expect($exitCode)->toBe(0)
             ->and($output)->toContain('Error Task')
             ->and($output)->toContain('"status": "failed"')
             ->and($output)->toContain('"exit_code": 1')
-            ->and($output)->toContain('Error: Task failed with error message')
+            ->and($output)->toContain('"error": "Task failed with error message"')
             ->and($output)->toContain('Some output before error');
     });
 
@@ -244,7 +249,7 @@ describe('TaskShowCommand', function () {
             'output' => $longOutput,
         ]);
 
-        $this->artisan('task:show', ['task' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id, '--output' => true])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Long Output Task')
@@ -259,12 +264,17 @@ describe('TaskShowCommand', function () {
             'output' => $specialOutput,
         ]);
 
-        $this->artisan('task:show', ['task' => $task->id])
-            ->assertExitCode(0)
-            ->expectsOutputToContain('Task Details')
-            ->expectsOutputToContain('Special Output Task')
-            ->expectsOutputToContain('Output with special chars: !@#$%^&*()')
-            ->expectsOutputToContain('Unicode: こんにちは世界');
+        // Captured rather than expectsOutputToContain(): both of these substrings
+        // live in the SAME line() write, and each expectation consumes one write,
+        // so the second could never match however correct the command is.
+        $exitCode = Artisan::call('task:show', ['task' => $task->id, '--output' => true]);
+        $output = Artisan::output();
+
+        expect($exitCode)->toBe(0)
+            ->and($output)->toContain('Task Details')
+            ->and($output)->toContain('Special Output Task')
+            ->and($output)->toContain('Output with special chars: !@#$%^&*()')
+            ->and($output)->toContain('Unicode: こんにちは世界');
     });
 
     it('shows task with special characters in name', function () {
@@ -333,7 +343,7 @@ describe('TaskShowCommand', function () {
             'output' => '',
         ]);
 
-        $this->artisan('task:show', ['task' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id, '--output' => true])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Empty Output Task')
@@ -347,7 +357,7 @@ describe('TaskShowCommand', function () {
             'output' => null,
         ]);
 
-        $this->artisan('task:show', ['task' => $task->id])
+        $this->artisan('task:show', ['task' => $task->id, '--output' => true])
             ->assertExitCode(0)
             ->expectsOutputToContain('Task Details')
             ->expectsOutputToContain('Null Output Task')
@@ -510,7 +520,7 @@ describe('TaskShowCommand', function () {
     it('shows help when --help flag is used', function () {
         $this->artisan('task:show', ['--help' => true])
             ->assertExitCode(0)
-            ->expectsOutputToContain('Show task details by ID or name');
+            ->expectsOutputToContain('Show detailed information about a task');
     });
 
     it('shows task with all possible statuses', function () {
@@ -548,10 +558,12 @@ describe('TaskShowCommand', function () {
                 'exit_code' => $exitCode,
             ]);
 
-            $this->artisan('task:show', ['task' => $task->id, '--format' => 'json'])
-                ->assertExitCode(0)
-                ->expectsOutputToContain("Task with exit code {$exitCode}")
-                ->expectsOutputToContain('"exit_code": ');
+            $callExit = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+            $output = Artisan::output();
+
+            expect($callExit)->toBe(0)
+                ->and($output)->toContain("Task with exit code {$exitCode}")
+                ->and($output)->toContain('"exit_code": '.$exitCode);
         }
     });
 
@@ -565,10 +577,12 @@ describe('TaskShowCommand', function () {
                 'options' => ['progress' => $progress],
             ]);
 
-            $this->artisan('task:show', ['task' => $task->id, '--format' => 'json'])
-                ->assertExitCode(0)
-                ->expectsOutputToContain("Task with {$progress}% progress")
-                ->expectsOutputToContain('"progress": ');
+            $callExit = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+            $output = Artisan::output();
+
+            expect($callExit)->toBe(0)
+                ->and($output)->toContain("Task with {$progress}% progress")
+                ->and($output)->toContain('"progress": '.$progress);
         }
     });
 
@@ -582,10 +596,12 @@ describe('TaskShowCommand', function () {
                 'timeout' => $timeout,
             ]);
 
-            $this->artisan('task:show', ['task' => $task->id, '--format' => 'json'])
-                ->assertExitCode(0)
-                ->expectsOutputToContain("Task with {$timeout}s timeout")
-                ->expectsOutputToContain('"timeout": ');
+            $callExit = Artisan::call('task:show', ['task' => $task->id, '--format' => 'json']);
+            $output = Artisan::output();
+
+            expect($callExit)->toBe(0)
+                ->and($output)->toContain("Task with {$timeout}s timeout")
+                ->and($output)->toContain('"timeout": '.$timeout);
         }
     });
 });
