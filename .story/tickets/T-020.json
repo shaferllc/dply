@@ -3,10 +3,11 @@
   "completedDate": null,
   "createdDate": "2026-09-04",
   "description": "Inventory from T-003, read-only group: ServerPatchAdvisor, PackageSecurityUpdatesInsightRunner, ServerInventoryProbeScript, ServerMetricsGuestScript. These read apt state rather than changing it, so a broken repo does not abort anything - it makes them report LESS. PackageSecurityUpdatesInsightRunner runs 'apt list --upgradable' against whatever the cached index holds, so a host whose apt-get update has failed for weeks reports few or no pending security updates and reads as healthy. Detect a stale or failing index and surface it as its own finding, rather than letting it suppress the signal.",
+  "displayId": "T-020",
   "id": "T-020",
   "order": 50,
   "phase": "provisioning-reliability",
-  "status": "open",
+  "status": "inprogress",
   "title": "Surface a broken apt index instead of reporting a healthy patch state",
   "type": "task"
 }

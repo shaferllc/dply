@@ -254,6 +254,26 @@ return [
             ],
         ],
 
+        // Registered separately from package_security_updates because it is the
+        // opposite signal: that insight can only under-report while apt is
+        // broken, so silence there must not read as health.
+        'apt_index_stale' => [
+            'label' => 'Stale apt package index',
+            'description' => 'Detect a package index apt has not refreshed, which makes the security-update count understate reality.',
+            'scope' => 'server',
+            'requires_pro' => false,
+            'runner' => PackageSecurityUpdatesInsightRunner::class,
+            'parameters' => [
+                'max_index_age_days' => [
+                    'type' => 'number',
+                    'label' => 'Days before the index counts as stale',
+                    'min' => 1,
+                    'max' => 90,
+                    'default' => 7,
+                ],
+            ],
+        ],
+
         'ssl_certificate_checks' => [
             'label' => 'SSL certificate checks',
             'description' => 'Check for SSL certificate issues.',

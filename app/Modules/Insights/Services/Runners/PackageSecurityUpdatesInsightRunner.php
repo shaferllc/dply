@@ -24,7 +24,7 @@ class PackageSecurityUpdatesInsightRunner implements InsightRunnerInterface
     ) {}
 
     /**
-     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, InsightCandidate>
      */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
@@ -43,6 +43,17 @@ fi
 # `apt list --upgradable` writes a leading "Listing..." header on stderr; the data lines
 # include the suite (e.g. jammy-security) which we grep for. Count separately so the
 # probe is robust to grep returning 1 when there are 0 matches.
+# How long since apt last refreshed its index. A repo that cannot verify makes
+# every `apt-get update` fail, the lists stop advancing, and the counts below
+# then describe a snapshot from weeks ago rather than the host today.
+index_age_days=-1
+newest=$(ls -t /var/lib/apt/lists/*Release 2>/dev/null | head -n1)
+if [ -z "$newest" ]; then newest=$(ls -t /var/lib/apt/lists/ 2>/dev/null | head -n1); fi
+if [ -n "$newest" ]; then
+  ts=$(stat -c %Y "/var/lib/apt/lists/$(basename "$newest")" 2>/dev/null || stat -c %Y "$newest" 2>/dev/null || echo 0)
+  if [ "${ts:-0}" -gt 0 ]; then index_age_days=$(( ( $(date +%s) - ts ) / 86400 )); fi
+fi
+echo "index_age_days=${index_age_days}"
 total=$(apt list --upgradable 2>/dev/null | tail -n +2 | wc -l | tr -d '[:space:]')
 security=$(apt list --upgradable 2>/dev/null | tail -n +2 | grep -E -- '(-security|-updates-security)' | wc -l | tr -d '[:space:]')
 if [ -z "$total" ];    then total=0;    fi
@@ -68,37 +79,66 @@ BASH;
         $security = (int) ($values['security'] ?? 0);
         $total = (int) ($values['total'] ?? 0);
 
+        $candidates = [];
+
+        // A stale index makes this insight quieter, not louder: `apt list
+        // --upgradable` reads the cached lists, so a host whose apt has been
+        // broken for weeks reports few or no pending security updates and looks
+        // healthier the longer it stays broken. Surface that inversion before
+        // trusting either count.
+        $indexAgeDays = (int) ($values['index_age_days'] ?? -1);
+        $maxIndexAge = max(1, (int) ($parameters['max_index_age_days'] ?? 7));
+
+        if ($indexAgeDays > $maxIndexAge) {
+            $candidates[] = new InsightCandidate(
+                insightKey: 'apt_index_stale',
+                dedupeHash: 'apt-index-stale',
+                severity: $indexAgeDays > ($maxIndexAge * 4)
+                    ? InsightFinding::SEVERITY_CRITICAL
+                    : InsightFinding::SEVERITY_WARNING,
+                title: __('apt has not refreshed its package index in :days days', ['days' => $indexAgeDays]),
+                body: __('The package index is :days days old, so the security-update count below is measured against a stale snapshot and understates what this host is missing. Usually a repository that can no longer be verified — an expired signing key fails the whole update. Run `dply server apt-repair <server> --dry-run`, or `sudo apt-get update` on the host to see which source is failing.', ['days' => $indexAgeDays]),
+                meta: [
+                    'signal' => [
+                        'index_age_days' => $indexAgeDays,
+                        'max_index_age_days' => $maxIndexAge,
+                    ],
+                ],
+            );
+        }
+
         $threshold = max(0, (int) ($parameters['min_security_updates'] ?? 1));
         if ($security < $threshold || $security <= 0) {
-            return [];
+            return $candidates;
         }
 
         $severity = $security >= 10
             ? InsightFinding::SEVERITY_CRITICAL
             : InsightFinding::SEVERITY_WARNING;
 
-        return [
-            new InsightCandidate(
-                insightKey: 'package_security_updates',
-                dedupeHash: 'apt-security',
-                severity: $severity,
-                title: trans_choice(
-                    '{1} :count security update available|[2,*] :count security updates available',
-                    $security,
-                    ['count' => $security],
-                ),
-                body: __(':sec security updates of :total upgradable packages. Run `sudo apt update && sudo apt upgrade` during a maintenance window — this can restart services and may require a reboot.', [
-                    'sec' => $security,
-                    'total' => $total,
-                ]),
-                meta: [
-                    'signal' => [
-                        'security_count' => $security,
-                        'total_upgradable' => $total,
-                    ],
-                ],
+        $candidates[] = new InsightCandidate(
+            insightKey: 'package_security_updates',
+            dedupeHash: 'apt-security',
+            severity: $severity,
+            title: trans_choice(
+                '{1} :count security update available|[2,*] :count security updates available',
+                $security,
+                ['count' => $security],
             ),
-        ];
+            body: __(':sec security updates of :total upgradable packages. Run `sudo apt update && sudo apt upgrade` during a maintenance window — this can restart services and may require a reboot.', [
+                'sec' => $security,
+                'total' => $total,
+            ]),
+            meta: [
+                'signal' => [
+                    'security_count' => $security,
+                    'total_upgradable' => $total,
+                    'index_age_days' => $indexAgeDays,
+                ],
+            ],
+        );
+
+        return $candidates;
     }
 
     private function parseKeyValues(string $buffer): array
