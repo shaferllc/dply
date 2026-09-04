@@ -4,6 +4,7 @@
   ],
   "createdBy": "claude-code/story-setup",
   "discoveredDate": "2026-09-04",
+  "displayId": "ISS-004",
   "id": "ISS-004",
   "impact": "The boundary test's BASELINE permits a Feedback module dependency on a presentation-layer admin concern. Each exemption is a live violation of the one enforced architectural rule.",
   "location": [],
@@ -11,9 +12,9 @@
   "relatedTickets": [
     "T-017"
   ],
-  "resolution": null,
-  "resolvedDate": null,
+  "resolution": "Fixed in T-017: AuthorizesPlatformAdmin moved to App\\Livewire\\Concerns (already classified as shared by the layer map), 14 consumers updated, BASELINE now empty.",
+  "resolvedDate": "2026-09-04",
   "severity": "low",
-  "status": "open",
+  "status": "resolved",
   "title": "Module to shell BASELINE carries tracked debt"
 }
