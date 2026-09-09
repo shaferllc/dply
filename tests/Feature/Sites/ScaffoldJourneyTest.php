@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ScaffoldJourneyTest;
 
+use App\Jobs\ResetSiteToBlankJob;
 use App\Livewire\Sites\ScaffoldJourney;
+use App\Livewire\Sites\Show;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -88,7 +90,7 @@ test('failed pipeline shows retry button when under attempt cap', function () {
         ->assertSee('Retry install')
         ->assertSee('wp-cli unavailable');
 });
-test('failed pipeline after three attempts offers delete only', function () {
+test('failed pipeline past the retry cap offers a real way out', function () {
     [$user, $server, $site] = makeSite(Site::STATUS_SCAFFOLD_FAILED, [
         'attempt_count' => 3,
         'steps' => [
@@ -96,10 +98,14 @@ test('failed pipeline after three attempts offers delete only', function () {
         ],
     ]);
 
+    // This used to offer "Delete site and start fresh", which was a link back
+    // to the same page that deleted nothing — a dead end. The retry cap is
+    // still enforced; the escape hatch now actually resets the scaffold.
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
         ->assertDontSee('Retry install')
-        ->assertSee('Delete site and start fresh');
+        ->assertSee('Start over')
+        ->assertDontSee('Delete site and start fresh');
 });
 test('retry dispatches pipeline and resets state', function () {
     Bus::fake();
@@ -270,4 +276,46 @@ test('404s for non scaffolded site', function () {
     $this->actingAs($user)
         ->get(route('sites.scaffold-journey', ['server' => $server, 'site' => $site->fresh()]))
         ->assertNotFound();
+});
+
+test('a failed scaffold can be reset back to the app picker', function () {
+    Bus::fake();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['webserver' => 'nginx', 'php_version' => '8.3'],
+    ]);
+
+    $site = Site::factory()->for($server)->create([
+        'slug' => 'wp-failed',
+        'status' => Site::STATUS_SCAFFOLD_FAILED,
+        'meta' => ['scaffold' => [
+            'framework' => 'wordpress',
+            'attempt_count' => 3,
+            'steps' => [['key' => 'wp_install', 'label' => 'x', 'state' => 'failed', 'error' => 'broken wp-config']],
+        ]],
+    ]);
+
+    // Retrying is capped at 3 attempts, and retrying a broken install would not
+    // help anyway — this is the way out.
+    expect($site->canRechooseApp())->toBeFalse();
+
+    Livewire::actingAs($user)
+        ->test(Show::class, ['server' => $server, 'site' => $site])
+        ->call('resetScaffoldAndChooseAgain');
+
+    $site->refresh();
+
+    expect($site->canRechooseApp())->toBeTrue()
+        ->and(data_get($site->meta, 'scaffold'))->toBeNull();
+
+    // The half-written install (incl. a broken wp-config.php) has to be wiped,
+    // or the next installer inherits it.
+    Bus::assertDispatched(ResetSiteToBlankJob::class);
 });

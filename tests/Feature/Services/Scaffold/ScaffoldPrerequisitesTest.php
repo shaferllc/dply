@@ -6,9 +6,9 @@ namespace Tests\Feature\Services\Scaffold\ScaffoldPrerequisitesTest;
 
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\Scaffold\Services\PrerequisiteResult;
 use App\Modules\Scaffold\Services\ScaffoldPrerequisites;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;

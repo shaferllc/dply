@@ -281,13 +281,31 @@ class ScaffoldWordPressPipeline
         $db = $site->fresh()->meta['scaffold']['database'];
         $dbPassword = decrypt($db['password']);
 
+        // The extra PHP is piped in, NOT passed via a shell heredoc.
+        //
+        // This was `--extra-php <<EOF … EOF` with the terminator indented, and
+        // an unquoted heredoc terminator must sit at column 0. Bash therefore
+        // never closed the heredoc, so the literal text "EOF" was fed to
+        // --extra-php and written into wp-config.php — landing directly before
+        // wp-config's own `if ( ! defined( 'ABSPATH' ) )` and turning the file
+        // into a parse error. wp-cli evals wp-config.php on every invocation,
+        // so that broke not just this step but every later `wp` command
+        // (`wp core install` died on `unexpected token "if"`).
+        //
+        // --extra-php reads from STDIN, which sidesteps heredoc quoting
+        // entirely and cannot be broken by indentation.
+        //
+        // --force lets a retry regenerate a half-written wp-config.php instead
+        // of failing on "file already exists"; only ever reached while
+        // scaffolding.
         $cmd = sprintf(
-            'cd %s && wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=127.0.0.1 --skip-check --extra-php <<EOF
-        define("DISALLOW_FILE_EDIT", true);
-        define("FORCE_SSL_ADMIN", true);
-        define("DISABLE_WP_CRON", true);
-        EOF',
+            'cd %s && printf %s | wp config create --dbname=%s --dbuser=%s --dbpass=%s --dbhost=127.0.0.1 --skip-check --force --extra-php',
             escapeshellarg($deployPath),
+            escapeshellarg(implode("\n", [
+                'define("DISALLOW_FILE_EDIT", true);',
+                'define("FORCE_SSL_ADMIN", true);',
+                'define("DISABLE_WP_CRON", true);',
+            ])."\n"),
             escapeshellarg($db['name']),
             escapeshellarg($db['username']),
             escapeshellarg($dbPassword),

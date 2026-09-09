@@ -81,12 +81,24 @@
                                 <x-heroicon-o-arrow-path class="h-4 w-4" />
                                 {{ __('Retry install') }}
                             </button>
-                        @else
-                            <a href="{{ route('sites.show', ['server' => $server, 'site' => $site]) }}" wire:navigate class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300 bg-white px-5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50">
-                                <x-heroicon-o-trash class="h-4 w-4" />
-                                {{ __('Delete site and start fresh') }}
-                            </a>
                         @endif
+
+                        {{-- Always offered on a failure, not just past the retry
+                             cap: when the install itself is broken, or the wrong
+                             app was picked, retrying the same installer will not
+                             help. Replaces a "Delete site and start fresh" link
+                             that pointed back at this very page and did nothing.
+                             The site shell is kept — only the app goes. --}}
+                        <button
+                            wire:click="resetScaffoldAndChooseAgain"
+                            wire:confirm="{{ __('Wipe this half-finished install and pick an app again? The server, domains and certificates are kept.') }}"
+                            wire:loading.attr="disabled"
+                            wire:target="resetScaffoldAndChooseAgain"
+                            class="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300 bg-white px-5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+                        >
+                            <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
+                            {{ __('Start over — pick a different app') }}
+                        </button>
                     </div>
             </div>
         </section>

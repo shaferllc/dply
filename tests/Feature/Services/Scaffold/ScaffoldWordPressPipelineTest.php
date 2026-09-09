@@ -10,13 +10,13 @@ use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
-use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Modules\Scaffold\Services\PrerequisiteResult;
 use App\Modules\Scaffold\Services\ScaffoldPrerequisites;
 use App\Modules\Scaffold\Services\ScaffoldStep;
 use App\Modules\Scaffold\Services\ScaffoldWordPressPipeline;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -240,4 +240,46 @@ test('the scaffold fails loudly when no theme ends up active', function () {
 
     $site->refresh();
     expect($site->status)->toBe(Site::STATUS_SCAFFOLD_FAILED);
+});
+
+test('wp config create pipes extra php instead of using a shell heredoc', function () {
+    $site = makeScaffoldingSite();
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->once()->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->once()->andReturn('ok');
+
+    $commands = [];
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturnUsing(function (...$args) use (&$commands) {
+        $commands[] = (string) ($args[2] ?? '');
+
+        return new ProcessOutput('twentytwentyfive', 0, false);
+    });
+
+    (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site);
+
+    $config = collect($commands)->first(fn (string $c) => str_contains($c, 'wp config create'));
+
+    expect($config)->not->toBeNull();
+
+    // The bug: `--extra-php <<EOF` with an indented terminator. An unquoted
+    // heredoc terminator must be at column 0, so bash never closed it and the
+    // literal "EOF" was written into wp-config.php, right before wp-config's
+    // own `if ( ! defined( 'ABSPATH' ) )` — a parse error that then broke every
+    // wp-cli call, because wp-cli evals wp-config.php.
+    expect($config)->not->toContain('<<EOF')
+        ->and($config)->toContain('--extra-php')
+        // Piped via STDIN, which cannot be broken by indentation.
+        ->and($config)->toContain('| wp config create')
+        ->and($config)->toContain('DISALLOW_FILE_EDIT');
+
+    // Any heredoc that IS emitted must have its terminator at column 0.
+    foreach ($commands as $command) {
+        if (preg_match('/<<-?\'?([A-Z]+)\'?/', $command, $m) === 1) {
+            expect($command)->toMatch('/^'.$m[1].'$/m');
+        }
+    }
 });
