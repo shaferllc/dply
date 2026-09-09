@@ -47,11 +47,11 @@ final class CacheServiceInstallScripts
      */
     public static function installPackageScript(string $engine): string
     {
-        return match ($engine) {
+        return AptSourceRepairScript::withTolerantApt(match ($engine) {
             'redis' => <<<'BASH'
 if ! command -v redis-server >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y
+    dply_apt_update
     apt-get install -y redis-server
 fi
 command -v redis-server >/dev/null 2>&1 || { echo "ERROR: redis-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
@@ -59,7 +59,7 @@ BASH,
             'valkey' => <<<'BASH'
 if ! command -v valkey-server >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y
+    dply_apt_update
     if ! { apt-get install -y valkey-server || apt-get install -y valkey; }; then
         echo "ERROR: Could not install valkey — neither 'valkey-server' nor 'valkey' is in the configured APT repositories. Enable 'universe' (Ubuntu 24.04+) or add the upstream Valkey APT source and retry." >&2
         exit 1
@@ -70,7 +70,7 @@ BASH,
             'memcached' => <<<'BASH'
 if ! command -v memcached >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y
+    dply_apt_update
     apt-get install -y memcached
 fi
 command -v memcached >/dev/null 2>&1 || { echo "ERROR: memcached binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
@@ -80,7 +80,7 @@ BASH,
                 (string) config('server_cache.dragonfly_version', 'v1.38.1')
             ),
             default => throw new \InvalidArgumentException("Unsupported cache engine: {$engine}"),
-        };
+        });
     }
 
     /**
@@ -117,7 +117,7 @@ BASH,
      */
     private static function keydbInstallPackageScript(): string
     {
-        return <<<'BASH'
+        return AptSourceRepairScript::withTolerantApt(<<<'BASH'
 if ! command -v keydb-server >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
 
@@ -140,7 +140,7 @@ if ! command -v keydb-server >/dev/null 2>&1; then
     command -v curl >/dev/null 2>&1 || need_install="$need_install curl"
     dpkg -s ca-certificates >/dev/null 2>&1 || need_install="$need_install ca-certificates"
     if [ -n "$need_install" ]; then
-        apt-get update -y
+        dply_apt_update
         apt-get install -y $need_install
     fi
 
@@ -160,14 +160,14 @@ if ! command -v keydb-server >/dev/null 2>&1; then
             > /etc/apt/sources.list.d/keydb.list
     fi
 
-    apt-get update -y
+    dply_apt_update
     if ! { apt-get install -y keydb-server || apt-get install -y keydb; }; then
         echo "ERROR: apt couldn't install KeyDB after adding the upstream APT source. Check 'apt-cache policy keydb-server keydb' on the host." >&2
         exit 1
     fi
 fi
 command -v keydb-server >/dev/null 2>&1 || { echo "ERROR: keydb-server binary not on PATH after apt install — package may be missing from the configured repositories." >&2; exit 1; }
-BASH;
+BASH);
     }
 
     /**
@@ -182,7 +182,7 @@ BASH;
         $tag = str_starts_with($version, 'v') ? $version : 'v'.$version;
         $tagShell = escapeshellarg($tag);
 
-        return <<<BASH
+        return AptSourceRepairScript::withTolerantApt(<<<BASH
 if ! command -v dragonfly >/dev/null 2>&1; then
     export DEBIAN_FRONTEND=noninteractive
 
@@ -211,7 +211,7 @@ if ! command -v dragonfly >/dev/null 2>&1; then
     command -v curl >/dev/null 2>&1 || need_install="\$need_install curl"
     dpkg -s ca-certificates >/dev/null 2>&1 || need_install="\$need_install ca-certificates"
     if [ -n "\$need_install" ]; then
-        apt-get update -y
+        dply_apt_update
         apt-get install -y \$need_install
     fi
 
@@ -233,7 +233,7 @@ if ! command -v dragonfly >/dev/null 2>&1; then
     fi
 fi
 command -v dragonfly >/dev/null 2>&1 || { echo "ERROR: dragonfly binary not on PATH after install — the .deb may have rejected this host's dependencies." >&2; exit 1; }
-BASH;
+BASH);
     }
 
     /**

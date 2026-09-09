@@ -53,9 +53,10 @@ use PhpParser\PhpVersion;
  * @var array<class-string, list<class-string>>
  */
 const BASELINE = [
-    'App\Modules\Feedback\Livewire\Admin\Index' => [
-        'App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin',
-    ],
+    // Empty. The last entry (Feedback's admin screen reaching into
+    // App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin) was paid off by
+    // moving that trait into the generic App\Livewire\Concerns namespace,
+    // which the layer map already treats as shared rather than shell.
 ];
 
 /**
@@ -219,7 +220,7 @@ test('modules never depend on the presentation shell', function (): void {
         "The arrow points UI -> engine -> kernel, never the reverse.\n".
         "See docs/adr/modular-monolith-structure.md.\n\n%d violation(s):\n%s\n\n".
         "Fix by moving the shared piece into the kernel (app/Support, app/Services,\n".
-        "app/Livewire/Concerns) and depending on that from both sides.",
+        'app/Livewire/Concerns) and depending on that from both sides.',
         count($violations),
         implode("\n", $violations)
     ));
@@ -282,5 +283,5 @@ test('the scanner actually sees both layers', function (): void {
     // would return an empty list and pass the boundary test for free.
     [$declared, $names] = referencesIn(dirname(__DIR__, 2).'/app/Modules/Feedback/Livewire/Admin/Index.php');
     expect($declared)->toBe('App\Modules\Feedback\Livewire\Admin\Index');
-    expect($names)->toContain('App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin');
+    expect($names)->toContain('App\Livewire\Concerns\AuthorizesPlatformAdmin');
 });

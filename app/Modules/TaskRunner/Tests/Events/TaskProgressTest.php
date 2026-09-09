@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Events\TaskProgress;
 use App\Modules\TaskRunner\PendingTask;
-use App\Modules\TaskRunner\TestTask;
+use App\Modules\TaskRunner\Tests\Helpers\TestTask;
 use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 

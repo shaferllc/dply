@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\CouldNotCreateScriptDirectoryException;
 use App\Modules\TaskRunner\ProcessOutput;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create CouldNotCreateScriptDirectoryException with constructor', function () {
     $output = ProcessOutput::make('mkdir failed')->setExitCode(1);

@@ -1,0 +1,19 @@
+{
+  "components": [
+    "tests/TestCase.php",
+    "phpunit.xml"
+  ],
+  "createdBy": "autonomous-session-d3782ff0",
+  "dedupeKey": "iss-018-followup:refreshdatabase-deadlock",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-022",
+  "impact": "Test runs using RefreshDatabase intermittently fail during the migration phase with SQLSTATE[40P01] Deadlock detected, before any test body executes. Observed repeatedly while working ISS-018: three consecutive identical runs of app/Actions/Tests/AsAuthenticatedTest.php gave 2 failed/3 passed, then 5 passed, then 5 passed, with the failures being deadlocks on foreign-key DDL rather than anything in the tests.\n\nSample:\n```\nSQLSTATE[40P01]: Deadlock detected: Process 85155 waits for ShareRowExclusiveLock on relation 9963318;\nblocked by process 85366. Process 85366 waits for RowExclusiveLock on relation 9963099; blocked by 85155.\nSQL: alter table \"server_credential_shares\" add constraint \"server_credential_shares_user_id_foreign\"\n     foreign key (\"user_id\") references \"users\" (\"id\") on delete cascade\n(Connection: pgsql, Database: dply_testing)\n```\nAlso seen on 2026_06_19_000000_create_server_log_alert_rules_table.php and 2026_06_01_150000_create_server_credential_shares_table.php.\n\nTwo Postgres backends are contending, so something else is holding locks on dply_testing while migrations run. `pg_stat_activity` during a run showed an extra `idle in transaction` backend. Not yet identified: whether that is a second concurrent pest process, a worker that resolves to the testing database, or a connection the previous run failed to release.\n\nWhy it matters beyond noise: it makes any suite using RefreshDatabase non-deterministic, so a red run cannot be trusted as a real regression and a green one cannot be trusted either. That directly undermines paying down the Modules/App suites, which is the largest coverage lever the project has (see CLAUDE.md), because those runs are exactly the ones being used to measure progress.\n\nWorth checking first whether anything long-running resolves to dply_testing, and whether parallel/TIA runs can overlap migrations on a single shared test database — a per-worker database would remove the contention entirely.\n\nFound while fixing ISS-018; environmental rather than caused by it.",
+  "location": [],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "RefreshDatabase migrations intermittently deadlock against dply_testing"
+}

@@ -1,0 +1,19 @@
+{
+  "content": "In a Laravel command test, each `expectsOutputToContain()` registers its own Mockery `doWrite` expectation, and every actual write is consumed by a single expectation. A command that emits a whole document in one `$this->line()` call — pretty-printed JSON, a multi-line output body — can therefore satisfy only the FIRST substring, no matter how plainly the others are present. When asserting several substrings that share one write, capture instead: `Artisan::call(...)` then `Artisan::output()` and `toContain()`, which matches against the full buffer. Reach for `expectsOutputToContain` only when each substring lands in a genuinely separate write.",
+  "context": "ISS-015. Three task:show tests asserted `expectsOutputToContain(\"Task with exit code {$code}\")` followed by `expectsOutputToContain('\"exit_code\": ')` against `--format=json`. The name matched and the key did not, which reads exactly like the JSON being wrong or the key being absent — it was neither. Confirmed by probe: a single `expectsOutputToContain('\"exit_code\": ')` on the same blob passes, and adding one more demonstrably-present substring makes it fail. The same trap hit a multi-line `--output` body where 'Output with special chars' matched and the 'Unicode: ...' line on the next row of the same write did not. Cost most of the debugging time on the issue, because the failure message (\"Output does not contain ...\") names the substring rather than the mechanism, and points at the command rather than the assertion.",
+  "createdDate": "2026-09-04",
+  "id": "L-004",
+  "lastValidated": "2026-09-04",
+  "reinforcements": 0,
+  "source": "review",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "testing",
+    "laravel",
+    "console",
+    "pest"
+  ],
+  "title": "expectsOutputToContain() consumes one write per expectation, so it cannot match two substrings in one line() call",
+  "updatedDate": "2026-09-04"
+}

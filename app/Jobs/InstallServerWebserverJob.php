@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Modules\Providers\Services\HetznerService;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SshConnectionFactory;
+use App\Support\Servers\AptSourceRepairScript;
 use App\Support\Servers\HetznerCloudFirewallRules;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -74,12 +75,16 @@ class InstallServerWebserverJob implements ShouldQueue
                 'install -d /usr/share/keyrings',
                 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg',
                 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list',
-                'apt-get update -y',
+                'dply_apt_update',
                 'apt-get install -y --no-install-recommends caddy',
                 'ufw allow 80/tcp || true',
                 'ufw allow 443/tcp || true',
                 'systemctl enable --now caddy',
             ]);
+
+            // The chain runs under `set -e`, so one unverifiable third-party
+            // repo would abort the whole webserver install at the update step.
+            $script = AptSourceRepairScript::tolerantUpdateFunction()."\n".$script;
 
             $log = $shell->exec("sudo bash -lc '{$script}' 2>&1", 540);
 

@@ -6,6 +6,9 @@ use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
 use App\Modules\TaskRunner\Events\TaskProgress;
 use App\Modules\TaskRunner\Traits\HasProgressTracking;
 use Illuminate\Support\Facades\Event;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('HasProgressTracking Trait (Complex)', function () {
     beforeEach(function () {

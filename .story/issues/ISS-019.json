@@ -1,0 +1,21 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php"
+  ],
+  "createdBy": "autonomous-session-d3782ff0",
+  "dedupeKey": "iss-015-followup:taskshow-schema-mismatch",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-019",
+  "impact": "Two tests in app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php die in the factory call, before task:show is ever invoked, so they test nothing:\n\n- 'shows task with very long name' builds `str_repeat('A', 1000)` and hits SQLSTATE[22001] `value too long for type character varying(255)`.\n- 'shows task with null name' passes `'name' => null` and hits SQLSTATE[23502] `null value in column \"name\" ... violates not-null constraint`.\n\nBoth describe a `task_runner_tasks` schema dply does not have: `name` is a NOT NULL varchar(255). This is the same class as ISS-016 (ConnectionManagerTest inserting a servers schema dply lacks) — tests inherited from the upstream task-runner package, whose migrations differed.\n\nThe fix is a decision, not a mechanical edit. Either (a) the tests should assert the boundary the schema actually enforces — a 255-char name renders, and a longer one is rejected at write time — or (b) `name` should genuinely be nullable/longer, in which case a migration is the change and these tests are correct in advance. Do not \"fix\" them by trimming to 254 chars and calling it a long-name test; that stops exercising the boundary entirely.\n\nOut of scope for ISS-015, which covered assertions describing the wrong renderer; these fail before any rendering happens.",
+  "location": [
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php:294",
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php:317"
+  ],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "TaskShowCommandTest creates tasks the task_runner_tasks schema rejects (null name, 1000-char name)"
+}

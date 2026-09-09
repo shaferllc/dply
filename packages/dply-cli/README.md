@@ -327,14 +327,53 @@ it works as a post-deploy gate:
 dply deploy --wait && dply errors
 ```
 
-### Run a command on a server
+### Run artisan on a site
 
-Requires the **`commands.run`** scope (included in admin CLI presets; refresh with `dply auth refresh`):
+Requires the **`commands.run`** scope (included in admin CLI presets; refresh with `dply auth refresh`).
 
 ```sh
-dply server run --server <id> php artisan migrate --force
-dply server run --server <id> --command "df -h"
+dply site artisan <site> -- migrate --force
+dply site artisan -- migrate:status            # site from .dply/site.json
+dply site artisan <site> --no-wait -- queue:retry all
+dply site artisan <site> --run 412             # read a queued run back
 ```
+
+Everything after `--` is the artisan command, flags included. Without it, `--force`
+would be parsed as a flag for `dply` itself and never reach the server.
+
+This runs through dply's artisan engine rather than a raw shell, so:
+
+- It runs as the site's user, in the site's root, with the site's PHP — no `cd`,
+  no `sudo -u`, no root-owned cache files.
+- Commands are classified. Inspect commands (`migrate:status`, `route:list`,
+  `config:show`) return inline; anything slower is queued and the CLI waits,
+  so a long migration is not cut off by a request timeout. `--no-wait` returns
+  the run id immediately and `--run <id>` reads it back later.
+- Destructive commands (`migrate:fresh`, `migrate:rollback`, `db:wipe`,
+  `tinker`, and anything unrecognised) prompt before running. `--yes`
+  pre-confirms for CI; off a TTY without it, the command refuses rather than
+  guessing.
+- `env`, `env:show`, `env:decrypt` and `tinker` additionally require **write**
+  access to the site, because they expose its secrets.
+- Every run is recorded with who ran it, and the exit code is the CLI's exit
+  code.
+
+Available for SSH-managed Laravel sites. Container and non-Laravel runtimes are
+refused with a typed error rather than a failed remote command.
+
+### Run a shell command on a server
+
+Also **`commands.run`**. The command is queued and the CLI waits for it, so it
+is not bounded by the HTTP request timeout:
+
+```sh
+dply server run --server <id> -- df -h
+dply server run --server <id> --command "df -h"
+dply server run --server <id> --no-wait -- apt-get update
+```
+
+It runs as the server's configured SSH user. For anything artisan, prefer
+`dply site artisan` above — it knows the site's path, user and PHP version.
 
 ### Firewall (UFW)
 

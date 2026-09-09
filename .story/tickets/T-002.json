@@ -1,0 +1,15 @@
+{
+  "blockedBy": [
+    "T-001"
+  ],
+  "completedDate": "2026-09-04",
+  "createdDate": "2026-09-04",
+  "description": "The key fix only changes newly generated provision scripts. Hosts provisioned earlier keep /etc/apt/sources.list.d/dply-mysql.list with the expired key and continue to break day-two package operations until something removes it. Add an idempotent detect-and-repair operation (day-two job or remediation) that reports what it found and what it removed. The provision-time pruner covers a re-provision; this covers hosts nobody re-provisions.",
+  "displayId": "T-002",
+  "id": "T-002",
+  "order": 20,
+  "phase": "provisioning-reliability",
+  "status": "complete",
+  "title": "Repair stale MySQL APT sources on already-provisioned hosts",
+  "type": "task"
+}

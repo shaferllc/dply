@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\TaskRunner\Services\AnalyticsService;
 use App\Modules\TaskRunner\Traits\HandlesAnalytics;
 use Illuminate\Support\Facades\Cache;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('HandlesAnalytics Trait (Complex)', function () {
     beforeEach(function () {

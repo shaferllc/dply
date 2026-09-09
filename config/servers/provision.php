@@ -13,6 +13,55 @@ return [
     | recent Debian/Ubuntu images from cloud providers).
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | MySQL apt repo signing keys
+    |--------------------------------------------------------------------------
+    | Tried in order when provisioning pins a MySQL series the distro does not
+    | ship. Each is fetched on the box, checked for expiry/revocation, and only
+    | then installed — MySQL's 2023 key expired and silently downgraded every
+    | 8.4 pin to the distro 8.0 package, so a single hardcoded URL is exactly
+    | the failure mode to avoid. Newest first; keep older ones as fallbacks.
+    |
+    | Fingerprints are an optional pin. Empty means "trust whatever the URL
+    | serves, as long as it verifies" — set them once you have confirmed the
+    | fingerprint from MySQL's own documentation, since a wrong value here
+    | blocks the repo entirely and falls the box back to the distro package.
+    */
+    'mysql_repo_key_urls' => [
+        'https://repo.mysql.com/RPM-GPG-KEY-mysql-2025',
+        'https://repo.mysql.com/RPM-GPG-KEY-mysql-2023',
+    ],
+
+    'mysql_repo_key_fingerprints' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | MariaDB apt repo signing key
+    |--------------------------------------------------------------------------
+    | Same contract as the MySQL keys above. Ubuntu ships exactly one MariaDB
+    | series in `mariadb-server` (10.11 on noble), so "MariaDB 11.4" and
+    | "MariaDB 11" can only be honoured from MariaDB's own repo — without a key
+    | here every one of the three wizard options installs the distro package and
+    | the version is a lie.
+    |
+    | MariaDB has published one long-lived signing key since 2016 (no expiry),
+    | so unlike MySQL there is no rotation list to keep — but the shape stays a
+    | list so a future key can be prepended without touching the provisioner.
+    */
+    'mariadb_repo_key_urls' => [
+        'https://mariadb.org/mariadb_release_signing_key.asc',
+    ],
+
+    /*
+    | Pinned because MariaDB's key is stable and publicly documented, so there
+    | is a correct value to pin — unlike the MySQL list, which rotates. This is
+    | the MariaDB Signing Key (0xF1656F24C74CD1D8).
+    */
+    'mariadb_repo_key_fingerprints' => [
+        '177F4010FE56CA3336300305F1656F24C74CD1D8',
+    ],
+
     'remote_script_path' => '/tmp/dply-provision.sh',
 
     'remote_script_timeout_seconds' => 3600,

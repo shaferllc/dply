@@ -818,28 +818,25 @@ trait AsHydratable
     }
 
     /**
-     * Get the fillable properties.
+     * Get the fillable properties. Empty means "every declared property".
+     *
+     * A class that declares its own getFillable() overrides this one outright -
+     * in PHP a class method always beats a trait method - so plain dispatch
+     * already calls the right implementation and no reflection is needed.
+     *
+     * The previous version reflected on $this, compared the declaring class
+     * against this trait, and invoked the method it found. That check can never
+     * be false: PHP flattens a trait method INTO the using class, so
+     * getDeclaringClass() reports the action class, never AsHydratable. Every
+     * call therefore re-invoked getFillable() on itself until the stack ran out
+     * and the process died with SIGSEGV - which is why AsHydratableTest took
+     * the whole App suite down rather than failing.
      *
      * @return array<int, string>
      */
     protected function getFillable(): array
     {
-        // Check if action class has its own getFillable method (not from this trait)
-        $reflection = new \ReflectionClass($this);
-
-        if ($reflection->hasMethod('getFillable')) {
-            $method = $reflection->getMethod('getFillable');
-            $declaringClass = $method->getDeclaringClass();
-
-            // If getFillable is declared in the action class (not this trait), call it
-            if ($declaringClass->getName() !== AsHydratable::class) {
-                // Use invoke to call the class's method, avoiding recursion
-                return $method->invoke($this);
-            }
-        }
-
-        // Otherwise check for fillable property
-        if (property_exists($this, 'fillable')) {
+        if (property_exists($this, 'fillable') && is_array($this->fillable)) {
             return $this->fillable;
         }
 

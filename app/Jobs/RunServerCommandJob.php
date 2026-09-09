@@ -1,167 +1,101 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
-use App\Models\AuditLog;
+use App\Models\ConsoleAction;
 use App\Models\Server;
-use App\Models\ServerCommandRun;
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use Illuminate\Bus\Queueable;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\SshConnectionFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
-use Throwable;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Worker for {@see ServerCommandRun} rows queued from the Run page.
+ * Runs one ad-hoc operator command on a server, off the request.
  *
- * Picks up a queued run, marks it 'running', shells out via the existing
- * TaskRunner SSH layer ({@see ExecuteRemoteTaskOnServer}) as the server's
- * ssh-user — not root — then settles the row to 'completed'/'failed' and
- * writes an {@see AuditLog} entry.
+ * The API used to open SSH inside the HTTP request, so anything slower than the
+ * web request timeout was truncated with no record of what happened — and the
+ * house rule forbids SSH in the request path regardless. The work now happens
+ * here and the caller polls the ConsoleAction.
  *
- * Output is flushed to the row incrementally (throttled) so the Run page
- * can stream stdout/stderr live via wire:poll while the command runs.
+ * Semantics are deliberately identical to the old inline call: a plain
+ * `exec()`, not the `set -euo pipefail` wrapper the task runner applies, so a
+ * command that worked before behaves the same now. A non-zero exit is recorded,
+ * not raised: `grep` finding nothing is data, not a failure of the run.
  */
 class RunServerCommandJob implements ShouldQueue
 {
-    use Dispatchable;
-    use InteractsWithQueue;
     use Queueable;
-    use SerializesModels;
 
-    /** Outer wall-clock cap for a single run (15 min). */
     public int $timeout = 900;
 
-    public int $tries = 1;
+    public function __construct(
+        public string $consoleActionId,
+        public string $serverId,
+        public string $command,
+    ) {}
 
-    /** Flush streamed output to the DB at most this often (seconds). */
-    private const FLUSH_INTERVAL = 0.75;
-
-    /** ...or whenever this many unflushed bytes accumulate. */
-    private const FLUSH_BYTES = 4096;
-
-    public function __construct(public string $serverCommandRunId)
+    public function handle(SshConnectionFactory $ssh): void
     {
-        $this->onQueue('dply-control');
-    }
+        $server = Server::query()->find($this->serverId);
+        $action = ConsoleAction::query()->find($this->consoleActionId);
 
-    public function handle(ExecuteRemoteTaskOnServer $executor): void
-    {
-        $run = ServerCommandRun::query()->find($this->serverCommandRunId);
-        if ($run === null) {
+        if ($server === null || $action === null) {
             return;
         }
 
-        // Idempotence — a retried worker shouldn't re-run a settled or
-        // already-running row.
-        if ($run->status !== ServerCommandRun::STATUS_QUEUED) {
-            return;
-        }
-
-        $server = $run->server;
-        if ($server === null) {
-            $run->fill([
-                'status' => ServerCommandRun::STATUS_FAILED,
-                'stderr' => 'Server no longer exists.',
-                'finished_at' => now(),
-            ])->save();
-
-            return;
-        }
-
-        $run->fill([
-            'status' => ServerCommandRun::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
-        ])->save();
+            'updated_at' => now(),
+        ]);
 
-        /** @var string $stdout */
-        $stdout = '';
-        /** @var string $stderr */
-        $stderr = '';
-        $lastFlush = microtime(true);
-        $dirtyBytes = 0;
-
-        $flush = function () use ($run, &$stdout, &$stderr, &$lastFlush, &$dirtyBytes): void {
-            $run->forceFill([
-                'stdout' => $stdout !== '' ? $stdout : null,
-                'stderr' => $stderr !== '' ? $stderr : null,
-            ])->save();
-            $lastFlush = microtime(true);
-            $dirtyBytes = 0;
-        };
+        $emit = new ConsoleEmitter($this->consoleActionId);
+        $emit->step('command', $this->command);
 
         try {
-            $script = "#!/bin/bash\n".$run->command."\n";
+            [$output, $exitCode] = $ssh->forServer($server)
+                ->execWithCallbackAndExit($this->command, static function (): void {}, $this->timeout - 60);
 
-            $output = $executor->runScriptWithOutputCallback(
-                server: $server,
-                name: 'server-run:'.$run->source.':'.$run->id,
-                script: $script,
-                onOutput: function (string $type, string $chunk) use (&$stdout, &$stderr, &$dirtyBytes, &$lastFlush, $flush): void {
-                    if ($type === 'err') {
-                        $stderr .= $chunk;
-                    } else {
-                        $stdout .= $chunk;
+            $buffer = rtrim((string) $output);
+            if ($buffer === '') {
+                $emit->info('(no output)', 'command');
+            } else {
+                // Capped on the way in so one `journalctl` cannot grow the row
+                // without bound; the tail is the useful end of a long run.
+                foreach (preg_split('/\r?\n/', mb_substr($buffer, -16_000)) ?: [] as $line) {
+                    if ($line !== '') {
+                        $emit($line, ConsoleAction::LEVEL_INFO, 'command');
                     }
-                    $dirtyBytes += strlen($chunk);
+                }
+            }
 
-                    if ($dirtyBytes >= self::FLUSH_BYTES
-                        || (microtime(true) - $lastFlush) >= self::FLUSH_INTERVAL) {
-                        $flush();
-                    }
-                },
-                timeoutSeconds: $this->timeout,
-            );
+            $exit = $exitCode ?? 0;
+            if ($exit === 0) {
+                $emit->success('Command completed.', 'command');
+            } else {
+                $emit->warn("Command exited {$exit}.", 'command');
+            }
 
-            $exitCode = $output->getExitCode();
-            $isTimeout = $output->isTimeout();
-
-            $run->fill([
-                'status' => $isTimeout || $exitCode !== 0
-                    ? ServerCommandRun::STATUS_FAILED
-                    : ServerCommandRun::STATUS_COMPLETED,
-                'exit_code' => $exitCode,
-                'stdout' => $stdout !== '' ? $stdout : null,
-                'stderr' => $stderr !== '' ? $stderr : null,
+            DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
-            ])->save();
-        } catch (Throwable $e) {
-            Log::warning('Server command run threw', [
-                'run_id' => $run->id,
-                'server_id' => $server->id,
-                'source' => $run->source,
-                'error' => $e->getMessage(),
+                // The exit code lives in `error` so a poll can report it without
+                // a schema change; a zero exit records nothing.
+                'error' => $exit === 0 ? null : "exit {$exit}",
+                'updated_at' => now(),
             ]);
+        } catch (\Throwable $e) {
+            $emit->error('The command could not be run on this server.', 'command');
 
-            $run->fill([
-                'status' => ServerCommandRun::STATUS_FAILED,
-                'stderr' => trim(($stderr !== '' ? $stderr."\n" : '').$e->getMessage()),
-                'stdout' => $stdout !== '' ? $stdout : null,
+            DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
-            ])->save();
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
         }
-
-        $this->writeAudit($run, $server);
-    }
-
-    protected function writeAudit(ServerCommandRun $run, Server $server): void
-    {
-        AuditLog::create([
-            'organization_id' => $server->organization_id,
-            'user_id' => $run->queued_by_user_id,
-            'action' => 'server.command.run',
-            'subject_type' => Server::class,
-            'subject_id' => $server->id,
-            'new_values' => [
-                'source' => $run->source,
-                'display_command' => $run->display_command,
-                'status' => $run->status,
-                'exit_code' => $run->exit_code,
-                'container_scope' => $run->container_scope_name,
-            ],
-        ]);
     }
 }

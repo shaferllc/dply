@@ -152,7 +152,8 @@ options live.
 - `dply link` opens a picker for BYO and Edge sites.
 - Any command that needs a site and wasn't given one opens the same kind of picker on a terminal.
 - Edge: `dply edge status --wait` or `dply deploy --wait`.
-- Server SSH: `dply server run --server <id> <command>` (needs the `commands.run` scope).
+- Server SSH: `dply server run --server <id> -- <command>` (needs the `commands.run` scope). Queued, so it is not cut off by the request timeout; `--no-wait` plus `--run <id>` to follow it later.
+- Site artisan: `dply site artisan <site> -- migrate --force` (same scope). Runs as the site user in the site root with the site's PHP, prompts on destructive commands (`--yes` for CI), and requires site write access for the `env` family.
 - **GitHub Actions:** create an org API token with `sites.deploy`, link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.
 
 ## Listing sites

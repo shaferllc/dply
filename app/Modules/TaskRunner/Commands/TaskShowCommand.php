@@ -68,6 +68,9 @@ class TaskShowCommand extends Command
             ['Duration', $task->getDuration() > 0 ? number_format((float) $task->getDuration(), 2).'s' : 'N/A'],
             ['Exit Code', $task->exit_code ?? 'N/A'],
             ['Progress', $task->getProgressAttribute() !== null ? $task->getProgressAttribute().'%' : 'N/A'],
+            ['Timeout', $task->timeout !== null ? $task->timeout.'s' : 'N/A'],
+            ['User', $task->user ?? '-'],
+            ['Instance', $task->instance ?? '-'],
         ]);
 
         if ($showError && $task->getErrorAttribute()) {
@@ -77,11 +80,13 @@ class TaskShowCommand extends Command
             $this->line($task->getErrorAttribute());
         }
 
-        if ($showOutput && $task->output) {
+        if ($showOutput) {
             $this->newLine();
             $this->info('Task Output');
             $this->line('===========');
-            $this->line($task->output);
+            // Asking for output and getting silence is indistinguishable from
+            // the flag not working. Say the task produced none.
+            $this->line(($task->output ?? '') !== '' ? $task->output : 'No output available');
         }
 
         if (! $showOutput && ! $showError && ($task->output || $task->getErrorAttribute())) {
@@ -103,6 +108,12 @@ class TaskShowCommand extends Command
             'duration' => $task->getDuration(),
             'exit_code' => $task->exit_code,
             'progress' => $task->getProgressAttribute(),
+            // Shown in both surfaces: a task's timeout, the user it ran as and
+            // the instance it ran on are what you reach for when a run looks
+            // wrong, and neither surface carried them.
+            'timeout' => $task->timeout,
+            'user' => $task->user,
+            'instance' => $task->instance,
         ];
 
         if ($showError) {
@@ -113,7 +124,10 @@ class TaskShowCommand extends Command
             $data['output'] = $task->output;
         }
 
-        $this->output->write(json_encode($data, JSON_PRETTY_PRINT));
+        // line(), not output->write(): write() bypasses the buffer Laravel's
+        // command-test expectations read, so --format=json was untestable. The
+        // trailing newline it adds is also friendlier for piping into jq.
+        $this->line((string) json_encode($data, JSON_PRETTY_PRINT));
     }
 
     protected function followTask(Task $task): int

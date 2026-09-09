@@ -156,6 +156,8 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('/servers', [ServerController::class, 'index'])->middleware('ability:'.$apiAbilities['servers.index']);
         Route::post('/servers/{server}/run-command', [ServerController::class, 'runCommand'])->middleware('ability:'.$apiAbilities['servers.run_command']);
+        // The command runs in a queued job; this is how a caller follows it.
+        Route::get('/servers/{server}/commands/{action}', [ServerController::class, 'commandRun'])->middleware('ability:'.$apiAbilities['servers.command_run']);
         Route::get('/servers/{server}/shared-host/explain', [ServerSharedHostController::class, 'explain'])
             ->middleware('ability:'.$apiAbilities['servers.index']);
 

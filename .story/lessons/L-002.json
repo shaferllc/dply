@@ -1,0 +1,18 @@
+{
+  "content": "Write 'if [ cond ]; then cmd; fi', never '[ cond ] && cmd', in any script that runs under set -e - and especially in PHP/JS-generated script strings, where the failure surfaces on a remote host during provisioning rather than in a test. Being called from an if condition suspends set -e and hides the bug, so do not treat 'it works today' as evidence. Run bash -n over the generated script in a test; it catches syntax but not this, so the rule has to be habitual.",
+  "context": "The apt-source pruner emitted '[ \"${base}\" = \"ubuntu.sources\" ] && continue'. When the test is false the whole AND-list returns 1, which under set -euo pipefail exits the script - on the common path, not the edge case. It was masked only because the function happened to be called from an if condition, where set -e is suspended for the entire function body.",
+  "createdDate": "2026-09-04",
+  "id": "L-002",
+  "lastValidated": "2026-09-04",
+  "reinforcements": 0,
+  "source": "review",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "bash",
+    "provisioning",
+    "codegen"
+  ],
+  "title": "In a generated bash script under set -e, use if/fi instead of '[ test ] && command'",
+  "updatedDate": "2026-09-04"
+}

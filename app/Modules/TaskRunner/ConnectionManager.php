@@ -88,11 +88,41 @@ class ConnectionManager
 
     /**
      * Create a connection from an array.
-     * @param  array<string, mixed> $source
+     *
+     * @param  array<string, mixed>  $source
      */
     protected function createFromArray(array $source): Connection
     {
-        return Connection::fromArray($source);
+        return Connection::fromArray(self::normalizeAttributes($source));
+    }
+
+    /**
+     * Accept the column names a host table actually uses.
+     *
+     * createFromModel() has always tolerated host/ip_address/address and
+     * ssh_user/username, but the raw-database path (`table:id`) went straight to
+     * Connection::fromArray(), which reads only 'host' and 'username'. Pointed
+     * at dply's own servers table - the obvious thing to point it at - it built
+     * a Connection with an empty host and no user. Both paths now normalize the
+     * same way.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    public static function normalizeAttributes(array $attributes): array
+    {
+        // Alias mapping ONLY — never a default. A missing username is a
+        // validation error downstream, and filling one in here turned
+        // "throws when username is missing" into a silent connection as root.
+        $aliases = [
+            'host' => $attributes['ip_address'] ?? $attributes['address'] ?? null,
+            'port' => $attributes['ssh_port'] ?? null,
+            'username' => $attributes['ssh_user'] ?? null,
+            'private_key' => $attributes['ssh_private_key'] ?? $attributes['ssh_key'] ?? null,
+            'script_path' => $attributes['working_directory'] ?? null,
+        ];
+
+        return $attributes + array_filter($aliases, static fn ($value): bool => $value !== null);
     }
 
     /**
@@ -103,14 +133,16 @@ class ConnectionManager
         $attributes = $model->toArray();
 
         // Map common server model attributes to connection attributes
-        $connectionData = [
-            'host' => $attributes['host'] ?? $attributes['ip_address'] ?? $attributes['address'] ?? '',
-            'port' => $attributes['port'] ?? $attributes['ssh_port'] ?? 22,
-            'username' => $attributes['username'] ?? $attributes['ssh_user'] ?? 'root',
-            'private_key' => $attributes['private_key'] ?? $attributes['ssh_key'] ?? null,
+        $connectionData = self::normalizeAttributes($attributes) + [
             'private_key_path' => $attributes['private_key_path'] ?? null,
-            'script_path' => $attributes['script_path'] ?? $attributes['working_directory'] ?? null,
             'proxy_jump' => $attributes['proxy_jump'] ?? $attributes['jump_host'] ?? null,
+            // A server model is a host by definition, so these defaults belong
+            // here rather than in the shared aliasing above.
+            'host' => '',
+            'port' => 22,
+            'username' => 'root',
+            'private_key' => null,
+            'script_path' => null,
         ];
 
         return Connection::fromArray($connectionData);
@@ -213,7 +245,13 @@ class ConnectionManager
      *
      * @return Collection<int, Connection>
      */
-    public function createFromGroup(string $groupName, string $table = 'servers'): Collection
+    /**
+     * $table is required rather than defaulting to 'servers': this queries a
+     * `group` column, and dply's servers table has none — the default was
+     * inherited from the upstream package's schema and could only ever throw
+     * here. Name the table that actually has the column.
+     */
+    public function createFromGroup(string $groupName, string $table): Collection
     {
         return $this->createFromQuery($table, ['group' => $groupName]);
     }
@@ -224,7 +262,7 @@ class ConnectionManager
      * @param  list<string>  $tags
      * @return Collection<int, Connection>
      */
-    public function createFromTags(array $tags, string $table = 'servers'): Collection
+    public function createFromTags(array $tags, string $table): Collection
     {
         $query = DB::table($table);
 
@@ -368,6 +406,7 @@ class ConnectionManager
 
     /**
      * Get cache statistics.
+     *
      * @return array<string, mixed>
      */
     public function getCacheStats(): array

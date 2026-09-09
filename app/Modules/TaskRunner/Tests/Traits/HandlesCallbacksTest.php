@@ -6,8 +6,12 @@ use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\CallbackService;
 use App\Modules\TaskRunner\Traits\HandlesCallbacks;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 describe('HandlesCallbacks Trait (Complex)', function () {
     beforeEach(function () {
@@ -20,14 +24,19 @@ describe('HandlesCallbacks Trait (Complex)', function () {
 
             public $task;
 
-            public $callbackUrl = 'http://localhost/callback';
-
-            public $callbacksEnabled = true;
-
             public $afterCallbackCalled = false;
 
             public function __construct()
             {
+                // Set here rather than redeclared as a property: the trait owns
+                // `protected ?string $callbackUrl = null`, and PHP treats a
+                // redeclaration with any different type, visibility or default
+                // as a fatal composition conflict. This file used to die at the
+                // app() call above before PHP ever composed the class, which is
+                // what hid it.
+                $this->callbackUrl = 'http://localhost/callback';
+                $this->callbacksEnabled = true;
+
                 $this->task = (object) [
                     'id' => 1,
                     'name' => 'Test',

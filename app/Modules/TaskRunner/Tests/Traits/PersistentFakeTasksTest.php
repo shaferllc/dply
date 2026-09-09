@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Traits\PersistentFakeTasks;
 use Illuminate\Filesystem\Filesystem;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('PersistentFakeTasks Trait (Complex)', function () {
     beforeEach(function () {

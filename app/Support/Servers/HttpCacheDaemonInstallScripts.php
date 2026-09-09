@@ -80,12 +80,12 @@ BASH,
         $vcl = self::renderDefaultVcl($port);
 
         // shellwords-safe: $port comes from a typed int, $cacheSizeMb same.
-        return <<<BASH
+        return AptSourceRepairScript::withTolerantApt(<<<BASH
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 if ! command -v varnishd >/dev/null 2>&1; then
-    apt-get update -y
+    dply_apt_update
     apt-get install -y varnish
 fi
 command -v varnishd >/dev/null 2>&1 || { echo "ERROR: varnishd binary not on PATH after apt install." >&2; exit 1; }
@@ -121,7 +121,7 @@ systemctl is-active varnish >/dev/null
 if command -v curl >/dev/null 2>&1; then
     curl -fsS --max-time 5 -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:80/__dply_varnish_probe || true
 fi
-BASH;
+BASH);
     }
 
     /**

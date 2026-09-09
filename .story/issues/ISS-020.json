@@ -1,0 +1,22 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Commands/TaskShowCommand.php",
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php"
+  ],
+  "createdBy": "autonomous-session-d3782ff0",
+  "dedupeKey": "iss-015-followup:taskshow-ambiguous-name",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-020",
+  "impact": "TaskShowCommand::handle() resolves a non-ID identifier with `Task::where('name', $identifier)->latest()->first()`, so when several tasks share a name it shows the newest and exits 0, with nothing in the output saying the name was ambiguous. The test 'shows error when multiple tasks found by name' asserts exit code 1 and 'Multiple tasks found with name: ...', which the command never emits (it fails on the exit code: 0 returned, 1 expected).\n\nThis is a product decision, not a test bug, which is why it is filed rather than fixed: either behaviour is defensible. Showing the newest is convenient for the common case of a task name re-run repeatedly. Erroring is safer, because the operator asked about \"the deploy task\" and silently got one of several — and the ID of what they actually got is in the output only if they read it.\n\nWorth noting the same ambiguity exists for the sibling commands that resolve tasks by name; if this is settled one way, settle it there too rather than only here.\n\nWhichever way it goes, the test should then assert the chosen behaviour. Do not delete the test to make the file green — the ambiguity is real either way, and the test is the only place it is currently written down.\n\nFound while fixing ISS-015; out of its scope, which was assertion style against the wrong renderer.",
+  "location": [
+    "app/Modules/TaskRunner/Commands/TaskShowCommand.php:34",
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php:66"
+  ],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "medium",
+  "status": "open",
+  "title": "task:show silently picks the newest of several same-named tasks; its test expects an error instead"
+}

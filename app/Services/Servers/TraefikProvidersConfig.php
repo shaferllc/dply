@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
+use App\Support\Servers\AptSourceRepairScript;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -90,7 +91,7 @@ class TraefikProvidersConfig
     }
 
     /**
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      *
      * @throws \RuntimeException
      */
@@ -143,18 +144,18 @@ class TraefikProvidersConfig
         $ssh = new SshConnection($server);
 
         $emit->step('traefik-docker', 'Installing Docker (docker.io)');
-        $script = <<<'BASH'
+        $script = AptSourceRepairScript::withTolerantApt(<<<'BASH'
 set -euo pipefail
 if command -v docker >/dev/null 2>&1 && [ -S /var/run/docker.sock ]; then
   echo "[dply] Docker already installed."
   exit 0
 fi
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -y
+dply_apt_update
 apt-get install -y --no-install-recommends docker.io
 systemctl enable --now docker 2>/dev/null || true
 [ -S /var/run/docker.sock ] || { echo "[dply] docker.sock missing after install" >&2; exit 127; }
-BASH;
+BASH);
         $out = $ssh->exec('sudo -n bash -c '.escapeshellarg($script), 120);
         if ($ssh->lastExecExitCode() !== 0) {
             $emit->error(trim($out) !== '' ? trim($out) : 'Docker install failed.');
@@ -164,8 +165,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $providers
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $providers
+     * @param  array<string, mixed>  $values
      */
     private function applyDocker(array &$providers, array $values): void
     {
@@ -182,8 +183,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $providers
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $providers
+     * @param  array<string, mixed>  $values
      */
     private function applyKubernetes(array &$providers, array $values): void
     {
@@ -204,8 +205,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $providers
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $providers
+     * @param  array<string, mixed>  $values
      */
     private function applyConsul(array &$providers, array $values): void
     {
