@@ -9,7 +9,17 @@
         </div>
 
         <div class="px-5 py-4 sm:px-6">
-            @if (trim((string) ($site->git_repository_url ?? '')) === '')
+            @php
+                // A manage-in-place app (classic WordPress, Drupal) is installed
+                // WITHOUT a repo, so gating this on git_repository_url alone left
+                // those sites with no way to start over: the reset button was
+                // hidden, and canRechooseApp() is already false once
+                // scaffold.framework is set, so the picker stayed closed too.
+                // Reset is offered whenever there is an app to remove, repo or not.
+                $hasApp = trim((string) ($site->git_repository_url ?? '')) !== ''
+                    || data_get($site->meta, 'scaffold.framework') !== null;
+            @endphp
+            @if (! $hasApp)
                 <p class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-cream/60 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
                     <span>{{ __('No repository is connected to this site yet, so there’s nothing to uninstall. Connect one from the Connection tab.') }}</span>

@@ -224,3 +224,21 @@ test('disconnect and start over clears the theme and plugin repos too', function
     expect($site->gitSources()->count())->toBe(0);
     expect($site->fresh()->canRechooseApp())->toBeTrue();
 });
+
+test('a repo-less wordpress site can still be reset and re-choose its app', function () {
+    Queue::fake();
+    $user = panelUser();
+    $site = panelSite($user);
+
+    // Classic WordPress is manage-in-place: no git_repository_url. The reset
+    // affordance used to be hidden for exactly these sites, and the picker was
+    // already closed, so they had no way back to the app chooser.
+    expect(trim((string) $site->git_repository_url))->toBe('')
+        ->and($site->canRechooseApp())->toBeFalse();
+
+    Livewire::actingAs($user)
+        ->test(Repository::class, ['server' => $site->server, 'site' => $site])
+        ->call('disconnectAndStartOver');
+
+    expect($site->fresh()->canRechooseApp())->toBeTrue();
+});
