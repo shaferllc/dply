@@ -201,10 +201,12 @@ trait BuildsProvisionDatabaseStack
 
         if (str_starts_with($database, 'mariadb')) {
             return $this->withStep('Installing MariaDB', [
+                ...$this->pinMariadbSeries($database),
                 ...$this->ensurePackagesInstalled(
                     ['mariadb-server'],
                     '[dply] mariadb-server already installed; skipping package install.'
                 ),
+                ...$this->ensureMysqlCompatShims(),
                 'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
                 $this->writeFileWithRollback('/etc/mysql/mariadb.conf.d/99-dply.cnf', "[mysqld]\nbind-address = 127.0.0.1\nmax_connections = 200\ninnodb_buffer_pool_size = 256M\n"),
                 'systemctl enable --now mariadb',
@@ -262,7 +264,17 @@ trait BuildsProvisionDatabaseStack
                 // Detect database version live from the running engine.
                 'DPLY_INSTALLED_DATABASE_VERSION=""',
                 'case "${DPLY_INSTALLED_DATABASE:-}" in',
-                '  mysql*|mariadb*)',
+                // mariadb first, and via the `mariadb` binary: on MariaDB 11
+                // `mysqladmin` lives in a Recommends-only compat package, so it
+                // can be absent. An empty version here reads downstream as "no
+                // version known" and quietly disables the requested-vs-installed
+                // drift banner — i.e. it would hide exactly the mismatch this
+                // probe exists to surface.
+                '  mariadb*)',
+                '    DPLY_INSTALLED_DATABASE_VERSION=$( (mariadb --version 2>/dev/null || mysqladmin --version 2>/dev/null) \\',
+                '      | sed -n \'s/.*Distrib \([0-9.]*\).*/\1/p\' | head -n1)',
+                '    ;;',
+                '  mysql*)',
                 '    DPLY_INSTALLED_DATABASE_VERSION=$(mysqladmin --version 2>/dev/null \\',
                 '      | sed -n \'s/.*Distrib \([0-9.]*\).*/\1/p\')',
                 '    ;;',
@@ -447,6 +459,156 @@ trait BuildsProvisionDatabaseStack
                     .'rm -f /usr/share/keyrings/dply-mysql.gpg /etc/apt/sources.list.d/dply-mysql.list; '
                 .'fi; '
             .'fi',
+        ];
+    }
+
+    /**
+     * Point apt at MariaDB's own repo when the distro cannot supply the series
+     * the wizard asked for. The MariaDB twin of {@see pinMysqlSeries()}, and it
+     * exists for the same reason: Ubuntu ships exactly one MariaDB in
+     * `mariadb-server` (10.11.14 on noble), so `mariadb114`, `mariadb11` and
+     * `mariadb1011` all installed that same package and only the version field
+     * downstream ever admitted it. A "MariaDB 11.4" request came back 10.11.14.
+     *
+     * Same three properties as the MySQL branch — checks first via
+     * `apt-cache policy`, never fatal, and it says so when the pin does not
+     * take — with one difference that is easy to miss:
+     *
+     * **Epoch.** Both Ubuntu's package ("1:10.11.14-0ubuntu0.24.04.1") and
+     * MariaDB's own ("1:11.4.13+maria~ubu2404") carry a `1:` epoch, which MySQL
+     * versions do not. Comparing the raw candidate the way pinMysqlSeries can
+     * would never match, so the pin would re-add the repo and warn on every
+     * provision. Every comparison here runs on `${…#*:}` instead.
+     *
+     * @return list<string>
+     */
+    private function pinMariadbSeries(string $wizardDatabase): array
+    {
+        // Repo path per series. "11" is MariaDB's rolling major (11.8 today),
+        // which is exactly what the wizard's bare "MariaDB 11" option promises.
+        $series = match ($wizardDatabase) {
+            'mariadb114' => '11.4',
+            'mariadb11' => '11',
+            'mariadb1011' => '10.11',
+            default => null,
+        };
+
+        if ($series === null) {
+            return [];
+        }
+
+        $keyUrls = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mariadb_repo_key_urls', [])))),
+        ));
+        $fingerprints = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mariadb_repo_key_fingerprints', [])))),
+        ));
+
+        // No configured key means no verifiable repo; the distro package is the
+        // only honest outcome, and the warning below still fires.
+        if ($keyUrls === '') {
+            return [];
+        }
+
+        // Anchored so "11" cannot swallow a hypothetical "110.x", and so the
+        // exact-series case ("11.4" with no patch) still matches.
+        $match = $series.'.*|'.$series;
+
+        $pin = [
+            'DPLY_MARIADB_CANDIDATE=$(apt-cache policy mariadb-server 2>/dev/null | awk \'/Candidate:/ {print $2}\')',
+            'DPLY_MARIADB_PIN=1',
+            'case "${DPLY_MARIADB_CANDIDATE#*:}" in '.$match.') DPLY_MARIADB_PIN=0; echo "[dply] distro mariadb-server is already ${DPLY_MARIADB_CANDIDATE} — no repo needed." ;; esac',
+            'if [ "$DPLY_MARIADB_PIN" = "1" ]; then '
+                .'echo "[dply] distro mariadb-server is ${DPLY_MARIADB_CANDIDATE:-unavailable}; adding MariaDB apt repo for '.$series.'."; '
+                .'install -d /usr/share/keyrings; '
+                .'DPLY_MARIADB_KEY_OK=0; '
+                .'for DPLY_MARIADB_KEY_URL in '.$keyUrls.'; do '
+                    .'if dply_install_apt_key "$DPLY_MARIADB_KEY_URL" /usr/share/keyrings/dply-mariadb.gpg '.$fingerprints.'; then '
+                        .'echo "[dply] MariaDB signing key accepted from ${DPLY_MARIADB_KEY_URL}."; '
+                        .'DPLY_MARIADB_KEY_OK=1; break; '
+                    .'fi; '
+                .'done; '
+                .'if [ "$DPLY_MARIADB_KEY_OK" = "1" ]; then '
+                    .'. /etc/os-release; '
+                    .'echo "deb [signed-by=/usr/share/keyrings/dply-mariadb.gpg] https://dlm.mariadb.com/repo/mariadb-server/'.$series.'/repo/ubuntu ${VERSION_CODENAME} main" > /etc/apt/sources.list.d/dply-mariadb.list; '
+                    // Same sentinel check as the MySQL branch: dply_apt_update
+                    // returns 0 even when a repo is unusable, and a dead
+                    // sources.list.d entry breaks every later apt-get update.
+                    .'dply_apt_update; '
+                    .'if [ "${DPLY_APT_UPDATE_STATUS:-0}" != "0" ]; then '
+                        .'echo "[dply] WARNING: MariaDB apt repo unusable on ${VERSION_CODENAME} — removing it and falling back to the distro mariadb-server." >&2; '
+                        .'rm -f /etc/apt/sources.list.d/dply-mariadb.list /usr/share/keyrings/dply-mariadb.gpg; '
+                        .'dply_apt_update || true; '
+                    .'fi; '
+                    .'DPLY_MARIADB_CANDIDATE=$(apt-cache policy mariadb-server 2>/dev/null | awk \'/Candidate:/ {print $2}\'); '
+                    .'case "${DPLY_MARIADB_CANDIDATE#*:}" in '.$match.') : ;; '
+                        .'*) echo "[dply] WARNING: MariaDB '.$series.' is not installable here (candidate: ${DPLY_MARIADB_CANDIDATE:-unavailable}) — installing the distro mariadb-server instead." >&2 ;; '
+                    .'esac; '
+                .'else '
+                    .'echo "[dply] WARNING: no usable MariaDB signing key (every candidate failed to fetch or verify) — falling back to the distro mariadb-server." >&2; '
+                    .'rm -f /usr/share/keyrings/dply-mariadb.gpg /etc/apt/sources.list.d/dply-mariadb.list; '
+                .'fi; '
+            .'fi',
+        ];
+
+        // force_reinstall genuinely re-installs the package, so the pin is what
+        // makes the reinstall land on the requested series — let it run.
+        if ($this->forceReinstall()) {
+            return $pin;
+        }
+
+        // Otherwise: never write a different-series repo onto a box that
+        // already has MariaDB. ensurePackagesInstalled() skips the install when
+        // the package is present, so the repo would just sit in sources.list.d
+        // until some later `apt-get upgrade` performed an unattended major
+        // upgrade against a datadir from the old series. Re-provisioning an
+        // existing mariadb114 server must not arm that. Changing series on a
+        // live datadir is a migration, not a provision step.
+        return [
+            implode("\n", [
+                'if dpkg -s mariadb-server >/dev/null 2>&1; then',
+                '  echo "[dply] mariadb-server is already installed — leaving apt sources alone (switching series on an existing datadir is a migration, not a provision step)."',
+                'else',
+                implode("\n", $pin),
+                'fi',
+            ]),
+        ];
+    }
+
+    /**
+     * Restore the `mysql*` command-line shims on MariaDB 11.x.
+     *
+     * MariaDB 11 moved `mysql`, `mysqldump`, `mysqladmin` and friends out of
+     * `mariadb-client`/`mariadb-server` into `mariadb-client-compat` /
+     * `mariadb-server-compat`, which are **Recommends, not Depends** — and every
+     * install here runs `--no-install-recommends`. dply shells out to those
+     * names everywhere (database + user creation, backups, quick download, and
+     * the installed-stack version probe), so pinning 11.4 without this leaves a
+     * server whose database tooling silently does nothing.
+     *
+     * Ubuntu's 10.11 packages have no separate compat packages at all — the
+     * shims are already in `mariadb-client` — so this is keyed off the missing
+     * binary rather than the version, and is a no-op on the distro path.
+     * Best-effort: a box that ends up without the shims gets a loud warning,
+     * not a failed provision.
+     *
+     * @return list<string>
+     */
+    private function ensureMysqlCompatShims(): array
+    {
+        return [
+            implode("\n", [
+                'if ! command -v mysqladmin >/dev/null 2>&1; then',
+                '  echo "[dply] mysql* client shims missing (MariaDB 11 splits them into *-compat) — installing them."',
+                '  dply_wait_for_apt_locks || true',
+                '  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends mariadb-client-compat mariadb-server-compat >/dev/null 2>&1 || true',
+                'fi',
+                'if ! command -v mysqladmin >/dev/null 2>&1; then',
+                '  echo "[dply] WARNING: mysqladmin is still missing after installing MariaDB — dply database management (backups, quick download, user creation) will not work on this server." >&2',
+                'fi',
+            ]),
         ];
     }
 

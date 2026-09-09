@@ -154,8 +154,17 @@ trait BuildsProvisionRuntimes
             }
         }
 
-        if (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
+        if (in_array($database, ['mysql84', 'mysql80', 'mysql57'], true)) {
             $candidates[] = 'mysql-server';
+        }
+
+        // MariaDB used to prefetch `mysql-server` here — the wrong package
+        // family entirely, so it warmed the cache for something that never got
+        // installed. Only 10.11 is worth prefetching: it is the one series the
+        // distro can serve, and the other two install from MariaDB's own repo,
+        // which is added later in the run than this prefetch pass.
+        if ($database === 'mariadb1011') {
+            $candidates[] = 'mariadb-server';
         }
 
         $candidates[] = match ($cache) {
