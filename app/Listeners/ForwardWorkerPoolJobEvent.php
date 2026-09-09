@@ -67,6 +67,12 @@ class ForwardWorkerPoolJobEvent
             return;
         }
 
+        // Never re-ingest broadcast/telemetry jobs — they are the output of this
+        // agent. Forwarding them queues more broadcasts and floods Redis.
+        if ($this->shouldIgnoreJobName($name)) {
+            return;
+        }
+
         try {
             $redis = Redis::connection();
             $now = microtime(true);
@@ -138,5 +144,14 @@ class ForwardWorkerPoolJobEvent
         } finally {
             $redis->del(self::LOCK);
         }
+    }
+
+    private function shouldIgnoreJobName(string $name): bool
+    {
+        $needle = strtolower($name);
+
+        return str_contains($needle, 'broadcastevent')
+            || str_contains($needle, 'workerpooljobevent')
+            || str_contains($needle, 'illuminate\\broadcasting\\');
     }
 }

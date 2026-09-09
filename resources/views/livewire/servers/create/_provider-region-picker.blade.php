@@ -70,7 +70,17 @@
     >
         @if ($regionOptions->isEmpty())
             <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
-                {{ __('Select an account first to load regions.') }}
+                @if (! empty($catalog['error']))
+                    {{ ! empty($catalog['provider_unreachable']) || \App\Support\Providers\ProviderCatalogFailure::isUnreachable($catalog['error'] ?? null)
+                        ? __('This provider is paused until its API responds.')
+                        : (($catalog['source'] ?? '') === 'platform'
+                            ? __('Regions will appear once the platform catalog can be reached.')
+                            : __('Regions will appear once this account can be reached.')) }}
+                @elseif (filled($form->provider_credential_id ?? null))
+                    {{ __('No regions came back for this account.') }}
+                @else
+                    {{ __('Select an account first to load regions.') }}
+                @endif
             </div>
         @else
             <button
@@ -153,9 +163,9 @@
                                 <div class="flex items-start justify-between gap-4">
                                     <div class="min-w-0">
                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
-                                        <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                        <div class="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
                                         @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
-                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-2xs font-medium text-brand-forest ring-1 ring-brand-sage/20">
                                                 <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
                                             </div>
@@ -186,7 +196,7 @@
                                     <h3 class="text-lg font-semibold text-slate-900">{{ __('Region map') }}</h3>
                                     <p class="mt-1 text-sm text-slate-600">{{ __('Pick a region by location, or use the list on the right.') }}</p>
                                 </div>
-                                <button type="button" x-on:click="mapOpen = false" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
+                                <button aria-label="{{ __('Close') }}" type="button" x-on:click="mapOpen = false" class="dply-hit-44 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700">
                                     <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
                                 </button>
                             </div>
@@ -217,9 +227,9 @@
                                                 <div class="flex items-start justify-between gap-4">
                                                     <div class="min-w-0">
                                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
-                                                        <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                                        <div class="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
                                                         @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
-                                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-2xs font-medium text-brand-forest ring-1 ring-brand-sage/20">
                                                                 <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                                 {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
                                                             </div>

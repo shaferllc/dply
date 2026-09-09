@@ -96,7 +96,7 @@ class SiteProvisioningRestarter
             return;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesKubernetesRuntime()) {
             return;
         }
 

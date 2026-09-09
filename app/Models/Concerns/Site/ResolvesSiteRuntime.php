@@ -16,6 +16,7 @@ use App\Modules\Deploy\Services\LaravelComposerPackageDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\PhpRuntimeDetector;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\SupervisorDeployRestarter;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 
@@ -67,6 +68,9 @@ trait ResolvesSiteRuntime
             return $this->runtime;
         }
 
+        // Null-safe: the return type is already `?string`, and a row with
+        // neither `runtime` nor `type` set (an unsaved model, a partially
+        // hydrated one) must answer "unknown", not fatal.
         return $this->type?->value;
     }
 
@@ -154,14 +158,6 @@ trait ResolvesSiteRuntime
             return (string) $profile;
         }
 
-        if ($this->server?->isDigitalOceanFunctionsHost()) {
-            return 'digitalocean_functions_web';
-        }
-
-        if ($this->server?->isAwsLambdaHost()) {
-            return 'aws_lambda_bref_web';
-        }
-
         if ($this->server?->isDockerHost()) {
             return 'docker_web';
         }
@@ -178,8 +174,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeProfile()) {
             'docker_web' => __('Docker'),
             'kubernetes_web' => __('Kubernetes'),
-            'digitalocean_functions_web' => __('DigitalOcean Functions'),
-            'aws_lambda_bref_web' => __('AWS Lambda'),
             'vm_web' => __('BYO VM'),
             default => (string) str($this->runtimeProfile())->replace('_', ' ')->title(),
         };
@@ -190,7 +184,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeTargetMode()) {
             'docker' => __('Container'),
             'kubernetes' => __('Kubernetes'),
-            'serverless' => __('Serverless'),
             default => __('VM'),
         };
     }
@@ -198,10 +191,10 @@ trait ResolvesSiteRuntime
     /**
      * App/stack detection from persisted meta. Priority matches
      * {@see DeploymentSecretInventory::detectedFramework}:
-     * Docker → Kubernetes → serverless → VM (composer.json on deploy).
+     * Docker → Kubernetes → VM (composer.json on deploy).
      *
      * @return array{
-     *     source: 'docker'|'kubernetes'|'serverless'|'vm',
+     *     source: 'docker'|'kubernetes'|'vm',
      *     framework: string,
      *     language: string,
      *     confidence?: string,
@@ -220,7 +213,6 @@ trait ResolvesSiteRuntime
         $candidates = [
             ['source' => 'docker', 'blob' => data_get($meta, 'docker_runtime.detected')],
             ['source' => 'kubernetes', 'blob' => data_get($meta, 'kubernetes_runtime.detected')],
-            ['source' => 'serverless', 'blob' => data_get($meta, 'serverless.detected_runtime') ?: data_get($meta, 'serverless.detected')],
             ['source' => 'vm', 'blob' => data_get($meta, 'vm_runtime.detected')],
         ];
 
@@ -239,6 +231,25 @@ trait ResolvesSiteRuntime
                 'framework' => (string) ($blob['framework'] ?? 'unknown'),
                 'language' => (string) ($blob['language'] ?? 'unknown'),
             ];
+
+            // The JS package manager the repo actually uses (npm/pnpm/yarn/bun).
+            // Carried through because the deploy step defaults pick the install
+            // command from it — `npm ci` on a pnpm repo fails outright.
+            if (isset($blob['package_manager']) && is_string($blob['package_manager']) && $blob['package_manager'] !== '') {
+                $out['package_manager'] = $blob['package_manager'];
+            }
+
+            // Which migration tool the repo ships (payload / prisma / drizzle),
+            // so the release phase can apply schema changes on deploy.
+            if (isset($blob['migration_tool']) && is_string($blob['migration_tool']) && $blob['migration_tool'] !== '') {
+                $out['migration_tool'] = $blob['migration_tool'];
+            }
+
+            // How to start the app, when the repo says. SiteRuntimeReconciler
+            // needs it before it can move the site onto a proxied runtime.
+            if (isset($blob['start_command']) && is_string($blob['start_command']) && $blob['start_command'] !== '') {
+                $out['start_command'] = $blob['start_command'];
+            }
 
             if (isset($blob['confidence']) && is_string($blob['confidence']) && $blob['confidence'] !== '') {
                 $out['confidence'] = $blob['confidence'];
@@ -332,17 +343,67 @@ trait ResolvesSiteRuntime
         return $resolved !== null ? strtolower($resolved['framework']) : '';
     }
 
-    public function usesFunctionsRuntime(): bool
+    /**
+     * Which product this site is, as one word. API payloads expose it so the
+     * CLI (`dply sites`) and other clients can say what a site IS without
+     * knowing the column layout.
+     */
+    public function siteKind(): string
     {
-        return in_array($this->runtimeProfile(), [
-            'digitalocean_functions_web',
-            'aws_lambda_bref_web',
-        ], true);
+        return 'vm';
     }
 
-    public function usesAwsLambdaRuntime(): bool
+    /**
+     * Whether the PHP-FPM control surface actually applies to this site: it
+     * runs PHP *and* its server has PHP installed.
+     *
+     * The Runtime tab used three different notions of "is this a PHP site" —
+     * runtimeHealthProbeKind() === 'fpm', usesDedicatedPhpFpmPool(), and
+     * type === SiteType::Php — and none of them consulted the host. So a PHP
+     * site on a php_version=none box rendered an FPM pool that could never be
+     * read, a permanently "disabled" OPcache card, and a table of PHP limits,
+     * all describing an interpreter that isn't installed. Those read as
+     * transient errors rather than "this server does not run PHP".
+     *
+     * Fails open when the server isn't loaded or has no stack summary yet, so
+     * a host we cannot read keeps the panels it has always had.
+     */
+    /**
+     * The site type the WEB SERVER CONFIG should be built for.
+     *
+     * Identical to `type` in every case but one: a reverse-proxied site with no
+     * application yet. Nothing is listening on its internal port — there is no
+     * code, no systemd unit, no process — so a proxy vhost can only ever return
+     * 502, which is indistinguishable from a crashed app. Serving the document
+     * root instead (where installPlaceholderPage() puts the splash) is the
+     * honest holding state until the first deploy puts a process there.
+     *
+     * All four config builders (Nginx / Caddy / Apache / OpenLiteSpeed) match on
+     * this rather than on `type`, so the holding state can't be implemented in
+     * one web server and forgotten in the other three.
+     */
+    public function configSiteType(): SiteType
     {
-        return $this->runtimeProfile() === 'aws_lambda_bref_web';
+        if ($this->type === SiteType::Node && $this->lacksInstalledApp()) {
+            return SiteType::Static;
+        }
+
+        return $this->type;
+    }
+
+    public function runsPhpOnItsServer(): bool
+    {
+        if ((string) ($this->runtimeKey() ?? '') !== 'php') {
+            return false;
+        }
+
+        $server = $this->server;
+
+        if ($server === null) {
+            return true;
+        }
+
+        return ServerInstalledServices::hasAny($server, ['php', 'unknown']);
     }
 
     public function usesDockerRuntime(): bool
@@ -403,7 +464,7 @@ trait ResolvesSiteRuntime
      * Which live runtime-health probe the Runtime → Overview card should run:
      * 'fpm' for a dedicated PHP-FPM pool, 'port' for a long-running app server
      * that listens on {@see $app_port}, or null when there's nothing cheap to
-     * probe (static, Docker/Kubernetes/serverless — those have their own
+     * probe (static, Docker/Kubernetes — those have their own
      * discovery surfaces). Used by both the Livewire loader and the blade so the
      * deferred probe and the rendered card always agree.
      */
@@ -413,7 +474,7 @@ trait ResolvesSiteRuntime
             return 'fpm';
         }
 
-        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime() || $this->usesFunctionsRuntime()) {
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
             return null;
         }
 
@@ -426,7 +487,7 @@ trait ResolvesSiteRuntime
 
     /**
      * Whether this site can use the site-scoped systemd Services workspace
-     * (dply-site-{id}[-{name}].service). PHP/static and container/serverless
+     * (dply-site-{id}[-{name}].service). PHP/static and container
      * workloads use FPM, nginx, or Supervisor (Daemons) instead.
      */
     public static function supportsSystemdServices(Site $site, Server $server): bool
@@ -435,8 +496,7 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        if ($site->usesFunctionsRuntime()
-            || $site->usesDockerRuntime()
+        if ($site->usesDockerRuntime()
             || $site->usesKubernetesRuntime()) {
             return false;
         }
@@ -487,12 +547,7 @@ trait ResolvesSiteRuntime
 
     public function usesContainerRuntime(): bool
     {
-        return $this->type === SiteType::Container
-            || in_array($this->container_backend, [
-                'digitalocean_app_platform',
-                'aws_app_runner',
-                'dply_cloud',
-            ], true);
+        return $this->type === SiteType::Container;
     }
 
     public function usesEdgeRuntime(): bool
@@ -634,7 +689,6 @@ trait ResolvesSiteRuntime
         $this->loadMissing('server');
 
         return (bool) $this->server?->hostCapabilities()->supportsSsh()
-            && ! $this->usesFunctionsRuntime()
             && ! $this->usesDockerRuntime()
             && ! $this->usesKubernetesRuntime();
     }
@@ -914,14 +968,6 @@ trait ResolvesSiteRuntime
             };
         }
 
-        if ($this->usesAwsLambdaRuntime()) {
-            return 'aws_lambda';
-        }
-
-        if ($this->usesFunctionsRuntime()) {
-            return 'digitalocean_functions';
-        }
-
         return 'byo_vm';
     }
 
@@ -929,8 +975,8 @@ trait ResolvesSiteRuntime
     {
         return match ($this->runtimeTargetFamily()) {
             'local_orbstack_docker', 'local_orbstack_kubernetes' => 'local',
-            'digitalocean_docker', 'digitalocean_kubernetes', 'digitalocean_functions' => 'digitalocean',
-            'aws_docker', 'aws_kubernetes', 'aws_lambda' => 'aws',
+            'digitalocean_docker', 'digitalocean_kubernetes' => 'digitalocean',
+            'aws_docker', 'aws_kubernetes' => 'aws',
             default => 'byo',
         };
     }
@@ -950,7 +996,6 @@ trait ResolvesSiteRuntime
         return match ($this->runtimeTargetFamily()) {
             'local_orbstack_kubernetes', 'digitalocean_kubernetes', 'aws_kubernetes', 'kubernetes' => 'kubernetes',
             'local_orbstack_docker', 'digitalocean_docker', 'aws_docker', 'docker', 'byo_vm_docker' => 'docker',
-            'digitalocean_functions', 'aws_lambda' => 'serverless',
             default => 'vm',
         };
     }
@@ -972,8 +1017,6 @@ trait ResolvesSiteRuntime
             'digitalocean_kubernetes' => 'DigitalOcean Kubernetes',
             'aws_docker' => 'AWS Docker',
             'aws_kubernetes' => 'AWS Kubernetes',
-            'digitalocean_functions' => 'DigitalOcean Functions',
-            'aws_lambda' => 'AWS Lambda',
             default => 'BYO runtime',
         };
     }

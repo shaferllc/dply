@@ -21,24 +21,19 @@
 @endphp
 
 <section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What we\'ll install') }}</h3>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('You chose a dedicated :role on the previous step. Pick the engine below — dply provisions only what that host needs.', ['role' => strtolower((string) ($selectedServerRole['label'] ?? __('server')))]) }}
-            </p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-check-badge"
+        :title="__('What we\'ll install')"
+        :note="__('You chose a dedicated :role on the previous step. Pick the engine below — dply provisions only what that host needs.', ['role' => strtolower((string) ($selectedServerRole['label'] ?? __('server')))])"
+        class="border-b border-brand-ink/10"
+    />
 
-    <div class="space-y-6 p-6 sm:p-7">
+    <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
         <div class="rounded-2xl border-2 border-brand-sage/40 bg-gradient-to-br from-brand-sage/10 via-white to-white p-5 ring-1 ring-brand-sage/20">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Server purpose') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Server purpose') }}</p>
                     <p class="mt-1 text-lg font-semibold text-brand-ink">{{ $selectedServerRole['label'] ?? $roleId }}</p>
                     @if (! empty($selectedServerRole['summary']))
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $selectedServerRole['summary'] }}</p>
@@ -56,7 +51,7 @@
 
             @if ($packageLabels->isNotEmpty())
                 <div class="mt-5">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Packages') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Packages') }}</p>
                     <ul class="mt-2 flex flex-wrap gap-2">
                         @foreach ($packageLabels as $package)
                             <li class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
@@ -83,7 +78,7 @@
 
         @if ($showDatabasePicker)
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database engine') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database engine') }}</p>
                 <p class="mt-1 text-xs text-brand-mist">{{ __('Pick the engine for this dedicated database host.') }}</p>
                 <div class="mt-3">
                     @include('livewire.servers.create._rich-select', [
@@ -108,7 +103,7 @@
 
         @if ($showPhpPicker)
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP runtime') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP runtime') }}</p>
                 <p class="mt-1 text-xs text-brand-mist">{{ __('Queue workers need PHP on the host. Pick the version your jobs target.') }}</p>
                 <div class="mt-3">
                     @include('livewire.servers.create._rich-select', [

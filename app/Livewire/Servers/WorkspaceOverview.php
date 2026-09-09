@@ -15,16 +15,15 @@ use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use App\Models\BackupSchedule;
 use App\Models\InsightFinding;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
-use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SupervisorProgram;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthCockpit;
 use App\Services\Servers\ServerPatchAdvisor;
@@ -35,6 +34,7 @@ use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
 use App\Support\Servers\SharedHostReport;
 use App\Support\Servers\SupervisorQueueProgramTypes;
+use App\Support\Servers\WorkerHostContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -70,36 +70,11 @@ class WorkspaceOverview extends Component
         $this->bootWorkspace($server);
 
         // A serverless function is not a server — the DO Functions namespace
-        // host is an implementation detail. Redirect to the function
-        // workspace so the operator never sees server-shaped chrome (SSH,
-        // setup, metrics) that does not apply to a function.
-        if ($server->isDigitalOceanFunctionsHost()) {
-            $function = $server->sites()->orderBy('created_at')->first();
-            if ($function !== null) {
-                return $this->redirect(
-                    route('sites.show', ['server' => $server, 'site' => $function]),
-                );
-            }
-        }
-
         // Same story for dply Edge + dply Cloud synthetic hosts — neither
         // has a VM, SSH, metrics, or anything else a "server overview"
         // would surface. Redirect to the first site's workspace (single
         // app per synthetic server in the common case) or fall back to
         // the product index when this server has no sites yet.
-        if ($server->isDplyEdgeHost() || $server->isDplyCloudHost()) {
-            $site = $server->sites()->orderBy('created_at')->first();
-            if ($site !== null) {
-                return $this->redirect(
-                    route('sites.show', ['server' => $server, 'site' => $site]),
-                );
-            }
-
-            return $this->redirect(
-                $server->isDplyEdgeHost() ? route('edge.index') : route('cloud.index'),
-            );
-        }
-
         $this->kickClusterPollIfStale();
 
         return null;
@@ -281,11 +256,11 @@ class WorkspaceOverview extends Component
                 ->whereIn('program_type', SupervisorQueueProgramTypes::TYPES)
                 ->where('is_active', true)
                 ->count(),
-            'active_schedules' => ServerBackupSchedule::query()
+            'active_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', true)
                 ->count(),
-            'paused_schedules' => ServerBackupSchedule::query()
+            'paused_schedules' => BackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', false)
                 ->count(),
@@ -353,6 +328,7 @@ class WorkspaceOverview extends Component
         $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
         $isDatabaseRoleHost = $serverRole === 'database';
         $isWorkerRoleHost = $serverRole === 'worker';
+        $workerHost = WorkerHostContext::for($this->server);
         // Dedicated cache/db boxes never host site code, so their site/stack/deploy
         // cards are hidden. A worker IS an app host (it runs queue workers from the
         // deployed code), so it keeps sites/deploys — it just doesn't serve web traffic.
@@ -360,8 +336,8 @@ class WorkspaceOverview extends Component
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
             && isset($latestMetricSnapshot->payload['cpu_pct']);
-        $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
-            + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
+        $hasBackupSchedule = $backgroundSummary['active_schedules']
+            + $backgroundSummary['paused_schedules'] > 0;
         // An "installed" cache engine is one that's past the install pipeline
         // (running or stopped). Pending/installing/uninstalling/failed rows
         // are mid-flight and don't satisfy the onboarding step yet.
@@ -410,8 +386,9 @@ class WorkspaceOverview extends Component
             $engineRow = $engineRows
                 ->sortByDesc(fn (ServerDatabaseEngine $row) => $row->status === ServerDatabaseEngine::STATUS_RUNNING ? 1 : 0)
                 ->first();
-            $engineKey = $engineRow?->engine
-                ?? (is_string($installedStack->database) && $installedStack->database !== 'none'
+            $engineKey = $engineRow !== null
+                ? $engineRow->engine
+                : (is_string($installedStack->database) && $installedStack->database !== 'none'
                     ? strtolower((string) preg_replace('/\d+$/', '', $installedStack->database))
                     : null);
             $engineLabel = $engineKey !== null
@@ -420,7 +397,7 @@ class WorkspaceOverview extends Component
             $databaseTileData = [
                 'engine' => $engineKey,
                 'engine_label' => $engineLabel,
-                'version' => $engineRow?->version ?? $installedStack->databaseVersion,
+                'version' => $engineRow !== null ? $engineRow->version : $installedStack->databaseVersion,
                 'status' => $engineRow?->status,
                 'database_count' => $databaseSummary['count'],
                 'active_schedules' => $backgroundSummary['active_schedules'],
@@ -463,7 +440,7 @@ class WorkspaceOverview extends Component
                 'cta_route' => route('servers.caches', $this->server),
             ];
         } elseif ($isDatabaseRoleHost) {
-            $engineLabel = $databaseTileData['engine_label'] ?? __('Database engine');
+            $engineLabel = $databaseTileData['engine_label'];
             $onboardingSteps[] = [
                 'key' => 'first_database_engine',
                 'label' => __('Install :engine', ['engine' => $engineLabel]),
@@ -471,6 +448,17 @@ class WorkspaceOverview extends Component
                 'done' => $databaseEngineInstalled,
                 'cta_label' => __('Open Database'),
                 'cta_route' => route('servers.databases', $this->server),
+            ];
+        } elseif ($isWorkerRoleHost) {
+            $onboardingSteps[] = [
+                'key' => 'first_site',
+                'label' => __('Install queue workload'),
+                'help' => $workerHost->originSite
+                    ? __('This worker copies :site and runs its queues.', ['site' => $workerHost->originSite->name])
+                    : __('This worker copies the origin site and runs its queues.'),
+                'done' => $sites->count() > 0,
+                'cta_label' => $workerHost->manageUrl ? __('Open Worker Servers') : __('Open Workload'),
+                'cta_route' => $workerHost->manageUrl ?? route('servers.sites', $this->server),
             ];
         } else {
             $onboardingSteps[] = [
@@ -493,7 +481,7 @@ class WorkspaceOverview extends Component
                 'key' => 'first_worker',
                 'label' => __('Start a queue worker'),
                 'help' => __('Run your queue workers and scheduled jobs from the Workers tab.'),
-                'done' => ($backgroundSummary['active_workers'] ?? 0) > 0,
+                'done' => $backgroundSummary['active_workers'] > 0,
                 'cta_label' => __('Open Workers'),
                 'cta_route' => route('servers.workers', $this->server),
             ];
@@ -527,7 +515,7 @@ class WorkspaceOverview extends Component
                 'key' => 'notifications',
                 'label' => __('Hook up notifications'),
                 'help' => __('Get pinged on Slack / email when something this server runs misbehaves.'),
-                'done' => ($notificationSummary['channel_count'] ?? 0) > 0,
+                'done' => $notificationSummary['channel_count'] > 0,
                 'cta_label' => __('Manage'),
                 'cta_route' => $notificationSummary['manage_url'],
             ];
@@ -535,7 +523,7 @@ class WorkspaceOverview extends Component
 
         $onboardingTotal = count($onboardingSteps);
         $onboardingDone = collect($onboardingSteps)->where('done', true)->count();
-        $onboardingComplete = $onboardingTotal > 0 && $onboardingDone === $onboardingTotal;
+        $onboardingComplete = $onboardingDone === $onboardingTotal;
 
         // K8s cluster gone / unreachable. PollDoksClusterStatusJob (and the EKS
         // counterpart) flip the server to STATUS_ERROR and stash a human
@@ -565,6 +553,7 @@ class WorkspaceOverview extends Component
         // operator lands, not buried in Settings → Notes. Cap at 3 — the notes
         // tab owns the full list.
         $pinnedNotes = $this->server->notes()
+            ->active()
             ->where('pinned', true)
             ->with('creator:id,name')
             ->orderByDesc('updated_at')
@@ -608,7 +597,10 @@ class WorkspaceOverview extends Component
             'latestMetricSnapshot' => $latestMetricSnapshot,
             'sitesPreview' => $sitesPreview,
             'sitesPreviewLatestDeploys' => $sitesPreviewLatestDeploys,
-            'deployableSiteCount' => $this->deployableSitesFor($this->server->loadMissing('sites'))->count(),
+            'deployableSiteCount' => $isWorkerRoleHost
+                ? 0
+                : $this->deployableSitesFor($this->server->loadMissing('sites'))->count(),
+            'workerHost' => $workerHost,
             'onboardingSteps' => $onboardingSteps,
             'onboardingDone' => $onboardingDone,
             'onboardingTotal' => $onboardingTotal,
@@ -621,6 +613,7 @@ class WorkspaceOverview extends Component
             'databaseTileData' => $databaseTileData,
             'isDedicatedServiceRoleHost' => $isDedicatedServiceRoleHost,
             'isDatabaseRoleHost' => $isDatabaseRoleHost,
+            'isWorkerRoleHost' => $isWorkerRoleHost,
         ]);
     }
 

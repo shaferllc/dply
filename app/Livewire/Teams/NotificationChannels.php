@@ -32,6 +32,9 @@ class NotificationChannels extends Component
         return $this->team;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function notificationChannelsViewData(): array
     {
         return [
@@ -40,15 +43,16 @@ class NotificationChannels extends Component
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                 ['label' => $this->organization->name, 'href' => route('organizations.show', $this->organization), 'icon' => 'building-office-2'],
-                ['label' => __('Teams'), 'href' => route('organizations.teams', $this->organization), 'icon' => 'rectangle-group'],
-                ['label' => $this->team->name, 'icon' => 'user-group'],
+                ['label' => __('People'), 'href' => route('organizations.members', $this->organization), 'icon' => 'user-group'],
+                // Back to the team's own slice of the People directory.
+                ['label' => $this->team->name, 'href' => route('organizations.members', $this->organization).'?team='.$this->team->id, 'icon' => 'rectangle-group'],
                 ['label' => __('Notification channels'), 'icon' => 'bell-alert'],
             ],
             'backUrl' => null,
             'backLabel' => null,
             'organization' => $this->organization,
             'useOrgShell' => true,
-            'orgShellSection' => 'teams',
+            'orgShellSection' => 'members',
             'showBulkAssign' => false,
             'currentOrganization' => null,
             'organizationChannels' => collect(),

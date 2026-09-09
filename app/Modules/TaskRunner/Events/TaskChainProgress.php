@@ -132,7 +132,6 @@ class TaskChainProgress
      * Get progress details.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getProgressDetails(): array
     {
         return [

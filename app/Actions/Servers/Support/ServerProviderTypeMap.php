@@ -10,7 +10,6 @@ final class ServerProviderTypeMap
     {
         return match ($type) {
             'digitalocean' => 'digitalocean',
-            'digitalocean_functions' => 'digitalocean',
             'digitalocean_kubernetes' => 'digitalocean',
             'hetzner' => 'hetzner',
             'linode' => 'linode',
@@ -19,7 +18,6 @@ final class ServerProviderTypeMap
             'aws' => 'aws',
             'azure' => 'azure',
             'oracle' => 'oracle',
-            'aws_lambda' => 'aws',
             'aws_kubernetes' => 'aws',
             default => null,
         };

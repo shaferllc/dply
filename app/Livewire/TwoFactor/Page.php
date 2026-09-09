@@ -12,6 +12,14 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use PragmaRX\Google2FA\Google2FA;
 
+/**
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read bool $isManageMode
+ * @property-read bool $needsStart
+ */
 #[Layout('layouts.settings')]
 class Page extends Component
 {
@@ -76,6 +84,36 @@ class Page extends Component
         );
 
         return app(TwoFactorQrCodeService::class)->svg($otpauthUrl);
+    }
+
+    /**
+     * The raw TOTP secret, for people whose authenticator can't scan a QR code.
+     * Same data the QR already encodes — only exposed during setup, never once
+     * 2FA is confirmed.
+     */
+    public function getSetupKeyProperty(): ?string
+    {
+        if ($this->isManageMode || $this->needsStart) {
+            return null;
+        }
+        $user = auth()->user();
+
+        return $user->two_factor_secret ? decrypt($user->two_factor_secret) : null;
+    }
+
+    /**
+     * How many single-use recovery codes are left. Codes are stored hashed, so
+     * this is a count only — the plaintext is shown once, at confirmation.
+     */
+    public function getRecoveryCodesRemainingProperty(): ?int
+    {
+        $user = auth()->user();
+        if (! $user->two_factor_recovery_codes) {
+            return null;
+        }
+        $codes = json_decode(decrypt($user->two_factor_recovery_codes), true);
+
+        return is_array($codes) ? count($codes) : null;
     }
 
     public function confirm(): mixed

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Projects\Livewire;
 
+use App\Enums\QuotaSurface;
 use App\Jobs\RunWorkspaceDeployJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -291,7 +292,7 @@ class Show extends Component
             return;
         }
 
-        $name = $member->user?->name ?? 'member';
+        $name = $member->user->name ?? 'member';
         $member->delete();
 
         audit_log($this->workspace->organization, auth()->user(), 'project.member_removed', $this->workspace, null, [
@@ -425,17 +426,20 @@ class Show extends Component
             'variableValue' => 'nullable|string|max:5000',
         ]);
 
+        $existing = $this->workspace->variables()->where('env_key', strtoupper($this->variableKey))->first();
+
         $this->workspace->variables()->updateOrCreate(
             ['env_key' => strtoupper($this->variableKey)],
             [
                 'env_value' => $this->variableValue !== '' ? $this->variableValue : null,
-                'is_secret' => $this->variableIsSecret,
+                // New project secrets are frozen — use org Secrets and link
+                // them onto sites. Existing is_secret flags keep working.
+                'is_secret' => (bool) ($existing?->is_secret ?? false),
             ]
         );
 
         $this->toastSuccess(__('Project variable saved.'));
         $this->reset('variableKey', 'variableValue');
-        $this->variableIsSecret = true;
     }
 
     public function deleteVariable(string $variableId): void
@@ -740,7 +744,14 @@ class Show extends Component
         $serversUnlimited = $serverCap === null;
         $sitesUnlimited = $siteCap === null;
         $serversRemaining = $serversUnlimited ? null : max(0, $serverCap - $workspace->servers->count());
-        $sitesRemaining = $sitesUnlimited ? null : max(0, $siteCap - $workspace->sites->count());
+
+        // Headroom must compare like with like: planSiteLimit() is the MACHINE-site
+        // ceiling since the per-surface split, so an Edge app or function in this
+        // workspace must not be subtracted from it. Org-wide usage, because the
+        // ceiling is org-wide — the workspace count alone would overstate headroom.
+        $sitesRemaining = $sitesUnlimited
+            ? null
+            : max(0, $siteCap - $workspace->organization->quotaUsage(QuotaSurface::Site));
 
         $costSummary = [
             'servers_used' => $workspace->servers->count(),

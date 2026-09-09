@@ -12,7 +12,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\Cloud\Services\AwsEksService;
+use App\Modules\Providers\Services\AwsEksService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -109,50 +109,6 @@ trait StoresAwsServers
         // generates kubeconfig. Stops on first poll since cluster is ACTIVE
         // (or marks ERROR if not). Same job runs on the Refresh button later.
         PollEksClusterStatusJob::dispatch($server);
-
-        return $server;
-    }
-
-    private function storeAwsLambda(User $user, Organization $org, ServerCreateForm $form): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'aws_lambda_region' => $form->aws_lambda_region,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'aws_lambda_region' => 'required|string|max:255',
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'aws')
-            ->findOrFail($form->provider_credential_id);
-
-        $meta = [
-            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
-            'aws_lambda' => [
-                'region' => trim($form->aws_lambda_region),
-            ],
-        ];
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::Aws,
-            'provider_credential_id' => $credential->id,
-            'ssh_port' => 22,
-            'ssh_user' => 'lambda',
-            'region' => trim($form->aws_lambda_region),
-            'status' => Server::STATUS_READY,
-            'health_status' => Server::HEALTH_REACHABLE,
-            'meta' => $meta,
-        ]);
-
-        audit_log($org, $user, 'server.created', $server);
 
         return $server;
     }

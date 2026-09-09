@@ -1,28 +1,34 @@
 @php
-    // Lightweight summary stats — pulled inline so this redesign doesn't
-    // require touching the Livewire component or its renderer signature.
-    $connectedProviders = $credentials->pluck('provider')->unique();
-    $verifiedCredentials = $credentials->filter(fn ($c) => ! empty($c->verified_at ?? null));
-
-    $capabilityTabs = [
-        ['id' => 'all', 'label' => __('All'), 'icon' => 'heroicon-o-squares-2x2'],
-        ['id' => 'server', 'label' => __('Compute'), 'icon' => 'heroicon-o-cpu-chip'],
+    // One table, both families. A provider token and a backup destination are
+    // different rows in different tables, but from the reader's side they answer
+    // the same question — what have we handed to a third party, and does it
+    // still work? The component's rows() projection makes them comparable.
+    $filters = [
+        ['id' => 'all', 'label' => __('All'), 'icon' => 'heroicon-o-key'],
+        ['id' => 'compute', 'label' => __('Compute'), 'icon' => 'heroicon-o-cpu-chip'],
         ['id' => 'dns', 'label' => __('DNS'), 'icon' => 'heroicon-o-globe-alt'],
         ['id' => 'cdn', 'label' => __('CDN'), 'icon' => 'heroicon-o-bolt'],
+        ['id' => 'storage', 'label' => __('Storage'), 'icon' => 'heroicon-o-circle-stack'],
+        ['id' => 'git', 'label' => __('Git'), 'icon' => 'heroicon-o-code-bracket'],
+        ['id' => 'attention', 'label' => __('Needs attention'), 'tone' => 'alert', 'icon' => 'heroicon-o-exclamation-triangle'],
     ];
 
-    // Capability dots for the provider cards — the existing panel.blade.php
-    // uses the same vocabulary, so cards and panel speak the same language.
-    $capabilityDot = function (string $cap): array {
-        return match ($cap) {
-            'compute' => ['label' => __('Compute'), 'dot' => 'bg-brand-moss'],
-            'dns' => ['label' => __('DNS'), 'dot' => 'bg-brand-sage'],
-            'cdn' => ['label' => __('CDN'), 'dot' => 'bg-sky-500'],
-            'app_platform' => ['label' => __('App Platform'), 'dot' => 'bg-violet-500'],
-            'import' => ['label' => __('Import'), 'dot' => 'bg-amber-500'],
-            default => ['label' => ucfirst(str_replace('_', ' ', $cap)), 'dot' => 'bg-brand-mist'],
-        };
+    $statusChip = fn (string $status): string => match ($status) {
+        'ok' => 'border-brand-sage/35 bg-brand-sage/15 text-brand-forest',
+        'bad' => 'border-rose-200 bg-rose-50 text-rose-700',
+        'warn' => 'border-amber-200 bg-amber-50 text-amber-900',
+        default => 'border-brand-ink/10 bg-brand-sand/50 text-brand-moss',
     };
+
+    $th = 'px-3 py-1.5 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist sm:px-4';
+    $td = 'px-3 py-2 align-middle sm:px-4';
+
+    // Row actions. whitespace-nowrap because "Re-check" was breaking across two
+    // lines and making the row twice as tall as its neighbours.
+    $act = 'inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-xs font-semibold shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+    $actNeutral = $act.' border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40';
+    $actDanger = $act.' border-rose-200 bg-white text-rose-700 hover:bg-rose-50';
+    $actIcon = 'h-3.5 w-3.5 shrink-0 opacity-90';
 @endphp
 
 <x-livewire-validation-errors />
@@ -30,253 +36,201 @@
 {{-- In the org shell the trail is hoisted above the whole box (see index.blade.php);
      here it only renders on the standalone (non-shell) surface. --}}
 @if (empty($useOrgShell))
-    @if ($organization)
-        <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-            ['label' => __('Provider credentials'), 'icon' => 'server'],
-        ]" />
-    @else
-        <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
-            ['label' => __('Provider credentials'), 'icon' => 'server'],
-        ]" />
-    @endif
+    <x-breadcrumb-trail doc-route="docs.connect-provider" :items="[
+        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+        ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
+        ['label' => __('Credentials'), 'icon' => 'key'],
+    ]" />
 @endif
 
-<div @class(["space-y-6" => empty($useOrgShell)])>
-@if (empty($useOrgShell))
-{{-- Standalone settings surface keeps its own hero; org shell already has title. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-key class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Providers') }}</h2>
-                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <a href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage underline decoration-brand-sage/35 underline-offset-2 transition hover:text-brand-ink hover:decoration-brand-ink/30">
-                        {{ __('Roles & limits') }}
-                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
-                    </a>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Providers') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $connectedProviders->count() }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ __('connected') }}</span>
-                    </dd>
-                </div>
-                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Credentials') }}</dt>
-                    <dd class="mt-1 flex items-baseline gap-1.5">
-                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $credentials->count() }}</span>
-                        <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $credentials->count()) }}</span>
-                    </dd>
-                </div>
-                <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest/80">{{ __('Storage') }}</dt>
-                    <dd class="mt-1 flex items-center gap-1.5">
-                        <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
-                        <span class="text-[11px] font-medium text-brand-forest">{{ __('Encrypted at rest') }}</span>
-                    </dd>
-                </div>
-            </dl>
-        </div>
-    </section>
-@endif
-
-    {{-- Capability filter. --}}
-    <section aria-label="{{ __('Capability filter') }}" @class([
-        'border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => ! empty($useOrgShell),
+{{-- OAuth round trips land back here, so this is the only place their outcome
+     can be reported. Without it a successful "Connect Dropbox" returned
+     silently and looked like nothing happened. --}}
+@if (session('success') || session('error'))
+    <div @class([
+        'px-5 py-4 sm:px-6' => empty($useOrgShell),
+        'border-b border-brand-ink/10 px-5 py-4 sm:px-6' => ! empty($useOrgShell),
     ])>
-        <x-server-workspace-tablist :aria-label="__('Capability filter')" scroll class="!mb-0">
-            @foreach ($capabilityTabs as $tabItem)
-                <x-server-workspace-tab :icon="$tabItem['icon']" :active="$tab === $tabItem['id']" wire:click="$set('tab', '{{ $tabItem['id'] }}')">
-                    {{ $tabItem['label'] }}
-                </x-server-workspace-tab>
-            @endforeach
-        </x-server-workspace-tablist>
-    </section>
+        <x-alert :tone="session('error') ? 'danger' : 'success'">
+            {{ session('error') ?: session('success') }}
+        </x-alert>
+    </div>
+@endif
 
-    {{-- First-run nudge. When the org has zero credentials anywhere,
-         surface a single "Connect your first provider" card above the grid
-         so an empty workspace doesn't read as a wall of greyed-out tiles. --}}
-    @if ($credentials->isEmpty())
-        <section @class([
-            'rounded-2xl border border-brand-sage/30 bg-brand-sage/5 p-5 sm:p-6' => empty($useOrgShell),
-            'border-b border-brand-ink/10 bg-brand-sage/5 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
-        ])>
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
-                    <x-heroicon-o-link class="h-6 w-6" aria-hidden="true" />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Connect your first provider') }}</p>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a provider below to link an API token. Tokens are encrypted before they hit disk and verified when possible.') }}</p>
-                </div>
-                <button
-                    type="button"
-                    x-on:click="$dispatch('open-add-provider-credential-modal')"
-                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition hover:bg-brand-forest"
-                >
-                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+{{-- Filters act on YOUR rows. The capability tabs they replace filtered the
+     catalog, so "DNS" hid providers you hadn't connected either way. Chips with
+     nothing behind them are hidden rather than shown at zero. --}}
+<section aria-label="{{ __('Filter credentials') }}" @class([
+    'flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 bg-brand-cream/40 px-3 py-2 sm:px-4' => ! empty($useOrgShell),
+    'flex flex-wrap items-center gap-1.5 rounded-xl border border-brand-ink/10 bg-white p-2' => empty($useOrgShell),
+])>
+    @foreach ($filters as $chip)
+        @php $n = $counts[$chip['id']] ?? 0; @endphp
+        @continue($n === 0 && $chip['id'] !== 'all')
+        <button
+            type="button"
+            wire:click="setFilter('{{ $chip['id'] }}')"
+            @class([
+                'inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs font-semibold transition-colors',
+                'border-brand-ink bg-brand-ink text-brand-cream' => $filter === $chip['id'],
+                'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => $filter !== $chip['id'] && ($chip['tone'] ?? '') !== 'alert',
+                'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' => $filter !== $chip['id'] && ($chip['tone'] ?? '') === 'alert',
+            ])
+        >
+            <x-dynamic-component :component="$chip['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {{ $chip['label'] }}
+            <span @class([
+                'font-mono tabular-nums',
+                'opacity-70' => $filter === $chip['id'],
+                'text-brand-mist' => $filter !== $chip['id'] && ($chip['tone'] ?? '') !== 'alert',
+            ])>{{ $n }}</span>
+        </button>
+    @endforeach
+</section>
+
+@if ($rows === [])
+    <div @class([
+        'px-3 py-10 text-center sm:px-4' => ! empty($useOrgShell),
+        'rounded-2xl border border-brand-ink/10 bg-white px-6 py-10 text-center' => empty($useOrgShell),
+    ])>
+        <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+        </span>
+        @if ($filter !== 'all')
+            <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('Nothing matches this filter.') }}</p>
+            <button type="button" wire:click="setFilter('all')" class="mt-2 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                {{ __('Show all credentials') }} →
+            </button>
+        @else
+            <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No credentials yet.') }}</p>
+            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-mist">
+                {{ __('Connect a provider to give dply an API token, or add a backup destination for your database dumps. Both are encrypted before they hit disk.') }}
+            </p>
+            <div class="mt-3 flex flex-wrap justify-center gap-2">
+                <button type="button" x-on:click="$dispatch('open-add-provider-credential-modal')" class="inline-flex h-6 items-center gap-1 rounded-lg bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Connect a provider') }}
                 </button>
+                <button type="button" wire:click="openStorageModal" class="inline-flex h-6 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                    <x-heroicon-o-cloud-arrow-up class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Add backup storage') }}
+                </button>
             </div>
-        </section>
-    @endif
-
-    {{-- Provider grid. Replaces the dense sidebar with tappable cards laid
-         out by category. Each card shows capability dots, a count badge,
-         and a clear connect / manage state — clicking sets the active
-         provider and the panel below jumps in to take over. --}}
-    <section aria-label="{{ __('Pick a provider') }}" @class([
-        'space-y-6' => empty($useOrgShell),
-        'space-y-6 border-b border-brand-ink/10 px-5 py-5 sm:px-6' => ! empty($useOrgShell),
-    ])>
-        @foreach ($providerNav as $group)
-            @php
-                $groupItems = $group['items'];
-                $groupTotal = count($groupItems);
-                $groupAvailable = collect($groupItems)->reject(fn ($i) => ! empty($i['comingSoon']))->count();
-                $groupConnected = collect($groupItems)->filter(fn ($i) => empty($i['comingSoon']) && $this->credentialCountFor($i['id']) > 0)->count();
-                $groupIcon = match (strtolower((string) $group['label'])) {
-                    default => 'heroicon-o-cube',
-                };
-                if (str_contains(strtolower((string) $group['label']), 'vps') || str_contains(strtolower((string) $group['label']), 'cloud')) {
-                    $groupIcon = 'heroicon-o-cloud';
-                } elseif (str_contains(strtolower((string) $group['label']), 'dns')) {
-                    $groupIcon = 'heroicon-o-globe-alt';
-                } elseif (str_contains(strtolower((string) $group['label']), 'cdn') || str_contains(strtolower((string) $group['label']), 'edge')) {
-                    $groupIcon = 'heroicon-o-bolt';
-                } elseif (str_contains(strtolower((string) $group['label']), 'registr') || str_contains(strtolower((string) $group['label']), 'image')) {
-                    $groupIcon = 'heroicon-o-archive-box';
-                } elseif (str_contains(strtolower((string) $group['label']), 'import')) {
-                    $groupIcon = 'heroicon-o-arrow-down-tray';
-                }
-            @endphp
-            <div>
-                {{-- Group header. Tightened with an icon + connected/total
-                     chip — gives quick read on how much of each family is
-                     already wired up without scanning every card. --}}
-                <div class="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">
-                        <x-dynamic-component :component="$groupIcon" class="h-3.5 w-3.5 shrink-0 text-brand-moss" aria-hidden="true" />
-                        {{ $group['label'] }}
-                    </h3>
-                    <span class="text-[10px] font-semibold tabular-nums text-brand-mist">
-                        @if ($groupConnected > 0)
-                            <span class="text-brand-forest">{{ $groupConnected }}</span><span class="text-brand-mist"> / {{ $groupAvailable }} {{ __('connected') }}</span>
-                        @else
-                            {{ $groupAvailable }} {{ __('available') }}
-                        @endif
-                    </span>
-                </div>
-                <ul class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    @foreach ($groupItems as $item)
-                        @php
-                            $count = $this->credentialCountFor($item['id']);
-                            $isComing = ! empty($item['comingSoon']);
-                            $isActive = $active_provider === $item['id'];
-                            $firstCred = $credentials->firstWhere('provider', $item['id']);
-                            $sampleCaps = $firstCred?->capabilities() ?? [];
-                        @endphp
-                        <li>
-                            <button
-                                type="button"
-                                @if (! $isComing)
-                                    x-on:click="$dispatch('open-add-provider-credential-modal', { provider: @js($item['id']) })"
-                                @endif
-                                @disabled($isComing)
-                                @class([
-                                    'group relative flex w-full flex-col items-start gap-3 rounded-2xl border bg-white p-4 text-left shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40',
-                                    'border-brand-ink/10 hover:-translate-y-0.5 hover:border-brand-sage/35 hover:shadow-md' => ! $isComing && $count === 0,
-                                    'border-brand-sage/35 hover:-translate-y-0.5 hover:border-brand-sage/55 hover:shadow-md' => ! $isComing && $count > 0,
-                                    'border-brand-ink/10 cursor-not-allowed opacity-65' => $isComing,
-                                ])
-                            >
-                                <div class="flex w-full items-start justify-between gap-2">
-                                    <span @class([
-                                        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-brand-ink/10',
-                                        'bg-brand-sage/12 text-brand-forest' => $count > 0 && ! $isComing,
-                                        'bg-brand-sand/45 text-brand-forest group-hover:bg-brand-sand/70' => $count === 0 || $isComing,
-                                    ])>
-                                        <x-credentials-provider-icon :provider="$item['id']" class="h-5 w-5" />
-                                    </span>
-                                    @if ($isComing)
-                                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
-                                    @elseif ($count > 0)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-brand-forest ring-1 ring-brand-sage/20">
-                                            <x-heroicon-m-check-circle class="h-3 w-3" aria-hidden="true" />
-                                            {{ $count }}
-                                        </span>
-                                    @endif
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $item['label'] }}</p>
-                                    <p class="mt-0.5 text-[11px] text-brand-moss">
-                                        @if ($isComing)
-                                            {{ __('Coming soon') }}
-                                        @elseif ($count === 0)
-                                            {{ __('Not connected') }}
-                                        @else
-                                            {{ trans_choice(':n credential|:n credentials', $count, ['n' => $count]) }}
-                                            @if ($firstCred?->created_at)
-                                                <span class="text-brand-mist"> · </span>
-                                                <span title="{{ $firstCred->created_at->toDayDateTimeString() }}">{{ __('added :time', ['time' => $firstCred->created_at->diffForHumans()]) }}</span>
-                                            @endif
-                                        @endif
-                                    </p>
-                                </div>
-                                @if (! empty($sampleCaps))
-                                    <div class="flex flex-wrap items-center gap-1.5">
-                                        @foreach ($sampleCaps as $cap)
-                                            @php $chip = $capabilityDot($cap); @endphp
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-cream/70 px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
-                                                <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
-                                                {{ $chip['label'] }}
+        @endif
+    </div>
+@else
+    <div @class(['overflow-x-auto', 'rounded-2xl border border-brand-ink/10 bg-white' => empty($useOrgShell)])>
+        <table class="w-full text-sm">
+            <thead class="bg-brand-sand/35">
+                <tr>
+                    <th class="{{ $th }}">{{ __('Provider') }}</th>
+                    <th class="{{ $th }}">{{ __('Name') }}</th>
+                    <th class="{{ $th }}">{{ __('Used for') }}</th>
+                    <th class="{{ $th }}">{{ __('Status') }}</th>
+                    <th class="{{ $th }} text-right"><span class="sr-only">{{ __('Actions') }}</span></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-brand-ink/10">
+                @foreach ($rows as $row)
+                    <tr class="transition-colors hover:bg-brand-sand/15" wire:key="cred-{{ $row['kind'] }}-{{ $row['id'] }}">
+                        <td class="{{ $td }}">
+                            <span class="flex items-center gap-2">
+                                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-sand/45 text-brand-forest ring-1 ring-brand-ink/10">
+                                    <x-credentials-provider-icon :provider="$row['provider']" class="h-3.5 w-3.5" />
+                                </span>
+                                <span class="truncate text-brand-ink">{{ $row['providerLabel'] }}</span>
+                            </span>
+                        </td>
+                        <td class="{{ $td }} font-medium text-brand-ink">
+                            {{ $row['name'] }}
+                            {{-- Storage rows carry it; a token row's is null. --}}
+                            @if ($row['lastWrite'] ?? null)
+                                <span class="mt-0.5 block text-xs font-normal text-brand-mist">{{ $row['lastWrite'] }}</span>
+                            @endif
+                        </td>
+                        <td class="{{ $td }} text-xs text-brand-moss">{{ $row['usedFor'] }}</td>
+                        <td class="{{ $td }}">
+                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold {{ $statusChip($row['status']) }}">
+                                {{ $row['statusLabel'] }}
+                            </span>
+                            {{-- The provider's own words. validation_error has always
+                                 been stored and counted, and never shown. --}}
+                            @if ($row['error'])
+                                <span class="mt-0.5 block max-w-md text-xs leading-relaxed text-brand-moss">{{ $row['error'] }}</span>
+                            @endif
+                        </td>
+                        <td class="{{ $td }} text-right">
+                            <div class="inline-flex flex-nowrap items-center gap-1.5">
+                                @if ($row['kind'] === 'token')
+                                    @if ($this->canVerifyCredentialProvider($row['provider']))
+                                        <button
+                                            type="button"
+                                            wire:click="verifyCredential('{{ $row['id'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="verifyCredential('{{ $row['id'] }}')"
+                                            class="{{ $actNeutral }}"
+                                        >
+                                            <span wire:loading.remove wire:target="verifyCredential('{{ $row['id'] }}')" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-arrow-path class="{{ $actIcon }}" aria-hidden="true" />
+                                                {{ __('Re-check') }}
                                             </span>
-                                        @endforeach
-                                    </div>
+                                            <span wire:loading wire:target="verifyCredential('{{ $row['id'] }}')" class="inline-flex items-center gap-1">
+                                                <x-spinner size="sm" />
+                                                {{ __('Checking…') }}
+                                            </span>
+                                        </button>
+                                    @endif
+                                    <button
+                                        type="button"
+                                        x-on:click="$dispatch('open-add-provider-credential-modal', { provider: @js($row['provider']) })"
+                                        class="{{ $actNeutral }}"
+                                    >
+                                        <x-heroicon-o-cog-6-tooth class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Manage') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="promptDestroyCredential('{{ $row['id'] }}')"
+                                        class="{{ $actDanger }}"
+                                    >
+                                        <x-heroicon-o-trash class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Remove') }}
+                                    </button>
+                                @elseif ($row['kind'] === 'git')
+                                    {{-- Shared Git token: no edit, because the value is
+                                         write-once — replacing it means adding a new one,
+                                         which is also how you rotate at the provider. --}}
+                                    <button
+                                        type="button"
+                                        wire:click="promptDeleteGitToken('{{ $row['id'] }}')"
+                                        class="{{ $actDanger }}"
+                                    >
+                                        <x-heroicon-o-trash class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Remove') }}
+                                    </button>
+                                @else
+                                    <button
+                                        type="button"
+                                        wire:click="editDestination('{{ $row['id'] }}')"
+                                        class="{{ $actNeutral }}"
+                                    >
+                                        <x-heroicon-o-pencil-square class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Edit') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="promptDeleteDestination('{{ $row['id'] }}')"
+                                        class="{{ $actDanger }}"
+                                    >
+                                        <x-heroicon-o-trash class="{{ $actIcon }}" aria-hidden="true" />
+                                        {{ __('Remove') }}
+                                    </button>
                                 @endif
-
-                                {{-- Trailing action hint. Visually a button-shaped
-                                     chip, semantically a span — the whole card IS the
-                                     trigger so we don't nest <button>s. --}}
-                                @unless ($isComing)
-                                    <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
-                                        <span class="inline-flex items-center gap-1.5">
-                                            @if ($count > 0)
-                                                <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Manage') }}
-                                            @else
-                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                {{ __('Add new') }}
-                                            @endif
-                                        </span>
-                                        <span aria-hidden="true" class="opacity-70 group-hover:opacity-100">→</span>
-                                    </span>
-                                @endunless
-                            </button>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-        @endforeach
-    </section>
-
-    {{-- Provider management lives in a modal now (opened per-card). Keeps
-         the index focused on connection state at a glance. --}}
-</div>
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+@endif

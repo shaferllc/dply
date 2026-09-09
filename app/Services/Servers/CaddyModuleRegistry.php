@@ -15,7 +15,6 @@ class CaddyModuleRegistry
     /**
      * @return array<string, list<array{name: string, docs: string, package: string, repo: string}>>
      */
-    /** @return array<string, mixed> */
     public function moduleIndex(): array
     {
         $ttl = (int) config('caddy_modules.registry_cache_seconds', 86_400);
@@ -50,25 +49,13 @@ class CaddyModuleRegistry
      *     module_ids: list<string>,
      * }>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function communityPackages(): array
     {
         $byPackage = [];
 
         foreach ($this->moduleIndex() as $moduleId => $entries) {
-            if (! is_array($entries)) {
-                continue;
-            }
-
             foreach ($entries as $entry) {
-                if (! is_array($entry)) {
-                    continue;
-                }
-
-                $package = trim((string) ($entry['package'] ?? ''));
+                $package = trim((string) $entry['package']);
                 if ($package === '' || $this->isStandardPackage($package)) {
                     continue;
                 }
@@ -76,9 +63,9 @@ class CaddyModuleRegistry
                 if (! isset($byPackage[$package])) {
                     $byPackage[$package] = [
                         'path' => $package,
-                        'repo' => trim((string) ($entry['repo'] ?? '')),
+                        'repo' => trim((string) $entry['repo']),
                         'label' => $this->labelForPackage($package, (string) ($this->catalogEntry($package)['label'] ?? '')),
-                        'description' => $this->summarizeDocs((string) ($entry['docs'] ?? '')),
+                        'description' => $this->summarizeDocs((string) $entry['docs']),
                         'module_ids' => [],
                     ];
                 }
@@ -89,7 +76,7 @@ class CaddyModuleRegistry
                 if ($catalogDescription !== '') {
                     $byPackage[$package]['description'] = $catalogDescription;
                 } elseif ($byPackage[$package]['description'] === '') {
-                    $byPackage[$package]['description'] = $this->summarizeDocs((string) ($entry['docs'] ?? ''));
+                    $byPackage[$package]['description'] = $this->summarizeDocs((string) $entry['docs']);
                 }
             }
         }
@@ -101,7 +88,6 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @return list<array<string, list<string>|string>>
      *     path: string,
      *     repo: string,
      *     label: string,
@@ -122,23 +108,15 @@ class CaddyModuleRegistry
         $bestDocs = '';
 
         foreach ($this->moduleIndex() as $moduleId => $entries) {
-            if (! is_array($entries)) {
-                continue;
-            }
-
             foreach ($entries as $entry) {
-                if (! is_array($entry)) {
-                    continue;
-                }
-
-                $package = trim((string) ($entry['package'] ?? ''));
+                $package = trim((string) $entry['package']);
                 if ($package !== $packagePath) {
                     continue;
                 }
 
                 $moduleIds[] = (string) $moduleId;
-                $repo = $repo !== '' ? $repo : trim((string) ($entry['repo'] ?? ''));
-                $docs = trim((string) ($entry['docs'] ?? ''));
+                $repo = $repo !== '' ? $repo : trim((string) $entry['repo']);
+                $docs = trim((string) $entry['docs']);
                 if (mb_strlen($docs) > mb_strlen($bestDocs)) {
                     $bestDocs = $docs;
                 }
@@ -170,10 +148,9 @@ class CaddyModuleRegistry
      * @param  array<string, mixed> $moduleIds
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
-     * @param  array<string, mixed> $moduleIds
+     * @param  list<string> $moduleIds
      */
     public function packagesFromModuleIds(array $moduleIds): array
     {
@@ -186,16 +163,12 @@ class CaddyModuleRegistry
 
         foreach ($moduleIds as $moduleId) {
             $moduleId = trim($moduleId);
-            if ($moduleId === '' || ! isset($index[$moduleId]) || ! is_array($index[$moduleId])) {
+            if ($moduleId === '' || ! isset($index[$moduleId])) {
                 continue;
             }
 
             foreach ($index[$moduleId] as $entry) {
-                if (! is_array($entry)) {
-                    continue;
-                }
-
-                $package = trim((string) ($entry['package'] ?? ''));
+                $package = trim((string) $entry['package']);
                 if ($package !== '' && ! $this->isStandardPackage($package)) {
                     $packages[] = $package;
                 }
@@ -216,8 +189,7 @@ class CaddyModuleRegistry
     }
 
     /**
-     * @param  array<string, mixed> $moduleIds
-     * @return list<string>
+     * @return array<string, mixed>
      */
     private function catalogEntry(string $path): array
     {

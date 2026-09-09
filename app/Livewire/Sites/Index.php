@@ -47,7 +47,7 @@ class Index extends Component
         }
         $serverIds = $serversQuery->pluck('id');
 
-        return Site::query()->whereIn('server_id', $serverIds);
+        return Site::query()->visibleInSiteIndex()->whereIn('server_id', $serverIds);
     }
 
     protected function applyFilters(Builder $query): Builder
@@ -83,6 +83,7 @@ class Index extends Component
                 Site::STATUS_ERROR,
                 Site::STATUS_CONTAINER_FAILED,
                 Site::STATUS_EDGE_FAILED,
+                Site::STATUS_FUNCTIONS_FAILED,
                 Site::STATUS_SCAFFOLD_FAILED,
             ]);
         }

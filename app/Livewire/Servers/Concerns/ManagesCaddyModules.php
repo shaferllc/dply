@@ -184,8 +184,8 @@ trait ManagesCaddyModules
     public function requestAddCaddyModule(): void
     {
         $this->openConfirmInstallCaddyModule(
-            (string) ($this->caddy_modules_new['path'] ?? ''),
-            (string) ($this->caddy_modules_new['version'] ?? ''),
+            (string) $this->caddy_modules_new['path'],
+            (string) $this->caddy_modules_new['version'],
         );
     }
 
@@ -217,7 +217,7 @@ trait ManagesCaddyModules
         }
 
         foreach ($this->caddy_modules_plugins as $plugin) {
-            if (($plugin['path'] ?? '') === $path) {
+            if ($plugin['path'] === $path) {
                 $this->toastError(__('That plugin is already in the build manifest.'));
 
                 return;
@@ -265,11 +265,11 @@ trait ManagesCaddyModules
             $details[] = ['label' => (string) __('Version pin'), 'value' => $version, 'mono' => true];
         }
 
-        if (($info['description'] ?? '') !== '') {
+        if ($info['description'] !== '') {
             $details[] = ['label' => (string) __('About'), 'value' => (string) $info['description'], 'multiline' => true];
         }
 
-        if (($info['module_ids'] ?? []) !== []) {
+        if ($info['module_ids'] !== []) {
             $details[] = [
                 'label' => (string) __('Module IDs'),
                 'value' => implode("\n", $info['module_ids']),
@@ -278,11 +278,11 @@ trait ManagesCaddyModules
             ];
         }
 
-        if (($info['repo'] ?? '') !== '') {
+        if ($info['repo'] !== '') {
             $details[] = ['label' => (string) __('Repository'), 'value' => (string) $info['repo'], 'mono' => true, 'link' => true];
         }
 
-        if (($info['docs_url'] ?? '') !== '') {
+        if ($info['docs_url'] !== '') {
             $details[] = ['label' => (string) __('Documentation'), 'value' => (string) $info['docs_url'], 'link' => true];
         }
 
@@ -319,8 +319,8 @@ trait ManagesCaddyModules
         try {
             $this->server = app(CaddyModulesManager::class)->addPlugin(
                 $this->server,
-                (string) ($this->caddy_modules_new['path'] ?? ''),
-                (string) ($this->caddy_modules_new['version'] ?? ''),
+                (string) $this->caddy_modules_new['path'],
+                (string) $this->caddy_modules_new['version'],
             );
             $this->caddy_modules_show_add = false;
             $this->caddy_modules_new = ['path' => '', 'version' => ''];

@@ -23,6 +23,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesInsightsNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same key set the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return $this->insightsEventKeys();
+    }
+
     /** Channel selected in the add-subscription form on the Notifications tab. */
     public string $notif_channel_id = '';
 
@@ -36,6 +50,8 @@ trait ManagesInsightsNotifications
 
     public function mountManagesInsightsNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = $this->insightsEventKeys();
     }
 
@@ -131,13 +147,11 @@ trait ManagesInsightsNotifications
         }
 
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $snapshot = [
             'channel_id' => (string) $sub->notification_channel_id,
-            'channel_label' => $channel?->label,
+            'channel_label' => $channel->label,
             'event_key' => $sub->event_key,
             'scope' => 'insights',
         ];

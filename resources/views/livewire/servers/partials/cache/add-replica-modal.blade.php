@@ -7,7 +7,7 @@
 <x-modal name="add-replica-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
     <form wire:submit="submitAddReplica" class="space-y-4 p-6 sm:p-8">
         <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Replication') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Replication') }}</p>
             <h3 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Add a replica') }}</h3>
             <p class="mt-1 text-sm text-brand-moss">
                 {{ __('Picks an org-owned redis/valkey server, exposes this master to its IP via a firewall rule, sets REPLICAOF on the target, and waits for master_link_status=up.') }}
@@ -27,7 +27,7 @@
                 @endforeach
             </select>
             @if ($availableReplicaServers->isEmpty())
-                <p class="mt-1 text-[11px] text-amber-700">{{ __('No other redis/valkey-role servers are READY in your organization.') }}</p>
+                <p class="mt-1 text-xs text-amber-700">{{ __('No other redis/valkey-role servers are READY in your organization.') }}</p>
             @endif
             <x-input-error :messages="$errors->get('addReplicaTargetServerId')" class="mt-1" />
         </div>

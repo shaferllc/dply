@@ -10,6 +10,7 @@ use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Support\Sites\FailedDedicatedVmBinding;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -68,14 +69,14 @@ class ProvisionDedicatedDatabaseVmJob implements ShouldQueue
 
         // The build failed — surface it on the binding and stop polling.
         if ($server->status === Server::STATUS_ERROR || $server->setup_status === Server::SETUP_STATUS_FAILED) {
-            $this->fail($binding, __('The database server failed to provision.'));
+            $this->fail($binding, __('The database server failed to provision.'), $server);
 
             return;
         }
 
         if (! $server->isProvisioningComplete()) {
             if ($this->attempt >= self::MAX_ATTEMPTS) {
-                $this->fail($binding, __('The database server did not come online in time.'));
+                $this->fail($binding, __('The database server did not come online in time.'), $server);
 
                 return;
             }
@@ -101,7 +102,7 @@ class ProvisionDedicatedDatabaseVmJob implements ShouldQueue
                 'site_id' => $site->id,
                 'error' => $e->getMessage(),
             ]);
-            $this->fail($binding, $e->getMessage());
+            $this->fail($binding, $e->getMessage(), $server);
 
             return;
         }
@@ -111,11 +112,8 @@ class ProvisionDedicatedDatabaseVmJob implements ShouldQueue
         }
     }
 
-    private function fail(SiteBinding $binding, string $error): void
+    private function fail(SiteBinding $binding, string $error, ?Server $server = null): void
     {
-        $binding->forceFill([
-            'status' => SiteBinding::STATUS_ERROR,
-            'last_error' => $error,
-        ])->save();
+        app(FailedDedicatedVmBinding::class)->settle($binding, $error, $server);
     }
 }

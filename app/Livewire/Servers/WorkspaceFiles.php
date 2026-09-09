@@ -99,7 +99,7 @@ class WorkspaceFiles extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }

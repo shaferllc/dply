@@ -291,6 +291,89 @@ test('provision vultr job registers ssh key and creates instance', function () {
     Queue::assertPushed(PollVultrIpJob::class);
 });
 
+test('provision vultr job uses catalog os image and vpc_ids', function () {
+    Queue::fake();
+
+    Http::fake([
+        'https://api.vultr.com/v2/ssh-keys' => Http::response([
+            'ssh_key' => ['id' => 'ssh-42', 'name' => 'dply-test'],
+        ], 201),
+        'https://api.vultr.com/v2/instances' => Http::response([
+            'instance' => ['id' => 'vps-9001'],
+        ], 201),
+    ]);
+
+    $user = vultrTestUser();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    $server = Server::factory()->vultr()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider_credential_id' => $credential->id,
+        'status' => Server::STATUS_PENDING,
+        'meta' => [
+            'server_role' => 'application',
+            'os_image' => 'debian-12',
+            'vultr' => ['vpc_id' => 'vpc-aaaa-bbbb'],
+        ],
+    ]);
+
+    config(['server_provision_fake.env_flag' => false]);
+
+    (new ProvisionVultrServerJob($server))->handle();
+
+    Http::assertSent(function ($request) {
+        if ($request->url() !== 'https://api.vultr.com/v2/instances') {
+            return false;
+        }
+        $data = $request->data();
+
+        return ($data['os_id'] ?? null) === 2136
+            && ($data['vpc_ids'] ?? null) === ['vpc-aaaa-bbbb'];
+    });
+});
+
+test('store vultr form persists vpc id on meta', function () {
+    Queue::fake();
+
+    $user = vultrTestUser();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    $form = new ServerCreateForm(vultrFormComponent(), 'form');
+    $form->type = 'vultr';
+    $form->name = 'vpc-server';
+    $form->provider_credential_id = (string) $credential->id;
+    $form->region = 'ewr';
+    $form->size = 'vc2-1c-1gb';
+    $form->os_image = 'ubuntu-24-04';
+    $form->vultr_vpc_id = 'vpc-form-123';
+    $form->install_profile = 'laravel_app';
+    $form->server_role = 'application';
+    $form->webserver = 'nginx';
+    $form->php_version = '8.3';
+    $form->database = 'mysql84';
+    $form->cache_service = 'redis';
+
+    $server = StoreServerFromCreateForm::run($user, $org, $form);
+
+    expect(data_get($server->meta, 'vultr.vpc_id'))->toBe('vpc-form-123')
+        ->and(data_get($server->meta, 'os_image'))->toBe('ubuntu-24-04');
+});
+
 test('provision vultr job surfaces api errors on server meta', function () {
     Http::fake([
         'https://api.vultr.com/v2/ssh-keys' => Http::response([

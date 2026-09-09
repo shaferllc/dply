@@ -73,10 +73,6 @@ YAML;
      *
      * @return array<int, array{path: string, middleware: string, users_file: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string>>
-     */
     protected function traefikBasicAuthGroups(Site $site, string $basename): array
     {
         if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
@@ -115,8 +111,8 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $groups
-     * @param  array<string, mixed> $formGateGroups
+     * @param  array<int, array<string, string>> $groups
+     * @param  array<int, array<string, string>> $formGateGroups
      */
     private function renderMiddlewaresYaml(array $groups, array $formGateGroups, int $backendPort): string
     {
@@ -143,7 +139,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $prefixGroups
+     * @param  list<array<string, string>> $prefixGroups
      */
     private function renderPrefixRoutersYaml(array $prefixGroups, string $basename, string $hostRule): string
     {

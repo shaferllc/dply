@@ -10,6 +10,8 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\SshConnectionFactory;
@@ -46,6 +48,47 @@ function dockerWorkspaceUserWithServer(array $meta = []): array
     ]);
 
     return [$user, $server];
+}
+
+/** @return array{0: User, 1: Server} */
+function dockerWorkspaceProjectViewer(): array
+{
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $viewer = User::factory()->create();
+    $org->users()->attach($viewer->id, ['role' => 'member']);
+
+    $workspace = Workspace::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $owner->id,
+    ]);
+    $workspace->members()->create([
+        'user_id' => $viewer->id,
+        'role' => WorkspaceMember::ROLE_VIEWER,
+    ]);
+
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+        'ssh_private_key' => 'test-key',
+        'meta' => [
+            'manage_docker' => [
+                'present' => true,
+                'version' => 'Docker version 27.0.0',
+                'containers_running' => 1,
+                'containers_stopped' => 0,
+                'images_count' => 1,
+            ],
+            'inventory_checked_at' => now()->toIso8601String(),
+        ],
+    ]);
+
+    return [$viewer, $server];
 }
 
 test('docker workspace overview renders probe summary', function (): void {
@@ -168,6 +211,48 @@ test('docker workspace pull image rejects empty input', function (): void {
         ->set('pullImageInput', '')
         ->call('confirmDockerImagePull')
         ->assertSet('manageRemoteTaskId', null);
+});
+
+test('project viewers cannot inspect containers or read logs', function (): void {
+    [$viewer, $server] = dockerWorkspaceProjectViewer();
+
+    Livewire::actingAs($viewer)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerInspect', 'abc123', 'web')
+        ->assertForbidden();
+
+    Livewire::actingAs($viewer)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerLogs', 'abc123', 'web')
+        ->assertForbidden();
+
+    Livewire::actingAs($viewer)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openComposeLogs', 'my-app', '/srv/my-app/docker-compose.dply.yml')
+        ->assertForbidden();
+});
+
+test('docker workspace opens container inspect modal for operators', function (): void {
+    [$user, $server] = dockerWorkspaceUserWithServer();
+
+    $inspect = json_encode([
+        [
+            'Id' => 'abc123',
+            'Config' => ['Env' => ['APP_KEY=base64:secret-from-container']],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $this->mock(ExecuteRemoteTaskOnServer::class, function ($mock) use ($inspect): void {
+        $mock->shouldReceive('runInlineBash')
+            ->once()
+            ->andReturn(ProcessOutput::make($inspect));
+    });
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->call('openContainerInspect', 'abc123', 'web')
+        ->assertSet('inspectModalContainerId', 'abc123')
+        ->assertSee('APP_KEY=base64:secret-from-container');
 });
 
 test('docker workspace opens container logs modal', function (): void {

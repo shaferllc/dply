@@ -149,7 +149,7 @@ trait ManagesSiteBindingMail
             return;
         }
 
-        $recipient = trim($this->mailTestRecipient) ?: (string) (auth()->user()?->email ?? '');
+        $recipient = trim($this->mailTestRecipient) ?: (string) (auth()->user()->email ?? '');
         if ($recipient === '' || filter_var($recipient, FILTER_VALIDATE_EMAIL) === false) {
             $this->toastError(__('Enter a valid email address to send the test to.'));
 

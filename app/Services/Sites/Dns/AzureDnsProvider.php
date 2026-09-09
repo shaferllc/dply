@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\AzureDnsService;
+use App\Modules\Providers\Services\AzureDnsService;
 
 class AzureDnsProvider implements DnsProvider
 {
@@ -10,7 +10,6 @@ class AzureDnsProvider implements DnsProvider
         private readonly AzureDnsService $service,
     ) {}
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {

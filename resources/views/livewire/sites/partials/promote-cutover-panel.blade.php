@@ -13,7 +13,7 @@
         <div class="border-b border-brand-sage/20 px-6 py-5 sm:px-8">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-forest">{{ __('Standby promote') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-forest">{{ __('Standby promote') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cutover playbook') }}</h2>
                     <p class="mt-1 text-sm text-brand-moss">
                         @if ($summary['source_site_name'])

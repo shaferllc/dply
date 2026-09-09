@@ -10,17 +10,17 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?Carbon $finished_at
- * @property string $output
- * @property array<string, mixed> $result_summary
- * @property array<string, mixed> $site_ids
+ * @property ?string $output
+ * @property ?array<string, mixed> $result_summary
+ * @property ?array<string, mixed> $site_ids
  * @property ?Carbon $started_at
  * @property string $status
  * @property ?string $user_id
  * @property ?string $workspace_id
  * @property-read ?Workspace $workspace
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WorkspaceDeployRun extends Model
 {

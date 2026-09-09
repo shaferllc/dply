@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
-
+use App\Support\Providers\ProviderCatalogCache;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -13,14 +13,11 @@ namespace App\Services\Concerns;
  */
 trait ManagesHetznerInstances
 {
-
-
     /**
      * Register an SSH public key in the Hetzner project. Returns key array with id.
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function addSshKey(string $name, string $publicKey): array
     {
         $response = $this->request('post', '/ssh_keys', [
@@ -50,11 +47,9 @@ trait ManagesHetznerInstances
     /**
      * Create a new server (instance) and return its ID.
      *
-     * @param  array<string, mixed> $sshKeyIds  Hetzner SSH key IDs or names
-     */
-    /**
-     * @param  array<string, mixed> $sshKeyIds  Hetzner SSH key IDs or names
-     * @param  array<string, mixed> $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
+     * @param  list<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
+     * @param  list<int|string>  $firewallIds  Cloud Firewall IDs to attach at boot (atomic — no unreachable window)
+     * @param  array<string, string>  $labels  Hetzner labels (key/value), e.g. ProviderResourceTags::labels()
      */
     public function createInstance(
         string $name,
@@ -65,6 +60,7 @@ trait ManagesHetznerInstances
         string $userData = '',
         array $firewallIds = [],
         ?int $networkId = null,
+        array $labels = [],
     ): int {
         $body = [
             'name' => $name,
@@ -72,6 +68,9 @@ trait ManagesHetznerInstances
             'server_type' => $serverType,
             'image' => $image,
         ];
+        if ($labels !== []) {
+            $body['labels'] = array_map(static fn ($v): string => (string) $v, $labels);
+        }
         if ($sshKeyIds !== []) {
             $body['ssh_keys'] = $sshKeyIds;
         }
@@ -81,7 +80,7 @@ trait ManagesHetznerInstances
         if ($firewallIds !== []) {
             $body['firewalls'] = array_map(
                 static fn ($id) => ['firewall' => (int) $id],
-                array_values($firewallIds)
+                $firewallIds
             );
         }
         if ($networkId !== null) {
@@ -101,9 +100,34 @@ trait ManagesHetznerInstances
     }
 
     /**
+     * Every server on the account. The create wizard's scan-and-import mode
+     * uses this to find hosts dply doesn't manage yet. The API pages at 50, so
+     * walk until a short page comes back (bounded, so a bad `next` can't spin).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listInstances(): array
+    {
+        $servers = [];
+        $page = 1;
+
+        do {
+            $response = $this->request('get', '/servers', ['page' => $page, 'per_page' => 50]);
+            $this->assertSuccess($response, 'list servers');
+
+            $batch = $response->json('servers');
+            $batch = is_array($batch) ? array_values(array_filter($batch, 'is_array')) : [];
+            $servers = array_merge($servers, $batch);
+
+            $page++;
+        } while (count($batch) === 50 && $page <= 20);
+
+        return $servers;
+    }
+
+    /**
      * Get instance (server) by ID. Returns decoded JSON server object.
      */
-    /** @return array<string, mixed> */
     public function getInstance(int $id): array
     {
         $response = $this->request('get', "/servers/{$id}");
@@ -165,7 +189,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function powerOffServer(int $id): array
     {
         $response = $this->request('post', "/servers/{$id}/actions/poweroff");
@@ -180,14 +203,65 @@ trait ManagesHetznerInstances
     }
 
     /**
+     * Power a server back on. Pairs with {@see self::powerOffServer()} — a
+     * change_type leaves the server off, so the caller restarts it.
+     *
+     * @return array<string, mixed>
+     */
+    public function powerOnServer(int $id): array
+    {
+        $response = $this->request('post', "/servers/{$id}/actions/poweron");
+        $this->assertSuccess($response, 'power on server');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action) || ! isset($action['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a power-on action.');
+        }
+
+        return $action;
+    }
+
+    /**
+     * Change a server's type (Hetzner's resize). The server must be powered
+     * off first — Hetzner rejects the action on a running server.
+     *
+     * $upgradeDisk mirrors DigitalOcean's `disk` flag:
+     *   false — CPU/RAM only, disk left alone, so the server can be moved back
+     *           down to a smaller type later.
+     *   true  — the disk grows too. PERMANENT: Hetzner will not downgrade a
+     *           server whose disk has been upgraded.
+     *
+     * @return array<string, mixed>
+     */
+    public function changeServerType(int $id, string $serverType, bool $upgradeDisk = false): array
+    {
+        $serverType = trim($serverType);
+        if ($serverType === '') {
+            throw new \InvalidArgumentException('Target server type is required.');
+        }
+
+        $response = $this->request('post', "/servers/{$id}/actions/change_type", [
+            'server_type' => $serverType,
+            'upgrade_disk' => $upgradeDisk,
+        ]);
+        $this->assertSuccess($response, 'change server type');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action) || ! isset($action['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a change-type action.');
+        }
+
+        return $action;
+    }
+
+    /**
      * Create a snapshot image from a server. Hetzner snapshots are GLOBAL across
      * locations (usable to create servers in any region). Returns
      * ['action' => <action>, 'image_id' => <int>].
      *
-     * @param  array<string, mixed> $labels
+     * @param  array<string, mixed>  $labels
      * @return array{action: array<string, mixed>, image_id: int}
      */
-    /** @return array<string, mixed> */
     public function createImageFromServer(int $id, string $description, array $labels = []): array
     {
         $body = [
@@ -217,7 +291,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getImage(int $imageId): array
     {
         $response = $this->request('get', "/images/{$imageId}");
@@ -252,7 +325,6 @@ trait ManagesHetznerInstances
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getAction(int $actionId): array
     {
         $response = $this->request('get', "/actions/{$actionId}");
@@ -306,14 +378,20 @@ trait ManagesHetznerInstances
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getLocations(): array
     {
-        $response = $this->request('get', '/locations');
-        $this->assertSuccess($response, 'list locations');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'hetzner',
+            'locations',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/locations');
+                $this->assertSuccess($response, 'list locations');
+                $data = $response->json();
 
-        return $data['locations'] ?? [];
+                return $data['locations'] ?? [];
+            },
+        );
     }
 
     /**
@@ -321,14 +399,20 @@ trait ManagesHetznerInstances
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getServerTypes(): array
     {
-        $response = $this->request('get', '/server_types');
-        $this->assertSuccess($response, 'list server types');
-        $data = $response->json();
+        return ProviderCatalogCache::remember(
+            'hetzner',
+            'server_types',
+            ProviderCatalogCache::scopeForToken($this->token),
+            function (): array {
+                $response = $this->request('get', '/server_types');
+                $this->assertSuccess($response, 'list server types');
+                $data = $response->json();
 
-        return $data['server_types'] ?? [];
+                return $data['server_types'] ?? [];
+            },
+        );
     }
 
     /**

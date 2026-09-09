@@ -183,7 +183,7 @@ BASH;
         if (preg_match_all('/^\s*upstream\s+(\S+)\s*\{/m', $configDump, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $i => $headerMatch) {
+        foreach ($matches[0] as $i => $headerMatch) {
             $name = $matches[1][$i][0];
             $bodyStart = $headerMatch[1] + strlen($headerMatch[0]);
             $body = $this->captureBalancedBody($configDump, $bodyStart);
@@ -237,7 +237,7 @@ BASH;
 
         if (preg_match('/configure arguments:\s*(.+)$/m', $nginxV, $m) === 1) {
             if (preg_match_all('/--with(?:out)?-([a-z0-9_]+)_module\b/', $m[1], $matches) !== false) {
-                foreach ($matches[1] ?? [] as $stem) {
+                foreach ($matches[1] as $stem) {
                     $rows[] = [
                         'name' => str_replace('_', '-', $stem),
                         'kind' => 'builtin',
@@ -319,7 +319,7 @@ BASH;
         if (preg_match_all('/^[\t ]*'.preg_quote($name, '/').'\s*\{/m', $configDump, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $headerMatch) {
+        foreach ($matches[0] as $headerMatch) {
             $bodyStart = $headerMatch[1] + strlen($headerMatch[0]);
             $body = $this->captureBalancedBody($configDump, $bodyStart);
             if ($body !== null) {
@@ -359,7 +359,7 @@ BASH;
         if (preg_match_all('/^[\t ]*'.preg_quote($directive, '/').'\s+([^;]+);/m', $block, $matches) === false) {
             return [];
         }
-        foreach ($matches[1] ?? [] as $val) {
+        foreach ($matches[1] as $val) {
             foreach (preg_split('/\s+/', trim($val)) ?: [] as $t) {
                 if ($t !== '') {
                     $tokens[] = $t;
@@ -380,7 +380,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $listens
+     * @param  list<string> $listens
      */
     private function blockHasSsl(string $block, array $listens): bool
     {

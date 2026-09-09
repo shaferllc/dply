@@ -15,20 +15,17 @@
                 @endphp
                 <div @if ($optimisticEngineSubtabs ?? false) x-show="subtab === 'config'" x-cloak @endif>
                 <div class="{{ $card }} overflow-hidden">
-                    {{-- Section header — matches the Overview / Live-state panels:
-                         icon badge + eyebrow + title + description on a tinted bar. --}}
-                    <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config editor') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine configuration', ['engine' => $info['label']]) }}</h3>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Edit → Review diff → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Saved revisions support diff and one-click rollback.') }}</p>
-                        </div>
-                    </div>
+                    {{-- Section head — dense, matching the Overview / Live-state
+                         panels and the rest of the workspace. --}}
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-pencil-square"
+                        :title="__(':engine configuration', ['engine' => $info['label']])"
+                        :note="__('Edit → Review diff → Validate (dry-run) → Save. Save snapshots the live file to _dply_backups/, atomically installs, re-validates, and auto-restores the snapshot if validation rejects the new file. Saved revisions support diff and one-click rollback.')"
+                        class="border-b border-brand-ink/10"
+                    />
 
-                    <div class="px-6 py-6 sm:px-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                     {{-- Pickup poll: while a read/write/validate is queued, keep the
                          component re-rendering (2s, matching the standalone config
                          page) so pickupQueuedConfig*() drains the worker result into
@@ -38,17 +35,29 @@
                         <div wire:poll.2s class="hidden" aria-hidden="true"></div>
                     @endif
                     @if ($configOptimisticPending)
-                        <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-sm text-brand-moss">
+                        <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-sm text-brand-moss">
                             <x-spinner variant="forest" class="h-4 w-4" />
                             {{ __('Loading config files…') }}
                         </div>
                     @elseif (! $opsReady || $isDeployer)
-                        <p class="text-sm text-brand-moss">{{ __('Editing config requires ready ops access and a non-deployer role.') }}</p>
+                        {{-- Gated. Two distinct blockers used to collapse into one
+                             flat sentence that named both and resolved neither —
+                             split them so the operator knows whether to fix the
+                             connection or ask for a role change. --}}
+                        <x-empty-state
+                            compact
+                            tone="amber"
+                            icon="heroicon-o-lock-closed"
+                            :title="$isDeployer ? __('Read-only for your role') : __('Server isn\'t ready for ops')"
+                            :description="$isDeployer
+                                ? __('Deploy-only members can view :engine but can\'t edit its config files. Ask an owner or admin to change your role.', ['engine' => $info['label']])
+                                : __('dply needs a ready ops connection to this server before it can read or write :engine config. Check the server\'s connection status, then reopen this tab.', ['engine' => $info['label']])"
+                        />
                     @else
                         <div class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
                             {{-- File picker --}}
                             <div class="rounded-xl border border-brand-ink/10 bg-white">
-                                <div class="border-b border-brand-ink/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
+                                <div class="border-b border-brand-ink/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
                                 @if (! $webserverConfigFilesLoaded)
                                     <div class="flex items-center gap-2 px-3 py-4 text-xs text-brand-moss">
                                         <x-spinner variant="forest" class="h-3.5 w-3.5 shrink-0" />
@@ -107,13 +116,13 @@
                                                                 <x-config-file-role-pill :label="$fileRoleLabel" :role="$fileRole" />
                                                             @endif
                                                         </span>
-                                                        <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
+                                                        <span class="block truncate font-mono text-2xs text-brand-mist">{{ $f['path'] }}</span>
                                                         @php $fileDescription = app(\App\Services\Servers\WebserverConfigDocLinks::class)->describe($key, $f['path']); @endphp
                                                         @if ($fileDescription)
-                                                            <span class="mt-1 line-clamp-2 block text-[10px] leading-snug text-brand-moss">{{ $fileDescription }}</span>
+                                                            <span class="mt-1 line-clamp-2 block text-2xs leading-snug text-brand-moss">{{ $fileDescription }}</span>
                                                         @endif
                                                     </span>
-                                                    <span class="shrink-0 font-mono text-[10px] text-brand-mist">
+                                                    <span class="shrink-0 font-mono text-2xs text-brand-mist">
                                                         @if ($isLoading)
                                                             {{ __('loading…') }}
                                                         @else
@@ -130,7 +139,7 @@
                             {{-- Editor --}}
                             <div class="min-w-0">
                                 @if ($config_selected_path === null)
-                                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-center text-sm text-brand-moss">
+                                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white px-4 py-8 text-center text-sm text-brand-moss">
                                         <x-heroicon-o-arrow-left class="mx-auto h-5 w-5 text-brand-mist" />
                                         <p class="mt-2">{{ __('Pick a file on the left to start editing.') }}</p>
                                     </div>
@@ -151,7 +160,7 @@
                                                     href="{{ $docLink['url'] }}"
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    class="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline"
+                                                    class="mt-1 inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline"
                                                     title="{{ $docLink['label'] }}"
                                                 >
                                                     <x-heroicon-o-book-open class="h-3 w-3" />
@@ -160,14 +169,14 @@
                                                 </a>
                                             @endif
                                             @if ($config_truncated_on_load)
-                                                <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                                                <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-900 ring-1 ring-amber-200">
                                                     <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
                                                     {{ __('Truncated on load — saving is disabled') }}
                                                 </p>
                                             @endif
                                         </div>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <button type="button" wire:click="loadWebserverConfig(@js($config_selected_path))" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
+                                            <button type="button" wire:click="loadWebserverConfig(@js($config_selected_path))" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
                                                 <x-heroicon-o-arrow-path class="h-3 w-3" />
                                                 {{ __('Reload') }}
                                             </button>
@@ -185,7 +194,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="openConfirmActionModal('resetWebserverConfigToDefault', [], @js(__('Reset to dply default?')), @js(__('Replace the editor buffer with the canonical content dply\'s provisioner would emit. Nothing is written until you click Save. Your current buffer is lost.')), @js(__('Reset')), false)"
-                                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                    class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                 >
                                                     <x-heroicon-o-arrow-uturn-down class="h-3 w-3" />
                                                     {{ __('Reset to default') }}
@@ -198,7 +207,7 @@
                                                 wire:loading.attr="disabled"
                                                 wire:target="validateWebserverConfigBuffer"
                                                 @disabled($config_truncated_on_load)
-                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                                             >
                                                 <span wire:loading.remove wire:target="validateWebserverConfigBuffer" class="inline-flex">
                                                     <x-heroicon-o-shield-check class="h-3 w-3" />
@@ -215,7 +224,7 @@
                                                 wire:loading.attr="disabled"
                                                 wire:target="saveWebserverConfig"
                                                 @disabled($config_truncated_on_load)
-                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-forest bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-50"
+                                                class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-forest bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-50"
                                             >
                                                 <span wire:loading.remove wire:target="saveWebserverConfig" class="inline-flex">
                                                     <x-heroicon-o-cloud-arrow-up class="h-3 w-3" />
@@ -251,10 +260,10 @@
                                             'border-emerald-200 bg-emerald-50/70 text-emerald-900' => $config_validate_ok,
                                             'border-rose-200 bg-rose-50/70 text-rose-900' => ! $config_validate_ok,
                                         ])>
-                                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                                            <p class="text-xs font-semibold uppercase tracking-[0.16em]">
                                                 {{ $config_validate_ok ? __('Validation passed') : __('Validation reported problems') }}
                                             </p>
-                                            <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px]">{{ $config_validate_output }}</pre>
+                                            <pre class="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-xs">{{ $config_validate_output }}</pre>
                                         </div>
                                     @endif
 
@@ -262,23 +271,23 @@
                                     @if (! empty($config_backups))
                                         <div class="mt-3 rounded-xl border border-brand-ink/10 bg-white">
                                             <div class="flex items-center justify-between border-b border-brand-ink/10 px-3 py-2">
-                                                <span class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
+                                                <span class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">
                                                     <x-heroicon-o-clock class="h-3 w-3" />
                                                     {{ __('Revisions') }}
                                                 </span>
-                                                <span class="text-[10px] text-brand-mist">{{ __(':n kept — newest first; click Restore to roll back', ['n' => count($config_backups)]) }}</span>
+                                                <span class="text-2xs text-brand-mist">{{ __(':n kept — newest first; click Restore to roll back', ['n' => count($config_backups)]) }}</span>
                                             </div>
                                             <ul class="max-h-48 divide-y divide-brand-ink/5 overflow-auto text-xs">
                                                 @foreach ($config_backups as $b)
                                                     <li class="flex items-center justify-between gap-3 px-3 py-1.5">
                                                         <div class="min-w-0">
-                                                            <p class="truncate font-mono text-[11px] text-brand-moss">{{ basename($b['path']) }}</p>
-                                                            <p class="text-[10px] text-brand-mist">{{ \Illuminate\Support\Carbon::createFromTimestamp($b['mtime'])->diffForHumans() }} — {{ number_format($b['size']) }} bytes</p>
+                                                            <p class="truncate font-mono text-xs text-brand-moss">{{ basename($b['path']) }}</p>
+                                                            <p class="text-2xs text-brand-mist">{{ \Illuminate\Support\Carbon::createFromTimestamp($b['mtime'])->diffForHumans() }} — {{ number_format($b['size']) }} bytes</p>
                                                         </div>
                                                         <button
                                                             type="button"
                                                             wire:click="openConfirmActionModal('restoreWebserverConfigBackup', [@js($b['path'])], @js(__('Restore backup?')), @js(__('Overwrite the live file with this backup? A snapshot of the current contents is taken first.')), @js(__('Restore')), true)"
-                                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[10px] font-medium text-brand-ink hover:bg-brand-sand/40"
+                                                            class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-2xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                                         >
                                                             <x-heroicon-o-arrow-uturn-left class="inline h-3 w-3" />
                                                             {{ __('Restore') }}

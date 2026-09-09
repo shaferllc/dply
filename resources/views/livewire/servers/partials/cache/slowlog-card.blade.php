@@ -8,13 +8,13 @@
 @endphp
 
 <div
-    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-5 py-5 sm:px-6"
+    class="{{ $card ?? 'border-b border-brand-ink/10' }} px-4 py-3.5 sm:px-5"
     wire:init="loadSlowlog"
     wire:poll.10s="loadSlowlog"
 >
     <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="min-w-0">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __(':engine — slowlog', ['engine' => $engineLabel]) }}</h3>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __(':engine — slowlog', ['engine' => $engineLabel]) }}</h3>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Commands that crossed the slowlog-log-slower-than threshold (10ms default). Most recent 32 entries; auto-refreshes every 10 seconds.') }}</p>
         </div>
         <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
@@ -25,7 +25,7 @@
                 wire:target="loadSlowlog"
                 class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
             >
-                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span wire:loading.remove wire:target="loadSlowlog">{{ __('Rescan') }}</span>
                 <span wire:loading wire:target="loadSlowlog">{{ __('Scanning…') }}</span>
             </button>
@@ -55,7 +55,7 @@
     @elseif ($entries === null)
         <p class="mt-4 text-xs text-brand-mist">{{ __('Loading…') }}</p>
     @elseif ($entries === [])
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
             </span>
@@ -65,7 +65,7 @@
     @else
         <div class="mt-4 overflow-x-auto rounded-lg border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                <thead class="bg-brand-sand/30 text-[10px] uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-2xs uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th scope="col" class="px-3 py-2 text-left font-semibold">{{ __('Time') }}</th>
                         <th scope="col" class="px-3 py-2 text-right font-semibold">{{ __('Duration') }}</th>
@@ -94,6 +94,6 @@
                 </tbody>
             </table>
         </div>
-        <p class="mt-2 text-[11px] text-brand-mist">{{ __('Threshold lives in CONFIG GET slowlog-log-slower-than. Tune it from the Configure subtab if you need finer-grained capture.') }}</p>
+        <p class="mt-2 text-xs text-brand-mist">{{ __('Threshold lives in CONFIG GET slowlog-log-slower-than. Tune it from the Configure subtab if you need finer-grained capture.') }}</p>
     @endif
 </div>

@@ -1,7 +1,27 @@
 @theme {
+    /* Workspace width. Every page frames itself with `max-w-7xl` (101 views), so
+       the cap is retuned here rather than swept through all of them — one token,
+       one consistent width, and reverting is deleting this line.
+       Tailwind's stock 80rem left the content column ~900px once the 3/12
+       settings sidebar took its share, which is what made dense pages (the env
+       variables table, the config-check list) run tall and cramped while a wide
+       monitor sat empty on both sides. */
+    --container-7xl: 90rem;
+
     /* App font (matches Bunny font loaded in Blade layouts) */
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Micro type scale — prefer text-xxs / text-3xs / text-2xs / text-xs over
+       arbitrary text-[Npx]. Resize sitewide by editing these tokens only.
+       Keep line-heights tight (not 1rem) so 8–10px labels don’t read as huge
+       blocky caps in metric strips and dense chrome. */
+    --text-xxs: 8px;
+    --text-xxs--line-height: 1;
+    --text-3xs: 9px;
+    --text-3xs--line-height: 1.15;
+    --text-2xs: 10px;
+    --text-2xs--line-height: 1.2;
 
     /* Brand palette — sampled from dply logo */
     --color-brand-ink: #171a0e;

@@ -27,7 +27,7 @@
             <div class="flex items-center gap-2">
                 <x-mac-window-dots />
             </div>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/90">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] text-violet-200/90">
                 <span class="relative flex h-1.5 w-1.5">
                     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400/60 opacity-75"></span>
                     <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-400"></span>
@@ -36,7 +36,7 @@
             </span>
         </div>
 
-        <div class="relative mt-4 font-mono text-[11px] leading-relaxed sm:text-xs">
+        <div class="relative mt-4 font-mono text-xs leading-relaxed sm:text-xs">
             <p class="text-slate-500">{{ __('# Caching preview — :site', ['site' => $siteLabel]) }}</p>
             <p class="mt-3 text-violet-300/90">{{ __('layers          nginx_http  varnish  opcache') }}</p>
             <p class="text-slate-400">{{ __('fastcgi ttl     200=60m     404=10m  min_uses=1') }}</p>
@@ -49,7 +49,7 @@
         </div>
 
         @if ($site)
-            <div class="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-slate-300">
+            <div class="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">
                 <x-heroicon-o-bolt-slash class="h-3.5 w-3.5 shrink-0 text-violet-300/80" aria-hidden="true" />
                 <span>{{ __('Cache layers will attach to :site when they ship.', ['site' => $siteLabel]) }}</span>
             </div>
@@ -153,7 +153,7 @@
             <span @class([
                 'inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-ink/[0.04] font-medium text-brand-mist',
                 'px-3 py-1.5 text-xs' => ! $compact,
-                'px-2.5 py-1 text-[10px]' => $compact,
+                'px-2.5 py-1 text-2xs' => $compact,
             ])>
                 <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('In development') }}

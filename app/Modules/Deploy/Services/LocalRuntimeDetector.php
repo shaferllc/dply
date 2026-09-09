@@ -7,11 +7,12 @@ namespace App\Modules\Deploy\Services;
 use App\Enums\SiteType;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use App\Modules\Deploy\Support\LocalRepositoryFiles;
 
 final class LocalRuntimeDetector
 {
     public function __construct(
-        private readonly ServerlessRuntimeDetector $serverlessRuntimeDetector,
+        private readonly RepositoryRuntimeDetector $serverlessRuntimeDetector,
     ) {}
 
     /**
@@ -39,10 +40,9 @@ final class LocalRuntimeDetector
      *     }
      * }
      */
-    /** @return array<string, mixed> */
     public function detect(string $workingDirectory, string $slug): array
     {
-        $appDetection = $this->serverlessRuntimeDetector->detect($workingDirectory, [
+        $appDetection = $this->serverlessRuntimeDetector->detect(new LocalRepositoryFiles($workingDirectory), [
             'supports_php_runtime' => true,
             'supports_node_runtime' => true,
             'supports_python_runtime' => true,
@@ -59,13 +59,13 @@ final class LocalRuntimeDetector
 
         $reasons = array_values(array_unique(array_merge(
             $containerSignals['reasons'],
-            $appDetection['reasons'] ?? [],
+            $appDetection['reasons'],
         )));
 
         $warnings = array_values(array_unique(array_merge(
             $containerSignals['warnings'],
-            $appDetection['warnings'] ?? [],
-            $this->targetWarnings($targetKind, $appDetection['framework'] ?? 'unknown'),
+            $appDetection['warnings'],
+            $this->targetWarnings($targetKind, $appDetection['framework']),
         )));
 
         if (! isset($containerSignals['target_kind'])) {
@@ -76,15 +76,15 @@ final class LocalRuntimeDetector
             'target_runtime' => $targetKind === 'kubernetes' ? 'kubernetes_web' : 'docker_web',
             'target_kind' => $targetKind,
             'site_type' => $siteType,
-            'framework' => (string) ($appDetection['framework'] ?? 'unknown'),
-            'language' => (string) ($appDetection['language'] ?? 'unknown'),
+            'framework' => (string) $appDetection['framework'],
+            'language' => (string) $appDetection['language'],
             'laravel_octane' => (bool) ($appDetection['laravel_octane'] ?? false),
             'laravel_horizon' => (bool) ($appDetection['laravel_horizon'] ?? false),
             'laravel_pulse' => (bool) ($appDetection['laravel_pulse'] ?? false),
             'laravel_reverb' => (bool) ($appDetection['laravel_reverb'] ?? false),
             'confidence' => $this->mergeConfidence(
-                (string) ($containerSignals['confidence'] ?? 'medium'),
-                (string) ($appDetection['confidence'] ?? 'low'),
+                (string) $containerSignals['confidence'],
+                (string) $appDetection['confidence'],
             ),
             'document_root' => $this->documentRootFor($siteType, $workingDirectory, $slug),
             'repository_path' => '/var/www/'.$slug,
@@ -166,7 +166,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $appDetection
+     * @param  array<string, mixed>  $appDetection
      */
     private function inferSiteType(array $appDetection): SiteType
     {
@@ -245,7 +245,7 @@ final class LocalRuntimeDetector
 
             return [
                 'path' => $file,
-                'keys' => array_values(array_unique($matches[1] ?? [])),
+                'keys' => array_values(array_unique($matches[1])),
             ];
         }
 
@@ -281,7 +281,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed>  $detectedFiles
      */
     private function hasDockerSignal(array $detectedFiles): bool
     {
@@ -290,7 +290,7 @@ final class LocalRuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
+     * @param  array<string, mixed>  $detectedFiles
      */
     private function hasKubernetesSignal(array $detectedFiles, ?string $manifestPath): bool
     {

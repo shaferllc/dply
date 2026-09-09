@@ -14,7 +14,7 @@
     $hubGroups = SiteBindingCatalog::grouped('vm', $hubBindings);
     $networkedAttached = $hubBindings->filter(fn ($b) => BindingReachability::isNetworked($b->type))->count();
     $provisionTypes = ['database', 'redis', 'storage'];
-    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth'];
+    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth', 'connected_app'];
     $statusBadge = [
         'configured' => 'bg-emerald-100 text-emerald-800',
         'pending' => 'bg-amber-100 text-amber-900',
@@ -27,6 +27,9 @@
         'provisioning' => 'bg-sky-500',
         'error' => 'bg-rose-500',
     ];
+    $provisionDigests = $provisionDigests ?? [];
+    $provisionServers = $provisionServers ?? collect();
+    $hasProvisioningBindings = $hasProvisioningBindings ?? false;
     $sectionUrl = fn (string $s) => route('sites.show', ['server' => $server, 'site' => $site, 'section' => $s]);
 
     // Roll-up counts for the header chip.
@@ -42,7 +45,15 @@
     // pure runtime-managed state). Everything else is "available" and lives only
     // in the single global "Add resource" dropdown until attached. Shared by the
     // header dropdown and each group column so they stay in lockstep.
-    $isShownAsCard = function ($t) {
+    // Publication is runtime-owned: the deploy writes it, an operator never
+    // attaches it. Until the runtime fills it in there is nothing to show but a
+    // "set on deploy" placeholder.
+    $publicationTarget = is_array(data_get($site->runtimeTarget(), 'publication'))
+        ? data_get($site->runtimeTarget(), 'publication')
+        : [];
+    $hasPublication = filled($publicationTarget['url'] ?? $publicationTarget['hostname'] ?? null);
+
+    $isShownAsCard = function ($t) use ($hasPublication) {
         if ($t['type'] === 'storage') {
             return ($t['bindings'] ?? collect())->isNotEmpty();
         }
@@ -51,6 +62,7 @@
         }
         return $t['attached'];
     };
+
 
     // Only draw a group pathway (hub + column + its trunk edge) once it actually
     // has a card to show. Empty pathways stay hidden until you add a resource to
@@ -64,9 +76,17 @@
     // Available types grouped by their (human) category label, so the global
     // dropdown shows which column each pick will land in. Spans every group —
     // even hidden ones — so a hidden pathway is still reachable from here.
+    // CDN is a deep link to a feature-flagged page, so it only belongs in the
+    // menu when that page is actually reachable — offering a link that bounces
+    // straight back is worse than not listing it.
+    $cdnAvailable = \Laravel\Pennant\Feature::for($site->organization)->active('workspace.site_cdn');
+
     $availableByGroup = [];
     foreach ($hubGroups as $g) {
         foreach ($g['types'] as $t) {
+            if ($t['type'] === 'cdn' && ! $cdnAvailable) {
+                continue;
+            }
             if (! $isShownAsCard($t)) {
                 $availableByGroup[$g['label']][] = $t;
             }
@@ -93,7 +113,8 @@
 @endphp
 
 {{-- Nested inside Settings Resources merged card — toolbar + strips, no second page card. --}}
-<div class="min-w-0">
+<div class="min-w-0" @if (! empty($hasProvisioningBindings) || (! empty($sectionConsoleActionRun) && $sectionConsoleActionRun->isInFlight())) wire:poll.5s @endif>
+    @include('livewire.sites.settings.partials._console-action-banner', ['embeddedBanner' => true])
     {{-- Toolbar: actions + status (page title lives in the outer sand identity). --}}
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-5 py-3.5 sm:px-6">
         <p class="text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
@@ -103,18 +124,24 @@
                  picking one runs the same attach path and it pops out as a card in
                  its proper group below. --}}
             @if ($availableCount > 0)
-                <div class="relative" x-data="{ open: false }">
-                    <button type="button" @click="open = ! open" :aria-expanded="open"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                        <x-heroicon-o-plus class="h-4 w-4" />
-                        {{ __('Add resource') }}
-                        <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-[10px] font-semibold">{{ $availableCount }}</span>
-                        <svg class="h-3.5 w-3.5 transition-transform duration-200" :class="open && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
-                    </button>
-                    <div x-show="open" x-cloak x-transition x-on:click.outside="open = false"
-                        class="absolute right-0 z-30 mt-1 max-h-[28rem] w-80 overflow-y-auto rounded-xl border border-brand-ink/10 bg-white py-1.5 text-left shadow-xl">
+                {{-- Shared <x-dropdown> (teleports to <body>, fixed-positioned):
+                     this toolbar lives inside a `.dply-card … overflow-hidden`
+                     section, which clipped the old absolutely-positioned panel —
+                     on a narrow viewport the 20rem menu ran past the card's left
+                     edge and its icons/labels were sliced off. --}}
+                <x-dropdown align="right" width="20rem" contentClasses="py-1.5 max-h-[min(70vh,28rem)] overflow-y-auto text-left">
+                    <x-slot name="trigger">
+                        <button type="button" aria-haspopup="true"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                            <x-heroicon-o-plus class="h-4 w-4" />
+                            {{ __('Add resource') }}
+                            <span class="rounded-full bg-brand-cream/20 px-1.5 py-0 text-2xs font-semibold">{{ $availableCount }}</span>
+                            <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        </button>
+                    </x-slot>
+                    <x-slot name="content">
                         @foreach ($availableByGroup as $groupLabel => $items)
-                            <p class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
+                            <p class="px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ $groupLabel }}</p>
                             @foreach ($items as $at)
                                 @php
                                     $atType = $at['type'];
@@ -122,8 +149,16 @@
                                         'logging' => $sectionUrl('logs'),
                                         'scheduler' => route('sites.schedule', ['server' => $server, 'site' => $site]),
                                         'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
+                                        // The edge is configured on its own page, not through
+                                        // the binding modal — there is no binding row behind it.
+                                        'cdn' => route('sites.cdn', ['server' => $server, 'site' => $site]),
                                         default => null,
                                     };
+                                    // Queue has no local store (file/array). Cache and
+                                    // sessions still open — Redis/Database options are
+                                    // disabled in the modal until those resources exist.
+                                    $atNeedsStore = $atType === 'queue'
+                                        && SiteBindingCatalog::missingNeedsAny($hubBindings, $at['needsAny'] ?? []);
                                 @endphp
                                 @if ($atRuntimeUrl)
                                     <a href="{{ $atRuntimeUrl }}" wire:navigate
@@ -133,25 +168,35 @@
                                         </span>
                                         <span class="min-w-0">
                                             <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
-                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
                                         </span>
                                     </a>
+                                @elseif ($atNeedsStore)
+                                    <div class="flex w-full cursor-not-allowed items-start gap-2.5 px-3 py-2 text-left opacity-50" title="{{ __('Attach Redis or a database first') }}">
+                                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                                            <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
+                                        </span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ __('Attach Redis or a database first.') }}</span>
+                                        </span>
+                                    </div>
                                 @else
-                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')" @click="open = false"
+                                    <button type="button" wire:click="openBindingModal('{{ $atType }}', 'attach')"
                                         class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition hover:bg-brand-sand/40">
                                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
                                             <x-dynamic-component :component="$at['icon']" class="h-4 w-4" />
                                         </span>
                                         <span class="min-w-0">
                                             <span class="block truncate text-sm font-semibold text-brand-ink">{{ $at['label'] }}</span>
-                                            <span class="block truncate text-[11px] leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
+                                            <span class="block truncate text-xs leading-snug text-brand-moss">{{ $at['purpose'] }}</span>
                                         </span>
                                     </button>
                                 @endif
                             @endforeach
                         @endforeach
-                    </div>
-                </div>
+                    </x-slot>
+                </x-dropdown>
             @endif
             @if ($networkedAttached > 0)
                 <button type="button" wire:click="validateReachability" wire:loading.attr="disabled" wire:target="validateReachability"
@@ -164,7 +209,7 @@
                 <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                 {{ $attachedTypes }}/{{ $totalTypes }} {{ __('configured') }}
             </span>
-            <div class="hidden items-center gap-3 text-[11px] font-medium text-brand-mist sm:flex">
+            <div class="hidden items-center gap-3 text-xs font-medium text-brand-mist sm:flex">
                 <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-brand-forest"></span>{{ __('Attached') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full border border-dashed border-brand-ink/30"></span>{{ __('Available') }}</span>
             </div>
@@ -202,7 +247,7 @@
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Release health') }}</h3>
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-bold uppercase tracking-wide {{ $state === 'drifted' ? 'bg-amber-100 text-amber-800' : ($state === 'in_sync' ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-ink/5 text-brand-moss') }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $card['dot'] }}"></span>
                                         {{ $state === 'drifted' ? __('Workers pinned') : ($state === 'in_sync' ? __('In sync') : __('Unconfirmed')) }}
                                     </span>
@@ -216,7 +261,7 @@
                                         {{ __('Couldn’t confirm the live release (the workers’ cache is empty or just flushed). Refresh after some traffic.') }}
                                     @endif
                                 </p>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-brand-mist">
+                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-brand-mist">
                                     <span>{{ __('Activated') }}: <span class="font-mono text-brand-ink">{{ $expected ?? '—' }}</span></span>
                                     <span>{{ __('Serving') }}: <span class="font-mono {{ $state === 'drifted' ? 'text-amber-700' : 'text-brand-ink' }}">{{ $serving ?? '—' }}</span></span>
                                     @if (is_array($oc) && ($oc['enabled'] ?? false))
@@ -230,13 +275,13 @@
                         </div>
                         <div class="flex shrink-0 items-center gap-2">
                             <button type="button" wire:click="refreshReleaseHealth" wire:loading.attr="disabled" wire:target="refreshReleaseHealth"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshReleaseHealth" />
                                 {{ __('Refresh') }}
                             </button>
                             @if ($state === 'drifted')
                                 <button type="button" wire:click="flushOpcacheResync" wire:loading.attr="disabled" wire:target="flushOpcacheResync"
-                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60">
                                     <x-heroicon-o-bolt class="h-3.5 w-3.5" />
                                     {{ __('Flush OPcache & re-sync') }}
                                 </button>
@@ -306,16 +351,20 @@
                     const frag = document.createDocumentFragment();
                     let i = 0;
                     const addEdge = (d, kind, n) => {
-                        const base = mk('path', { d, fill: 'none', 'stroke-width': kind === 'trunk' ? 2.5 : 2, 'stroke-linecap': 'round', 'class': kind === 'idle' ? 'dply-edge-idle' : 'dply-edge-flow' },
-                            { stroke: kind === 'idle' ? INK : FOREST, opacity: kind === 'idle' ? 0.16 : (kind === 'trunk' ? 0.7 : 0.55) });
+                        const isProv = kind === 'provisioning';
+                        const isErr = kind === 'error';
+                        const baseClass = kind === 'idle' ? 'dply-edge-idle' : (isProv ? 'dply-edge-provisioning' : (isErr ? 'dply-edge-error' : 'dply-edge-flow'));
+                        const stroke = kind === 'idle' ? INK : (isProv ? '#0ea5e9' : (isErr ? '#f43f5e' : FOREST));
+                        const base = mk('path', { d, fill: 'none', 'stroke-width': kind === 'trunk' ? 2.5 : 2, 'stroke-linecap': 'round', 'class': baseClass },
+                            { stroke, opacity: kind === 'idle' ? 0.16 : (kind === 'trunk' ? 0.7 : 0.55) });
                         frag.appendChild(base);
                         if (kind !== 'idle') {
-                            frag.appendChild(mk('path', { d, fill: 'none', pathLength: '100', 'stroke-width': 3.5, 'stroke-linecap': 'round', filter: 'url(#dplyGlow)', 'class': 'dply-pulse' },
-                                { stroke: '#6ee7b7', animationDelay: (n * 0.22) + 's' }));
+                            frag.appendChild(mk('path', { d, fill: 'none', pathLength: '100', 'stroke-width': 3.5, 'stroke-linecap': 'round', filter: 'url(#dplyGlow)', 'class': isProv ? 'dply-pulse-provisioning' : (isErr ? 'dply-pulse-error' : 'dply-pulse') },
+                                { stroke: isProv ? '#7dd3fc' : (isErr ? '#fda4af' : '#6ee7b7'), animationDelay: (n * 0.22) + 's' }));
                         }
                     };
                     const addDot = (p, kind) => frag.appendChild(mk('circle', { cx: p.x, cy: p.y, r: 3.5 },
-                        { fill: kind === 'idle' ? INK : FOREST, opacity: kind === 'idle' ? 0.3 : 1 }));
+                        { fill: kind === 'idle' ? INK : (kind === 'provisioning' ? '#0ea5e9' : (kind === 'error' ? '#f43f5e' : FOREST)), opacity: kind === 'idle' ? 0.3 : 1 }));
 
                     // Inbound routing (bottom) flows down into the site (top) —
                     // the front door of the request path. Animates only when the
@@ -344,7 +393,10 @@
                         const from = hubBottom[node.dataset.group];
                         if (! from) return;
                         const to = this.point(node.getBoundingClientRect(), wrap, 'left');
-                        const kind = node.dataset.attached === '1' ? 'attached' : 'idle';
+                        const kind = node.dataset.attached !== '1'
+                            ? 'idle'
+                            : (node.dataset.status === 'provisioning' ? 'provisioning'
+                                : (node.dataset.status === 'error' ? 'error' : 'attached'));
                         addEdge(this.curve(from, DOWN, to, LEFT), kind, i++);
                         addDot(to, kind);
                     });
@@ -391,19 +443,19 @@
                         </span>
                         <div class="min-w-0">
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ __('Routing') }}</p>
-                            <p class="text-[11px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Inbound') }}</p>
+                            <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Inbound') }}</p>
                         </div>
                     </div>
                     <div class="mt-3 border-t border-brand-ink/10 pt-2.5">
                         @if ($routingActive)
-                            <p class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $routingPrimary?->hostname ?? __('Configured') }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                            <p class="truncate font-mono text-xs font-medium text-brand-moss">{{ $routingPrimary?->hostname ?? __('Configured') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-mist">
                                 {{ trans_choice(':n domain|:n domains', $routingDomainCount, ['n' => $routingDomainCount]) }}@if ($routingRedirectCount > 0) · {{ trans_choice(':n redirect|:n redirects', $routingRedirectCount, ['n' => $routingRedirectCount]) }}@endif
                             </p>
                         @else
-                            <p class="text-[11px] text-brand-moss">{{ __('No public domain yet') }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('No public domain yet') }}</p>
                         @endif
-                        <a href="{{ $sectionUrl('routing') }}" wire:navigate class="mt-2 inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <a href="{{ $sectionUrl('routing') }}" wire:navigate class="mt-2 inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage routing') }}
                         </a>
                     </div>
@@ -419,10 +471,10 @@
                         </span>
                         <div class="min-w-0">
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $site->domain ?? $site->name ?? __('This site') }}</p>
-                            <p class="text-[11px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Site') }}</p>
+                            <p class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Site') }}</p>
                         </div>
                     </div>
-                    <div class="mt-3 flex items-center gap-1.5 border-t border-brand-ink/10 pt-2.5 text-[11px] text-brand-moss">
+                    <div class="mt-3 flex items-center gap-1.5 border-t border-brand-ink/10 pt-2.5 text-xs text-brand-moss">
                         <x-heroicon-o-server class="h-3.5 w-3.5 text-brand-mist" />
                         <span class="truncate">{{ $server->name }}</span>
                     </div>
@@ -434,7 +486,6 @@
             @foreach ($visibleGroups as $groupKey => $group)
                 @php
                     $col = $loop->iteration;
-                    $gAttached = collect($group['types'])->where('attached', true)->count();
 
                     // Only render the resources that are actually present as cards
                     // (anything attached, plus publication which is purely
@@ -442,13 +493,34 @@
                     // single global "Add resource" dropdown in the header and pop
                     // out here once attached — no wall of empty ghost cards.
                     $cardTypes = collect($group['types'])->filter($isShownAsCard)->values();
+
+                    // Count the cards actually rendered below, not the attached
+                    // flag. Publication is drawn whether or not it is "attached"
+                    // (it is runtime-owned, never operator-attached), so counting
+                    // the flag made the Runtime hub read "nothing attached"
+                    // directly above a visible Publication card. Identical to the
+                    // old count for every other group, where card == attached.
+                    $gShown = $cardTypes->count();
                 @endphp
 
                 {{-- Group hub --}}
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gAttached, ['count' => $gAttached]) }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
+                        {{-- The runtime hub names what the site actually runs on. Its
+                             cards are runtime-OWNED (publication is written by the
+                             deploy, never attached by an operator), so a count of
+                             "attached" resources was both wrong and useless there —
+                             it read "1 attached" for a thing nobody attached, on a
+                             site whose runtime it never mentioned. Every other group
+                             does hold attachable resources, so those keep the count. --}}
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">
+                            @if ($groupKey === 'runtime')
+                                <span class="capitalize">{{ $site->runtimeKey() ?: __('no runtime') }}</span>@if ($site->runtimeVersion())<span class="font-mono"> {{ $site->runtimeVersion() }}</span>@endif
+                            @else
+                                {{ trans_choice('{0}nothing attached|{1}:count attached|[2,*]:count attached', $gShown, ['count' => $gShown]) }}
+                            @endif
+                        </p>
                     </div>
                 </div>
 
@@ -473,8 +545,8 @@
                             $canProvision = in_array($type, $provisionTypes, true);
                             $canConfig = in_array($type, $configTypes, true);
                             $isLogging = $type === 'logging';
-                            $needsRedis = in_array('redis', $t['needs'] ?? [], true)
-                                && ! $hubBindings->contains(fn ($b) => $b->type === 'redis');
+                            $needsRedis = $type === 'queue'
+                                && SiteBindingCatalog::missingNeedsAny($hubBindings, $t['needsAny'] ?? []);
                             $hasAction = $isLogging || $canProvision || $canConfig;
                             $conn = $attached && is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
                             $reachTarget = $attached ? BindingReachability::target($binding) : null;
@@ -509,10 +581,13 @@
                                 // Managed databases provision asynchronously: the cluster takes a few
                                 // minutes, then its connection vars land on the binding. They apply at
                                 // the next deploy, so a configured managed DB prompts a redeploy.
-                                $attached && ($cfg['managed'] ?? false) && $binding->status === 'provisioning' => __('Provisioning the managed cluster — this takes a few minutes.'),
-                                $attached && in_array($cfg['placement'] ?? '', ['docker', 'docker_vm'], true) && $binding->status === 'provisioning' => match ($cfg['placement'] ?? '') {
+                                $attached && ($cfg['managed'] ?? false) && $binding->isProvisioning() => __('Provisioning the managed cluster — this takes a few minutes.'),
+                                $attached && $binding->isProvisioning() => match ($cfg['placement'] ?? '') {
+                                    'cache_vm' => __('Provisioning the dedicated Redis server — this can take several minutes.'),
+                                    'dedicated_vm' => __('Provisioning the dedicated database server — this can take several minutes.'),
                                     'docker_vm' => __('Provisioning the Docker database server and starting the container — this can take several minutes.'),
-                                    default => __('Starting the Docker database container — this usually takes under a minute.'),
+                                    'docker' => __('Starting the Docker database container — this usually takes under a minute.'),
+                                    default => __('Provisioning this resource — click the card for live status.'),
                                 },
                                 $needsRedeploy => __('Connection ready — redeploy to apply the connection variables.'),
                                 $attached && $binding->status === 'configured' => __('Configured and ready.'),
@@ -521,22 +596,38 @@
                                 default => __('Not attached yet.'),
                             };
 
-                            // A dedicated-VM database binding owns its own server. Let the status
-                            // badge deep-link to that server — servers.show redirects to the live
-                            // provisioning journey while it's still coming up, then to the server
-                            // workspace once it's ready.
-                            $dbVmServerId = in_array($cfg['placement'] ?? null, ['dedicated_vm', 'docker_vm'], true) ? ($cfg['db_vm_server_id'] ?? null) : null;
-                            $dbVmServerUrl = $attached && filled($dbVmServerId) ? route('servers.show', $dbVmServerId) : null;
+                            $isProvisioning = $attached && $binding->isProvisioning();
+                            $isErrored = $attached && $binding->isErrored();
+                            $canOpenStatus = ($isProvisioning || $isErrored) && method_exists($this, 'openBindingInfoModal');
+                            $vmServerId = $attached ? $binding->provisionServerId() : null;
+                            $vmServer = filled($vmServerId) ? ($provisionServers[$vmServerId] ?? null) : null;
+                            $dbVmServerUrl = $attached && filled($vmServerId) && ! $isProvisioning && ! $isErrored
+                                ? route('servers.show', $vmServerId)
+                                : null;
+                            $digest = filled($vmServerId) ? ($provisionDigests[$vmServerId] ?? null) : null;
+                            $displayError = $isErrored ? $binding->displayError($vmServer instanceof \App\Models\Server ? $vmServer : null) : null;
+                            $authFailure = $isErrored && \App\Support\Providers\ProviderAuthFailure::detected($displayError);
+                            $authProvider = $authFailure ? $this->bindingAuthProvider($binding, $cfg) : null;
+                            if ($authFailure) {
+                                $statusHint = \App\Support\Providers\ProviderAuthFailure::message((string) $authProvider);
+                            }
+                            $canRetryProvision = $attached
+                                && ! $authFailure
+                                && method_exists($this, 'canRetryBindingProvision')
+                                && $this->canRetryBindingProvision($binding);
                         @endphp
                         <div
                             wire:key="res-{{ $type }}-{{ $attached ? $binding->id : 'new' }}"
                             data-resource-node="{{ $type }}{{ $attached ? '-'.$binding->id : '' }}"
                             data-group="{{ $groupKey }}"
                             data-attached="{{ $attached ? '1' : '0' }}"
+                            data-status="{{ $attached ? $binding->status : '' }}"
                             x-data="{ open: false }"
                             @class([
                                 'group/node relative w-full rounded-xl border bg-white p-3 pr-9 shadow-sm transition',
-                                'border-brand-forest/30 ring-1 ring-brand-forest/10' => $attached,
+                                'dply-provisioning-card border-sky-300/80 ring-1 ring-sky-200/80' => $isProvisioning,
+                                'border-rose-300/90 ring-1 ring-rose-200/80' => $isErrored,
+                                'border-brand-forest/30 ring-1 ring-brand-forest/10' => $attached && ! $isProvisioning && ! $isErrored,
                                 'border-brand-ink/10 border-dashed hover:border-brand-forest/40 hover:shadow-md' => ! $attached,
                             ])
                         >
@@ -556,6 +647,13 @@
                                     </button>
                                 @endif
                                 @if ($attached && ! $isLogging)
+                                    @if ($binding->canOfferDeleteOnDetach())
+                                        <button type="button" title="{{ __('Detach & delete') }}"
+                                            wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
+                                            class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
+                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                        </button>
+                                    @endif
                                     <button type="button" title="{{ __('Detach') }}"
                                         wire:click="openDetachBindingConfirmModal(@js((string) $binding->id), @js($t['label']))"
                                         class="rounded-md p-1 text-brand-mist hover:bg-rose-50 hover:text-rose-600">
@@ -564,66 +662,116 @@
                                 @endif
                             </div>
 
-                            <div class="flex items-start gap-2.5">
-                                <span class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ $attached ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/50 text-brand-moss' }}">
-                                    <x-dynamic-component :component="$t['icon']" class="h-5 w-5" />
+                            @php $identityTag = $canOpenStatus ? 'button' : 'div'; @endphp
+                            <{{ $identityTag }}
+                                @if ($canOpenStatus)
+                                    type="button"
+                                    wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                    title="{{ $isErrored ? __('View error and fix options') : __('View provisioning status') }}"
+                                @endif
+                                @class([
+                                    'flex min-w-0 w-full items-start gap-2.5 rounded-lg text-left',
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70' => $canOpenStatus && $isErrored,
+                                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70' => $canOpenStatus && ! $isErrored,
+                                ])
+                            >
+                                <span @class([
+                                    'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
+                                    'bg-sky-50 text-sky-700' => $isProvisioning,
+                                    'bg-rose-50 text-rose-700' => $isErrored,
+                                    'bg-brand-forest/10 text-brand-forest' => $attached && ! $isProvisioning && ! $isErrored,
+                                    'bg-brand-sand/50 text-brand-moss' => ! $attached,
+                                ])>
+                                    @if ($isProvisioning)
+                                        <span class="pointer-events-none absolute inset-0 animate-spin rounded-lg border-2 border-sky-200 border-t-sky-500" aria-hidden="true"></span>
+                                    @endif
+                                    <x-dynamic-component :component="$t['icon']" class="relative h-5 w-5" />
                                     @if ($attached)
-                                        <span title="{{ $statusHint }}" class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
+                                        <span title="{{ $statusHint }}" class="absolute -right-0.5 -top-0.5 flex h-2.5 w-2.5">
+                                            @if ($isProvisioning)
+                                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75"></span>
+                                            @endif
+                                            <span class="relative inline-flex h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
+                                        </span>
                                     @endif
                                 </span>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5">
                                         <h3 class="truncate text-sm font-semibold text-brand-ink">{{ $t['label'] }}</h3>
                                         @if ($needsRedis)
-                                            <span title="{{ __('Attach Redis first to use the redis driver') }}" class="inline-flex shrink-0 items-center text-amber-500">
+                                            <span title="{{ __('Attach Redis or a database first') }}" class="inline-flex shrink-0 items-center text-amber-500">
                                                 <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />
                                             </span>
                                         @endif
                                     </div>
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
-                                            <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
-                                            @if ($dbVmServerUrl)
+                                            <span class="truncate font-mono text-xs font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
+                                            @if ($isProvisioning)
+                                                <span class="dply-provisioning-badge inline-flex items-center gap-1 rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-sky-900">
+                                                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-600"></span>
+                                                    {{ $binding->status }}
+                                                </span>
+                                                <span class="text-xs font-semibold text-sky-700">{{ __('View status') }}</span>
+                                            @elseif ($isErrored)
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-rose-800">
+                                                    <x-heroicon-m-exclamation-triangle class="h-2.5 w-2.5" />
+                                                    {{ $binding->status }}
+                                                </span>
+                                                <span class="text-xs font-semibold text-rose-700">{{ __('View error') }}</span>
+                                            @elseif ($dbVmServerUrl)
                                                 <a href="{{ $dbVmServerUrl }}" wire:navigate
-                                                    title="{{ $binding->status === 'provisioning' ? __('View provisioning status') : __('View database server') }}"
-                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
+                                                    title="{{ __('View database server') }}"
+                                                    class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide hover:brightness-95 hover:underline {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}<x-heroicon-o-arrow-top-right-on-square class="h-2.5 w-2.5" /></a>
                                             @else
-                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                                <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
                                             @endif
                                             @if ($needsRedeploy)
                                                 <a href="{{ $sectionUrl('deploy') }}" wire:navigate
                                                     title="{{ __('The connection variables apply at the next deploy.') }}"
-                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
+                                                    class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0 text-3xs font-semibold uppercase tracking-wide text-amber-800 hover:bg-amber-200">
                                                     <x-heroicon-o-arrow-path class="h-2.5 w-2.5" /> {{ __('Redeploy to apply') }}
                                                 </a>
                                             @endif
                                         </div>
+                                        @if ($isProvisioning && $digest)
+                                            <p class="mt-1 truncate text-xs text-sky-800">
+                                                <span class="font-semibold">{{ $digest->phaseLabel }}</span>
+                                                <span class="text-sky-700/80"> · {{ $digest->stepLabel }}</span>
+                                                @if ($digest->elapsedHuman())
+                                                    <span class="text-sky-700/70"> · {{ __(':elapsed elapsed', ['elapsed' => $digest->elapsedHuman()]) }}</span>
+                                                @endif
+                                            </p>
+                                        @endif
+                                        @if ($isErrored && filled($displayError))
+                                            <p class="mt-1 line-clamp-2 text-xs leading-snug text-rose-800">{{ $displayError }}</p>
+                                        @endif
                                         @if ($conn !== null)
                                             @php
                                                 $reachOk = (bool) ($conn['ok'] ?? false);
                                                 $reachWhen = ! empty($conn['checked_at']) ? Carbon::parse($conn['checked_at'])->diffForHumans(short: true) : null;
                                             @endphp
-                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {{ $reachOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}" title="{{ $conn['detail'] ?? ($reachOk ? __('Reachable from the server') : '') }}">
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-3xs font-semibold {{ $reachOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}" title="{{ $conn['detail'] ?? ($reachOk ? __('Reachable from the server') : '') }}">
                                                 <span class="h-1.5 w-1.5 rounded-full {{ $reachOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
                                                 {{ $reachOk ? __('Reachable') : __('Unreachable') }}@if ($reachWhen) · {{ $reachWhen }}@endif
                                             </span>
                                         @elseif ($reachTarget)
-                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-[9px] font-medium text-brand-moss">
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-3xs font-medium text-brand-moss">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-brand-mist"></span>{{ __('Not checked') }}
                                             </span>
                                         @endif
                                     @else
-                                        <p class="mt-0.5 line-clamp-2 text-[11px] leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
+                                        <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
                                     @endif
                                 </div>
-                            </div>
+                            </{{ $identityTag }}>
 
                             {{-- injected variables: collapsed summary, expands to full list --}}
                             @if ($attached && $envKeys !== [])
                                 <div class="mt-2">
-                                    <p x-show="! open" class="truncate font-mono text-[10px] text-brand-mist">{{ collect($envKeys)->take(4)->implode(' · ') }}{{ count($envKeys) > 4 ? ' · +'.(count($envKeys) - 4) : '' }}</p>
+                                    <p x-show="! open" class="truncate font-mono text-2xs text-brand-mist">{{ collect($envKeys)->take(4)->implode(' · ') }}{{ count($envKeys) > 4 ? ' · +'.(count($envKeys) - 4) : '' }}</p>
                                     <div x-show="open" x-cloak class="rounded-lg bg-brand-cream/40 p-2">
-                                        <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
+                                        <p class="mb-1 text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
                                         <div class="flex flex-wrap gap-1">
                                             @foreach ($binding->injected_env as $k => $v)
                                                 {{-- Hover/click a chip to reveal its injected value (masked by
@@ -635,21 +783,21 @@
                                                     class="relative"
                                                 >
                                                     <button type="button" @click="pop = ! pop"
-                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
+                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-2xs text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
                                                     <div x-show="pop" x-cloak x-transition.opacity
                                                         class="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-brand-ink/10 bg-white p-2 text-left shadow-xl">
                                                         <div class="flex items-center justify-between gap-2">
-                                                            <span class="truncate font-mono text-[10px] font-semibold text-brand-ink">{{ $k }}</span>
-                                                            <div class="flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                                                            <span class="truncate font-mono text-2xs font-semibold text-brand-ink">{{ $k }}</span>
+                                                            <div class="flex shrink-0 items-center gap-2 text-2xs font-semibold">
                                                                 <button type="button" @click="show = ! show" class="text-brand-sage hover:underline"><span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span></button>
                                                                 <button type="button" @click="copyVal()" class="text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                                             </div>
                                                         </div>
-                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-[10px] text-brand-ink">
+                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-2xs text-brand-ink">
                                                             <span x-show="show" x-cloak>{{ ((string) $v) === '' ? '(empty)' : $v }}</span>
                                                             <span x-show="! show">••••••••••</span>
                                                         </p>
-                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:underline">
+                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-2xs font-semibold text-brand-forest hover:underline">
                                                             <x-heroicon-o-pencil-square class="h-3 w-3" /> {{ __('Override in Environment') }}
                                                         </a>
                                                     </div>
@@ -661,10 +809,10 @@
                                                  the app's config/database.php — hand over the exact array. --}}
                                             <div class="mt-2" x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js((string) ($cfg['connection_snippet'] ?? ''))); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }">
                                                 <div class="flex items-center justify-between">
-                                                    <p class="text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
-                                                    <button type="button" @click="copy()" class="text-[10px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                    <p class="text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/database.php → connections') }}</p>
+                                                    <button type="button" @click="copy()" class="text-2xs font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                                 </div>
-                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
+                                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-2xs leading-relaxed text-brand-cream">{{ $cfg['connection_snippet'] }}</pre>
                                             </div>
                                         @endif
                                     </div>
@@ -673,25 +821,53 @@
 
                             {{-- Actions --}}
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-                                @if ($isUnreachable && method_exists($this, 'fixBindingConnectivity'))
-                                    {{-- Highlighted remediation when the server can't reach the resource.
-                                         database/redis get the server-side auto-fix modal; logging links to
-                                         the Logs editor; everything else opens the reconfigure modal. --}}
-                                    @if (in_array($type, ['database', 'redis'], true))
+                                @if ($authFailure && method_exists($this, 'openBindingInfoModal'))
+                                    <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
+                                        title="{{ __('Reconnect or add a new API token.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md bg-rose-800 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-900">
+                                        <x-heroicon-o-key class="h-3.5 w-3.5" /> {{ __('Reconnect') }}
+                                    </button>
+                                @elseif ($canRetryProvision && method_exists($this, 'retryFailedBindingProvision'))
+                                    <button type="button" wire:click="retryFailedBindingProvision(@js((string) $binding->id))"
+                                        wire:loading.attr="disabled" wire:target="retryFailedBindingProvision"
+                                        title="{{ __('Retry provisioning this resource.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md bg-rose-700 px-2 py-1 text-xs font-semibold text-white shadow-sm hover:bg-rose-800 disabled:opacity-60">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="retryFailedBindingProvision" /> {{ __('Retry') }}
+                                    </button>
+                                @endif
+                                @if ($canRetryProvision && in_array($type, ['database', 'redis'], true) && method_exists($this, 'openFailedBindingRepair'))
+                                    <button type="button" wire:click="openFailedBindingRepair(@js((string) $binding->id))"
+                                        title="{{ __('Pick a different region or placement and remake this resource.') }}"
+                                        class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" /> {{ __('Change placement') }}
+                                    </button>
+                                @endif
+                                @if (($isUnreachable || $isErrored) && method_exists($this, 'fixBindingConnectivity'))
+                                    {{-- Highlighted remediation when the server can't reach the resource
+                                         or provision failed. database/redis get the server-side auto-fix
+                                         modal; logging links to the Logs editor; everything else opens
+                                         the reconfigure modal. --}}
+                                    @if (in_array($type, ['database', 'redis'], true) && $isUnreachable)
                                         <button type="button" wire:click="startFixBinding(@js((string) $binding->id))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')"
                                             title="{{ __('Fix the private-network connectivity for this resource.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
-                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix access') }}
                                         </button>
                                     @elseif ($isLogging)
                                         <a href="{{ $sectionUrl('logs') }}" wire:navigate
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </a>
-                                    @else
+                                    @elseif ($isErrored && ! $canRetryProvision)
                                         <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
                                             title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                        </button>
+                                    @elseif ($isUnreachable)
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
+                                            title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
                                         </button>
                                     @endif
@@ -706,7 +882,7 @@
                                         <div class="relative" x-data="{ open: false }" wire:key="cardmailtest-{{ md5((string) $binding->id) }}">
                                             <button type="button" x-on:click="open = !open"
                                                 title="{{ __('Send a test email through this transport.') }}"
-                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                                class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                                 <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                             </button>
                                             <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute left-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 text-left shadow-lg">
@@ -715,13 +891,13 @@
                                                 <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
                                                     <x-heroicon-o-paper-airplane class="h-4 w-4" /> {{ __('Send test email') }}
                                                 </button>
-                                                <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                                <p class="mt-1.5 text-xs text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
                                             </div>
                                         </div>
                                     @elseif (in_array($type, ['database', 'redis', 'cache', 'queue', 'session'], true) && method_exists($this, 'verifyBinding'))
                                         <button type="button" wire:click="verifyBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="verifyBinding"
                                             title="{{ __('Probe this connection from the server now.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
                                     @elseif ($type === 'broadcasting' && method_exists($this, 'testBroadcastingBinding'))
@@ -729,29 +905,34 @@
                                              to the server-side TCP probe (handled in the method). --}}
                                         <button type="button" wire:click="testBroadcastingBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="testBroadcastingBinding"
                                             title="{{ __('Publish a test event to the relay now.') }}"
-                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
                                     @endif
                                 @endif
                                 @if ($attached && method_exists($this, 'openBindingInfoModal'))
                                     <button type="button" wire:click="openBindingInfoModal(@js((string) $binding->id))"
-                                        title="{{ __('View this connection\'s details (injected variables + reachability).') }}"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ __('Info') }}
+                                        title="{{ $isErrored ? __('View the error and fix options') : ($isProvisioning ? __('View live provisioning status') : __('View this connection\'s details (injected variables + reachability).')) }}"
+                                        @class([
+                                            'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-semibold shadow-sm',
+                                            'border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100' => $isErrored,
+                                            'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100' => $isProvisioning && ! $isErrored,
+                                            'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isProvisioning && ! $isErrored,
+                                        ])>
+                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" /> {{ $isErrored ? __('Error') : ($isProvisioning ? __('Status') : __('Info')) }}
                                     </button>
                                 @endif
                                 {{-- Jump from a managed broadcasting binding to the relay app's own page
                                      (credentials, live stats, connected sites, tier). --}}
                                 @if ($type === 'broadcasting' && $attached && $binding->target_type === 'realtime_app' && (auth()->user()?->can('view', $site->organization) ?? false))
-                                    <a href="{{ route('organizations.realtime.show', [$site->organization, $binding->target_id]) }}" wire:navigate
+                                    <a href="{{ route('realtime.show', $binding->target_id) }}" wire:navigate
                                         title="{{ __('Manage the relay app (credentials, stats, tier).') }}"
-                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage app') }}
                                     </a>
                                 @endif
                                 @if ($isLogging)
-                                    <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </a>
                                 @elseif ($canProvision)
@@ -762,14 +943,14 @@
                                         {{-- Already wired up: one binding per type, so attach/provision
                                              both *replace* it. Offer a single "Replace…" that opens the
                                              modal (where you can re-link an existing one or spin up a new). --}}
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Replace…') }}
                                         </button>
                                     @else
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ __('Attach') }}
                                         </button>
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
                                             <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Provision') }}
                                         </button>
                                     @endif
@@ -779,7 +960,7 @@
                                              "Add another" sits below; the id-less Configure button here
                                              would open a fresh form, so it's suppressed. --}}
                                     @else
-                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                         </button>
                                     @endif
@@ -792,7 +973,7 @@
                                         };
                                     @endphp
                                     @if ($runtimeUrl)
-                                        <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Configure') }}
                                         </a>
                                     @elseif ($type === 'publication')
@@ -804,18 +985,24 @@
                                             $pubHref = $pubUrl ? (\Illuminate\Support\Str::startsWith($pubUrl, ['http://', 'https://']) ? $pubUrl : 'https://'.$pubUrl) : null;
                                         @endphp
                                         @if ($pubHref)
-                                            <span class="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-medium">
+                                            <span class="inline-flex min-w-0 items-center gap-1.5 text-xs font-medium">
                                                 <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
                                                 <span class="shrink-0 text-brand-mist">{{ __('Published') }}</span>
                                                 <a href="{{ $pubHref }}" target="_blank" rel="noopener" class="truncate font-mono text-brand-forest hover:underline">{{ $pubUrl }}</a>
                                             </span>
                                         @else
-                                            <span title="{{ __('Set automatically on deploy') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                                                <x-heroicon-o-cpu-chip class="h-3 w-3" /> {{ __('Managed by the runtime') }}
+                                            {{-- Name the runtime that will fill this in. "Managed by
+                                                 the runtime" was true and useless — which runtime, and
+                                                 when? Same key/version idiom the dashboard header and
+                                                 general tab already use. --}}
+                                            <span title="{{ __('The deploy writes this once the site is served.') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
+                                                <x-heroicon-o-cpu-chip class="h-3 w-3" />
+                                                <span class="capitalize">{{ $site->runtimeKey() ?: __('the runtime') }}</span>@if ($site->runtimeVersion())<span class="font-mono normal-case"> {{ $site->runtimeVersion() }}</span>@endif
+                                                <span>· {{ __('set on deploy') }}</span>
                                             </span>
                                         @endif
                                     @else
-                                        <span class="text-[11px] italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
+                                        <span class="text-xs italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
                                     @endif
                                 @endif
                             </div>
@@ -826,7 +1013,7 @@
                                  a second database / connection). It lands in this same
                                  column once attached. --}}
                             <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
-                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-[11px] font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
+                                class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-ink/20 bg-white/60 px-3 py-2 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-forest/40 hover:text-brand-ink hover:shadow-md">
                                 <x-heroicon-o-plus class="h-3.5 w-3.5 text-brand-forest" />
                                 {{ __('Add another :label', ['label' => \Illuminate\Support\Str::lower($t['label'])]) }}
                             </button>
@@ -842,8 +1029,8 @@
                 @php $wcol = $groupCount + 1; @endphp
                 <div class="relative z-10 flex justify-center" style="grid-column: {{ $wcol }}; grid-row: 3;">
                     <div data-hub="workers" class="w-44 rounded-xl border border-violet-200 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
-                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
+                        <p class="mt-0.5 text-xs font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
                     </div>
                 </div>
                 <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $wcol }}; grid-row: 4;">
@@ -862,15 +1049,13 @@
                                 </span>
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</p>
-                                    <p class="text-[11px] text-brand-moss">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }} · {{ $pool->status }}</p>
+                                    <p class="text-xs text-brand-moss">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }} · {{ $pool->status }}</p>
                                 </div>
                             </div>
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-                                @if ($primary)
-                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
-                                    </a>
-                                @endif
+                                <a href="{{ $pool->workspaceUrl() }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
+                                </a>
                             </div>
                         </div>
                     @endforeach
@@ -896,11 +1081,27 @@
             [x-cloak] { display: none !important; }
             @keyframes dplyEdgeFlow { to { stroke-dashoffset: -28; } }
             @keyframes dplyPulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+            @keyframes dplyProvisionShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+            @keyframes dplyProvisionGlow {
+                0%, 100% { box-shadow: 0 0 0 0 rgb(14 165 233 / 0.28); }
+                50% { box-shadow: 0 0 0 7px rgb(14 165 233 / 0); }
+            }
             .dply-edge-flow { stroke-dasharray: 5 7; animation: dplyEdgeFlow 1.1s linear infinite; }
+            .dply-edge-provisioning { stroke-dasharray: 3 6; animation: dplyEdgeFlow 0.65s linear infinite; }
+            .dply-edge-error { stroke-dasharray: 4 6; }
             .dply-edge-idle { stroke-dasharray: 4 7; }
             .dply-pulse { stroke-dasharray: 1.5 98.5; animation: dplyPulse 2.6s linear infinite; }
+            .dply-pulse-provisioning { stroke-dasharray: 4 96; animation: dplyPulse 1.4s linear infinite; }
+            .dply-pulse-error { stroke-dasharray: 6 94; animation: dplyPulse 2s linear infinite; }
+            .dply-provisioning-card { animation: dplyProvisionGlow 2s ease-in-out infinite; }
+            .dply-provisioning-badge {
+                background-image: linear-gradient(90deg, #e0f2fe, #7dd3fc, #e0f2fe);
+                background-size: 200% 100%;
+                animation: dplyProvisionShimmer 1.6s linear infinite;
+            }
             @media (prefers-reduced-motion: reduce) {
-                .dply-edge-flow, .dply-pulse { animation: none; }
+                .dply-edge-flow, .dply-edge-provisioning, .dply-pulse, .dply-pulse-provisioning,
+                .dply-pulse-error, .dply-provisioning-card, .dply-provisioning-badge { animation: none; }
             }
         </style>
     @endverbatim

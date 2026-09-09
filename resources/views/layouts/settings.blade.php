@@ -23,10 +23,11 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-skip-link />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
 
-            <main class="flex-1 w-full pb-28 sm:pb-32">
+            <main id="main-content" class="flex-1 w-full pb-28 sm:pb-32">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     {{-- Breadcrumb sits above the nav + content grid, full width,
                          matching the rest of the app. Each settings page pushes
@@ -63,25 +64,7 @@
 
         {{ $modals ?? '' }}
 
-        <div x-bind:class="regionClass" aria-live="polite">
-            <template x-for="toast in toasts" :key="toast.id">
-                <div
-                    x-show="true"
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 translate-y-2"
-                    x-transition:enter-end="opacity-100 translate-y-0"
-                    :class="toast.type === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : toast.type === 'warning'
-                            ? 'bg-amber-50 border-amber-200 text-amber-950'
-                            : 'bg-brand-ink text-brand-cream'"
-                    class="rounded-lg border px-4 py-3 shadow-lg text-sm flex items-center gap-3 min-w-[200px]"
-                >
-                    <span x-text="toast.message"></span>
-                    <button type="button" @click="remove(toast.id)" class="shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss">&times;</button>
-                </div>
-            </template>
-        </div>
+        @include('partials.toast-stack')
 
         @include('partials.session-flash-toasts')
         @livewireScripts

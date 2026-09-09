@@ -153,14 +153,14 @@
                         autocomplete="off"
                         spellcheck="false"
                     />
-                    <kbd class="hidden shrink-0 rounded bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold text-brand-moss sm:inline-flex">ESC</kbd>
+                    <kbd class="hidden shrink-0 rounded bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold text-brand-moss sm:inline-flex">ESC</kbd>
                 </div>
 
                 {{-- Results --}}
                 <div class="max-h-[55vh] overflow-y-auto px-1.5 py-2" wire:loading.class="opacity-60">
                     @php $i = 0; @endphp
                     @forelse ($groups as $group)
-                        <div class="px-1.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                        <div class="px-1.5 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">
                             {{ $group['label'] }}
                         </div>
                         @foreach ($group['items'] as $item)
@@ -253,7 +253,7 @@
                 </div>
 
                 {{-- Footer hints --}}
-                <div class="flex items-center gap-4 border-t border-brand-ink/10 bg-brand-cream/40 px-4 py-2 text-[11px] text-brand-moss">
+                <div class="flex items-center gap-4 border-t border-brand-ink/10 bg-brand-cream/40 px-4 py-2 text-xs text-brand-moss">
                     <span class="inline-flex items-center gap-1">
                         <kbd class="rounded bg-white px-1 py-0.5 font-semibold ring-1 ring-brand-ink/10">↑</kbd>
                         <kbd class="rounded bg-white px-1 py-0.5 font-semibold ring-1 ring-brand-ink/10">↓</kbd>

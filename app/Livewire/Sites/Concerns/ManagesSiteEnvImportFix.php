@@ -11,6 +11,7 @@ use App\Models\SiteSecretResidency;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SecretEscalator;
+use App\Services\Sites\SiteEnvValidator;
 use App\Support\Sites\EnvImportSources;
 use App\Support\Sites\SiteFixers;
 use Illuminate\Support\Str;
@@ -210,16 +211,47 @@ trait ManagesSiteEnvImportFix
      */
     public function applySuggestedEnvFix(): void
     {
-        $key = strtoupper(trim((string) $this->fixing_env_key));
-        $this->fixing_env_value = match ($key) {
+        $suggested = $this->suggestedEnvFixValue(
+            (string) $this->fixing_env_key,
+            (string) $this->fixing_env_value,
+        );
+
+        if ($suggested !== null) {
+            $this->fixing_env_value = $suggested;
+        }
+    }
+
+    /**
+     * The value this key *should* have, or null when only the operator can know
+     * it (DB_PASSWORD, MAIL_USERNAME, …).
+     *
+     * Single source of truth for the one-key "Use suggested" button, the
+     * suggestion label, and {@see fixAllEnvWarnings()} — they drifted apart
+     * when each carried its own copy of the map.
+     *
+     * Note this is NOT deterministic for the generated keys (APP_KEY, the
+     * broadcaster credentials): each call mints a fresh secret, so callers that
+     * only need to know *whether* a suggestion exists must use
+     * {@see envFixSuggestionLabel()} rather than calling this on every render.
+     */
+    public function suggestedEnvFixValue(string $key, string $current): ?string
+    {
+        return match (strtoupper(trim($key))) {
             'APP_DEBUG' => 'false',
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
             'APP_KEY' => $this->freshAppKey(),
-            'APP_URL' => str_starts_with(strtolower($this->fixing_env_value), 'http://')
-                ? 'https://'.substr($this->fixing_env_value, 7)
-                : $this->fixing_env_value,
-            default => $this->fixing_env_value,
+            // Reverb/Pusher app credentials are values *you* choose and then
+            // hand to the broadcaster — there is nothing to look up, which is
+            // why `artisan install:broadcasting` simply generates them. Same
+            // shapes here: a numeric app id and two random secrets.
+            'REVERB_APP_ID', 'PUSHER_APP_ID' => (string) random_int(100000, 999999),
+            'REVERB_APP_KEY', 'REVERB_APP_SECRET',
+            'PUSHER_APP_KEY', 'PUSHER_APP_SECRET' => Str::lower(Str::random(20)),
+            'APP_URL' => str_starts_with(strtolower($current), 'http://')
+                ? 'https://'.substr($current, 7)
+                : null,
+            default => null,
         };
     }
 
@@ -235,11 +267,128 @@ trait ManagesSiteEnvImportFix
             'APP_ENV' => 'production',
             'SESSION_SECURE_COOKIE' => 'true',
             'APP_KEY' => __('Generate a fresh key'),
+            'REVERB_APP_ID', 'PUSHER_APP_ID' => __('Generate an app ID'),
+            'REVERB_APP_KEY', 'REVERB_APP_SECRET',
+            'PUSHER_APP_KEY', 'PUSHER_APP_SECRET' => __('Generate a secret'),
             'APP_URL' => str_starts_with(strtolower($current), 'http://')
                 ? 'https://'.substr($current, 7)
                 : null,
             default => null,
         };
+    }
+
+    /**
+     * Warning keys that {@see fixAllEnvWarnings()} can settle without asking:
+     * every currently-shown warning whose key has a known good value.
+     *
+     * Driven off the same validator findings the panel renders, so the button's
+     * count can never disagree with the rows above it.
+     *
+     * @return list<string>
+     */
+    public function autoFixableEnvWarningKeys(SiteEnvValidator $validator, DotEnvFileParser $parser): array
+    {
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+
+        // Same suppression list the panel filters on, so an ignored warning is
+        // never silently "fixed" behind the operator's back.
+        $suppressed = $this->suppressedEnvWarningKeys();
+
+        $keys = [];
+        foreach ($validator->validate($map) as $finding) {
+            $key = (string) ($finding['key'] ?? '');
+            if ($key === '' || in_array($key, $suppressed, true) || in_array($key, $keys, true)) {
+                continue;
+            }
+            if ($this->envFixSuggestionLabel($key, (string) ($map[$key] ?? '')) !== null) {
+                $keys[] = $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Settle every auto-fixable warning in one pass: one cache write and one
+     * push, rather than N trips through the single-key modal.
+     *
+     * Deliberately only touches keys with a known good value — a missing
+     * DB_PASSWORD is left alone rather than filled with a guess, so this can
+     * never quietly invent a credential the operator has to go discover later.
+     */
+    public function fixAllEnvWarnings(
+        SiteEnvValidator $validator,
+        DotEnvFileParser $parser,
+        DotEnvFileWriter $writer,
+    ): void {
+        $this->fixEnvWarningKeys(
+            $this->autoFixableEnvWarningKeys($validator, $parser),
+            $parser,
+            $writer,
+        );
+    }
+
+    /**
+     * Settle a specific set of warning keys — the per-group "Fix all" on a row
+     * that covers several keys at once (the three broadcaster credentials are
+     * one problem, not three).
+     *
+     * @param  list<string> $keys
+     */
+    public function fixEnvWarningKeys(
+        array $keys,
+        DotEnvFileParser $parser,
+        DotEnvFileWriter $writer,
+    ): void {
+        $this->authorize('update', $this->site);
+
+        // Never act on a key the operator has suppressed, however it was asked
+        // for — the caller here is a view passing keys back in.
+        $suppressed = $this->suppressedEnvWarningKeys();
+        $keys = array_values(array_filter(
+            array_map('strval', $keys),
+            fn (string $k): bool => $k !== '' && ! in_array($k, $suppressed, true),
+        ));
+
+        if ($keys === []) {
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+
+        $applied = [];
+        foreach ($keys as $key) {
+            $value = $this->suggestedEnvFixValue($key, (string) ($map[$key] ?? ''));
+            if ($value === null) {
+                continue;
+            }
+            $map[$key] = $value;
+            $applied[] = $key;
+        }
+
+        if ($applied === []) {
+            return;
+        }
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.warnings_bulk_fixed', $this->site, null, [
+                'keys' => $applied,
+            ]);
+        }
+
+        $this->autoPushAfterCacheMutation(trans_choice(
+            '{1} :keys fixed.|[2,*] :count variables fixed: :keys',
+            count($applied),
+            ['count' => count($applied), 'keys' => implode(', ', $applied)],
+        ));
     }
 
     /**

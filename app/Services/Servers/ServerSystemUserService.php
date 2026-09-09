@@ -24,10 +24,6 @@ class ServerSystemUserService
      *
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
-     */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
         $details = $lister->listPasswdDetails($server);
@@ -42,10 +38,6 @@ class ServerSystemUserService
      *
      * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, bool|int|list<array<string, string>|string>|string|null>>
-     */
     public function storedSystemUsersWithMetadata(Server $server): array
     {
         $details = $server->systemUsers()->get()
@@ -54,7 +46,7 @@ class ServerSystemUserService
                 'uid' => $u->uid,
                 'home' => (string) $u->home,
                 'shell' => (string) $u->shell,
-                'groups' => (array_values($u->groups) ),
+                'groups' => $u->groups,
             ])
             ->all();
 
@@ -62,7 +54,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $details
+     * @param  list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>  $details
      */
     private function persistSystemUsers(Server $server, array $details): void
     {
@@ -71,7 +63,7 @@ class ServerSystemUserService
 
         DB::transaction(function () use ($server, $details, $now, &$seen): void {
             foreach ($details as $d) {
-                $username = (string) ($d['username'] ?? '');
+                $username = $d['username'];
                 if ($username === '') {
                     continue;
                 }
@@ -80,10 +72,10 @@ class ServerSystemUserService
                 ServerSystemUser::query()->updateOrCreate(
                     ['server_id' => $server->id, 'username' => $username],
                     [
-                        'uid' => $d['uid'] ?? null,
-                        'home' => (string) ($d['home'] ?? ''),
-                        'shell' => (string) ($d['shell'] ?? ''),
-                        'groups' => array_values($d['groups'] ?? []),
+                        'uid' => $d['uid'],
+                        'home' => $d['home'],
+                        'shell' => $d['shell'],
+                        'groups' => $d['groups'],
                         'last_seen_at' => $now,
                     ],
                 );
@@ -98,7 +90,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $details
+     * @param  list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>  $details
      * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
@@ -109,25 +101,26 @@ class ServerSystemUserService
 
         $rows = [];
         foreach ($details as $d) {
-            $key = strtolower(trim($d['username']));
+            $username = $d['username'];
+            $key = strtolower(trim($username));
             $sites = $sitesByUser[$key] ?? [];
             $siteCount = count($sites);
             $workerCount = $workerCounts[$key] ?? 0;
             $cronCount = $cronCounts[$key] ?? 0;
-            $protected = $this->deletionPolicy->isProtected($server, $d['username']);
+            $protected = $this->deletionPolicy->isProtected($server, $username);
             $inUse = $siteCount > 0 || $workerCount > 0 || $cronCount > 0;
 
             $rows[] = [
-                'username' => $d['username'],
+                'username' => $username,
                 'site_count' => $siteCount,
                 'worker_count' => $workerCount,
                 'cron_count' => $cronCount,
                 'is_protected' => $protected,
                 'is_orphan' => ! $protected && ! $inUse,
-                'uid' => $d['uid'] ?? null,
-                'home' => (string) ($d['home'] ?? ''),
-                'shell' => (string) ($d['shell'] ?? ''),
-                'groups' => array_values($d['groups'] ?? []),
+                'uid' => $d['uid'],
+                'home' => $d['home'],
+                'shell' => $d['shell'],
+                'groups' => $d['groups'],
                 'sites' => $sites,
             ];
         }
@@ -163,7 +156,7 @@ class ServerSystemUserService
      * /system-users page; the site-level "Create user" path is gone — sites
      * pick from the existing-users dropdown via {@see assignExistingUserToSite()}.
      *
-     * @param  array<string, mixed> $extraGroups  supplementary groups (e.g. www-data)
+     * @param  list<string>  $extraGroups  supplementary groups (e.g. www-data)
      *
      * @throws \RuntimeException
      */
@@ -290,7 +283,7 @@ class ServerSystemUserService
     }
 
     /**
-     * @param  array<string, mixed> $extraGroups
+     * @param  list<string>  $extraGroups
      */
     private function createUserIfMissing(Server $server, string $username, bool $grantSudo, string $shell, array $extraGroups): void
     {

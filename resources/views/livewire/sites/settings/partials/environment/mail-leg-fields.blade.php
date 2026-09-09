@@ -9,7 +9,7 @@
 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
     <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
-            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-forest/10 text-[11px] font-bold text-brand-forest">{{ $legIndex + 1 }}</span>
+            <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-forest/10 text-xs font-bold text-brand-forest">{{ $legIndex + 1 }}</span>
             <select wire:model.live="bindingForm.legs.{{ $legIndex }}.provider" class="dply-input !w-auto py-1.5 text-sm">
                 <option value="smtp">{{ __('SMTP') }}</option>
                 <option value="mailgun">{{ __('Mailgun') }}</option>
@@ -20,7 +20,7 @@
             </select>
         </div>
         @if ($legCanRemove)
-            <button type="button" wire:click="removeMailLeg({{ $legIndex }})" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
+            <button type="button" wire:click="removeMailLeg({{ $legIndex }})" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">
                 <x-heroicon-o-x-mark class="h-4 w-4" /> {{ __('Remove') }}
             </button>
         @endif
@@ -99,7 +99,7 @@
         @endif
 
         @if ($legPackage)
-            <p class="text-[11px] text-brand-moss">{{ __('Requires') }} <code class="font-mono font-semibold text-brand-ink">{{ $legPackage }}</code> {{ __('in composer.json.') }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Requires') }} <code class="font-mono font-semibold text-brand-ink">{{ $legPackage }}</code> {{ __('in composer.json.') }}</p>
         @endif
     </div>
 </div>

@@ -80,7 +80,7 @@ trait ManagesScheduleRuns
         );
 
         $this->emitPanelEvent(
-            __('Run now queued for :site scheduler.', ['site' => $heartbeat->site?->name ?? $heartbeatId]),
+            __('Run now queued for :site scheduler.', ['site' => $heartbeat->site->name ?? $heartbeatId]),
             [__('Running schedule:run on the server… (5-minute timeout)')],
             'running',
         );

@@ -9,11 +9,11 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerWebhook;
 use App\Livewire\Sites\Settings;
 use App\Models\NotificationChannel;
-use App\Models\NotificationWebhookDestination;
 use App\Models\Server;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
 use App\Support\NotificationSubscriptionMatrix;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
@@ -21,6 +21,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 /**
  * The server's central "Notifications" workspace — one place to route notification
@@ -51,6 +52,7 @@ class WorkspaceNotifications extends Component
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use ManagesServerWebhook;
+    use WithPagination;
 
     /** @var list<string> */
     public const NOTIF_TABS = ['subscriptions', 'webhooks'];
@@ -77,7 +79,7 @@ class WorkspaceNotifications extends Component
     /**
      * Whether the current user may edit server-scoped settings (the per-server
      * webhook form gates on this). Deployers are read-only. Mirrors the same
-     * computed on {@see WorkspaceSettings}.
+     * computed on {@see SettingsCard}.
      */
     #[Computed]
     public function canEditServerSettings(): bool
@@ -203,35 +205,17 @@ class WorkspaceNotifications extends Component
         return AssignableNotificationChannels::forUser(Auth::user(), Auth::user()?->currentOrganization());
     }
 
-    /**
-     * Organization-wide outbound webhook destinations (no per-server scope exists),
-     * surfaced read-only here. Managed under Organization → Automation.
-     *
-     * @return Collection<int, NotificationWebhookDestination>
-     */
-    protected function organizationWebhookDestinations(): Collection
-    {
-        if ($this->server->organization_id === null) {
-            return new Collection;
-        }
-
-        return NotificationWebhookDestination::query()
-            ->where('organization_id', $this->server->organization_id)
-            ->whereNull('site_id')
-            ->orderBy('name')
-            ->get();
-    }
-
     public function render(): View
     {
         return view('livewire.servers.workspace-notifications', [
             'assignableNotificationChannels' => $this->assignableChannels(),
             'eventCategories' => $this->eventCategories(),
-            'organizationWebhookDestinations' => $this->organizationWebhookDestinations(),
-            // Only query the deliveries log when its tab is showing.
+            // Only query the deliveries log when its tab is showing. The empty
+            // stand-in is a paginator too, so the view can call ->links() and
+            // ->total() without branching on which one it got.
             'webhookDeliveries' => $this->notifTab === 'webhooks'
                 ? $this->recentWebhookDeliveries()
-                : new Collection,
+                : new LengthAwarePaginator([], 0, self::DELIVERIES_PER_PAGE),
         ]);
     }
 }

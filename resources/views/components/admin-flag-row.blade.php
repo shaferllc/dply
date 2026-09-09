@@ -17,8 +17,8 @@
             @endif
             <span class="font-semibold text-brand-ink">{{ $flag['label'] }}</span>
         </span>
-        <code class="font-mono text-[11px] text-brand-mist">{{ $flag['key'] }}</code>
-        <span class="text-[10px] text-brand-mist">{{ __('config default :state', ['state' => ($flag['configDefault'] ?? $flag['default'] ?? false) ? __('on') : __('off')]) }}</span>
+        <code class="font-mono text-xs text-brand-mist">{{ $flag['key'] }}</code>
+        <span class="text-2xs text-brand-mist">{{ __('config default :state', ['state' => ($flag['configDefault'] ?? $flag['default'] ?? false) ? __('on') : __('off')]) }}</span>
     </span>
     {{ $slot }}
 </label>

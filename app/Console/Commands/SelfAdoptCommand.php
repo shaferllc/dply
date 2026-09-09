@@ -109,7 +109,7 @@ class SelfAdoptCommand extends Command
         );
 
         $this->info("Adopted prod as Server {$serverModel->id} ({$name}).");
-        $this->line('Next: add this server_id to secret_vault.drift.targets and create a ServerBackupSchedule for its database.');
+        $this->line('Next: add this server_id to secret_vault.drift.targets and create a BackupSchedule for its database.');
 
         return self::SUCCESS;
     }

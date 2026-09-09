@@ -20,6 +20,12 @@ use App\Modules\Logs\Jobs\InstallLogAggregatorJob;
  *
  * Requires the host component to also use {@see DispatchesToastNotifications}
  * and {@see InteractsWithServerWorkspace} (provides $server + authorize()).
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read array<string, string> $logShippingSourceCatalog
  */
 trait ManagesServerLogShipping
 {
@@ -118,6 +124,28 @@ trait ManagesServerLogShipping
 
         $this->server->load('logAgent');
         $this->toastSuccess(__('Re-syncing the log agent with the latest sources.'));
+    }
+
+    /**
+     * Escape hatch for an install that is stuck — a dead queue worker, an
+     * unreachable box, or simply one taking longer than the operator wants to
+     * wait. Without it the whole panel stays disabled behind "Installing…" with
+     * nothing to click.
+     */
+    public function cancelLogShipping(): void
+    {
+        $this->authorize('update', $this->server);
+
+        try {
+            app(ManageServerLogShipping::class)->cancel($this->server);
+        } catch (LogShippingException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->server->load('logAgent');
+        $this->toastSuccess(__('Canceled. You can retry the install when you are ready.'));
     }
 
     public function disableLogShipping(): void

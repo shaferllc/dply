@@ -849,7 +849,7 @@ class WorkspaceConfiguration extends Component
 
         foreach ($this->groupedConfigFiles as $groupKey => $group) {
             foreach ($group['files'] as $index => $file) {
-                $path = (string) ($file['path'] ?? '');
+                $path = $file['path'];
                 $this->groupedConfigFiles[$groupKey]['files'][$index]['cached'] = $path !== ''
                     && Cache::has(RunServerConfigOpJob::fileContentCacheKey($serverId, $path));
             }
@@ -860,7 +860,7 @@ class WorkspaceConfiguration extends Component
     {
         foreach ($this->groupedConfigFiles as $groupKey => $group) {
             foreach ($group['files'] as $index => $file) {
-                if (($file['path'] ?? '') === $path) {
+                if ($file['path'] === $path) {
                     $this->groupedConfigFiles[$groupKey]['files'][$index]['cached'] = $cached;
                 }
             }

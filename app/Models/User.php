@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\RoutesIntercomNotifications;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,7 +27,7 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property string $name
  * @property string $email
  * @property ?Carbon $email_verified_at
- * @property string $password
+ * @property ?string $password
  * @property ?string $country_code
  * @property ?string $locale
  * @property ?string $timezone
@@ -39,9 +40,9 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property ?Carbon $two_factor_confirmed_at
  * @property ?string $referral_code
  * @property ?Carbon $referral_converted_at
- * @property Carbon $created_at
- * @property Carbon $updated_at
- * @property array<string, mixed> $ui_preferences
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property ?array<string, mixed> $ui_preferences
  * @property-read Collection<int, Organization> $organizations
  * @property-read Collection<int, Team> $teams
  * @property-read Collection<int, SocialAccount> $socialAccounts
@@ -53,6 +54,9 @@ use Laravel\Passkeys\PasskeyAuthenticatable;
  * @property-read Collection<int, ApiToken> $apiTokens
  * @property-read Collection<int, NotificationChannel> $notificationChannels
  * @property-read Collection<int, NotificationInboxItem> $notificationInboxItems
+ * @property ?string $referred_by_user_id  Real column (users.referred_by_user_id);
+ *           it lives only in database/schema/pgsql-schema.sql, which Larastan
+ *           does not read, so it has to be declared here.
  * @property-read ?User $referrer
  * @property-read Collection<int, User> $referredUsers
  * @property-read Collection<int, ReferralReward> $referralRewardsGranted
@@ -79,6 +83,8 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasUlids, Notifiable, PasskeyAuthenticatable;
+
+    use RoutesIntercomNotifications;
 
     protected static function booted(): void
     {

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing\Services;
 
+use App\Support\Billing\CurrencyConverter;
+
 /**
  * Extracts a monthly amount from free-form server cost notes (manual entry
  * or provider-pull formatted strings like "~$12.00/mo · Hetzner cx22 …").
@@ -58,12 +60,9 @@ final class ServerMonthlyCostNoteParser
 
     public function toUsdCents(float $amount, string $currency): int
     {
-        if ($currency === 'EUR') {
-            $rate = (float) config('subscription.observatory.eur_to_usd_rate', 1.08);
-
-            return (int) round($amount * $rate * 100);
-        }
-
-        return (int) round($amount * 100);
+        // The rate lives under `standard.observatory` — reading it as
+        // `subscription.observatory.*` resolved to null, so every non-default
+        // SUBSCRIPTION_EUR_TO_USD_RATE was silently ignored.
+        return (int) round(app(CurrencyConverter::class)->toUsd($amount, $currency) * 100);
     }
 }

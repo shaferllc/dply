@@ -44,7 +44,6 @@ final class SiteErrorReferenceResolver
     /**
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
-    /** @return array<string, mixed> */
     public function resolve(Site $site, string $reference): array
     {
         $reference = trim($reference);
@@ -98,7 +97,6 @@ final class SiteErrorReferenceResolver
     }
 
     /**
-     * @param  array<string, mixed> $miss
      * @param  array<string, mixed> $sourceMap
      * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
@@ -155,7 +153,7 @@ final class SiteErrorReferenceResolver
      * FPM logs, nginx/apache for the webserver error log). Lines that don't parse
      * are simply dropped from `entries` — they remain verbatim in `trace`.
      *
-     * @param  array<string, mixed> $trace
+     * @param  list<string> $trace
      * @param  array<string, mixed> $sourceMap
      * @return list<array<string, mixed>>
      */
@@ -166,9 +164,10 @@ final class SiteErrorReferenceResolver
         $source = null;
         $buffer = [];
 
-        $flush = function () use (&$entries, &$buffer, &$file, &$source): void {
-            $lines = $buffer;
-            $buffer = [];
+        // Takes the block it should parse as arguments rather than capturing
+        // them by reference — the by-ref form hid every mutation from static
+        // analysis, which then read the whole body as unreachable.
+        $flush = function (?string $source, ?string $file, array $lines) use (&$entries): void {
             if ($source === null || $lines === []) {
                 return;
             }
@@ -188,7 +187,8 @@ final class SiteErrorReferenceResolver
 
         foreach ($trace as $line) {
             if (preg_match('/^──\s*(.+?)\s*──$/', trim($line), $m)) {
-                $flush();
+                $flush($source, $file, $buffer);
+                $buffer = [];
                 $file = $m[1];
                 $source = $sourceMap[$file] ?? 'laravel';
 
@@ -196,7 +196,7 @@ final class SiteErrorReferenceResolver
             }
             $buffer[] = $line;
         }
-        $flush();
+        $flush($source, $file, $buffer);
 
         return array_slice($entries, 0, self::TRACE_LINE_CAP);
     }

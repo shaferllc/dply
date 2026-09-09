@@ -11,12 +11,14 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('Background')"
-                :title="__('Services')"
-                :description="__('Manage the systemd units for this site — the web upstream and worker or scheduler processes.')"
-                icon="cpu-chip"
-            />
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-cpu-chip"
+                    :title="__('Services')"
+                    :note="__('Manage the systemd units for this site — the web upstream and worker or scheduler processes.')"
+                />
+            </section>
 
             @if (! $supportsSystemd)
                 @include('livewire.sites.partials.systemd._unsupported')

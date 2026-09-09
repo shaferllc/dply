@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Deploy;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Mcp\Tools\AbstractDplyTool;
 use App\Models\Organization;
 use App\Models\SiteDeployment;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Request;
@@ -29,7 +30,7 @@ class DeploySite extends AbstractDplyTool
     protected string $ability = 'sites.deploy';
 
     /**
-     * @return array<string, \Illuminate\JsonSchema\Types\Type>
+     * @return array<string, Type>
      */
     public function schema(JsonSchema $schema): array
     {
@@ -50,6 +51,7 @@ class DeploySite extends AbstractDplyTool
         ]);
 
         $site = $this->resolveSite($data['site_id'], $organization);
+        $this->assertCanDeploySite($site, $organization);
 
         if (blank($site->git_repository_url)) {
             return Response::error('Configure a Git repository URL for this site before deploying.');

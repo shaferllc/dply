@@ -6,22 +6,21 @@
      Strip-shaped to match the merged dply-card chrome (no nested floating card). --}}
 <section class="border-b border-brand-ink/10" aria-busy="true" aria-live="polite">
     <span class="sr-only">{{ __('Loading…') }}</span>
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7" aria-hidden="true">
-        <span class="h-10 w-10 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-        <div class="min-w-0 flex-1 space-y-2">
-            <span class="block h-2.5 w-24 animate-pulse rounded bg-brand-ink/10"></span>
+    <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3.5 sm:px-6" aria-hidden="true">
+        <span class="mt-0.5 h-4 w-4 shrink-0 animate-pulse rounded bg-brand-ink/10"></span>
+        <div class="min-w-0 flex-1 space-y-1.5">
             <span class="block h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/15"></span>
             <span class="block h-2.5 w-64 max-w-full animate-pulse rounded bg-brand-ink/10"></span>
         </div>
     </div>
-    <div class="divide-y divide-brand-ink/10 px-6 py-2 sm:px-7" aria-hidden="true">
+    <div class="divide-y divide-brand-ink/10 px-5 py-1 sm:px-6" aria-hidden="true">
         @for ($i = 0; $i < 5; $i++)
-            <div class="flex items-center justify-between gap-4 py-3.5">
+            <div class="flex items-center justify-between gap-4 py-2.5">
                 <div class="min-w-0 flex-1 space-y-2">
                     <span class="block h-2.5 w-16 animate-pulse rounded bg-brand-ink/10"></span>
                     <span class="block h-3 animate-pulse rounded bg-brand-ink/15" style="width: {{ [70, 55, 80, 45, 62][$i] }}%"></span>
                 </div>
-                <span class="h-7 w-16 shrink-0 animate-pulse rounded-lg bg-brand-ink/10"></span>
+                <span class="h-6 w-14 shrink-0 animate-pulse rounded-md bg-brand-ink/10"></span>
             </div>
         @endfor
     </div>

@@ -59,9 +59,6 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, 'validate connection');
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function listServers(): array
     {
         $response = $this->client->get('/servers');
@@ -69,15 +66,12 @@ class ForgeImportDriver implements ImportDriver
 
         $rows = $this->collectionFrom($response->json(), 'servers');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $row): array => $this->normaliseServer($row),
             $rows,
-        ));
+        );
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -96,14 +90,27 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "list sites for server {$sourceServerId}");
         $rows = $this->collectionFrom($response->json(), 'sites');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $row): array => $this->normaliseSite($row),
             $rows,
-        ));
+        );
     }
 
     /**
-     * @return list<array<string, array<string, mixed>|int|string|null>>
+     * One normalised site, not a list — this returns normaliseSite()'s row
+     * directly. The previous list<> annotation hid $site['raw'] from callers.
+     *
+     * @return array{
+     *     id: int,
+     *     domain: string,
+     *     site_type: string,
+     *     php_version: ?string,
+     *     repository_url: ?string,
+     *     repository_branch: ?string,
+     *     web_directory: ?string,
+     *     status: ?string,
+     *     raw: array<string, mixed>,
+     * }
      */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
@@ -286,9 +293,6 @@ class ForgeImportDriver implements ImportDriver
         // Prefer an active LE cert; fall back to the first.
         $primary = null;
         foreach ($rows as $cert) {
-            if (! is_array($cert)) {
-                continue;
-            }
             if (($cert['active'] ?? false) === true) {
                 $primary = $cert;
                 break;
@@ -330,14 +334,14 @@ class ForgeImportDriver implements ImportDriver
         $this->client->assertSuccess($response, "list webhooks for site {$sourceServerId}/{$sourceSiteId}");
         $rows = $this->collectionFrom($response->json(), 'webhooks');
 
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'url' => (string) ($r['url'] ?? ''),
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void
@@ -348,7 +352,6 @@ class ForgeImportDriver implements ImportDriver
 
     /**
      * @param  array<string, mixed> $row
-     * @return list<array<string, array<string, mixed>|int|string>>
      *     id: int,
      *     name: string,
      *     ip_address: ?string,
@@ -451,7 +454,6 @@ class ForgeImportDriver implements ImportDriver
 
     /**
      * Forge encodes versions as "php82" / "php83"; normalise to "8.2" / "8.3"
-     * @param  array<string, mixed> $row
      * to match Ploi's shape.
      */
     protected function humanisePhpVersion(mixed $value): ?string

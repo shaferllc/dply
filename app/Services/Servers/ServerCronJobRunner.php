@@ -67,7 +67,7 @@ class ServerCronJobRunner
             'last_run_output' => Str::limit($output, 65535),
         ]);
 
-        return new CronJobRunResult($output !== false ? $output : '', $exit);
+        return new CronJobRunResult($output, $exit);
     }
 
     /**

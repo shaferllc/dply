@@ -6,7 +6,7 @@
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Overall') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                     @switch($report['overall'] ?? 'ok')
                         @case('critical') {{ __('Action needed') }} @break
@@ -93,7 +93,7 @@
             <x-heroicon-o-chart-bar-square class="h-5 w-5" aria-hidden="true" />
         </span>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Summary') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Summary') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Patch snapshot') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Key counts from the latest inventory probe.') }}</p>
         </div>
@@ -101,7 +101,7 @@
 
     <div class="grid gap-3 px-5 py-5 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Upgradable') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Upgradable') }}</p>
             <p class="mt-2 flex items-baseline gap-2">
                 <span class="text-3xl font-semibold tabular-nums text-brand-ink">{{ $report['packages']['total'] ?? '—' }}</span>
                 @if ($report['packages']['total'] !== null)
@@ -115,7 +115,7 @@
             'border-red-200/80 bg-red-50/40' => ($report['packages']['security'] ?? 0) > 0,
             'border-brand-ink/10 bg-white' => ($report['packages']['security'] ?? 0) === 0,
         ])>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Security') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Security') }}</p>
             <p class="mt-2 flex items-baseline gap-2">
                 <span @class([
                     'text-3xl font-semibold tabular-nums',
@@ -131,7 +131,7 @@
             'border-amber-200/80 bg-amber-50/40' => ($report['reboot']['required'] ?? null) === true,
             'border-brand-ink/10 bg-white' => ($report['reboot']['required'] ?? null) !== true,
         ])>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Reboot pending') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Reboot pending') }}</p>
             <p class="mt-2 text-lg font-semibold text-brand-ink">
                 @if (($report['reboot']['required'] ?? null) === true)
                     <span class="text-amber-900">{{ __('Yes') }}</span>
@@ -144,7 +144,7 @@
         </div>
 
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-4 shadow-sm">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Last apt update') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Last apt update') }}</p>
             <p class="mt-2 text-sm font-semibold leading-snug text-brand-ink">
                 @if ($report['inventory']['last_apt_update'] ?? null)
                     {{ $report['inventory']['last_apt_update']->diffForHumans() }}
@@ -153,7 +153,7 @@
                 @endif
             </p>
             @if ($report['inventory']['last_apt_update'] ?? null)
-                <p class="mt-1 text-[11px] text-brand-moss">
+                <p class="mt-1 text-xs text-brand-moss">
                     {{ $report['inventory']['last_apt_update']->timezone(config('app.timezone'))->format('Y-m-d H:i T') }}
                 </p>
             @endif

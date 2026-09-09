@@ -10,6 +10,8 @@ use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\User;
+use App\Support\Sites\SiteApiAccess;
 
 /**
  * Shared auth/org/site context for dply MCP tools AND resources.
@@ -66,7 +68,23 @@ trait ResolvesDplyContext
             throw new DplyMcpException("Site \"{$siteId}\" was not found in this organization.");
         }
 
+        $user = $this->token()->user;
+        if (! $user instanceof User || ! SiteApiAccess::userCanView($user, $site, $organization)) {
+            throw new DplyMcpException("Site \"{$siteId}\" was not found in this organization.");
+        }
+
         return $site;
+    }
+
+    /**
+     * Same project-membership bar as API v1 site deploy.
+     */
+    protected function assertCanDeploySite(Site $site, Organization $organization): void
+    {
+        $user = $this->token()->user;
+        if (! $user instanceof User || ! SiteApiAccess::userCanDeploy($user, $site, $organization)) {
+            throw new DplyMcpException('Forbidden: you cannot deploy this site.');
+        }
     }
 
     /**

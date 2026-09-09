@@ -328,6 +328,7 @@ class Index extends Component
     }
 
     /**
+     * @param  Collection<int, Server>  $servers
      * @return Collection<string, Collection<int, Server>>
      */
     protected function groupedServers(Collection $servers): Collection
@@ -353,8 +354,8 @@ class Index extends Component
      * in that priority order, so each peer appears once. Peers are drawn from
      * the full in-scope set so a server hidden by the active filter still links.
      *
-     * @param  Collection<int, Server>  $servers   the rows actually rendered
-     * @param  Collection<int, Server>  $candidates the full in-scope fleet
+     * @param  Collection<int, Server>  $servers  the rows actually rendered
+     * @param  Collection<int, Server>  $candidates  the full in-scope fleet
      * @return array<int|string, list<array{server: Server, reason: string}>>
      */
     protected function relatedServersMap(Collection $servers, Collection $candidates): array
@@ -397,6 +398,9 @@ class Index extends Component
         return $map;
     }
 
+    /**
+     * @return Builder<Server>|null
+     */
     protected function baseQuery(): ?Builder
     {
         $org = auth()->user()->currentOrganization();
@@ -404,7 +408,12 @@ class Index extends Component
             return null;
         }
 
+        // Edge apps, function namespaces and Cloud containers are backed by
+        // placeholder host rows, not machines. They have their own surfaces at
+        // /edge, /serverless and /cloud; counting them here inflated the fleet
+        // and rendered "Provisioning…" / empty-metrics rows that never apply.
         $query = Server::query()
+            ->onlyMachineHosts()
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
@@ -418,6 +427,10 @@ class Index extends Component
         return $query;
     }
 
+    /**
+     * @param  Builder<Server>  $query
+     * @return Builder<Server>
+     */
     protected function applyFilters(Builder $query): Builder
     {
         $term = trim($this->search);
@@ -457,10 +470,28 @@ class Index extends Component
         $hasServersInScope = $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
-                ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
+                ->with(['sites', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
+
+        // organization / team / workspace are deliberately NOT eager-loaded above:
+        // $allInScope already carries them for every in-scope server, and $servers
+        // is a filtered subset of that same base query — so loading them again
+        // re-ran the identical `organizations` / `workspaces` / `teams` selects.
+        // Hand the already-hydrated instances across instead.
+        $inScopeById = $allInScope->keyBy('id');
+        foreach ($servers as $server) {
+            $loaded = $inScopeById->get($server->getKey());
+            if ($loaded === null) {
+                continue;
+            }
+            foreach (['organization', 'team', 'workspace'] as $relation) {
+                if ($loaded->relationLoaded($relation)) {
+                    $server->setRelation($relation, $loaded->getRelation($relation));
+                }
+            }
+        }
 
         // Per-server Deploy / Sync targets for the fleet card action buttons.
         $deployTargets = $this->buildDeployTargets($servers, $org);
@@ -501,7 +532,7 @@ class Index extends Component
             return ServerIndexRow::fromServer(
                 $server,
                 $latestSnapshots->get($server->id),
-                (int) ($insights['open'] ?? 0),
+                (int) $insights['open'],
                 isset($insights['worst']) ? (string) $insights['worst'] : null,
                 $relatedServers[$server->id] ?? [],
                 $target !== null,
@@ -571,6 +602,7 @@ class Index extends Component
                 Server::STATUS_PENDING => __('Pending'),
                 Server::STATUS_PROVISIONING => __('Provisioning'),
                 Server::STATUS_READY => __('Ready'),
+                Server::STATUS_RESIZING => __('Resizing'),
                 Server::STATUS_ERROR => __('Error'),
                 Server::STATUS_DISCONNECTED => __('Disconnected'),
             ],

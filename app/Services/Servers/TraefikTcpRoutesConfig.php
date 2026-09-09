@@ -24,7 +24,6 @@ class TraefikTcpRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, rule: string, entry_points: list<string>, server_address: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         return $this->readByPrefix($server, self::FILE_PREFIX, 'tcp');
@@ -37,7 +36,7 @@ class TraefikTcpRoutesConfig
     {
         $slug = $this->normalizeTraefikSlug($slug);
         foreach ($this->read($server)['routes'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("TCP route `{$slug}` already exists.");
             }
         }
@@ -69,7 +68,7 @@ class TraefikTcpRoutesConfig
         if ($entryPoints === []) {
             $entryPoints = ['web'];
         }
-        $addr = trim((string) ($fields['server_address'] ?? ''));
+        $addr = trim((string) $fields['server_address']);
         if ($addr === '') {
             throw new \InvalidArgumentException('Backend address is required (e.g. :3306 or 127.0.0.1:6379).');
         }
@@ -95,7 +94,6 @@ YAML;
     /**
      * @return array{routes: list<array<string, mixed>>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     protected function readByPrefix(Server $server, string $prefix, string $layer): array
     {
         try {

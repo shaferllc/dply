@@ -97,5 +97,9 @@
         @endif
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply sites:env:diff '.$site->slug" />
+    <div class="mt-8 overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
+        <x-cli-snippet :commands="[
+            ['command' => 'dply sites:env:diff '.$site->slug],
+        ]" />
+    </div>
 </div>

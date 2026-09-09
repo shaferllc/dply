@@ -26,7 +26,6 @@ final class ServerCertificateInventory
      *     critical_days: int,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get(['id', 'name', 'server_id']);
@@ -257,7 +256,6 @@ final class ServerCertificateInventory
      * @param  list<array<string, mixed>>  $liveCerts  `certs` from {@see WebserverCertsAggregator::cached()}
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function withLiveExpiry(array $items, array $liveCerts): array
     {
         if ($items === [] || $liveCerts === []) {
@@ -270,9 +268,6 @@ final class ServerCertificateInventory
         // domain (lowercased) => earliest CarbonImmutable expiry from the scan.
         $expiryByDomain = [];
         foreach ($liveCerts as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
             $expiresAt = $row['expires_at'] ?? null;
             if (! $expiresAt instanceof CarbonImmutable) {
                 continue;
@@ -337,8 +332,6 @@ final class ServerCertificateInventory
      * scan row back to an inventory item by domain.
      *
      * @param  array<string, mixed> $row
-     * @param  array<string, mixed> $items
-     * @param  array<string, mixed> $liveCerts
      * @return list<string>
      */
     private function liveCertDomains(array $row): array
@@ -419,7 +412,6 @@ final class ServerCertificateInventory
      *
      * @return array{queued: int, skipped: int}
      */
-    /** @return array<string, mixed> */
     public function queueRenewals(Server $server, ?int $withinDays = null): array
     {
         $report = $this->forServer($server);

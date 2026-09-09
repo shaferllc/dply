@@ -33,7 +33,7 @@
                 @foreach ($traefik_http_services_form as $svcSlug => $svcFields)
                     <form wire:submit.prevent="saveTraefikHttpService(@js($svcSlug))" class="mt-4 rounded-xl border border-brand-ink/10 p-4" wire:key="traefik-svc-{{ $svcSlug }}">
                         <div class="flex justify-between"><p class="font-mono text-sm font-semibold">dply-svc-{{ $svcSlug }}</p>
-                            <button type="button" wire:click="openConfirmActionModal('removeTraefikHttpService', [@js($svcSlug)], @js(__('Remove service')), @js(__('Delete this service file?')), @js(__('Remove')), true)" class="text-[11px] text-rose-800">{{ __('Remove') }}</button></div>
+                            <button type="button" wire:click="openConfirmActionModal('removeTraefikHttpService', [@js($svcSlug)], @js(__('Remove service')), @js(__('Delete this service file?')), @js(__('Remove')), true)" class="text-xs text-rose-800">{{ __('Remove') }}</button></div>
                         <label class="mt-3 block"><span class="text-xs">{{ __('Server URLs') }}</span>
                             <textarea wire:model.lazy="traefik_http_services_form.{{ $svcSlug }}.servers" rows="3" class="mt-1 w-full rounded-md font-mono text-sm"></textarea></label>
                         <div class="mt-3 flex justify-end"><button type="submit" class="rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream">{{ __('Save') }}</button></div>

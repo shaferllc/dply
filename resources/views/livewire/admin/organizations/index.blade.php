@@ -7,7 +7,7 @@
     />
 
     <div class="mb-6">
-        <label for="org-search" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
+        <label for="org-search" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
         <input id="org-search" type="search" wire:model.live.debounce.300ms="search" class="mt-1 block w-full max-w-md rounded-lg border-brand-ink/15 text-sm shadow-sm" placeholder="{{ __('Name, slug, or email…') }}" />
     </div>
 
@@ -27,7 +27,7 @@
                     <tr wire:key="admin-org-{{ $org->id }}">
                         <td class="px-4 py-3">
                             <a href="{{ route('admin.organizations.show', $org) }}" wire:navigate class="font-medium text-brand-ink hover:underline">{{ $org->name }}</a>
-                            <p class="font-mono text-[11px] text-brand-mist">{{ $org->slug }}</p>
+                            <p class="font-mono text-xs text-brand-mist">{{ $org->slug }}</p>
                         </td>
                         <td class="px-4 py-3 tabular-nums">{{ number_format($org->servers_count) }}</td>
                         <td class="px-4 py-3 tabular-nums">{{ number_format($org->sites_count) }}</td>

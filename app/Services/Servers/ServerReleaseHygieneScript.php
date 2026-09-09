@@ -10,7 +10,7 @@ namespace App\Services\Servers;
 final class ServerReleaseHygieneScript
 {
     /**
-     * @param  array<string, mixed> $sites
+     * @param  list<array<string, bool|int|string>> $sites
      */
     public function build(array $sites): string
     {
@@ -157,7 +157,7 @@ SH;
             }
         }
 
-        $meta = is_array($existingMeta) ? $existingMeta : [];
+        $meta = $existingMeta;
         $meta['release_hygiene_snapshot'] = [
             'checked_at' => now()->toIso8601String(),
             'sites' => $sites,

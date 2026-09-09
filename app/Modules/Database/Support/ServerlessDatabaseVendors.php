@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Database\Support;
 
 use App\Models\CloudDatabase;
+use App\Modules\Database\Backends\DatabaseRouter;
+use Laravel\Pennant\Feature;
 
 /**
  * Registry of BYO serverless-database vendors surfaced in the provision modal.
@@ -12,7 +14,7 @@ use App\Models\CloudDatabase;
  * Each entry is region-agnostic (the customer connects their own vendor API
  * key and picks from the vendor's regions). The `key` doubles as the placement
  * key in the modal and the CloudDatabase.backend value, so it resolves through
- * {@see \App\Modules\Database\Backends\DatabaseRouter::backend()}. `provider`
+ * {@see DatabaseRouter::backend()}. `provider`
  * is the ProviderCredential.provider string the API key is stored under.
  *
  * `account_label` (when set) makes the modal render a second credential input —
@@ -50,22 +52,6 @@ final class ServerlessDatabaseVendors
                 ],
             ],
             [
-                'key' => CloudDatabase::BACKEND_PLANETSCALE,
-                'label' => 'PlanetScale',
-                'provider' => 'planetscale',
-                'engines' => [CloudDatabase::ENGINE_MYSQL],
-                'account_label' => 'Organization (optional)',
-                'account_required' => false,
-                'regions' => [
-                    ['value' => 'us-east', 'label' => 'AWS US East (Virginia)'],
-                    ['value' => 'us-west', 'label' => 'AWS US West (Oregon)'],
-                    ['value' => 'eu-west', 'label' => 'AWS Europe (Ireland)'],
-                    ['value' => 'eu-central', 'label' => 'AWS Europe (Frankfurt)'],
-                    ['value' => 'ap-southeast', 'label' => 'AWS Asia Pacific (Singapore)'],
-                    ['value' => 'ap-northeast', 'label' => 'AWS Asia Pacific (Tokyo)'],
-                ],
-            ],
-            [
                 'key' => CloudDatabase::BACKEND_SUPABASE,
                 'label' => 'Supabase',
                 'provider' => 'supabase',
@@ -97,6 +83,22 @@ final class ServerlessDatabaseVendors
                     ['value' => 'ap-southeast-1', 'label' => 'AWS Asia Pacific (Singapore)'],
                 ],
             ],
+            [
+                'key' => CloudDatabase::BACKEND_PLANETSCALE,
+                'label' => 'PlanetScale',
+                'provider' => 'planetscale',
+                'engines' => [CloudDatabase::ENGINE_MYSQL],
+                'account_label' => 'Organization (optional)',
+                'account_required' => false,
+                'regions' => [
+                    ['value' => 'us-east', 'label' => 'AWS US East (Virginia)'],
+                    ['value' => 'us-west', 'label' => 'AWS US West (Oregon)'],
+                    ['value' => 'eu-west', 'label' => 'AWS Europe (Ireland)'],
+                    ['value' => 'eu-central', 'label' => 'AWS Europe (Frankfurt)'],
+                    ['value' => 'ap-southeast', 'label' => 'AWS Asia Pacific (Singapore)'],
+                    ['value' => 'ap-northeast', 'label' => 'AWS Asia Pacific (Tokyo)'],
+                ],
+            ],
         ];
     }
 
@@ -109,6 +111,23 @@ final class ServerlessDatabaseVendors
     public static function isServerless(string $key): bool
     {
         return in_array($key, self::keys(), true);
+    }
+
+    /**
+     * Whether this vendor may be provisioned. Ungated vendors are always on;
+     * Upstash / Neon / Supabase are behind {@see Feature} `database.*` flags
+     * (off = Coming soon card, not hidden).
+     */
+    public static function isEnabled(string $key): bool
+    {
+        $flag = match ($key) {
+            CloudDatabase::BACKEND_UPSTASH => 'database.upstash',
+            CloudDatabase::BACKEND_NEON => 'database.neon',
+            CloudDatabase::BACKEND_SUPABASE => 'database.supabase',
+            default => null,
+        };
+
+        return $flag === null || Feature::active($flag);
     }
 
     /**

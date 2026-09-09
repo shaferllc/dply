@@ -30,7 +30,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runtime errors') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The latest failure or error-focused diagnostics captured for this runtime.') }}</p>
                     </div>
@@ -49,7 +49,7 @@
 
         @if ($runtimeOperationConsoles->isNotEmpty())
             <div class="border-b border-brand-ink/10 px-5 py-5 sm:px-6">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent runtime operations') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent runtime operations') }}</p>
                 <div class="mt-3 space-y-3">
                     @foreach ($runtimeOperationConsoles as $runtimeConsole)
                         @include('livewire.partials.deployment-activity-console', [

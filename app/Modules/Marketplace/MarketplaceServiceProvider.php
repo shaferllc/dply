@@ -26,7 +26,6 @@ class MarketplaceServiceProvider extends ServiceProvider
         Livewire::component('scripts.index', \App\Modules\Marketplace\Livewire\Scripts\Index::class);
         Livewire::component('scripts.create', \App\Modules\Marketplace\Livewire\Scripts\Create::class);
         Livewire::component('scripts.edit', \App\Modules\Marketplace\Livewire\Scripts\Edit::class);
-        Livewire::component('scripts.marketplace', \App\Modules\Marketplace\Livewire\Scripts\Marketplace::class);
         Livewire::component('scripts.marketplace-modal', \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::class);
     }
 }

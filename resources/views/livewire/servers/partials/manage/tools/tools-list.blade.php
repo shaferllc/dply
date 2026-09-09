@@ -3,8 +3,8 @@
         $actionPrimary = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50';
         $actionSecondary = 'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:border-brand-sage/30 hover:bg-brand-sage/8 focus:outline-none focus:ring-2 focus:ring-brand-sage focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50';
         $actionBusy = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-sage/35 bg-brand-sage/12 px-3 py-1.5 text-xs font-semibold text-brand-forest';
-        $actionChip = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1 text-[11px] font-semibold text-brand-forest transition hover:border-brand-sage/35 hover:bg-brand-sage/10 hover:text-brand-ink';
-        $actionMuted = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sand/55 px-2.5 py-1 text-[11px] font-medium text-brand-moss ring-1 ring-brand-ink/10';
+        $actionChip = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1 text-xs font-semibold text-brand-forest transition hover:border-brand-sage/35 hover:bg-brand-sage/10 hover:text-brand-ink';
+        $actionMuted = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sand/55 px-2.5 py-1 text-xs font-medium text-brand-moss ring-1 ring-brand-ink/10';
     @endphp
     <ul role="list" class="divide-y divide-brand-ink/10">
         @foreach ($catalogRows as $tool)
@@ -42,19 +42,19 @@
                         <x-dynamic-component :component="$tool['icon']" class="h-4 w-4 shrink-0 text-brand-moss" />
                         <p class="font-medium text-brand-ink">{{ $tool['label'] }}</p>
                         @if ($tool['docs_url'])
-                            <a href="{{ $tool['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="text-[11px] text-brand-moss hover:text-brand-ink">
+                            <a href="{{ $tool['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs text-brand-moss hover:text-brand-ink">
                                 {{ __('Docs') }}
                             </a>
                         @endif
                     </div>
 
                     <div class="mt-1.5 flex flex-wrap items-center gap-2">
-                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 {{ $statusTone($tool['status_tone']) }}">
+                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 {{ $statusTone($tool['status_tone']) }}">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusBadgeDot($tool['status_tone']) }}"></span>
                             {{ $tool['status_label'] }}
                         </span>
                         @if (filled($tool['version'] ?? null))
-                            <span class="font-mono text-[11px] text-brand-moss">{{ $tool['version'] }}</span>
+                            <span class="font-mono text-xs text-brand-moss">{{ $tool['version'] }}</span>
                         @endif
                     </div>
 

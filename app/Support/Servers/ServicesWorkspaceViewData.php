@@ -9,7 +9,6 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\ServerSystemdServiceAuditEvent;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -20,7 +19,6 @@ use Illuminate\Support\Collection;
 final class ServicesWorkspaceViewData
 {
     /**
-     * @param  LengthAwarePaginator<int, array<string, mixed>>|null  $activityEvents
      * @return array<string, mixed>
      */
     public static function for(
@@ -29,7 +27,7 @@ final class ServicesWorkspaceViewData
         bool $includeBannerContext = false,
         bool $includeInventoryContext = false,
         bool $includeActivityContext = false,
-        ?LengthAwarePaginator $activityEvents = null,
+        mixed $activityEvents = null,
         ?string $systemdInventoryFetchedAt = null,
     ): array {
         // Nested sections inside the merged Services card — not second page cards.

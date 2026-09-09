@@ -76,7 +76,7 @@
                     <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Steps') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Steps') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server-level steps') }}</h2>
                 </div>
             </div>
@@ -91,7 +91,7 @@
                             @endif
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sp['class'] }}">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $sp['class'] }}">
                                 {{ $sp['label'] }}
                             </span>
                             @if ($step->status === 'failed')
@@ -128,7 +128,7 @@
                     <p class="text-xs text-brand-moss">{{ $site->site_type }}@if ($site->ssl_strategy) · SSL: {{ $site->ssl_strategy }} @endif</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sitePill['class'] }}">
+                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $sitePill['class'] }}">
                         {{ $sitePill['label'] }}
                     </span>
                     @if ($cutoverReady)
@@ -155,7 +155,7 @@
                 <div class="border-b border-red-200 bg-red-50/70 px-5 py-4 text-xs text-red-950 space-y-2">
                     <p class="font-semibold">{{ __('Cutover failed.') }}</p>
                     @if ($site->failure_summary)
-                        <p class="font-mono text-[11px] leading-relaxed">{{ $site->failure_summary }}</p>
+                        <p class="font-mono text-xs leading-relaxed">{{ $site->failure_summary }}</p>
                     @endif
                     <p class="leading-relaxed">
                         @if ($dnsSwapped)
@@ -289,7 +289,7 @@
                                 <span class="min-w-0">
                                     <span class="block font-medium">{{ $c['title'] }}</span>
                                     @if (! empty($c['detail']))
-                                        <span class="block text-[11px] text-amber-900">{{ $c['detail'] }}</span>
+                                        <span class="block text-xs text-amber-900">{{ $c['detail'] }}</span>
                                     @endif
                                 </span>
                             </li>
@@ -313,7 +313,7 @@
                             @endif
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $sp['class'] }}">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $sp['class'] }}">
                                 {{ $sp['label'] }}
                             </span>
                             @if ($step->status === 'failed')
@@ -367,7 +367,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Review') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Review') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manual review — items dply did not migrate') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These existed on your Ploi server but require manual handling on dply. Review each one and dismiss when done.') }}</p>
                 </div>
@@ -384,7 +384,7 @@
                                 <p class="text-sm font-medium text-brand-ink">{{ $item['title'] ?? $item['kind'] }}</p>
                                 <p class="text-xs text-brand-moss leading-relaxed">{{ $item['detail'] ?? '' }}</p>
                                 @if ($rawJson)
-                                    <pre class="mt-2 max-h-48 overflow-auto rounded-md bg-brand-cream px-3 py-2 text-[11px] font-mono text-brand-ink">{{ $rawJson }}</pre>
+                                    <pre class="mt-2 max-h-48 overflow-auto rounded-md bg-brand-cream px-3 py-2 text-xs font-mono text-brand-ink">{{ $rawJson }}</pre>
                                 @endif
                             </div>
                             @if (! $dismissed)
@@ -392,7 +392,7 @@
                                     {{ __('Mark reviewed') }}
                                 </button>
                             @else
-                                <span class="text-[10px] uppercase tracking-wide text-brand-moss">{{ __('Reviewed') }}</span>
+                                <span class="text-2xs uppercase tracking-wide text-brand-moss">{{ __('Reviewed') }}</span>
                             @endif
                         </div>
                     </li>

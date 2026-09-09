@@ -46,6 +46,11 @@ use Livewire\Component;
  *
  * The read-only diagnosis is visible to anyone who can view the deploy; the fix
  * actions are gated to the site's update policy (Q9).
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read bool $retryReady
  */
 class DeployDatabaseFix extends Component
 {
@@ -174,8 +179,8 @@ class DeployDatabaseFix extends Component
         $this->authorize('update', $this->site);
 
         $readiness = app(DatabaseEngineReadinessGuard::class)->check($this->server, $this->new_db_engine);
-        if (! ($readiness['ok'] ?? false)) {
-            $this->addError('new_db_engine', (string) ($readiness['reason'] ?? __('That engine isn’t ready on this server.')));
+        if (! $readiness['ok']) {
+            $this->addError('new_db_engine', (string) $readiness['reason']);
 
             return;
         }
@@ -295,7 +300,7 @@ class DeployDatabaseFix extends Component
         $this->validate(['inject_env' => 'required|string|max:8000']);
 
         $incoming = $parser->parse($this->inject_env);
-        if (($incoming['variables'] ?? []) === []) {
+        if ($incoming['variables'] === []) {
             $this->addError('inject_env', __('No KEY=value lines were found.'));
 
             return;
@@ -378,7 +383,7 @@ class DeployDatabaseFix extends Component
         $caps = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
         $this->installedEngines = array_values(array_filter(
             ['mysql', 'mariadb', 'postgres'],
-            fn (string $engine): bool => (bool) ($caps[$engine] ?? false),
+            fn (string $engine): bool => (bool) $caps[$engine],
         ));
         $this->enginesLoaded = true;
     }
@@ -387,11 +392,11 @@ class DeployDatabaseFix extends Component
     private function currentDbEnvBlock(): string
     {
         $parser = app(DotEnvFileParser::class);
-        $vars = $parser->parse((string) ($this->site->env_file_content ?? ''))['variables'] ?? [];
+        $vars = $parser->parse((string) ($this->site->env_file_content ?? ''))['variables'];
 
         $lines = [];
         foreach ($vars as $key => $value) {
-            if (is_string($key) && str_starts_with($key, 'DB_')) {
+            if (str_starts_with($key, 'DB_')) {
                 $lines[] = $key.'='.$value;
             }
         }

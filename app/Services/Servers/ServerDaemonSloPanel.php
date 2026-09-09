@@ -28,7 +28,6 @@ final class ServerDaemonSloPanel
      *     programs: array{total: int, active: int, inactive: int, running: int, unhealthy: int, rows: list<array<string, mixed>>},
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $health = $this->healthSnapshot($server);

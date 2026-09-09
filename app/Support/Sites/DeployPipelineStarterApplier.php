@@ -7,6 +7,7 @@ namespace App\Support\Sites;
 use App\Models\Site;
 use App\Models\SiteDeployPipeline;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Services\Sites\SiteAtomicLayoutRequester;
 
 /**
  * Applies a full pipeline starter (Rollout + replace steps/hooks on a pipeline).
@@ -90,7 +91,6 @@ final class DeployPipelineStarterApplier
         $meta['deploy_health_path'] = $path[0] === '/' ? $path : '/'.$path;
 
         $update = [
-            'deploy_strategy' => $changes['deploy_strategy'],
             'meta' => $meta,
         ];
 
@@ -99,6 +99,14 @@ final class DeployPipelineStarterApplier
         }
 
         $site->update($update);
+
+        $requester = app(SiteAtomicLayoutRequester::class);
+        $wanted = (string) $changes['deploy_strategy'];
+        if ($wanted === 'atomic' && ! $site->isAtomicDeploys()) {
+            $requester->requestAtomic($site, auth()->id(), confirmed: true);
+        } elseif ($wanted === 'simple' && $site->isAtomicDeploys()) {
+            $requester->requestFlat($site);
+        }
     }
 
     public function pipelineIsEmpty(SiteDeployPipeline $pipeline): bool

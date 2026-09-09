@@ -28,6 +28,18 @@ describe('edge addons html helpers', () => {
     expect(out).toContain('src="https://example.com/a.js"');
   });
 
+  it('injects consent helper without any script URLs', () => {
+    const html = '<html><head></head><body></body></html>';
+    const out = injectTags(html, {
+      enabled: true,
+      consent_required: true,
+      tools: [],
+    });
+    expect(out).toContain('window.__dplyTags');
+    expect(out).toContain('dply_tag_consent');
+    expect(out).not.toContain('<script src=');
+  });
+
   it('applyHtmlAddons combines tags and snippets', () => {
     const html = '<html><head></head><body><form></form></body></html>';
     const out = applyHtmlAddons(html, '/', {

@@ -126,7 +126,7 @@ final class GitOpsRepoVaultStore implements VaultStore
     }
 
     /**
-     * @param  array<string, mixed> $args
+     * @param  array<int, string> $args
      */
     private function git(string $dir, array $args, bool $allowFailure = false): void
     {

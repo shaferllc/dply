@@ -26,7 +26,7 @@
             <div class="flex items-center gap-2">
                 <x-mac-window-dots />
             </div>
-            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-amber-200/90">
+            <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-2xs font-semibold uppercase tracking-[0.16em] text-amber-200/90">
                 <span class="relative flex h-1.5 w-1.5">
                     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400/60 opacity-75"></span>
                     <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400"></span>
@@ -35,7 +35,7 @@
             </span>
         </div>
 
-        <div class="relative mt-5 space-y-2.5 font-mono text-[11px] leading-relaxed sm:text-xs">
+        <div class="relative mt-5 space-y-2.5 font-mono text-xs leading-relaxed sm:text-xs">
             <div class="rounded-lg border border-white/8 bg-white/[0.03] px-3 py-2.5">
                 <p class="text-rose-300/90"><span class="text-slate-500">{{ __('critical') }}</span> · {{ __('SSH password auth enabled') }}</p>
                 <p class="mt-1 text-slate-500">{{ __('sshd allows password logins — prefer key-only access.') }}</p>
@@ -51,7 +51,7 @@
         </div>
 
         @if ($server)
-            <div class="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-slate-300">
+            <div class="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">
                 <x-heroicon-o-light-bulb class="h-3.5 w-3.5 shrink-0 text-amber-300/80" aria-hidden="true" />
                 <span>{{ __('Insights will scan :server and surface prioritized findings here.', ['server' => $serverName]) }}</span>
             </div>
@@ -143,7 +143,7 @@
             <span @class([
                 'inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-ink/[0.04] font-medium text-brand-mist',
                 'px-3 py-1.5 text-xs' => ! $compact,
-                'px-2.5 py-1 text-[10px]' => $compact,
+                'px-2.5 py-1 text-2xs' => $compact,
             ])>
                 <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('In development') }}

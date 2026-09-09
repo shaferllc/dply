@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites\Clone;
 
+use App\Enums\QuotaSurface;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -33,8 +34,12 @@ final class SiteCloneDestinationValidator
             throw new \RuntimeException(__('The destination server must be ready with SSH.'));
         }
 
-        if (! $org->canCreateSite()) {
-            throw new \RuntimeException(__('Your organization has reached the site limit for the current plan.'));
+        // Ceilings are per surface, so ask the one the destination host feeds.
+        $surface = QuotaSurface::forServer($destServer);
+        if (! $org->canCreateOnSurface($surface)) {
+            throw new \RuntimeException(__('Your organization has reached the :noun limit for the current plan.', [
+                'noun' => $surface->label(),
+            ]));
         }
 
         $host = strtolower(trim($primaryHostname));
@@ -45,8 +50,7 @@ final class SiteCloneDestinationValidator
 
         self::assertCompatibleRuntime($source, $destServer);
 
-        if (! $source->usesFunctionsRuntime()
-            && ! $source->usesDockerRuntime()
+        if (! $source->usesDockerRuntime()
             && ! $source->usesKubernetesRuntime()) {
             $srcSrv = $source->server;
             if ($srcSrv === null || ! $srcSrv->isReady() || ! $srcSrv->hasAnySshPrivateKey()) {
@@ -60,20 +64,6 @@ final class SiteCloneDestinationValidator
      */
     public static function assertCompatibleRuntime(Site $source, Server $destServer): void
     {
-        $srcHost = $source->server?->hostKind();
-        $dstHost = $destServer->hostKind();
-
-        if ($source->usesFunctionsRuntime()) {
-            if (! $destServer->hostCapabilities()->supportsFunctionDeploy()) {
-                throw new \RuntimeException(__('Clone a serverless site only to a serverless-capable host (same class of target).'));
-            }
-            if ($srcHost !== $dstHost) {
-                throw new \RuntimeException(__('Serverless clones must use the same host kind as the source (for example AWS Lambda to AWS Lambda).'));
-            }
-
-            return;
-        }
-
         if ($source->usesDockerRuntime()) {
             if (! $destServer->hostCapabilities()->supportsContainerDeploy()) {
                 throw new \RuntimeException(__('Clone a Docker runtime site only to a Docker-capable server.'));

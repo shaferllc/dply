@@ -15,7 +15,7 @@
             @feature('workspace.insights')
                 @php $insOpen = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
                 @if ($insOpen > 0)
-                    <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpen, ['count' => $insOpen]) }}</a>
+                    <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpen, ['count' => $insOpen]) }}</a>
                 @endif
             @endfeature
         </div>
@@ -33,7 +33,7 @@
                     <button
                         type="button"
                         wire:click="$set('tagFilter', @js($tag))"
-                        class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
+                        class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
                         title="{{ __('Filter fleet by :tag', ['tag' => $tag]) }}"
                     >
                         {{ $tag }}

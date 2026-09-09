@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\Livewire\Organizations\RealtimeDashboardTest;
 
-use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
-use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
-use App\Modules\Realtime\Livewire\Realtime;
 use App\Models\Organization;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\User;
+use App\Modules\Billing\Jobs\SyncOrganizationBillingJob;
+use App\Modules\Realtime\Jobs\ProvisionRealtimeAppJob;
+use App\Modules\Realtime\Livewire\Realtime;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -161,3 +161,34 @@ test('apps from another org are not visible or reachable', function () {
         ->call('startTierChange', $foreign->id)
         ->assertStatus(404);
 })->throws(ModelNotFoundException::class);
+
+test('a view-only member does not receive the app secret in the integration guide', function () {
+    [$user, $org] = orgWithRole('member');
+    $app = RealtimeApp::factory()->for($org)->create([
+        'name' => 'Alpha relay',
+        'status' => RealtimeApp::STATUS_ACTIVE,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(Realtime::class, ['organization' => $org])
+        ->assertSee('Alpha relay')
+        ->assertDontSee($app->app_secret)
+        ->assertDontSee('PUSHER_APP_SECRET=')
+        ->assertDontSee('X-Dply-Secret:');
+});
+
+test('an org admin still sees copy-paste credentials in the integration guide', function () {
+    [$user, $org] = orgWithRole('owner');
+    $app = RealtimeApp::factory()->for($org)->create([
+        'name' => 'Alpha relay',
+        'status' => RealtimeApp::STATUS_ACTIVE,
+    ]);
+
+    $this->actingAs($user);
+
+    Livewire::test(Realtime::class, ['organization' => $org])
+        ->assertSee($app->app_secret)
+        ->assertSee('PUSHER_APP_SECRET=')
+        ->assertSee('X-Dply-Secret:');
+});

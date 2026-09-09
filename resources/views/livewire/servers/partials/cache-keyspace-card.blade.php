@@ -42,25 +42,23 @@
 @endphp
 
 <div class="{{ $card }}" wire:key="cache-keyspace-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keyspace') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — keyspace dashboard', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live INFO sampling. Memory and clients are absolute; ops/sec and hit-rate are computed from the delta between the two latest samples.') }}</p>
-        </div>
-        <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__(':engine — keyspace dashboard', ['engine' => $engineLabel])"
+        :note="__('Live INFO sampling. Memory and clients are absolute; ops/sec and hit-rate are computed from the delta between the two latest samples.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             @if (! $loaded && $error === null)
                 <button
                     type="button"
                     wire:click="loadKeyspaceDashboard"
                     wire:loading.attr="disabled"
                     wire:target="loadKeyspaceDashboard"
-                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                 >
-                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
+                    <x-heroicon-m-chart-bar class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span wire:loading.remove wire:target="loadKeyspaceDashboard">{{ __('Show dashboard') }}</span>
                     <span wire:loading wire:target="loadKeyspaceDashboard">{{ __('Loading…') }}</span>
                 </button>
@@ -70,17 +68,17 @@
                     wire:click="loadKeyspaceDashboard"
                     wire:loading.attr="disabled"
                     wire:target="loadKeyspaceDashboard"
-                    class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                    class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-50"
                 >
-                    <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                    <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span wire:loading.remove wire:target="loadKeyspaceDashboard">{{ __('Rescan') }}</span>
                     <span wire:loading wire:target="loadKeyspaceDashboard">{{ __('Scanning…') }}</span>
                 </button>
             @endif
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
 
     {{-- In-body active-load indicator. Two flavors:
            - First load (no $latest yet): big banner + 4-tile skeleton replaces
@@ -116,7 +114,7 @@
             <div class="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach (['Memory', 'Connected clients', 'Ops / sec (window)', 'Hit rate (window)'] as $label)
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
                         <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
                         <div class="mt-3 h-4 w-full animate-pulse rounded bg-brand-ink/5"></div>
                     </div>
@@ -137,7 +135,7 @@
         <div wire:poll.10000ms="pollKeyspaceDashboard" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @foreach (['Memory', 'Connected clients', 'Ops / sec (window)', 'Hit rate (window)'] as $label)
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __($label) }}</p>
                     <div class="mt-2 h-5 w-20 animate-pulse rounded bg-brand-ink/10"></div>
                     <div class="mt-3 h-4 w-full animate-pulse rounded bg-brand-ink/5"></div>
                 </div>
@@ -159,7 +157,7 @@
         @endif
         <div wire:poll.10000ms="pollKeyspaceDashboard" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memory') }}</p>
                 <p class="mt-1 font-mono text-base text-brand-ink">{{ $latest['used_memory_human'] ?: '—' }}</p>
                 @if ($memoryPoints)
                     <svg viewBox="0 0 100 24" preserveAspectRatio="none" class="mt-2 h-6 w-full text-brand-forest" aria-hidden="true">
@@ -168,11 +166,11 @@
                 @endif
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connected clients') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connected clients') }}</p>
                 <p class="mt-1 font-mono text-base text-brand-ink">{{ $latest['connected_clients'] }}</p>
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ops / sec (window)') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ops / sec (window)') }}</p>
                 <p class="mt-1 font-mono text-base text-brand-ink">
                     @if ($latest['ops_per_second_window'] !== null)
                         {{ number_format($latest['ops_per_second_window'], 1) }}
@@ -182,7 +180,7 @@
                 </p>
             </div>
             <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hit rate (window)') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hit rate (window)') }}</p>
                 <p class="mt-1 font-mono text-base text-brand-ink">
                     @if ($latest['hit_rate_window'] !== null)
                         {{ number_format($latest['hit_rate_window'] * 100, 1) }}%
@@ -204,14 +202,14 @@
              card header uses, bold title, helper copy that inlines the actual
              button styling so the operator sees what they're being told to
              click. --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
             </span>
             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('Dashboard is paused') }}</p>
             <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                 {{ __('Hit') }}
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">
                     <x-heroicon-o-chart-bar class="h-3 w-3" aria-hidden="true" />
                     {{ __('Show dashboard') }}
                 </span>

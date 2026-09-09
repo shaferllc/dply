@@ -87,7 +87,7 @@
                 <p class="mt-2 text-xs font-medium text-red-700">{{ $message }}</p>
             @enderror
 
-            <p class="mt-2 border-t border-brand-ink/10 pt-2 text-[11px] leading-relaxed text-brand-mist">
+            <p class="mt-2 border-t border-brand-ink/10 pt-2 text-xs leading-relaxed text-brand-mist">
                 {{ __('PNG, JPG, WEBP, GIF or ICO up to 1 MB. Favicon pull works for publicly reachable sites.') }}
             </p>
         </div>

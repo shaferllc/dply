@@ -4,10 +4,10 @@
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activity') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activity') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Service activity') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Started, stopped, restarted, and state-change events Dply observed between inventory snapshots.') }}</p>
-                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                             <span class="inline-flex items-center gap-1">
                                 <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                                 {{ trans_choice('{0} no events recorded|{1} :count event recorded|[2,*] :count events recorded', $activityCount, ['count' => $activityCount]) }}
@@ -63,11 +63,11 @@
                                         <span class="text-xs font-semibold text-brand-ink">{{ $kindLabel }}</span>
                                         <span class="font-mono text-xs text-brand-moss">{{ $ev['label'] ?? $ev['unit'] ?? '' }}</span>
                                         @if ($atRel)
-                                            <span class="ml-auto text-[11px] text-brand-mist" title="{{ $atEv }}">{{ $atRel }}</span>
+                                            <span class="ml-auto text-xs text-brand-mist" title="{{ $atEv }}">{{ $atRel }}</span>
                                         @endif
                                     </div>
                                     @if (! empty($ev['detail']))
-                                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ $ev['detail'] }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $ev['detail'] }}</p>
                                     @endif
                                 </div>
                             </li>

@@ -25,7 +25,7 @@
 
 **Primary-health alert (manual failover, per decision):** `dply:worker-pools:primary-health` (every 5 min) alerts org owners/admins via `NotificationPublisher` when a pool primary is unhealthy >10 min (cooldown 60 min). Promotion stays manual (one-click in UI) + delete-guard; no auto-promotion (split-brain).
 
-**Cost preview:** dollar estimate from the primary's `billingTier()->priceCents()` shown on the scale control.
+**Cost preview:** none. This used to quote `billingTier()->priceCents()` × worker count; under the flat-plan model an added worker costs either nothing (inside the plan's server allowance) or a whole plan step, so the scale control states that workers count toward the plan instead of quoting a per-worker price.
 
 **Tests:** `tests/Feature/WorkerPoolTest.php` (Pest) covers pool creation, non-worker rejection, scale validation + reconcile dispatch, promote single-primary invariant, primary-removal guard + drain dispatch, and the env-transformer rewrite/exposure-plan (and no-op) paths. Written, not run (per the project's manual-test preference).
 

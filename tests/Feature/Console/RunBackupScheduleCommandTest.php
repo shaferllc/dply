@@ -8,7 +8,7 @@ use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
@@ -38,9 +38,9 @@ test('database schedule dispatches export database job', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
-        'target_type' => ServerBackupSchedule::TARGET_DATABASE,
+        'target_type' => BackupSchedule::TARGET_DATABASE,
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => true,
@@ -60,9 +60,9 @@ test('site files schedule dispatches export site files job', function () {
         'user_id' => $server->user_id,
         'organization_id' => $server->organization_id,
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
-        'target_type' => ServerBackupSchedule::TARGET_SITE_FILES,
+        'target_type' => BackupSchedule::TARGET_SITE_FILES,
         'target_id' => $site->id,
         'cron_expression' => '30 4 * * *',
         'is_active' => true,
@@ -82,9 +82,9 @@ test('inactive schedule skips dispatch', function () {
         'username' => '',
         'password' => '',
     ]);
-    $schedule = ServerBackupSchedule::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
-        'target_type' => ServerBackupSchedule::TARGET_DATABASE,
+        'target_type' => BackupSchedule::TARGET_DATABASE,
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => false,
@@ -110,22 +110,12 @@ test('schedule auto pauses after three consecutive failures', function () {
         'password' => '',
     ]);
 
-    // Materialize a cron entry like the real schedule path does.
-    $cronJob = ServerCronJob::create([
+    $schedule = BackupSchedule::create([
         'server_id' => $server->id,
-        'cron_expression' => '0 3 * * *',
-        'command' => 'php artisan dply:run-backup-schedule X',
-        'user' => 'root',
-        'enabled' => true,
-        'system_managed' => true,
-    ]);
-    $schedule = ServerBackupSchedule::create([
-        'server_id' => $server->id,
-        'target_type' => ServerBackupSchedule::TARGET_DATABASE,
+        'target_type' => BackupSchedule::TARGET_DATABASE,
         'target_id' => $database->id,
         'cron_expression' => '0 3 * * *',
         'is_active' => true,
-        'server_cron_job_id' => $cronJob->id,
     ]);
 
     // Three failed backups for the target.
@@ -140,8 +130,7 @@ test('schedule auto pauses after three consecutive failures', function () {
     $this->artisan('dply:run-backup-schedule', ['schedule' => $schedule->id])
         ->assertSuccessful();
 
-    // Schedule + cron should be auto-paused, no new backup dispatched.
+    // is_active false is the whole pause — the dispatcher only sees active rows.
     expect($schedule->fresh()->is_active)->toBeFalse();
-    expect($cronJob->fresh()->enabled)->toBeFalse();
     Bus::assertNotDispatched(ExportServerDatabaseBackupJob::class);
 });

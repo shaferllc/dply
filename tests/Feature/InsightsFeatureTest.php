@@ -2,9 +2,6 @@
 
 namespace Tests\Feature\InsightsFeatureTest;
 
-use App\Modules\Insights\Jobs\ApplyInsightFixJob;
-use App\Modules\Insights\Jobs\RevertInsightFixJob;
-use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Settings\Hub;
 use App\Models\InsightFinding;
@@ -18,9 +15,9 @@ use App\Models\ServerProvisionRun;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Models\User;
-use App\Modules\TaskRunner\Enums\TaskStatus;
-use App\Modules\TaskRunner\Models\Task;
-use App\Modules\TaskRunner\ProcessOutput;
+use App\Modules\Insights\Jobs\ApplyInsightFixJob;
+use App\Modules\Insights\Jobs\RevertInsightFixJob;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Services\Contracts\InsightFixActionInterface;
 use App\Modules\Insights\Services\Contracts\InsightRunnerInterface;
 use App\Modules\Insights\Services\FixActions\BumpFpmWorkersFixAction;
@@ -35,6 +32,9 @@ use App\Modules\Insights\Services\Runners\OctaneRecommendedInsightRunner;
 use App\Modules\Insights\Services\Runners\PackageSecurityUpdatesInsightRunner;
 use App\Modules\Insights\Services\Runners\PhpFpmWorkersUndersizedInsightRunner;
 use App\Modules\Insights\Services\Runners\SystemClockSyncInsightRunner;
+use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Models\Task;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpFpmProbe;
@@ -571,6 +571,53 @@ test('package security updates runner emits warning when security updates presen
     expect($c->meta['signal']['security_count'])->toBe(3);
     expect($c->meta['signal']['total_upgradable'])->toBe(12);
     $this->assertStringContainsString('3 security updates', $c->title);
+});
+
+test('a stale apt index is surfaced even when no security updates are reported', function () {
+    [, $server] = userWithServer();
+
+    // The inversion this exists to catch: apt has been broken for six weeks, so
+    // `apt list --upgradable` reads a frozen index and reports nothing pending.
+    // Silence here is not health.
+    stubRemoteBashOutput("index_age_days=42\ntotal=0\nsecurity=0\n");
+
+    $candidates = app(PackageSecurityUpdatesInsightRunner::class)->run($server->fresh(), null, []);
+
+    expect($candidates)->toHaveCount(1);
+    expect($candidates[0]->insightKey)->toBe('apt_index_stale');
+    expect($candidates[0]->severity)->toBe(InsightFinding::SEVERITY_CRITICAL);
+    expect($candidates[0]->meta['signal']['index_age_days'])->toBe(42);
+});
+
+test('a stale index is reported alongside the security count, not instead of it', function () {
+    [, $server] = userWithServer();
+
+    stubRemoteBashOutput("index_age_days=10\ntotal=12\nsecurity=3\n");
+
+    $candidates = app(PackageSecurityUpdatesInsightRunner::class)->run($server->fresh(), null, []);
+
+    expect($candidates)->toHaveCount(2);
+    expect($candidates[0]->insightKey)->toBe('apt_index_stale');
+    expect($candidates[0]->severity)->toBe(InsightFinding::SEVERITY_WARNING);
+    expect($candidates[1]->insightKey)->toBe('package_security_updates');
+});
+
+test('a fresh index raises nothing on its own', function () {
+    [, $server] = userWithServer();
+
+    stubRemoteBashOutput("index_age_days=1\ntotal=0\nsecurity=0\n");
+
+    expect(app(PackageSecurityUpdatesInsightRunner::class)->run($server->fresh(), null, []))->toBe([]);
+});
+
+test('an unreadable index age is not treated as stale', function () {
+    // -1 means the probe could not read the lists directory at all. Guessing
+    // "stale" there would page someone every scan on a host with no apt state.
+    [, $server] = userWithServer();
+
+    stubRemoteBashOutput("index_age_days=-1\ntotal=0\nsecurity=0\n");
+
+    expect(app(PackageSecurityUpdatesInsightRunner::class)->run($server->fresh(), null, []))->toBe([]);
 });
 
 test('package security updates runner escalates to critical above ten', function () {

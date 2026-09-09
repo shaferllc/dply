@@ -34,11 +34,20 @@ Thumbs.db
 .env.worker
 .env.*.local
 
-storage/blaze/traces/
-
 # refactor helper (local only)
 .dply-extract.py
 .defract-worktrees
 
 # Deptrac analysis cache
 .deptrac.cache
+storage/app/vultr-control-plane*.json
+
+**/caddy
+frankenphp
+frankenphp-worker.php
+
+storage/blaze/
+storage/framework/lookout/
+
+# Coverage report from `composer test:coverage:clover`
+coverage.xml

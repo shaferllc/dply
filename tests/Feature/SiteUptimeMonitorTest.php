@@ -7,6 +7,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Models\SiteUptimeMonitor;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -33,6 +34,7 @@ test('authenticated user can add uptime monitor', function () {
     $server = Server::factory()->ready()->create([
         'user_id' => $user->id,
         'organization_id' => $org->id,
+        'region' => 'nyc1',
     ]);
     $site = Site::factory()->create([
         'server_id' => $server->id,
@@ -53,13 +55,14 @@ test('authenticated user can add uptime monitor', function () {
         ->set('newProbeWorker', 'worker-1')
         ->call('saveMonitor');
 
-    // The region label is derived from the chosen worker, not set directly.
+    // The region label is the host-nearest probe region; the worker only
+    // routes the check queue.
     $this->assertDatabaseHas('site_uptime_monitors', [
         'site_id' => $site->id,
         'label' => 'Homepage',
         'path' => '/api/health',
         'probe_worker' => 'worker-1',
-        'probe_region' => 'eu-falkenstein',
+        'probe_region' => 'us-east',
     ]);
 });
 
@@ -80,4 +83,11 @@ test('monitor route requires auth', function () {
     $this->get(route('sites.monitor', [$server, $site]))->assertRedirect();
 
     $this->actingAs($user)->get(route('sites.monitor', [$server, $site]))->assertOk();
+});
+
+test('check type labels distinguish http https and ssl', function () {
+    expect((new SiteUptimeMonitor(['check_type' => SiteUptimeMonitor::CHECK_HTTP]))->checkTypeLabel())->toBe('HTTP');
+    expect((new SiteUptimeMonitor(['check_type' => SiteUptimeMonitor::CHECK_HTTPS]))->checkTypeLabel())->toBe('HTTPS');
+    expect((new SiteUptimeMonitor(['check_type' => SiteUptimeMonitor::CHECK_SSL]))->checkTypeLabel())->toBe('SSL');
+    expect((new SiteUptimeMonitor(['check_type' => SiteUptimeMonitor::CHECK_HTTPS]))->isHttpsCheck())->toBeTrue();
 });

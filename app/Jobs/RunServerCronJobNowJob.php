@@ -101,8 +101,8 @@ class RunServerCronJobNowJob implements ShouldQueue
             }
         }
 
-        $metaHtml = '<p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">'.e(__('Run now')).'</p>'
-            .'<pre class="mt-2 whitespace-pre-wrap break-all font-mono text-[11px] leading-snug text-brand-ink">'
+        $metaHtml = '<p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">'.e(__('Run now')).'</p>'
+            .'<pre class="mt-2 whitespace-pre-wrap break-all font-mono text-xs leading-snug text-brand-ink">'
             .e($shown).'</pre>';
 
         $this->mergePayload([

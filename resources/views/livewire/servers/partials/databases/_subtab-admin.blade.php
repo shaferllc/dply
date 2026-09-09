@@ -1,7 +1,16 @@
 @if (! $showEngineWorkspace)
-    <div class="{{ $card }} px-5 py-5 sm:px-6">
+    <div class="{{ $card }}">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-key"
+            :title="__(':engine admin credentials', ['engine' => $engineLabels[$engine]])"
+            :note="__('Optional admin password used over SSH when passwordless sudo or socket access is not available.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-5 sm:px-5">
         <x-empty-state
             borderless
+            compact
             icon="heroicon-o-key"
             tone="sage"
             :title="__('Admin credentials unavailable')"
@@ -17,17 +26,18 @@
                 </button>
             </x-slot:actions>
         </x-empty-state>
+        </div>
     </div>
 @else
     <div class="{{ $card }}">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credentials') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine admin credentials', ['engine' => $engineLabels[$engine]]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Optional admin password used over SSH when passwordless sudo or socket access is not available. Stored encrypted.') }}
-            </p>
-        </div>
-        <div class="px-5 py-5 sm:px-6">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-key"
+            :title="__(':engine admin credentials', ['engine' => $engineLabels[$engine]])"
+            :note="__('Optional admin password used over SSH when passwordless sudo or socket access is not available. Stored encrypted.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-4 py-3.5 sm:px-5">
             <form wire:submit="saveAdminCredentials('{{ $engine }}')" class="max-w-2xl space-y-6">
                 @if (\App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($engine))
                     <div class="grid gap-6 sm:grid-cols-2 sm:items-end">

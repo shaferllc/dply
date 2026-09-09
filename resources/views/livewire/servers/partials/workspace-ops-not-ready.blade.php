@@ -3,7 +3,7 @@
     <p>{{ __('Provisioning and SSH must be ready before you can use this section.') }}</p>
     <div class="mt-3">
         <a
-            href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}"
+            href="{{ route('servers.settings', $server) }}"
             wire:navigate
             class="font-medium text-brand-olive underline decoration-brand-gold/60 underline-offset-4"
         >

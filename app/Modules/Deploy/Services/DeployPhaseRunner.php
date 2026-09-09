@@ -51,10 +51,6 @@ class DeployPhaseRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function runBuild(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
         return $this->runPhase($site, SiteDeployStep::PHASE_BUILD, $releaseDir, $shellFactory);
@@ -71,10 +67,6 @@ class DeployPhaseRunner
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return list<array<string, mixed>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<int, array<string, mixed>>
      */
     public function runSwap(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
@@ -96,10 +88,6 @@ class DeployPhaseRunner
     /**
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
      * @return array<int, array<string, mixed>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, mixed>>
      */
     public function runRelease(Site $site, string $releaseDir, ?Closure $shellFactory = null): array
     {
@@ -128,10 +116,6 @@ class DeployPhaseRunner
      * runPhase's stop-on-first-failure semantics.
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<array<string, mixed>>
-     */
-    /** @return array<string, mixed> */
-    /**
      * @return list<array<string, mixed>>
      */
     public function runRestart(Site $site, ?Closure $shellFactory = null): array
@@ -230,7 +214,7 @@ class DeployPhaseRunner
             $result['command'] = $cmd;
             $hookLog = $this->hookRunner->runAfterStep($shell, $site, (string) $step->id, $cwd);
             if ($hookLog !== '') {
-                $result['output'] = ($result['output'] ?? '').$hookLog;
+                $result['output'] = ($result['output']).$hookLog;
             }
             $results[] = $result;
 

@@ -10,12 +10,14 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-hero-card
-                :eyebrow="__('Deployments')"
-                :title="__('Commits')"
-                :description="__('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.')"
-                icon="code-bracket-square"
-            />
+            <section class="dply-card min-w-0 overflow-hidden p-0">
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-code-bracket-square"
+                    :title="__('Commits')"
+                    :note="__('Recent commits from your connected Git provider for this site’s repository and branch. Links open on GitHub, GitLab, or Bitbucket.')"
+                />
+            </section>
 
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
@@ -24,7 +26,7 @@
                             <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $provider ?: __('Repository') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $provider ?: __('Repository') }}</p>
                             @if ($remoteLabel)
                                 <h2 class="mt-0.5 truncate text-base font-semibold text-brand-ink" title="{{ $remoteLabel }}">{{ $remoteLabel }}</h2>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent commits from your connected Git provider, filtered by branch and message.') }}</p>
@@ -127,18 +129,18 @@
                                     && strcasecmp(substr((string) $lastDeployedSha, 0, 7), substr($c['sha'], 0, 7)) === 0;
                                 $when = $this->relativeTime($c['committed_at'] ?? null);
                             @endphp
-                            <li class="flex flex-wrap items-start justify-between gap-4 px-6 py-4 transition-colors hover:bg-brand-sand/20 sm:px-8">
+                            <li class="flex flex-wrap items-start justify-between gap-4 px-6 py-5 transition-colors hover:bg-brand-sand/20 sm:px-8">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
                                         <span class="font-mono text-xs font-semibold text-brand-sage bg-brand-sand/60 px-1.5 py-0.5 rounded">{{ $c['short_sha'] }}</span>
                                         @if ($shaMatch)
-                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 ring-1 ring-green-200">{{ __('Deployed') }}</span>
+                                            <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-green-800 ring-1 ring-green-200">{{ __('Deployed') }}</span>
                                         @endif
                                     </div>
                                     <p class="mt-2 font-medium text-brand-ink text-sm leading-snug break-words">{{ $c['message'] }}</p>
                                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                                         <span class="inline-flex items-center gap-1.5">
-                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-ink/10 text-[10px] font-bold text-brand-ink" aria-hidden="true">
+                                            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-ink/10 text-2xs font-bold text-brand-ink" aria-hidden="true">
                                                 {{ strtoupper(mb_substr($c['author_name'], 0, 1)) }}
                                             </span>
                                             {{ $c['author_name'] }}
@@ -154,7 +156,7 @@
                                             href="{{ $c['html_url'] }}"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors !py-2 !px-3 !text-[11px]"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors !py-2 !px-3 !text-xs"
                                         >
                                             {{ __('View commit') }}
                                         </a>
@@ -164,9 +166,14 @@
                         @endforeach
                     </ul>
                 @endif
-            </section>
 
-            <x-cli-snippet :command="'dply sites:commits '.$site->slug" />
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                    ]" />
+                </div>
+            </section>
         </main>
     </div>
 </div>

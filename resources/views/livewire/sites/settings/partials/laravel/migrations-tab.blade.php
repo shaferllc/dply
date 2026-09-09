@@ -4,7 +4,7 @@
             <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schema') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schema') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrations') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live status from `php artisan migrate:status`. Roll back the last batch with a one-click pre-rollback safety snapshot.') }}</p>
         </div>
@@ -52,7 +52,7 @@
     @else
         <div class="mt-5 overflow-hidden rounded-xl border border-brand-ink/10">
             <table class="w-full text-sm">
-                <thead class="bg-brand-cream/30 text-left text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-cream/30 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-4 py-2">{{ __('Migration') }}</th>
                         <th class="px-4 py-2">{{ __('Batch') }}</th>
@@ -66,12 +66,12 @@
                             <td class="px-4 py-2 text-xs text-brand-moss">{{ $entry['batch'] ?? '—' }}</td>
                             <td class="px-4 py-2">
                                 @if (($entry['ran'] ?? false) === true || ($entry['ran'] ?? '') === 'Yes')
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold text-brand-forest">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-2xs font-semibold text-brand-forest">
                                         <x-heroicon-m-check class="h-3 w-3" />
                                         {{ __('Ran') }}
                                     </span>
                                 @else
-                                    <span class="rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold text-brand-ink">{{ __('Pending') }}</span>
+                                    <span class="rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold text-brand-ink">{{ __('Pending') }}</span>
                                 @endif
                             </td>
                         </tr>

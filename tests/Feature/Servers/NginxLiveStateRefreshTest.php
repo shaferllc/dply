@@ -27,7 +27,7 @@ function makeUser(): User
     return $user->fresh();
 }
 
-test('nginx certs live state shows coming soon preview', function () {
+test('nginx certs live state renders the real panel, not the coming-soon teaser', function () {
     $user = makeUser();
     $server = Server::factory()->ready()->create([
         'user_id' => $user->id,
@@ -36,15 +36,17 @@ test('nginx certs live state shows coming soon preview', function () {
         'meta' => ['webserver' => 'nginx'],
     ]);
 
-    // nginx live-state sub-tabs (hosts/upstreams/certs/…) still render the
-    // shared coming-soon teaser instead of the probe-backed empty state.
+    // Certs came off $nginxComingSoonSubtabs once the probe's units['certs']
+    // (ssl_certificate paths + openssl expiry) was wired to the live-state
+    // table. It stays read-only — issuance lives in the Certificates module —
+    // so the panel signposts there instead of teasing an unbuilt feature.
     Livewire::actingAs($user)
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->set('workspace_tab', 'nginx')
         ->set('engine_subtab', 'certs')
-        ->assertSee(__('nginx certificates'))
-        ->assertSee(__('nginx certs preview'))
-        ->assertDontSee(__('In sync — nothing to list'));
+        ->assertSee(__('TLS certificates'))
+        ->assertSee(__('Cert inventory'))
+        ->assertDontSee(__('nginx certs preview'));
 });
 
 test('nginx live state cache is reused within ttl', function () {

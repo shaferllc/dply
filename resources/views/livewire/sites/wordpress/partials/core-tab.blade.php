@@ -4,7 +4,7 @@
             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Core') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Core') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('WordPress core') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Installed version from `wp core version` with an availability check against WordPress.org.') }}</p>
         </div>
@@ -37,7 +37,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Update status') }}</p>
                 @if (data_get($core, 'update_available'))
                     <p class="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-ink">
-                        <span class="rounded-full bg-brand-gold/20 px-2 py-0.5 text-[11px]">{{ __('Update available') }}</span>
+                        <span class="rounded-full bg-brand-gold/20 px-2 py-0.5 text-xs">{{ __('Update available') }}</span>
                         @if (data_get($core, 'latest'))
                             <span class="font-mono text-brand-moss">→ {{ data_get($core, 'latest') }}</span>
                         @endif
@@ -64,7 +64,7 @@
                     <span wire:loading.remove wire:target="updateCore">{{ __('Update WordPress core') }}</span>
                     <span wire:loading wire:target="updateCore">{{ __('Queueing…') }}</span>
                 </button>
-                <p class="mt-2 text-[11px] text-brand-mist">{{ __('The core update queues and applies in the background — refresh to confirm the new version.') }}</p>
+                <p class="mt-2 text-xs text-brand-mist">{{ __('The core update queues and applies in the background — refresh to confirm the new version.') }}</p>
             </div>
         @endif
     @endif

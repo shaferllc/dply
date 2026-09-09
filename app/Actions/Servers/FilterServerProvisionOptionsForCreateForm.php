@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 
 /**
  * Applies optional per-row rules from config/server_provision_options.php:
+ * - enabled: `false` withdraws the row from every picker (temporary rollbacks)
  * - providers: whitelist of form.type values (e.g. digitalocean, aws)
  * - exclude_providers: blacklist of form.type values
  * - requires_linked_credential: row is omitted until the org has a credential for this provider
@@ -24,12 +25,45 @@ final class FilterServerProvisionOptionsForCreateForm
 
     /** @var list<string> */
     private const STRIP_ROW_KEYS = [
+        'enabled',
         'providers',
         'exclude_providers',
         'requires_linked_credential',
         'only_server_roles',
         'exclude_server_roles',
     ];
+
+    /**
+     * Install profiles that should appear in the picker.
+     *
+     * Withdrawn profiles stay in config because their ids are internal
+     * identity — role → profile mapping, the dedicated database/cache create
+     * flows, and `Server::meta.install_profile` all resolve against the raw
+     * list. Only the picker filters.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function offeredInstallProfiles(): array
+    {
+        $rows = (array) config('server_provision_options.install_profiles', []);
+
+        return array_values(array_filter(
+            $rows,
+            static fn (mixed $row): bool => is_array($row) && ($row['enabled'] ?? true) !== false,
+        ));
+    }
+
+    /**
+     * A row is offered unless it carries an explicit `enabled => false`. Kept
+     * separate from the provider/role rules because it's a blanket withdrawal:
+     * it applies on the custom-provider path too, which skips filterRows().
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function rowIsEnabled(array $row): bool
+    {
+        return ($row['enabled'] ?? true) !== false;
+    }
 
     /**
      * @return array{
@@ -66,30 +100,30 @@ final class FilterServerProvisionOptionsForCreateForm
     /**
      * Drop cache + database engines that are still "coming soon" (gated behind
      * cache.* / database.* Pennant flags) from the create wizard. Redis,
-     * MySQL, PostgreSQL, and SQLite are never gated. Also drops the dedicated
-     * Valkey server role when Valkey is coming soon so it can't be provisioned
-     * out from under the gate.
+     * Valkey, MySQL, PostgreSQL, and SQLite are never gated. Also drops any
+     * dedicated cache server role whose engine is gated, so an engine can't be
+     * provisioned out from under its own flag.
      *
      * @param  array<string, list<array<string, mixed>>>  $out
      * @return array<string, list<array<string, mixed>>>
      */
     private function removeComingSoonEngines(array $out): array
     {
-        if (isset($out['cache_services']) && is_array($out['cache_services'])) {
+        if (isset($out['cache_services'])) {
             $out['cache_services'] = array_values(array_filter(
                 $out['cache_services'],
                 fn (array $row): bool => CacheEngineAvailability::isAvailable((string) ($row['id'] ?? '')),
             ));
         }
 
-        if (isset($out['server_roles']) && is_array($out['server_roles'])) {
+        if (isset($out['server_roles'])) {
             $out['server_roles'] = array_values(array_filter(
                 $out['server_roles'],
-                fn (array $row): bool => ! (($row['id'] ?? null) === 'valkey' && CacheEngineAvailability::isComingSoon('valkey')),
+                fn (array $row): bool => CacheEngineAvailability::isAvailable((string) ($row['id'] ?? '')),
             ));
         }
 
-        if (isset($out['databases']) && is_array($out['databases'])) {
+        if (isset($out['databases'])) {
             $out['databases'] = array_values(array_filter(
                 $out['databases'],
                 fn (array $row): bool => ! DatabaseEngineAvailability::isProvisionOptionComingSoon((string) ($row['id'] ?? '')),
@@ -120,9 +154,12 @@ final class FilterServerProvisionOptionsForCreateForm
                 if (! is_array($row) || ! isset($row['id'])) {
                     continue;
                 }
+                if (! $this->rowIsEnabled($row)) {
+                    continue;
+                }
                 $stripped[] = Arr::except($row, self::STRIP_ROW_KEYS);
             }
-            $out[$key] = array_values($stripped);
+            $out[$key] = $stripped;
         }
 
         return $out;
@@ -140,7 +177,10 @@ final class FilterServerProvisionOptionsForCreateForm
     ): array {
         $filtered = [];
         foreach ($rows as $row) {
-            if (! is_array($row) || ! isset($row['id'])) {
+            if (! isset($row['id'])) {
+                continue;
+            }
+            if (! $this->rowIsEnabled($row)) {
                 continue;
             }
             if (($row['requires_linked_credential'] ?? false) === true && ! $hasLinkedCredentialForProvider) {
@@ -160,7 +200,7 @@ final class FilterServerProvisionOptionsForCreateForm
             $filtered[] = Arr::except($row, self::STRIP_ROW_KEYS);
         }
 
-        return array_values($filtered);
+        return $filtered;
     }
 
     /**

@@ -54,7 +54,7 @@ trait ManagesSiteDeployHooks
      */
     public function addDeployPipelineHookFromPreset(array $preset): void
     {
-        $kind = $preset['kind'] ?? SiteDeployHook::KIND_SHELL;
+        $kind = $preset['kind'];
         $anchor = $preset['anchor'] ?? SiteDeployHook::ANCHOR_AFTER_ACTIVATE;
         $script = trim((string) ($preset['script'] ?? ''));
 

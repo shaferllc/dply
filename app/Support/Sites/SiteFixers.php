@@ -6,6 +6,7 @@ namespace App\Support\Sites;
 
 use App\Jobs\RunSiteFixerJob;
 use App\Jobs\TestSiteHealthJob;
+use App\Services\Servers\PhpRedisExtensionScripts;
 
 /**
  * Registry of one-click "smart fixers" for the things that commonly break a
@@ -75,6 +76,7 @@ final class SiteFixers
                 'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); export DEBIAN_FRONTEND=noninteractive; APT="apt-get -o DPkg::Lock::Timeout=120"; $APT update -y >/dev/null 2>&1; '
                     .'if $APT install -y "php$V-redis"; then :; '
                     .'else $APT install -y "php$V-dev" php-pear build-essential autoconf pkg-config && (yes "" | pecl install -f redis) && echo "extension=redis.so" > "/etc/php/$V/mods-available/redis.ini" && phpenmod -v "$V" redis; fi; '
+                    ."\n".PhpRedisExtensionScripts::dedupeFromDetectedCli()."\n"
                     .'systemctl restart "php$V-fpm" 2>/dev/null || true',
                 'sudo' => true, 'cwd' => false, 'timeout' => 600,
                 'detect' => '/Class ["\']Redis["\'] not found|PhpRedisConnector|ext-redis|the redis extension/i',

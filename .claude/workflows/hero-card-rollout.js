@@ -148,7 +148,6 @@ const EMBEDDED_SITES = [
   'resources/views/livewire/sites/repository.blade.php',
   'resources/views/livewire/sites/resources.blade.php',
   'resources/views/livewire/sites/schedule.blade.php',
-  'resources/views/livewire/sites/serverless-routing.blade.php',
   'resources/views/livewire/sites/settings.blade.php',
   'resources/views/livewire/sites/show.blade.php',
   'resources/views/livewire/sites/site-app-logs.blade.php',

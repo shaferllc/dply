@@ -19,15 +19,15 @@ use Illuminate\Support\Carbon;
  *                      until {@see expires_at} (config/quick_download.php retention_minutes), when the
  *                      sweeper prunes it. This is a short-lived download tier, not a durable backup.
  * @property string $artifact
- * @property string $bucket
- * @property int $bytes
+ * @property string|null $bucket
+ * @property int|null $bytes
  * @property ?Carbon $consumed_at
  * @property ?Carbon $expires_at
- * @property string $filename
+ * @property string|null $filename
  * @property string $kind
- * @property array<string, mixed> $meta
- * @property string $mime
- * @property string $object_key
+ * @property array<string, mixed>|null $meta
+ * @property string|null $mime
+ * @property string|null $object_key
  * @property ?string $organization_id
  * @property ?string $requested_by_user_id
  * @property ?string $server_database_id
@@ -38,8 +38,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Site $site
  * @property-read ?ServerDatabase $serverDatabase
  * @property-read ?User $requestedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class QuickDownload extends Model
 {

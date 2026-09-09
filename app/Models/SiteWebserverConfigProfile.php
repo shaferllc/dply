@@ -9,20 +9,20 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $after_body
- * @property string $before_body
+ * @property ?string $after_body
+ * @property ?string $before_body
  * @property ?Carbon $draft_saved_at
- * @property string $full_override_body
+ * @property ?string $full_override_body
  * @property ?Carbon $last_applied_at
- * @property string $last_applied_core_hash
- * @property string $last_applied_effective_checksum
- * @property string $main_snippet_body
+ * @property ?string $last_applied_core_hash
+ * @property ?string $last_applied_effective_checksum
+ * @property ?string $main_snippet_body
  * @property string $mode
  * @property ?string $site_id
  * @property string $webserver
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteWebserverConfigProfile extends Model
 {

@@ -125,7 +125,9 @@ class WorkspaceCron extends Component
         if ($org?->cron_maintenance_until) {
             $this->org_maintenance_until_local = $org->cron_maintenance_until->timezone(config('app.timezone'))->format('Y-m-d\TH:i');
         }
-        $this->org_maintenance_note = (string) ($org?->cron_maintenance_note ?? '');
+        $this->org_maintenance_note = $org !== null
+            ? (string) ($org->cron_maintenance_note ?? '')
+            : '';
     }
 
     public function render(): View
@@ -228,7 +230,7 @@ class WorkspaceCron extends Component
                 'filteredCronJobs' => $filteredCronJobs,
                 'recentCronRuns' => $recentCronRuns,
                 'canUpdateOrg' => $canUpdateOrg,
-                'orgCronTemplates' => $needsTemplates ? ($org?->cronJobTemplates ?? collect()) : collect(),
+                'orgCronTemplates' => $needsTemplates && $org !== null ? $org->cronJobTemplates : collect(),
                 'dependsJobChoices' => $needsJobsModal
                     ? ServerCronJob::query()
                         ->where('server_id', $this->server->id)

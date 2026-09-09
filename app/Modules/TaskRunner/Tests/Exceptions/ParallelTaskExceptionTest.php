@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\ParallelTaskException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create ParallelTaskException with default constructor', function () {
     $exception = new ParallelTaskException;

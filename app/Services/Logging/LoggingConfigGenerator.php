@@ -426,7 +426,7 @@ TXT;
         return $this->str((string) $value);
     }
 
-    /** @param  array<string, mixed> $arr */
+    /** @param  array<array-key, mixed> $arr */
     private function exportArray(array $arr, int $depth): string
     {
         if ($arr === []) {

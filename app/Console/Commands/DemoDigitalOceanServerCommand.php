@@ -12,7 +12,7 @@ use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;

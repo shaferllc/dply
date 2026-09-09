@@ -4,25 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\PushSiteEnvJob;
-use App\Jobs\RunSiteFixerJob;
-use App\Jobs\ScanSiteEnvRequirementsJob;
-use App\Jobs\SyncEnvFromServerJob;
-use App\Jobs\SyncWorkerPoolEnvJob;
-use App\Jobs\TestSiteHealthJob;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Show;
-use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteSecretResidency;
-use App\Services\Sites\DotEnvFileParser;
-use App\Services\Sites\DotEnvFileWriter;
-use App\Services\Sites\SecretEscalator;
-use App\Services\Sites\SiteEnvPushScheduler;
-use App\Support\Sites\EnvImportSources;
-use App\Support\Sites\SiteFixers;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -43,6 +28,7 @@ use Livewire\Component;
  */
 trait ManagesSiteEnvironment
 {
+    use ManagesLinkedOrganizationSecrets;
     use ManagesSiteEnvCrud;
     use ManagesSiteEnvImportFix;
     use ManagesSiteEnvRequirements;
@@ -94,12 +80,9 @@ trait ManagesSiteEnvironment
     /** 1-based page for the (in-memory) variables list. */
     public int $env_page = 1;
 
-
     /** Editable buffer for the "Edit all" modal (the full .env as text). */
     public string $edit_all_env = '';
 
     /** @var array<string, string> */
     public array $missing_env_values = [];
-
-
 }

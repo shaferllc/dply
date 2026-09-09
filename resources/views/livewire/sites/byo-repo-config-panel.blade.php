@@ -9,7 +9,7 @@
                 <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply.yaml (in-repo)') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                     {{ __('Commit redirects, site crons, server crons, and deploy hooks in dply.yaml — Dply syncs them after each deploy on this server.') }}
@@ -17,7 +17,7 @@
             </div>
         </div>
         @if ($snapshot)
-            <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+            <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">
                 <x-heroicon-o-check-circle class="h-4 w-4" />
                 {{ __('Synced') }}
             </span>
@@ -52,7 +52,7 @@
 
         @if ($snapshot === null)
             <p class="text-sm text-brand-moss">{{ __('No dply.yaml found on the last deploy. Add one at the repo root and redeploy to sync redirects, crons, and hooks.') }}</p>
-            <pre class="overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 font-mono text-[11px] leading-relaxed text-brand-ink"># dply.yaml — BYO example
+            <pre class="overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 font-mono text-xs leading-relaxed text-brand-ink"># dply.yaml — BYO example
 redirects:
   - from: /docs/*
     to: https://docs.example.com/:splat
@@ -74,17 +74,17 @@ deploy_hooks:
         @else
             <dl class="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Source file') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Source file') }}</dt>
                     <dd class="mt-1 font-mono text-brand-ink">{{ $snapshot['source_path'] ?? 'dply.yaml' }}</dd>
                 </div>
                 @if ($snapshot['synced_at'])
                     <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last synced') }}</dt>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last synced') }}</dt>
                         <dd class="mt-1 text-brand-ink">{{ $snapshot['synced_at'] }}</dd>
                     </div>
                 @endif
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Managed rules') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Managed rules') }}</dt>
                     <dd class="mt-1 text-brand-moss">
                         {{ trans(':redirects redirects · :rewrites rewrites · :crons site crons · :server_crons server crons · :hooks hooks · :env env vars', [
                             'redirects' => $snapshot['counts']['redirects'] ?? 0,
@@ -122,7 +122,7 @@ deploy_hooks:
                 @foreach (['build' => __('Build steps'), 'release' => __('Release steps')] as $phase => $label)
                     @if (count($managed[$phase]))
                         <div class="mt-3">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</p>
                             <ul class="mt-1 space-y-1">
                                 @foreach ($managed[$phase] as $cmd)
                                     <li class="font-mono text-xs text-brand-ink">$ {{ $cmd }}</li>
@@ -133,7 +133,7 @@ deploy_hooks:
                 @endforeach
                 @if (count($managed['processes']))
                     <div class="mt-3">
-                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Processes') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Processes') }}</p>
                         <ul class="mt-1 space-y-1">
                             @foreach ($managed['processes'] as $proc)
                                 <li class="font-mono text-xs text-brand-ink">{{ $proc['name'] }} ×{{ $proc['scale'] }} — {{ $proc['command'] }}</li>

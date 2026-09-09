@@ -32,26 +32,20 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Load balancers') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Load balancers that target this server. Manage all load balancers from the Networking section.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense page head, matching Settings / Logs / Files / Firewall / Networking. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-arrows-right-left"
+            :title="__('Load balancers')"
+            :note="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
+            :count="trans_choice('{0} none|{1} :count balancer|[2,*] :count balancers', $loadBalancers->count(), ['count' => $loadBalancers->count()])"
+            class="border-b border-brand-ink/10"
+        />
 
     {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
          server's load_balancer.* events. Mirrors the system-users page. --}}
-    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-        <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+        <x-server-workspace-tablist :aria-label="__('Load balancer sections')" scroll bare class="!mb-0 w-full">
             <x-server-workspace-tab icon="heroicon-o-arrows-right-left" :active="$lb_workspace_tab === 'load_balancers'" wire:click="setLbWorkspaceTab('load_balancers')">
                 {{ __('Load balancers') }}
             </x-server-workspace-tab>
@@ -61,26 +55,40 @@
         </x-server-workspace-tablist>
     </div>
 
-    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
+    {{-- Skeleton while a tab switch is in flight. Both panels are rendered and
+         toggled with `hidden`, so the swap still costs a round trip with no
+         feedback until the response lands.
+
+         Same shape as the firewall strip: wire:loading.block (bare wire:loading
+         reveals as inline-block and shrink-wraps), a stable outer wrapper
+         carrying the directive, and the tab key on an inner div so a morph can't
+         orphan the previous tab's subtree outside the hidden element. --}}
+    <div wire:loading.block wire:target="setLbWorkspaceTab" aria-busy="true" aria-live="polite">
+        <span class="sr-only">{{ __('Loading section…') }}</span>
+        <div wire:key="lb-skeleton-{{ $lb_workspace_tab }}">
+            @include('livewire.servers.partials.load-balancers._tab-skeleton', ['tab' => $lb_workspace_tab])
+        </div>
+    </div>
+
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'load_balancers']) wire:loading.remove wire:target="setLbWorkspaceTab">
 
         {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
         <section class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-center gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Load balancers') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Manage load balancers') }}</h3>
-                    </div>
-                </div>
-                <a href="{{ route('networking.index') }}?tab=load-balancers" wire:navigate
-                    class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                    <x-heroicon-o-arrows-right-left class="h-4 w-4" />
-                    {{ __('Manage in Networking →') }}
-                </a>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-arrows-right-left"
+                :title="__('Manage load balancers')"
+                :note="__('Software (HAProxy) balancers run on any server. Managed (Hetzner) balancers are redundant but billed by the provider.')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    <a href="{{ route('networking.index') }}?tab=load-balancers" wire:navigate
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                        {{ __('Manage in Networking →') }}
+                    </a>
+                </x-slot:actions>
+            </x-workspace-panel-head>
             @if ($loadBalancers->isEmpty())
                 <div class="px-6 py-8 sm:px-7">
                     <x-empty-state
@@ -113,7 +121,7 @@
                         </x-icon-badge>
                         <div>
                             <h3 class="text-base font-semibold text-brand-ink">{{ $lb->name }}</h3>
-                            <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[11px] text-brand-mist">
+                            <div class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-xs text-brand-mist">
                                 <span>{{ strtoupper($lb->load_balancer_type) }}</span>
                                 <span>{{ $lb->region }}</span>
                                 @if ($lb->public_ipv4)
@@ -130,11 +138,11 @@
                     </div>
                     <div class="flex items-center gap-3">
                         @if ($lb->isSoftware())
-                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">HAProxy · {{ $lb->server?->name }}</span>
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">HAProxy · {{ $lb->server?->name }}</span>
                         @else
-                            <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200">Hetzner managed</span>
+                            <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold text-sky-700 ring-1 ring-sky-200">Hetzner managed</span>
                         @endif
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium ring-1 ring-brand-ink/10 {{ $statusPill['text'] }}">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-medium ring-1 ring-brand-ink/10 {{ $statusPill['text'] }}">
                             @if ($lb->status === 'provisioning')
                                 <x-spinner variant="forest" size="sm" />
                             @else
@@ -161,7 +169,7 @@
                 <div class="grid divide-y divide-brand-ink/5 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
                     {{-- Services --}}
                     <div class="px-6 py-5 sm:px-7">
-                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Services') }}</p>
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Services') }}</p>
                         @if ($lb->services->isEmpty())
                             <p class="text-sm text-brand-mist">{{ __('No services configured.') }}</p>
                         @else
@@ -169,7 +177,7 @@
                                 @foreach ($lb->services as $svc)
                                     <div class="flex items-center gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
                                         <span @class([
-                                            'inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase',
+                                            'inline-flex shrink-0 rounded-md px-1.5 py-0.5 text-2xs font-bold uppercase',
                                             'bg-sky-100 text-sky-700' => $svc->protocol === 'http',
                                             'bg-emerald-100 text-emerald-700' => $svc->protocol === 'https',
                                             'bg-violet-100 text-violet-700' => $svc->protocol === 'tcp',
@@ -178,7 +186,7 @@
                                             :{{ $svc->listen_port }} → :{{ $svc->destination_port }}
                                         </code>
                                         @if ($svc->sticky_sessions)
-                                            <span class="ml-auto text-[10px] text-brand-mist">{{ __('sticky') }}</span>
+                                            <span class="ml-auto text-2xs text-brand-mist">{{ __('sticky') }}</span>
                                         @endif
                                     </div>
                                 @endforeach
@@ -188,7 +196,7 @@
 
                     {{-- Targets --}}
                     <div class="px-6 py-5 sm:px-7">
-                        <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Targets') }}</p>
+                        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Targets') }}</p>
                         @if ($lb->targets->isEmpty())
                             <p class="text-sm text-brand-mist">{{ __('No targets yet.') }}</p>
                         @else
@@ -202,11 +210,11 @@
                                             'bg-amber-400' => ! in_array($target->status, ['healthy', 'unhealthy'], true),
                                         ])></span>
                                         <span class="min-w-0 flex-1 truncate text-sm text-brand-ink">{{ $target->server?->name ?? __('Unknown server') }}</span>
-                                        <span class="font-mono text-[11px] text-brand-mist">{{ $target->server?->private_ip_address ?? $target->server?->ip_address }}</span>
+                                        <span class="font-mono text-xs text-brand-mist">{{ $target->server?->private_ip_address ?? $target->server?->ip_address }}</span>
                                         <button
                                             type="button"
                                             wire:click="removeTarget('{{ $target->id }}')"
-                                            class="shrink-0 text-[11px] text-rose-600 hover:underline"
+                                            class="shrink-0 text-xs text-rose-600 hover:underline"
                                         >{{ __('Remove') }}</button>
                                     </div>
                                 @endforeach
@@ -244,10 +252,10 @@
 
                 {{-- Algorithm badge --}}
                 <div class="flex items-center gap-2 border-t border-brand-ink/5 bg-brand-sand/10 px-6 py-3 sm:px-7">
-                    <span class="text-[11px] text-brand-mist">{{ __('Algorithm') }}:</span>
-                    <span class="text-[11px] font-medium text-brand-ink">{{ $lb->algorithm === 'round_robin' ? __('Round robin') : __('Least connections') }}</span>
+                    <span class="text-xs text-brand-mist">{{ __('Algorithm') }}:</span>
+                    <span class="text-xs font-medium text-brand-ink">{{ $lb->algorithm === 'round_robin' ? __('Round robin') : __('Least connections') }}</span>
                     @if ($lb->hetzner_network_id)
-                        <span class="ml-3 text-[11px] text-brand-mist">{{ __('Network') }}: <span class="font-mono">{{ $lb->hetzner_network_id }}</span></span>
+                        <span class="ml-3 text-xs text-brand-mist">{{ __('Network') }}: <span class="font-mono">{{ $lb->hetzner_network_id }}</span></span>
                     @endif
                 </div>
             </section>
@@ -255,7 +263,7 @@
 
     </div>
 
-    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'notifications'])>
+    <div @class(['min-w-0', 'hidden' => $lb_workspace_tab !== 'notifications']) wire:loading.remove wire:target="setLbWorkspaceTab">
         @include('livewire.servers.partials.load-balancers.notifications-tab')
     </div>
     </section>
@@ -268,11 +276,11 @@
                     <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Free · HAProxy') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Free · HAProxy') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create software load balancer') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Runs HAProxy on a server you already own. No extra cost — just the server. Dply writes the config and reloads over SSH.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'create-haproxy-lb-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'create-haproxy-lb-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -298,7 +306,7 @@
                 {{-- HAProxy server picker --}}
                 <div>
                     <x-input-label for="haproxy_server_id" :value="__('HAProxy server')" />
-                    <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Pick any server with the "Load balancer" role (HAProxy pre-installed). Or create one from the server wizard first.') }}</p>
+                    <p class="mt-0.5 text-xs text-brand-mist">{{ __('Pick any server with the "Load balancer" role (HAProxy pre-installed). Or create one from the server wizard first.') }}</p>
                     <select id="haproxy_server_id" wire:model="haproxy_server_id" class="dply-input mt-2 block w-full">
                         <option value="">{{ __('Select a server…') }}</option>
                         @foreach ($orgServers as $s)
@@ -368,10 +376,10 @@
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $s->name }}
                                         @if ($s->id === $server->id)
-                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest">{{ __('this server') }}</span>
+                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-medium text-brand-forest">{{ __('this server') }}</span>
                                         @endif
                                     </p>
-                                    <p class="font-mono text-[11px] text-brand-mist">
+                                    <p class="font-mono text-xs text-brand-mist">
                                         {{ $s->private_ip_address ?? $s->ip_address }} · {{ $s->region }}
                                         @if ($s->private_ip_address)
                                             <span class="text-emerald-600">· {{ __('private') }}</span>
@@ -414,11 +422,11 @@
                     <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hetzner') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hetzner') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create load balancer') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Provisions a Hetzner load balancer in your account and wires it up with the selected servers as targets.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'create-lb-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'create-lb-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -454,7 +462,7 @@
                     <x-input-label for="lb_network_id" :value="__('Private network ID (optional)')" />
                     <x-text-input id="lb_network_id" wire:model="lb_network_id" class="mt-1 block w-full font-mono"
                         :placeholder="$server->hetzner_network_id ?? 'e.g. 1234567'" />
-                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('If set, targets connect over private IP. Leave blank to use public IPs.') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('If set, targets connect over private IP. Leave blank to use public IPs.') }}</p>
                 </div>
 
                 {{-- Services --}}
@@ -513,10 +521,10 @@
                                 <div class="min-w-0 flex-1">
                                     <p class="text-sm font-semibold text-brand-ink">{{ $s->name }}
                                         @if ($s->id === $server->id)
-                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest">{{ __('this server') }}</span>
+                                            <span class="ml-1 rounded-full bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-medium text-brand-forest">{{ __('this server') }}</span>
                                         @endif
                                     </p>
-                                    <p class="font-mono text-[11px] text-brand-mist">
+                                    <p class="font-mono text-xs text-brand-mist">
                                         {{ $s->private_ip_address ?? $s->ip_address }} · {{ $s->region }}
                                     </p>
                                 </div>

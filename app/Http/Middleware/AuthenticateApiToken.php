@@ -51,6 +51,14 @@ class AuthenticateApiToken
         $request->attributes->set('api_token', $token);
         $request->attributes->set('api_organization', $token->organization);
 
+        // Policies reach org/workspace membership through currentOrganization(),
+        // which reads the session — absent on an API request, so it would fall
+        // back to the user's *first* org and wrongly deny a multi-org caller.
+        // The token names the org, so prime the memo with it.
+        if ($token->organization !== null) {
+            $user->rememberCurrentOrganization($token->organization);
+        }
+
         return $next($request);
     }
 

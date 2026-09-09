@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * @property string $id
@@ -23,14 +24,14 @@ use Illuminate\Support\Carbon;
  *                      ConsoleActions and SiteDeployments. Append-only; triage is a shared
  *                      {@see $dismissed_at}.
  * @property string $category
- * @property string $detail
+ * @property string|null $detail
  * @property ?Carbon $dismissed_at
  * @property ?string $dismissed_by
  * @property ?string $link_url
  * @property ?Carbon $occurred_at
  * @property ?string $organization_id
- * @property string $reference
- * @property string $remediation_code
+ * @property string|null $reference
+ * @property string|null $remediation_code
  * @property ?string $server_id
  * @property ?string $site_id
  * @property ?string $source_id
@@ -40,8 +41,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Server $server
  * @property-read ?Site $site
  * @property-read ?User $dismisser
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ErrorEvent extends Model
 {
@@ -148,6 +149,47 @@ class ErrorEvent extends Model
             ->where('server_id', $serverId)
             ->whereNull('dismissed_at')
             ->count();
+    }
+
+    /**
+     * How long the nav badge may serve a stale count. Matched to the sites-count
+     * cache on {@see \App\Models\Server::cachedSitesCount} — shorter than this
+     * and the entry keeps lapsing between page loads, so it stops earning its
+     * keep as a cache.
+     */
+    private const BADGE_CACHE_TTL_SECONDS = 60;
+
+    /**
+     * Count for the server-workspace nav badge specifically. Same number as
+     * {@see undismissedCountForServer}, but allowed to be up to
+     * {@see BADGE_CACHE_TTL_SECONDS} stale — the badge renders on every page in
+     * the workspace, and this count(*) was one of the slower queries on each of
+     * them. Anything that needs the exact figure (the Errors stream, dismissal
+     * flows) must keep calling {@see undismissedCountForServer}.
+     *
+     * Deliberately a separate memo: writing a possibly-stale value into the
+     * exact memo would silently degrade those callers.
+     *
+     * @var array<string, int>
+     */
+    protected static array $undismissedBadgeCountMemo = [];
+
+    public static function undismissedBadgeCountForServer(string $serverId): int
+    {
+        // The exact count already resolved this request (the Errors stream
+        // primes it) — prefer it over anything cached.
+        if (array_key_exists($serverId, static::$undismissedServerCountMemo)) {
+            return static::$undismissedServerCountMemo[$serverId];
+        }
+
+        return static::$undismissedBadgeCountMemo[$serverId] ??= (int) Cache::remember(
+            'server:'.$serverId.':undismissed-error-badge',
+            self::BADGE_CACHE_TTL_SECONDS,
+            fn (): int => static::query()
+                ->where('server_id', $serverId)
+                ->whereNull('dismissed_at')
+                ->count(),
+        );
     }
 
     /** Seed the memo from a count computed elsewhere (e.g. the stream paginator). */

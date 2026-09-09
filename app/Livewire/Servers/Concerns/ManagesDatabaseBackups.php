@@ -16,6 +16,7 @@ use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -42,11 +43,12 @@ trait ManagesDatabaseBackups
     /** @var array<string, mixed> Trait-shaped destination form for the 'new' mode. */
     public array $backupDestinationForm = [];
 
-    public $import_sql_file = null;
+    public TemporaryUploadedFile|null $import_sql_file = null;
 
     /**
-     * Org-level S3-compatible backup destinations this server can reuse. Keyed
-     * for the modal's "existing destination" picker.
+     * Org-level backup destinations this server can reuse — every provider the
+     * exporter can write to (S3/Spaces, SFTP/FTP/Rclone, Dropbox/Drive), not
+     * just the S3 family. Keyed for the modal's "existing destination" picker.
      *
      * @return Collection<int, BackupConfiguration>
      */
@@ -128,7 +130,7 @@ trait ManagesDatabaseBackups
 
             $provider = (string) ($this->backupDestinationForm['provider'] ?? '');
             if (! in_array($provider, self::S3_BACKUP_PROVIDERS, true)) {
-                $this->addError('backupDestinationForm.provider', __('Database backups support S3-compatible destinations only (AWS S3, Custom S3, or DigitalOcean Spaces).'));
+                $this->addError('backupDestinationForm.provider', __('That destination type is not supported for database backups yet.'));
 
                 return;
             }
@@ -178,7 +180,7 @@ trait ManagesDatabaseBackups
             ->firstOrFail();
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
-        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+        $filename = ($backup->serverDatabase->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
         try {
             return $downloader->response($backup, $filename);

@@ -1,17 +1,14 @@
 <section>
     <div class="border-b border-rose-200">
-        <div class="flex items-start gap-3 border-b border-red-200 bg-red-50/60 px-6 py-5 sm:px-7">
-            <x-icon-badge tone="red">
-                <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
+        <div class="flex items-start gap-2 border-b border-red-200 bg-red-50/60 px-5 py-3.5 sm:px-6">
+            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-red-700" aria-hidden="true" />
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reset this site') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Destructive actions for this site’s application. The site shell — server, domains, testing URL, and certificates — is always kept.') }}</p>
+                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Reset this site') }}</h2>
+                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Destructive actions for this site’s application. The site shell — server, domains, testing URL, and certificates — is always kept.') }}</p>
             </div>
         </div>
 
-        <div class="p-6 sm:p-7">
+        <div class="px-5 py-4 sm:px-6">
             @if (trim((string) ($site->git_repository_url ?? '')) === '')
                 <p class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-cream/60 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />

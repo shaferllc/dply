@@ -22,6 +22,7 @@ use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
+use App\Support\Servers\WorkerHostContext;
 use App\Support\Sites\SiteCreateAccess;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
@@ -32,6 +33,16 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+/**
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read bool $canAddSite
+ * @property-read array{redeploy_count: int, renewable_count: int, site_names: list<string>} $selectedBulkPreview
+ * @property-read array{blocked_reason: string, blocked_by: string, can_create: bool, quota: array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null} $siteCreateAccess
+ * @property-read array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null $siteQuotaBlock
+ * @property-read bool $supportsQuickAdd
+ */
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSites extends Component
@@ -60,6 +71,9 @@ class WorkspaceSites extends Component
      */
     public array $phpVersions = [];
 
+    /**
+     * @return array{blocked_reason: string, blocked_by: string, can_create: bool, quota: array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null}
+     */
     #[Computed]
     public function siteCreateAccess(): array
     {
@@ -81,6 +95,19 @@ class WorkspaceSites extends Component
     public function addSiteBlockedReason(): string
     {
         return $this->siteCreateAccess['blocked_reason'];
+    }
+
+    /**
+     * The plan-cap numbers when the block is a quota block, else null. Drives
+     * the callout that says WHERE the usage is — the count is org-wide, so a
+     * full quota reads as nonsense on an empty server without it.
+     *
+     * @return array{elsewhere: int, index_route: string, limit: int|null, noun: string, noun_plural: string, plan: string, surface: string, used: int}|null
+     */
+    #[Computed]
+    public function siteQuotaBlock(): ?array
+    {
+        return $this->siteCreateAccess['quota'];
     }
 
     #[Computed]
@@ -112,7 +139,12 @@ class WorkspaceSites extends Component
             $this->form->php_version = $phpData['preselected_version'];
         }
 
-        $this->form->applyDefaultsForType($this->form->type);
+        // Default to what the server can actually run — see Server::defaultSiteRuntime().
+        [$defaultType, $defaultRuntimeVersion] = $this->server->defaultSiteRuntime();
+        $this->form->applyDefaultsForType($defaultType);
+        if ($defaultRuntimeVersion !== null) {
+            $this->form->runtime_version = $defaultRuntimeVersion;
+        }
     }
 
     public function openAddSiteModal(): void
@@ -452,7 +484,9 @@ class WorkspaceSites extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
-            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions'),
+            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions')
+                && ! $this->server->isWorkerHost(),
+            'workerHost' => WorkerHostContext::for($this->server),
         ]);
     }
 }

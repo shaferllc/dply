@@ -18,6 +18,36 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
+test('fake edge adhoc preview uses local testing apex not parent on-dply hostname', function () {
+    Queue::fake();
+    config([
+        'edge.fake.enabled' => true,
+        'edge.fake.allowed_environments' => ['testing', 'local'],
+        'edge.testing_domains' => ['on-dply.site', 'edge.test'],
+        'app.env' => 'testing',
+        'app.url' => 'https://dply.test',
+    ]);
+
+    [$parent] = makeEdgeParentWithGithub();
+    $parent->mergeEdgeMeta([
+        'routing' => ['hostname' => 'sample-edge-app-b6adb77e.on-dply.site'],
+        'live_url' => 'https://sample-edge-app-b6adb77e.on-dply.site',
+    ]);
+    $parent->save();
+
+    $preview = (new CreateEdgePreviewSite)->handleAdhoc(
+        $parent->fresh(),
+        'main',
+        'b704ccb0123456789abcdef0123456789abcdef0',
+    );
+
+    $hostname = (string) ($preview->edgeMeta()['routing']['hostname'] ?? '');
+
+    expect($hostname)->toEndWith('.edge.test')
+        ->and($hostname)->toContain('--b704ccb')
+        ->and($hostname)->not->toContain('on-dply.site');
+});
+
 test('preview spawn posts github check run and pr comment when head sha present', function () {
     Queue::fake();
     Http::fake(function (Request $request) {

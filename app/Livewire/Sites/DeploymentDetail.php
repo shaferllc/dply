@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\CorrelatesWindowLogs;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\Server;
 use App\Models\Site;
@@ -28,6 +29,7 @@ class DeploymentDetail extends Component
 {
     use CorrelatesWindowLogs;
     use DispatchesToastNotifications;
+    use SeedsSiteConsoleActions;
     use SurfacesDeploymentRemediation;
 
     public Server $server;

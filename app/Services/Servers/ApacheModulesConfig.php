@@ -53,7 +53,6 @@ class ApacheModulesConfig
     /**
      * @return array{modules: list<array{name: string, enabled: bool, protected: bool, type: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -199,7 +198,7 @@ BASH;
         if (str_starts_with($name, 'log') || str_contains($name, 'status')) {
             return 'observability';
         }
-        if (str_contains($name, 'rewrite') || str_contains($name, 'headers') || str_contains($name, 'expires') || str_contains($name, 'macro')) {
+        if (str_contains($name, 'rewrite') || str_contains($name, 'headers') || str_contains($name, 'macro')) {
             return 'core';
         }
 

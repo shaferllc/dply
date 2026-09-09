@@ -166,11 +166,17 @@ trait ManagesSiteDeployExecution
 
         $group = $coordinator->findGroupForSite($this->site);
 
-        if ($group === null) {
-            return 0;
+        $fleet = $coordinator->fleetReplicas($this->site)->count();
+
+        if (! $coordinator->shouldIncludePeersOnManual($this->site)) {
+            return $fleet;
         }
 
-        return max(0, $group->sites()->count() - 1);
+        if ($group === null) {
+            return $fleet;
+        }
+
+        return max(0, $group->sites()->count() - 1) + $fleet;
     }
 
     /**

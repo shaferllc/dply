@@ -2,9 +2,6 @@
 
 namespace App\Livewire\Servers;
 
-use App\Modules\Insights\Jobs\ApplyInsightFixJob;
-use App\Modules\Insights\Jobs\RevertInsightFixJob;
-use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -15,19 +12,12 @@ use App\Livewire\Servers\Concerns\ManagesInsightsNotifications;
 use App\Livewire\Servers\Concerns\ManagesInsightsSettings;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\InsightFinding;
-use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\Insights\Services\InsightSettingsRepository;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
-use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
@@ -97,12 +87,11 @@ class WorkspaceInsights extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
     }
-
 
     /**
      * Fired by {@see CreatesNotificationChannelInline} after the inline modal
@@ -131,7 +120,6 @@ class WorkspaceInsights extends Component
         ]);
     }
 
-
     // ─── Workspace banner state ──────────────────────────────────────────────────────────
     //
     // The console banner mirrors the firewall / SSH-keys workspace pattern. Three banner
@@ -141,7 +129,6 @@ class WorkspaceInsights extends Component
     // through the application cache keyed by run_id, with a TTL ~5 minutes.
 
     public const STALE_THRESHOLD_SECONDS = 300;
-
 
     public function render(): View
     {

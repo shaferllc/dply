@@ -29,7 +29,7 @@ class InnodbBufferPoolInsightRunner implements InsightRunnerInterface
     ) {}
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
      */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
@@ -99,7 +99,7 @@ BASH;
         }
 
         $memTotalBytes = $memTotalKb * 1024;
-        $ramSharePct = $memTotalBytes > 0 ? ($poolBytes / $memTotalBytes) * 100.0 : 0.0;
+        $ramSharePct = ($poolBytes / $memTotalBytes) * 100.0;
         $workingSetPct = $pagesTotal > 0 ? ($pagesData / $pagesTotal) * 100.0 : 0.0;
 
         $minRamShare = (float) ($parameters['min_ram_share_pct'] ?? 25);
@@ -149,9 +149,6 @@ BASH;
         return number_format($n, 1, '.', '');
     }
 
-    /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
-     */
     private function parseKeyValues(string $buffer): array
     {
         $out = [];

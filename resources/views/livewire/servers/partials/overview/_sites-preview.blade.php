@@ -4,7 +4,7 @@
         // Site lifecycle status → human label + tone. The raw values are
         // webserver-specific (nginx_active / caddy_active / container_active …),
         // so collapse them into a handful of states an operator actually reads.
-        $siteStatusMeta = function (?string $status): array {
+        $siteStatusMeta = function (?string $status) use ($isWorkerRoleHost): array {
             $s = (string) $status;
             if ($s === '') {
                 return ['label' => __('Unknown'), 'tone' => 'neutral'];
@@ -19,7 +19,7 @@
                 return ['label' => __('Deploying'), 'tone' => 'sky'];
             }
             if (str_ends_with($s, '_provisioning') || str_ends_with($s, '_configured') || in_array($s, ['pending', 'scaffolding', 'awaiting_app'], true)) {
-                return ['label' => __('Setting up'), 'tone' => 'amber'];
+                return ['label' => $isWorkerRoleHost ? __('Installing') : __('Setting up'), 'tone' => 'amber'];
             }
 
             return ['label' => (string) str($s)->headline(), 'tone' => 'neutral'];
@@ -44,23 +44,20 @@
             null => '', default => (string) str($key)->headline(),
         };
     @endphp
-    <section class="dply-card overflow-hidden">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hosting') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Sites') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Sites hosted on this server, each with its current status and most recent deploy.') }}</p>
-                </div>
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
-                @if ($siteCount > 0)
-                    <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
-                @endif
-                @if (($deployableSiteCount ?? 0) > 0)
+    <section class="dply-card overflow-hidden p-0">
+        {{-- The "HOSTING" eyebrow over "Sites" said the same thing twice; the count
+             moves to the head's own pill. --}}
+        <x-workspace-panel-head
+            :icon="$isWorkerRoleHost ? 'heroicon-o-square-3-stack-3d' : 'heroicon-o-globe-alt'"
+            :title="$isWorkerRoleHost ? __('Workload') : __('Sites')"
+            :note="$isWorkerRoleHost
+                ? __('Code this worker deploys to run queues — not a public site.')
+                : __('Sites hosted on this server, each with its current status and most recent deploy.')"
+            :count="$siteCount ?: null"
+            class="border-b border-brand-ink/10"
+        >
+            <x-slot:actions>
+                @if (($deployableSiteCount ?? 0) > 0 && ! $isWorkerRoleHost)
                     {{-- Deploys the one deployable site immediately, or opens the
                          pick-sites modal when there's more than one (WatchesSiteDeploys). --}}
                     {{-- Fixed w-36 (matched on Open Sites below) so the idle→busy
@@ -77,12 +74,17 @@
                         :busy-label="__('Deploying…')"
                     />
                 @endif
-                <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex w-36 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-white px-4 py-2.5 text-xs font-semibold text-brand-ink shadow-sm ring-1 ring-inset ring-brand-ink/15 transition hover:bg-brand-sand/40">
+                <x-secondary-button
+                    size="sm"
+                    class="w-36"
+                    :href="route('servers.sites', $server)"
+                    wire:navigate
+                >
                     <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Open Sites') }}
-                </a>
-            </div>
-        </div>
+                    {{ $isWorkerRoleHost ? __('Open Workload') : __('Open Sites') }}
+                </x-secondary-button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($sitesPreview as $previewSite)
                 @php
@@ -122,23 +124,30 @@
                                 <a href="{{ route('sites.show', ['server' => $server, 'site' => $previewSite]) }}" wire:navigate class="truncate text-sm font-semibold text-brand-ink hover:text-brand-sage">
                                     {{ $previewSite->name }}
                                 </a>
-                                <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $toneBadge[$status['tone']] }}">
+                                @if ($isWorkerRoleHost || $previewSite->isFleetReplica())
+                                    <span class="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">
+                                        {{ __('Worker') }}
+                                    </span>
+                                @endif
+                                <span class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $toneBadge[$status['tone']] }}">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $toneDot[$status['tone']] }}"></span>
                                     {{ $status['label'] }}
                                 </span>
                                 @if ($sslActive)
-                                    <span class="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700" title="{{ __('SSL certificate active') }}">
+                                    <span class="inline-flex items-center gap-1 text-2xs font-medium text-emerald-700" title="{{ __('SSL certificate active') }}">
                                         <x-heroicon-m-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         {{ __('SSL') }}
                                     </span>
                                 @endif
                             </div>
-                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
-                                @if ($domain)
+                            <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
+                                @if ($domain && ! $isWorkerRoleHost && ! $previewSite->isFleetReplica())
                                     <a href="https://{{ $domain }}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center gap-1 truncate font-mono text-brand-moss hover:text-brand-sage hover:underline">
                                         <span class="truncate">{{ $domain }}</span>
                                         <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 shrink-0" aria-hidden="true" />
                                     </a>
+                                @elseif ($isWorkerRoleHost)
+                                    <span>{{ __('Queue workload') }}</span>
                                 @endif
                                 @if ($runtimeLabel)
                                     @if ($domain)<span class="text-brand-mist/50">·</span>@endif
@@ -150,12 +159,12 @@
 
                     <div class="flex shrink-0 flex-col items-end gap-1 text-right">
                         @if ($deployStatus)
-                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $toneBadge[$deployTone] }}">
+                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $toneBadge[$deployTone] }}">
                                 {{ str($deployStatus)->headline() }}
                             </span>
                         @endif
                         @if ($deployTime)
-                            <span class="text-[11px] text-brand-mist">
+                            <span class="text-xs text-brand-mist">
                                 {{ $deployTime->diffForHumans() }}
                                 @if ($deploySha)
                                     <span class="text-brand-mist/50"> · </span>
@@ -163,20 +172,8 @@
                                 @endif
                             </span>
                         @else
-                            <span class="text-[11px] text-brand-mist">{{ __('No deploys yet') }}</span>
+                            <span class="text-xs text-brand-mist">{{ __('No deploys yet') }}</span>
                         @endif
-                        @feature('surface.fleet')
-                            @if ($deployStatus === 'failed' && ops_copilot_active())
-                                <a
-                                    href="{{ route('fleet.copilot', ['site' => $previewSite->id]) }}"
-                                    wire:navigate
-                                    class="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800 hover:bg-violet-100"
-                                >
-                                    <x-heroicon-o-sparkles class="h-3 w-3" aria-hidden="true" />
-                                    {{ __('Copilot') }}
-                                </a>
-                            @endif
-                        @endfeature
                     </div>
                 </li>
             @endforeach

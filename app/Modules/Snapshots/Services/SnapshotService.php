@@ -176,7 +176,7 @@ class SnapshotService
                 kind: 'database',
                 status: $status,
                 label: (string) ($site->name ?: $site->slug),
-                serverName: (string) ($site->server?->name ?? ''),
+                serverName: (string) $site->server->name,
                 url: route('servers.snapshots', $site->server_id, absolute: true),
                 errorMessage: $errorMessage,
             ));

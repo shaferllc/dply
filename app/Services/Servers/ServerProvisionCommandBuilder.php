@@ -43,8 +43,6 @@ final class ServerProvisionCommandBuilder
 
     private const VERIFY_PREFIX = '[dply-verify] ';
 
-    private const ROLLBACK_PREFIX = '[dply-rollback] ';
-
     /**
      * In-progress server, populated for the duration of a single build()
      * call so role helpers can read meta without threading it through
@@ -74,7 +72,7 @@ final class ServerProvisionCommandBuilder
     private function buildInner(Server $server): array
     {
         $meta = $server->meta ?? [];
-        if (! is_array($meta) || empty($meta['server_role']) || ! is_string($meta['server_role'])) {
+        if (empty($meta['server_role']) || ! is_string($meta['server_role'])) {
             return [];
         }
 
@@ -142,7 +140,7 @@ final class ServerProvisionCommandBuilder
     public function buildArtifacts(Server $server): array
     {
         $meta = $server->meta ?? [];
-        if (! is_array($meta) || empty($meta['server_role']) || ! is_string($meta['server_role'])) {
+        if (empty($meta['server_role']) || ! is_string($meta['server_role'])) {
             return [];
         }
 
@@ -317,7 +315,7 @@ final class ServerProvisionCommandBuilder
      * demand. Force-reinstall mode wipes the directory at bootstrap
      * (see bootstrap()).
      *
-     * @param  array<string, mixed> $commands
+     * @param  list<string> $commands
      * @return list<string>
      */
     private function withStep(string $label, array $commands): array
@@ -362,7 +360,7 @@ final class ServerProvisionCommandBuilder
     }
 
     /**
-     * @param  array<string, mixed> $packages
+     * @param  array<int, string> $packages
      * @return list<string>
      */
     private function ensurePackagesInstalled(array $packages, string $alreadyInstalledMessage): array
@@ -426,8 +424,8 @@ final class ServerProvisionCommandBuilder
      * Required-missing still trips exit 100; optional-missing are pre-filtered
      * out so they can't.
      *
-     * @param  array<string, mixed> $required
-     * @param  array<string, mixed> $optional
+     * @param  array<int, string> $required
+     * @param  array<int, string> $optional
      * @return list<string>
      */
     private function ensureMixedPackagesInstalled(array $required, array $optional, string $alreadyInstalledMessage): array

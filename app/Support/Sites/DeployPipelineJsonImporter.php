@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployPipeline;
 use App\Models\SiteDeployStep;
+use App\Services\Sites\SiteAtomicLayoutRequester;
 use InvalidArgumentException;
 
 final class DeployPipelineJsonImporter
@@ -282,7 +283,6 @@ final class DeployPipelineJsonImporter
         }
 
         $update = [
-            'deploy_strategy' => $strategy,
             'meta' => $meta,
         ];
         if (array_key_exists('releases_to_keep', $rollout)) {
@@ -290,5 +290,12 @@ final class DeployPipelineJsonImporter
         }
 
         $site->update($update);
+
+        $requester = app(SiteAtomicLayoutRequester::class);
+        if ($strategy === 'atomic' && ! $site->isAtomicDeploys()) {
+            $requester->requestAtomic($site, auth()->id(), confirmed: true);
+        } elseif ($strategy === 'simple' && $site->isAtomicDeploys()) {
+            $requester->requestFlat($site);
+        }
     }
 }

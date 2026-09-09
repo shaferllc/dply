@@ -24,7 +24,6 @@ class TraefikUdpRoutesConfig
     /**
      * @return array{routes: list<array{slug: string, path: string, entry_points: list<string>, server_address: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -81,7 +80,7 @@ class TraefikUdpRoutesConfig
     {
         $slug = $this->normalizeTraefikSlug($slug);
         foreach ($this->read($server)['routes'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("UDP route `{$slug}` already exists.");
             }
         }
@@ -111,7 +110,7 @@ class TraefikUdpRoutesConfig
         if ($entryPoints === []) {
             $entryPoints = ['web'];
         }
-        $addr = trim((string) ($fields['server_address'] ?? ''));
+        $addr = trim((string) $fields['server_address']);
         if ($addr === '') {
             throw new \InvalidArgumentException('Backend address is required.');
         }

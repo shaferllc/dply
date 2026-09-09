@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
+use App\Support\Servers\AptSourceRepairScript;
 
 /**
  * Inventory + custom-build management for Caddy modules.
@@ -22,13 +23,12 @@ class CaddyModulesManager
     /**
      * @return array{
      *     modules: list<array{id: string, namespace: string, kind: string}>,
-     *     plugins: list<array{path: string, version: string, label: string}>,
+     *     plugins: list<array{path: string, version: string, label: string, description: string, repo: string, docs_url: string, module_ids: list<string>, compiled: bool}>,
      *     caddy_version: ?string,
      *     custom_binary: bool,
      *     unreadable: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -76,10 +76,6 @@ class CaddyModulesManager
     /**
      * @return list<array{path: string, version: string, label: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string>>
-     */
     public function manifestPlugins(Server $server): array
     {
         $raw = data_get($server->meta, 'caddy_modules.plugins', []);
@@ -109,22 +105,21 @@ class CaddyModulesManager
     }
 
     /**
-     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed>  $installedModules
      * @return list<array<string, string>>
-     *     path: string,
-     *     version: string,
-     *     label: string,
-     *     description: string,
-     *     repo: string,
-     *     docs_url: string,
-     *     module_ids: list<string>,
-     *     compiled: bool,
-     * }>
+     *                                     path: string,
+     *                                     version: string,
+     *                                     label: string,
+     *                                     description: string,
+     *                                     repo: string,
+     *                                     docs_url: string,
+     *                                     module_ids: list<string>,
+     *                                     compiled: bool,
+     *                                     }>
      */
-    /** @return array<string, mixed> */
     /**
+     * @param  list<array<string, string>>  $installedModules
      * @return list<array<string, mixed>>
-     * @param  array<string, mixed> $installedModules
      */
     public function enrichedManifestPlugins(Server $server, array $installedModules = []): array
     {
@@ -167,9 +162,8 @@ class CaddyModulesManager
     }
 
     /**
-     * @param  array<string, mixed> $moduleIds
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $installedModuleIds
+     * @param  list  $moduleIds
+     * @param  list<string>  $installedModuleIds
      */
     public function isPluginCompiled(string $path, array $moduleIds, array $installedModuleIds): bool
     {
@@ -266,13 +260,13 @@ class CaddyModulesManager
 
         $pluginCount = count($plugins);
 
-        return <<<BASH
+        return AptSourceRepairScript::withTolerantApt(<<<BASH
 set -euo pipefail
 
 echo "[dply] Ensuring Go toolchain…"
 if ! command -v go >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -qq
+  dply_apt_update
   apt-get install -y golang-go
 fi
 export PATH="\${PATH}:\$(go env GOPATH 2>/dev/null)/bin:/root/go/bin"
@@ -321,7 +315,7 @@ fi
 caddy version
 echo "[dply] Sample of compiled modules:"
 caddy list-modules 2>/dev/null | head -30
-BASH;
+BASH);
     }
 
     /**
@@ -329,25 +323,21 @@ BASH;
      */
     public function restorePackageScript(): string
     {
-        return <<<'BASH'
+        return AptSourceRepairScript::withTolerantApt(<<<'BASH'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 echo "[dply] Reinstalling Caddy from apt…"
-apt-get update -qq
+dply_apt_update
 apt-get install --reinstall -y caddy
 echo "[dply] Restarting Caddy…"
 systemctl restart caddy || service caddy restart || true
 caddy version
 caddy list-modules 2>/dev/null | head -20
-BASH;
+BASH);
     }
 
     /**
      * @return list<array{id: string, namespace: string, kind: string}>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string>>
      */
     public function parseModuleIds(string $output): array
     {
@@ -379,15 +369,14 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $manifestPlugins
-     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed>  $manifestPlugins
+     * @param  array<string, mixed>  $installedModules
      * @return list<array<string, string>>
      */
-    /** @return array<string, mixed> */
     /**
+     * @param  list<array<string, string>>  $installedModules
+     * @param  list<array<string, bool|list<string>|string>>  $manifestPlugins
      * @return list<mixed>
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
      */
     public function satisfiedPluginPaths(array $manifestPlugins, array $installedModules): array
     {
@@ -411,11 +400,12 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $manifestPlugins
-     * @param  array<string, mixed> $installedModules
-     * @return list<mixed>
+     * @param  list<array<string, bool|list<string>|string>>  $manifestPlugins
+     * @param  list<array<string, string>>  $installedModules
+     *                                                         The catalog is keyed by module path (array_filter preserves keys), so
+     *                                                         this is a map, not a list.
+     * @return array<string, array{label: string, description: string}>
      */
-    /** @return array<string, mixed> */
     public function availableCatalog(array $manifestPlugins, array $installedModules): array
     {
         $satisfied = array_flip($this->satisfiedPluginPaths($manifestPlugins, $installedModules));
@@ -429,8 +419,8 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $manifestPlugins
-     * @param  array<string, mixed> $installedModules
+     * @param  array<string, mixed>  $manifestPlugins
+     * @param  array<string, mixed>  $installedModules
      * @return list<array{
      *     path: string,
      *     repo: string,
@@ -439,11 +429,10 @@ BASH;
      *     module_ids: list<string>,
      * }>
      */
-    /** @return array<string, mixed> */
     /**
+     * @param  list<array<string, string>>  $installedModules
+     * @param  list<array<string, bool|list<string>|string>>  $manifestPlugins
      * @return list<mixed>
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
      */
     public function browsePackages(array $manifestPlugins, array $installedModules, string $search = ''): array
     {
@@ -477,18 +466,14 @@ BASH;
     }
 
     /**
-     * @return list<mixed>
      *     path: string,
      *     repo: string,
      *     label: string,
      *     description: string,
      *     module_ids: list<string>,
      *     docs_url: string,
-     * @param  array<string, mixed> $installedModules
-     * @param  array<string, mixed> $manifestPlugins
      * }
      */
-    /** @return array<string, mixed> */
     public function packageInfoForInstall(string $path): array
     {
         $path = trim($path);
@@ -539,7 +524,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $plugins
+     * @param  list<array<string, string>>  $plugins
      */
     private function persistManifest(Server $server, array $plugins, ?bool $customBinary = null): Server
     {
@@ -571,7 +556,7 @@ BASH;
             return $parts[0].'.'.$parts[1];
         }
 
-        return $parts[0] ?? 'other';
+        return $parts[0];
     }
 
     private function kindFor(string $id): string

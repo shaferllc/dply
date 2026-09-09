@@ -639,15 +639,15 @@ trait ManagesNginxWebserver
             $result = app(NginxCustomHostsConfig::class)->read($this->server);
             $form = [];
             foreach ($result['hosts'] as $host) {
-                $slug = (string) ($host['slug'] ?? '');
+                $slug = (string) $host['slug'];
                 if ($slug === '') {
                     continue;
                 }
                 $form[$slug] = [
-                    'server_names' => implode("\n", $host['server_names'] ?? []),
-                    'listen' => implode("\n", $host['listen'] ?? ['80', '[::]:80']),
-                    'root' => (string) ($host['root'] ?? ''),
-                    'upstream' => (string) ($host['upstream'] ?? ''),
+                    'server_names' => implode("\n", $host['server_names']),
+                    'listen' => implode("\n", $host['listen']),
+                    'root' => (string) $host['root'],
+                    'upstream' => (string) $host['upstream'],
                 ];
             }
             $this->nginx_custom_hosts_form = $form;
@@ -709,7 +709,7 @@ trait ManagesNginxWebserver
         $this->nginx_custom_hosts_error = null;
 
         $fields = $this->nginxCustomHostFieldsFromForm($this->nginx_custom_hosts_new);
-        $slug = (string) ($this->nginx_custom_hosts_new['slug'] ?? '');
+        $slug = (string) $this->nginx_custom_hosts_new['slug'];
 
         $consoleId = $this->seedManageConsoleAction(
             $this->server->fresh(),

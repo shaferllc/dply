@@ -71,10 +71,10 @@ final class PythonRuntimeDetector implements RuntimeDetector
         $buildCommand = $this->detectBuildCommand($hasPyproject, $usesPoetry, $hasRequirements, $hasPipfile, $hasSetupPy, $reasons);
         $djangoProject = $framework === 'django' ? $this->detectDjangoProject($root, $detectedFiles, $reasons) : null;
         $startCommand = $this->detectStartCommand($framework, $root, $djangoProject, $reasons);
-        $appPort = $framework !== null ? 8000 : null;
+        $appPort = 8000;
         $processes = $this->detectProcesses($framework, $deps, $djangoProject, $reasons);
 
-        $confidence = $framework !== null && $framework !== 'python' ? 'high' : 'medium';
+        $confidence = $framework !== 'python' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'python',
@@ -91,8 +91,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectVersion(
         string $root,
@@ -208,11 +208,11 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string> $deps
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
-    private function detectFramework(array $deps, bool $hasManagePy, array &$detectedFiles, array &$reasons): ?string
+    private function detectFramework(array $deps, bool $hasManagePy, array &$detectedFiles, array &$reasons): string
     {
         if (in_array('django', $deps, true)) {
             $reasons[] = 'Detected django from declared dependencies.';
@@ -243,7 +243,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectBuildCommand(
         bool $hasPyproject,
@@ -287,8 +287,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectDjangoProject(string $root, array &$detectedFiles, array &$reasons): ?string
     {
@@ -311,7 +311,7 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectStartCommand(?string $framework, string $root, ?string $djangoProject, array &$reasons): ?string
     {
@@ -348,8 +348,8 @@ final class PythonRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $deps
-     * @param  array<string, mixed> $reasons
+     * @param  list<string> $deps
+     * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(?string $framework, array $deps, ?string $djangoProject, array &$reasons): array

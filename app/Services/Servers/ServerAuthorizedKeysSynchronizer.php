@@ -134,10 +134,9 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  array<string, mixed> $targets
+     * @param  list<string>  $targets
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function buildSyncPayload(Server $server, array $targets): array
     {
         $fingerprints = [];
@@ -163,12 +162,7 @@ class ServerAuthorizedKeysSynchronizer
      * file), plus the SSH login user (so an empty panel clears the deploy account).
      *
      * @param  Collection<string, Collection<int, ServerAuthorizedKey>>  $groups
-     * @param  array<string, mixed> $targets
      * @return list<string>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<mixed>
      */
     protected function resolveSyncTargets(Server $server, Collection $groups): array
     {
@@ -191,7 +185,7 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * @param  array<string, mixed> $targets
+     * @param  list<string>  $targets
      */
     protected function persistSyncedTargets(Server $server, array $targets): void
     {
@@ -265,18 +259,20 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     protected function desiredAuthorizedKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
     {
         $lines = [];
         foreach ($rows as $row) {
             $key = trim((string) $row->public_key);
-            if ($key !== '') {
-                $lines[] = $key;
+            if ($key === '') {
+                continue;
             }
+
+            // Options (permitopen, no-pty, …) are stored apart from the key so
+            // the key itself stays fingerprintable; they are only re-joined here,
+            // at the point the authorized_keys line is written.
+            $options = trim((string) ($row->key_options ?? ''));
+            $lines[] = $options !== '' ? $options.' '.$key : $key;
         }
 
         if ($targetUser === $connectionUser) {
@@ -310,10 +306,6 @@ class ServerAuthorizedKeysSynchronizer
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     protected function reconciledKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
     {
         $desired = $this->desiredAuthorizedKeyLines($server, $connectionUser, $targetUser, $rows);
@@ -326,7 +318,7 @@ class ServerAuthorizedKeysSynchronizer
         }
 
         // Record what dply manages for this target (flushed to meta after the write succeeds).
-        $this->managedFingerprintsByTarget[$targetUser] = array_values(array_keys($desiredFps));
+        $this->managedFingerprintsByTarget[$targetUser] = array_keys($desiredFps);
 
         // Read what's currently on the box. If we genuinely can't read it (e.g. sudo -n denied for a
         // non-login user), fall back to the desired set rather than crash — same situation in which
@@ -378,7 +370,6 @@ class ServerAuthorizedKeysSynchronizer
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     protected function hiddenManagedTargets(Server $server): array
     {
         return trim((string) $server->openSshPublicKeyFromRecoveryPrivate()) !== ''

@@ -10,5 +10,5 @@
             <span class="mt-0.5 block text-xs font-normal leading-snug text-brand-mist/70">{{ $description }}</span>
         @endif
     </span>
-    <span class="shrink-0 self-start rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Soon') }}</span>
+    <span class="shrink-0 self-start rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Soon') }}</span>
 </div>

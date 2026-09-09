@@ -1,26 +1,124 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Backups;
 
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
+use App\Livewire\Backups\Concerns\EditsBackupSchedules;
+use App\Livewire\Backups\Concerns\RunsBackupSchedules;
+use App\Livewire\Backups\Concerns\SummarisesBackupRuns;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Models\BackupConfiguration;
+use App\Models\BackupSchedule;
+use App\Models\Organization;
 use App\Models\Site;
+use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Modules\Backups\Models\SiteFileBackup;
+use App\Modules\Backups\Services\SiteFileBackupExporter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Number;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
+/**
+ * The Files tab: every site dply can archive, the schedules protecting them,
+ * their run history, and a one-click archive to the browser.
+ *
+ * Owns its type end-to-end alongside Databases and Snapshots
+ * (docs/adr/backups-as-a-product.md, decision 1) — which is why the schedules
+ * live on this page rather than only in each server's workspace.
+ */
 #[Layout('layouts.app')]
 class Files extends Component
 {
     use DispatchesToastNotifications;
+    use EditsBackupSchedules;
     use QueuesQuickDownloads;
+    use RunsBackupSchedules;
     use StagesBackupDownloads;
+    use SummarisesBackupRuns;
+    use WithPagination;
+
+    /** Free-text over site, server and error text. */
+    #[Url(as: 'q', except: '')]
+    public string $runSearch = '';
+
+    /** '' = every status. */
+    #[Url(as: 'status', except: '')]
+    public string $runStatus = '';
+
+    public function updatedRunSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedRunStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearRunFilters(): void
+    {
+        $this->runSearch = '';
+        $this->runStatus = '';
+        $this->resetPage();
+    }
+
+    public function hasRunFilters(): bool
+    {
+        return $this->runSearch !== '' || $this->runStatus !== '';
+    }
+
+    /**
+     * Remove one archive and its stored file.
+     *
+     * There is no restore counterpart: unpacking a tar over a live document root
+     * is a different and far riskier operation than importing a SQL dump, and
+     * inventing one here would be a promise the engine cannot keep.
+     */
+    public function deleteArchive(string $backupId, SiteFileBackupExporter $exporter): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if (! $org instanceof Organization) {
+            return;
+        }
+
+        $serverIds = $org->servers()->pluck('id');
+        $backup = SiteFileBackup::query()
+            ->whereKey($backupId)
+            ->whereHas('site', fn ($q) => $q->whereIn('server_id', $serverIds))
+            ->with('site')
+            ->first();
+
+        if (! $backup instanceof SiteFileBackup) {
+            $this->toastError(__('That archive is no longer available.'));
+
+            return;
+        }
+
+        $this->authorize('update', $backup->site);
+
+        try {
+            $exporter->deleteArtifact($backup);
+        } catch (\Throwable $e) {
+            // The row still goes — a stuck artifact must not leave an
+            // undeletable entry in the history forever.
+            $backup->delete();
+            $this->toastError(__('Removed the record, but the stored file could not be deleted: :error', ['error' => $e->getMessage()]));
+
+            return;
+        }
+
+        $backup->delete();
+        $this->toastSuccess(__('Archive deleted.'));
+    }
 
     public function queueFullBackup(string $siteId): void
     {
@@ -89,14 +187,17 @@ class Files extends Component
     public function render(): View
     {
         $org = auth()->user()->currentOrganization();
-        if (! $org) {
+        if (! $org instanceof Organization) {
             abort(403, 'Select an organization first.');
+        }
+
+        if (! Feature::for($org)->active('workspace.backups')) {
+            return view('livewire.backups.files', ['featureActive' => false]);
         }
 
         $this->authorize('viewAny', Site::class);
 
         $serverIds = $org->servers()->pluck('id');
-        $user = auth()->user();
 
         /** @var Collection<int, Site> $sites */
         $sites = Site::query()
@@ -107,26 +208,199 @@ class Files extends Component
 
         $siteIds = $sites->pluck('id');
 
+        $schedules = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_SITE_FILES)
+            ->whereIn('server_id', $serverIds)
+            ->with(['server', 'backupConfiguration'])
+            ->orderByDesc('is_active')
+            ->orderByDesc('last_run_at')
+            ->get();
+
+        // The view renders one row per site with its schedule folded in, so
+        // schedules that no longer point at a live site have to be surfaced
+        // separately or they would silently vanish from the tab.
+        $schedulesByTarget = $schedules->groupBy('target_id');
+        $orphanSchedules = $schedules
+            ->reject(fn (BackupSchedule $schedule) => $siteIds->contains($schedule->target_id))
+            ->values();
+        $scheduledSiteIds = $schedules->where('is_active', true)->pluck('target_id')->unique();
+
         /** @var \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, SiteFileBackup>> $recentBackups */
         $recentBackups = SiteFileBackup::query()
             ->whereIn('site_id', $siteIds)
             ->orderByDesc('created_at')
             ->limit(200)
             ->get()
-            ->groupBy(fn (SiteFileBackup $b) => (string) $b->site_id)
+            ->groupBy(fn (SiteFileBackup $backup) => (string) $backup->site_id)
             ->map(fn ($group) => $group->take(5));
 
-        $storageDestinations = $org
-            ? $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider'])
-            : collect();
+        $runs = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->with('site.server')
+            ->when($this->runStatus !== '', fn ($q) => $q->where('status', $this->runStatus))
+            ->when($this->runSearch !== '', function ($q) {
+                $term = '%'.str_replace('%', '\\%', trim($this->runSearch)).'%';
+
+                $q->where(function ($inner) use ($term) {
+                    $inner->whereHas('site', fn ($s) => $s->where('name', 'like', $term))
+                        ->orWhereHas('site.server', fn ($sv) => $sv->where('name', 'like', $term))
+                        ->orWhere('error_message', 'like', $term);
+                });
+            })
+            ->orderByDesc('created_at')
+            ->paginate(20, ['*'], 'runs');
+
+        // Newest run per site, so a row can show that its last attempt failed —
+        // inferred from history rather than probed, per the no-SSH-in-render rule.
+        $lastRuns = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->orderByDesc('created_at')
+            ->limit(300)
+            ->get(['site_id', 'status', 'error_message', 'created_at'])
+            ->unique('site_id')
+            ->keyBy('site_id');
+
+        $storageBytes = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->sum('bytes');
+
+        // Coverage is measured against sites that CAN be archived. An Edge or
+        // serverless site has no filesystem to tar, so counting it as
+        // unprotected would manufacture a gap nobody can close — the same
+        // capability-aware rule the Overview's gaps band follows.
+        $archivable = $sites->filter->supportsSshFileArchive();
+        $protected = $archivable->filter(fn (Site $site) => $scheduledSiteIds->contains($site->id));
+
+        $archivedSiteIds = SiteFileBackup::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->distinct()
+            ->pluck('site_id');
 
         return view('livewire.backups.files', [
+            'featureActive' => true,
             'organization' => $org,
-            'sites' => $sites,
+            // Archivable sites first: the rows with nothing actionable on them
+            // should not sit between the ones an operator came here to act on.
+            // sortBy is stable, so alphabetical order survives within each group.
+            'sites' => $sites->sortByDesc(fn (Site $site) => $site->supportsSshFileArchive())->values(),
+            'schedules' => $schedules,
+            'schedulesByTarget' => $schedulesByTarget,
+            'orphanSchedules' => $orphanSchedules,
+            'scheduledSiteIds' => $scheduledSiteIds,
+            'nextRuns' => $this->nextRuns($schedules),
+            'trends' => $this->recentSizes(
+                SiteFileBackup::query()->whereIn('site_id', $siteIds),
+                'site_id',
+            ),
+            'activity' => $this->dailyActivity(
+                SiteFileBackup::query()->whereIn('site_id', $siteIds),
+            ),
             'recentBackups' => $recentBackups,
-            'storageDestinations' => $storageDestinations,
+            'runs' => $runs,
+            'lastRuns' => $lastRuns,
+            'coverageChecks' => $this->coverage($sites, $schedulesByTarget, $lastRuns),
+            'metrics' => [
+                'sites' => $sites->count(),
+                'archivable' => $archivable->count(),
+                'unarchivable' => $sites->count() - $archivable->count(),
+                'protected' => $protected->count(),
+                'archivedSites' => $archivedSiteIds->count(),
+                'storage' => Number::fileSize((int) $storageBytes),
+                'coverage' => $archivable->count() > 0
+                    ? (int) round($protected->count() / $archivable->count() * 100)
+                    : 0,
+            ],
+            'storageDestinations' => $org->backupConfigurations()->orderBy('name')->get(['id', 'name', 'provider']),
             'providerLabels' => collect(BackupConfiguration::providers())
                 ->mapWithKeys(fn (string $provider) => [$provider => BackupConfiguration::labelForProvider($provider)]),
         ]);
+    }
+
+    /**
+     * Coverage as a grid: one row per site, one cell per property an archive
+     * needs before it counts as protection.
+     *
+     * Mirrors the Databases grid deliberately — the two tabs answer the same
+     * question about different artifacts, so they should not need to be read
+     * differently. An archive that never left the server it came from is the
+     * case this makes visible: it shows up in the run feed as a completed
+     * backup and dies with the machine.
+     *
+     * @param  Collection<int, Site>  $sites
+     * @param  Collection<string, Collection<int, BackupSchedule>>  $schedulesByTarget
+     * @param  Collection<string, SiteFileBackup>  $lastRuns
+     * @return list<array{key: string, title: string, subtitle: string, url: ?string, applicable: int, covered: int, cells: array<string, array{state: string, label: string, note: ?string}>}>
+     */
+    private function coverage($sites, $schedulesByTarget, $lastRuns): array
+    {
+        $lastCompleted = SiteFileBackup::query()
+            ->whereIn('site_id', $sites->pluck('id'))
+            ->where('status', SiteFileBackup::STATUS_COMPLETED)
+            ->orderByDesc('created_at')
+            ->get()
+            ->unique('site_id')
+            ->keyBy('site_id');
+
+        $rows = [];
+
+        foreach ($sites as $site) {
+            $schedules = $schedulesByTarget->get($site->id) ?? collect();
+            $active = $schedules->firstWhere('is_active', true);
+            $completed = $lastCompleted->get($site->id);
+            $lastRun = $lastRuns->get($site->id);
+            // Edge and serverless sites have no filesystem to tar — nothing to
+            // schedule, so nothing to count as missing.
+            $canArchive = $site->supportsSshFileArchive();
+
+            $cells = [
+                'schedule' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => __('no filesystem to archive')],
+                    $active !== null => ['state' => 'scheduled', 'label' => $active->cronDescription() ?: $active->cron_expression, 'note' => null],
+                    $schedules->isNotEmpty() => ['state' => 'manual', 'label' => __('paused'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('none'), 'note' => null],
+                },
+                'archive' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $lastRun?->status === SiteFileBackup::STATUS_FAILED => ['state' => 'failed', 'label' => __('failed :when', ['when' => $lastRun->created_at->diffForHumans(short: true)]), 'note' => $lastRun->error_message],
+                    $completed !== null => ['state' => 'scheduled', 'label' => $completed->created_at->diffForHumans(short: true), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('never'), 'note' => null],
+                },
+                'offsite' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $completed === null => ['state' => 'missing', 'label' => __('nothing stored'), 'note' => null],
+                    $completed->effectiveStorageKind() === SiteFileBackup::STORAGE_KIND_REMOTE_SERVER => ['state' => 'missing', 'label' => __('on the server'), 'note' => __('This copy dies with the machine it came from.')],
+                    default => ['state' => 'scheduled', 'label' => __('shipped off-box'), 'note' => null],
+                },
+                'retrievable' => match (true) {
+                    ! $canArchive => ['state' => 'na', 'label' => __('n/a'), 'note' => null],
+                    $completed === null => ['state' => 'missing', 'label' => __('nothing to pull'), 'note' => null],
+                    $completed->isDownloadable() => ['state' => 'scheduled', 'label' => __('downloadable'), 'note' => null],
+                    default => ['state' => 'missing', 'label' => __('no path recorded'), 'note' => __('The archive row has no remote, disk or destination path.')],
+                },
+            ];
+
+            $applicable = collect($cells)->reject(fn (array $cell) => $cell['state'] === 'na');
+
+            $rows[] = [
+                'key' => $site->id,
+                'title' => $site->name,
+                'subtitle' => $site->server?->name ?? '—',
+                'url' => $site->server ? route('servers.backups', $site->server) : null,
+                'applicable' => $applicable->count(),
+                'covered' => $applicable->where('state', 'scheduled')->count(),
+                'cells' => $cells,
+            ];
+        }
+
+        // Least-covered first; rows with nothing applicable sink to the bottom.
+        usort($rows, fn (array $a, array $b) => [
+            $a['applicable'] === 0 ? 1 : 0, $a['covered'], -$a['applicable'],
+        ] <=> [
+            $b['applicable'] === 0 ? 1 : 0, $b['covered'], -$b['applicable'],
+        ]);
+
+        return $rows;
     }
 }

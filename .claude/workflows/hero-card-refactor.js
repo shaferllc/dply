@@ -35,8 +35,6 @@ const CANDIDATES = [
   'resources/views/livewire/profile/referrals.blade.php',
   'resources/views/livewire/projects/index.blade.php',
   'resources/views/livewire/scripts/edit.blade.php',
-  'resources/views/livewire/serverless/create.blade.php',
-  'resources/views/livewire/serverless/journey.blade.php',
   'resources/views/livewire/servers/create-managed.blade.php',
   'resources/views/livewire/servers/create/step-review.blade.php',
   'resources/views/livewire/servers/create/step-type.blade.php',

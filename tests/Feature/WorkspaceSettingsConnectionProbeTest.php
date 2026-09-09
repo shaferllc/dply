@@ -3,7 +3,7 @@
 namespace Tests\Feature\WorkspaceSettingsConnectionProbeTest;
 
 use App\Jobs\ProbeServerOperationalSshJob;
-use App\Livewire\Servers\WorkspaceSettings;
+use App\Livewire\Servers\SettingsCard;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -36,7 +36,7 @@ test('saving connection settings dispatches the operational ssh probe and arms p
     [$user, $server] = ownerWithServer();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->call('saveServerSettingsInfo')
         ->assertSet('operationalSshProbing', true)
         ->assertDispatched('notify', type: 'success');
@@ -52,7 +52,7 @@ test('the test connection button dispatches the probe without saving', function 
     [$user, $server] = ownerWithServer();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->call('testSshConnection')
         ->assertSet('operationalSshProbing', true)
         ->assertDispatched('notify', type: 'success');
@@ -64,7 +64,7 @@ test('reload stops polling once the probe records a fresh result', function (): 
     [$user, $server] = ownerWithServer();
 
     $component = Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->set('operationalSshProbing', true)
         ->set('operationalSshProbeStartedAt', now()->subSeconds(5)->getTimestamp());
 
@@ -82,7 +82,7 @@ test('reload keeps polling while the probe is still in flight', function (): voi
     [$user, $server] = ownerWithServer();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->set('operationalSshProbing', true)
         ->set('operationalSshProbeStartedAt', now()->subSeconds(5)->getTimestamp())
         ->call('reloadOperationalSshStatus')
@@ -99,7 +99,7 @@ test('a stale prior probe result does not end the new probe', function (): void 
     ])]);
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->set('operationalSshProbing', true)
         ->set('operationalSshProbeStartedAt', now()->subSeconds(5)->getTimestamp())
         ->call('reloadOperationalSshStatus')
@@ -110,7 +110,7 @@ test('reload times out after 45s and surfaces an error', function (): void {
     [$user, $server] = ownerWithServer();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->set('operationalSshProbing', true)
         ->set('operationalSshProbeStartedAt', now()->subSeconds(60)->getTimestamp())
         ->call('reloadOperationalSshStatus')

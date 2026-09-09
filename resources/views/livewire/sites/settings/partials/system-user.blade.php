@@ -107,6 +107,8 @@
     </div>
 
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
-        <x-cli-snippet :command="'dply sites:system-user '.$site->slug" />
+        <x-cli-snippet :commands="[
+            ['command' => 'dply sites:system-user '.$site->slug],
+        ]" />
     </div>
 </div>

@@ -123,7 +123,7 @@ BASH;
             } catch (\Throwable) {
                 continue;
             }
-            $daysToEol = (int) floor(now()->diffInRealSeconds($eolDate, false) / 86400);
+            $daysToEol = (int) floor(now()->diffInSeconds($eolDate, false) / 86400);
             $rowWithEol = $row + ['eol_date' => $eolStr, 'days_to_eol' => $daysToEol];
             if ($daysToEol < 0) {
                 $critical[] = $rowWithEol;

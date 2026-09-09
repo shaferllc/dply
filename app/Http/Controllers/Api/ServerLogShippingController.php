@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Servers\ManageServerLogShipping;
 use App\Exceptions\LogShippingException;
+use App\Http\Controllers\Api\Concerns\AuthorizesHostExecution;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\Server;
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
  */
 class ServerLogShippingController extends Controller
 {
+    use AuthorizesHostExecution;
+
     public function show(Request $request, Server $server, ManageServerLogShipping $action): JsonResponse
     {
         $this->assertServerOrg($server, $this->organization($request));
@@ -29,7 +32,9 @@ class ServerLogShippingController extends Controller
 
     public function enable(Request $request, Server $server, ManageServerLogShipping $action): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         $validated = $request->validate([
             'sources' => ['sometimes', 'array'],
@@ -41,14 +46,18 @@ class ServerLogShippingController extends Controller
 
     public function resync(Request $request, Server $server, ManageServerLogShipping $action): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         return $this->run(fn () => $action->resync($server), $server, $action);
     }
 
     public function disable(Request $request, Server $server, ManageServerLogShipping $action): JsonResponse
     {
-        $this->assertServerOrg($server, $this->organization($request));
+        // Ability + org membership are not enough: this changes what runs on
+        // the host, so the caller must also be authorized for this server.
+        $this->authorizeServerExecution($request, $server);
 
         $action->disable($server);
 

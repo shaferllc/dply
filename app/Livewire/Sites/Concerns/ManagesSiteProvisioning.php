@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Modules\Edge\Actions\RedeployEdgeSite;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RestartSiteProvisioningJob;
-use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Modules\Certificates\Services\CertificateRepairService;
 use App\Modules\Deploy\Services\SiteRuntimeActionExecutor;
-use App\Modules\Edge\Services\EdgeSiteCanceller;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
 use Livewire\Attributes\On;
@@ -51,7 +48,6 @@ trait ManagesSiteProvisioning
     public function shouldAutoReapplyManagedWebserverConfig(): bool
     {
         return $this->server->hostCapabilities()->supportsWebserverProvisioning()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime();
     }
@@ -83,7 +79,11 @@ trait ManagesSiteProvisioning
         $org = $this->site->server?->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.ssl.issuance_queued', $this->site, null, [
-                'primary_hostname' => optional($this->site->primaryDomain)->hostname,
+                // primaryDomain() is a plain method returning ?SiteDomain, not a
+                // relation — property access routes through Eloquent's relation
+                // resolution and throws LogicException. Every other call site
+                // (53 of them) invokes it as a method.
+                'primary_hostname' => $this->site->primaryDomain()?->hostname,
             ]);
         }
 
@@ -98,21 +98,6 @@ trait ManagesSiteProvisioning
 
         if ($this->site->isReadyForWorkspace()) {
             $this->toastSuccess(__('This site is already configured.'));
-
-            return;
-        }
-
-        if ($this->site->usesEdgeRuntime()) {
-            try {
-                (new RedeployEdgeSite)->handle($this->site->fresh());
-            } catch (\Throwable $e) {
-                $this->toastError($e->getMessage());
-
-                return;
-            }
-
-            $this->site->refresh();
-            $this->toastSuccess(__('Edge build queued again.'));
 
             return;
         }
@@ -210,7 +195,7 @@ trait ManagesSiteProvisioning
         );
     }
 
-    public function cancelProvisioning(SiteProvisioningCanceller $canceller, EdgeSiteCanceller $edgeCanceller): void
+    public function cancelProvisioning(SiteProvisioningCanceller $canceller): void
     {
         $this->authorize('update', $this->site);
 
@@ -223,29 +208,6 @@ trait ManagesSiteProvisioning
         }
 
         try {
-            if ($this->site->usesEdgeRuntime()) {
-                // Prefer EdgeSettings + ManagesEdgeSiteProvisioning; this path
-                // is a fallback. Mark cancelled + async teardown so the build
-                // job cannot resurrect BUILDING while Cloudflare cleanup runs.
-                $deployment = EdgeDeployment::query()
-                    ->where('site_id', $this->site->id)
-                    ->whereIn('status', [
-                        EdgeDeployment::STATUS_BUILDING,
-                        EdgeDeployment::STATUS_PUBLISHING,
-                    ])
-                    ->orderByDesc('created_at')
-                    ->first();
-                $deployment?->markCancelledByOperator(__('Cancelled by user.'));
-                $this->site->update(['status' => Site::STATUS_EDGE_FAILED]);
-
-                // Hard redirect — SPA navigate flashes 404 on the deleted site URL.
-                $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
-                $this->skipRender();
-                $this->redirect(route('edge.index'), navigate: false);
-
-                return;
-            }
-
             $canceller->cancel($this->site->fresh(['server', 'domains']));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());

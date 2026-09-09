@@ -6,37 +6,30 @@
         $healthRemediations = is_array($healthRemediations) ? $healthRemediations : [];
     @endphp
     @if ($healthRemediations !== [] && method_exists($this, 'runRemediation'))
-        <div class="{{ $card }}">
-            <div class="flex items-start gap-3 bg-amber-50 px-5 py-4">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-100 text-amber-700 ring-amber-200">
-                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('Suggested fixes') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-amber-950">
-                        {{ trans_choice('{1} :count one-click fix from the last site test|[2,*] :count one-click fixes from the last site test', count($healthRemediations), ['count' => count($healthRemediations)]) }}
-                    </h3>
-                    <ul class="mt-2 space-y-2">
-                        @foreach ($healthRemediations as $rem)
-                            <li class="flex flex-wrap items-center justify-between gap-2">
-                                <span class="flex min-w-0 items-start gap-2 text-sm text-amber-900">
-                                    <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"></span>
-                                    <span>{{ $rem['reason'] ?? '' }}</span>
-                                </span>
-                                <button
-                                    type="button"
-                                    wire:click="runRemediation(@js($rem['key']))"
-                                    wire:loading.attr="disabled"
-                                    wire:target="runRemediation"
-                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-60"
-                                >
-                                    <x-heroicon-o-play class="h-4 w-4" />
-                                    {{ $rem['label'] ?? __('Run fix') }}
-                                </button>
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            </div>
+        <div class="{{ $card }} overflow-hidden">
+            <x-workspace-panel-head
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-wrench-screwdriver"
+                :title="__('Suggested fixes')"
+                :note="trans_choice('{1} :count one-click fix dply detected from the last site test.|[2,*] :count one-click fixes dply detected from the last site test.', count($healthRemediations), ['count' => count($healthRemediations)])"
+                tone="amber"
+            />
+            <ul class="mx-5 mb-4 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white sm:mx-6">
+                @foreach ($healthRemediations as $rem)
+                    <li class="flex items-start gap-3 border-l-2 border-l-amber-500 px-4 py-3 transition-colors hover:bg-brand-sand/15">
+                        <p class="min-w-0 flex-1 text-xs leading-5 text-brand-ink">{{ $rem['reason'] ?? '' }}</p>
+                        <button
+                            type="button"
+                            wire:click="runRemediation(@js($rem['key']))"
+                            wire:loading.attr="disabled"
+                            wire:target="runRemediation"
+                            class="dply-btn dply-btn-xs bg-amber-600 text-white hover:bg-amber-700"
+                        >
+                            <x-heroicon-o-play class="h-3 w-3" />
+                            {{ $rem['label'] ?? __('Run fix') }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
         </div>
     @endif

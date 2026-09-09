@@ -5,12 +5,14 @@ namespace Tests\Feature\UniversalNotificationsTest;
 use App\Models\NotificationChannel;
 use App\Models\NotificationEvent;
 use App\Models\NotificationSubscription;
-use App\Models\NotificationWebhookDestination;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Modules\Notifications\Services\NotificationRoutingResolver;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Notifications\CronJobAlertNotification;
 use App\Notifications\OrganizationInvitationNotification;
 use App\Notifications\ServerRemovalExecutedNotification;
@@ -19,8 +21,6 @@ use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Notifications\SshKeyRotationDueNotification;
 use App\Notifications\SupervisorProgramsUnhealthyNotification;
 use App\Notifications\UniversalEventNotification;
-use App\Modules\Notifications\Services\NotificationPublisher;
-use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Broadcast;
@@ -192,123 +192,6 @@ test('user broadcast channel authorizes ulid user ids', function () {
     $this->assertNotFalse($result);
 });
 
-test('publisher routes deploy events to org webhook destinations', function () {
-    Http::fake([
-        '*' => Http::response('ok', 200),
-    ]);
-
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    $site = Site::factory()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-    ]);
-
-    NotificationWebhookDestination::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'name' => 'Deploy hook',
-        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-        'webhook_url' => 'https://example.test/deploy-hook',
-        'events' => ['deploy_failed'],
-        'enabled' => true,
-    ]);
-
-    app(NotificationPublisher::class)->publish(
-        eventKey: 'site.deployments',
-        subject: $site,
-        title: 'Deploy failed',
-        body: 'Production deploy failed.',
-        url: route('sites.show', [$site->server, $site], absolute: true),
-        metadata: [
-            'site_id' => $site->id,
-            'status' => 'failed',
-        ],
-        recipientUsers: [$user],
-    );
-
-    Http::assertSent(fn ($request) => $request->url() === 'https://example.test/deploy-hook');
-});
-
-test('publisher routes deployment started to integration webhook', function () {
-    Http::fake([
-        '*' => Http::response('ok', 200),
-    ]);
-
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    $site = Site::factory()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-    ]);
-
-    NotificationWebhookDestination::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'name' => 'Start hook',
-        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-        'webhook_url' => 'https://example.test/start-hook',
-        'events' => ['deploy_started'],
-        'enabled' => true,
-    ]);
-
-    app(NotificationPublisher::class)->publish(
-        eventKey: 'site.deployment_started',
-        subject: $site,
-        title: 'Deploy started',
-        body: 'Manual deploy',
-        url: route('sites.show', [$site->server, $site], absolute: true),
-        metadata: [
-            'site_id' => $site->id,
-            'trigger' => 'manual',
-        ],
-        recipientUsers: [$user],
-    );
-
-    Http::assertSent(fn ($request) => $request->url() === 'https://example.test/start-hook');
-});
-
-test('publisher routes uptime events to integration webhook', function () {
-    Http::fake([
-        '*' => Http::response('ok', 200),
-    ]);
-
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    $site = Site::factory()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-    ]);
-
-    NotificationWebhookDestination::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'name' => 'Uptime hook',
-        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-        'webhook_url' => 'https://example.test/uptime-hook',
-        'events' => ['uptime_down', 'uptime_recovered'],
-        'enabled' => true,
-    ]);
-
-    app(NotificationPublisher::class)->publish(
-        eventKey: 'site.uptime.down',
-        subject: $site,
-        title: 'Monitor down',
-        body: 'URL: https://example.com',
-        url: route('sites.monitor', [$site->server, $site], absolute: true),
-        metadata: [
-            'site_id' => $site->id,
-            'state' => 'down',
-        ],
-        recipientUsers: [$user],
-    );
-
-    Http::assertSent(fn ($request) => $request->url() === 'https://example.test/uptime-hook');
-});
-
 test('deploy email notification renders from universal event metadata', function () {
     $user = User::factory()->create();
 
@@ -466,4 +349,108 @@ test('server removal mail wrappers render from event metadata', function () {
     ]);
     $executedMail = (new ServerRemovalExecutedNotification($executedEvent))->toMail($user);
     expect($executedMail->introLines)->toContain('The server was deleted after the scheduled window elapsed.');
+});
+
+test('an org-wide subscription routes events for every resource in the org', function () {
+    // This is the capability that replaced NotificationWebhookDestination's
+    // "All sites in this org" scope. Before it, a subscription could only name
+    // one server or site, which is the whole reason the parallel webhook system
+    // existed. The subscription below names the ORGANIZATION and must still fire
+    // for an event whose resource is a server.
+    Http::fake(['hooks.slack.com/*' => Http::response('ok', 200)]);
+
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $server = Server::factory()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'name' => 'web-1',
+    ]);
+
+    $channel = NotificationChannel::factory()->forUser($owner)->create([
+        'type' => NotificationChannel::TYPE_SLACK,
+        'label' => 'Ops',
+        'config' => ['webhook_url' => 'https://hooks.slack.com/services/T/B/X'],
+    ]);
+
+    NotificationSubscription::query()->create([
+        'notification_channel_id' => $channel->id,
+        'subscribable_type' => Organization::class,
+        'subscribable_id' => $org->id,
+        'event_key' => 'server.insights_alerts',
+    ]);
+
+    $event = NotificationEvent::query()->create([
+        'event_key' => 'server.insights_alerts',
+        'resource_type' => Server::class,
+        'resource_id' => $server->id,
+        'organization_id' => $org->id,
+        'title' => 'Disk almost full',
+        'body' => 'web-1 is at 92%.',
+        'severity' => 'warning',
+        'category' => 'server',
+        'supports_in_app' => false,
+        'supports_email' => false,
+        'supports_webhook' => true,
+        'occurred_at' => now(),
+    ]);
+
+    app(NotificationRoutingResolver::class)->route($event);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'hooks.slack.com'));
+});
+
+test('a channel subscribed both per-resource and org-wide is only messaged once', function () {
+    // The two subscription shapes are OR-ed in one query, so without the
+    // unique() on channel id an operator who ticked both would get doubles.
+    Http::fake(['hooks.slack.com/*' => Http::response('ok', 200)]);
+
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+    $server = Server::factory()->create(['user_id' => $owner->id, 'organization_id' => $org->id]);
+
+    $channel = NotificationChannel::factory()->forUser($owner)->create([
+        'type' => NotificationChannel::TYPE_SLACK,
+        'label' => 'Ops',
+        'config' => ['webhook_url' => 'https://hooks.slack.com/services/T/B/X'],
+    ]);
+
+    foreach ([[Organization::class, $org->id], [Server::class, $server->id]] as [$type, $id]) {
+        NotificationSubscription::query()->create([
+            'notification_channel_id' => $channel->id,
+            'subscribable_type' => $type,
+            'subscribable_id' => $id,
+            'event_key' => 'server.insights_alerts',
+        ]);
+    }
+
+    $event = NotificationEvent::query()->create([
+        'event_key' => 'server.insights_alerts',
+        'resource_type' => Server::class,
+        'resource_id' => $server->id,
+        'organization_id' => $org->id,
+        'title' => 'Disk almost full',
+        'severity' => 'warning',
+        'category' => 'server',
+        'supports_in_app' => false,
+        'supports_email' => false,
+        'supports_webhook' => true,
+        'occurred_at' => now(),
+    ]);
+
+    app(NotificationRoutingResolver::class)->route($event);
+
+    $sent = 0;
+    Http::assertSent(function ($request) use (&$sent) {
+        if (str_contains($request->url(), 'hooks.slack.com')) {
+            $sent++;
+        }
+
+        return true;
+    });
+
+    expect($sent)->toBe(1);
 });

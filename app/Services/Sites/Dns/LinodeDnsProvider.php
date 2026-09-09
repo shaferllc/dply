@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Providers\Services\LinodeService;
 
 class LinodeDnsProvider implements DnsProvider
 {
@@ -10,7 +10,6 @@ class LinodeDnsProvider implements DnsProvider
         private readonly LinodeService $service,
     ) {}
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {

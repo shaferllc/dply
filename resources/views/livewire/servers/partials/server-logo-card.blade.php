@@ -9,7 +9,7 @@
             <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logo') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logo') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server logo') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Shown beside this server across the dashboard, breadcrumbs, and lists. PNG, JPG, WEBP, GIF or ICO up to 1 MB. Leave empty to use the generated avatar.') }}

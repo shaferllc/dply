@@ -21,7 +21,6 @@ final class DeploymentPreflightValidator
      *     checks: list<array{key: string, level: string, message: string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function validate(Site $site, ?DeploymentContract $contract = null): array
     {
         $contract ??= $this->contractBuilder->build($site);

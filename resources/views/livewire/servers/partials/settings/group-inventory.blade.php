@@ -26,21 +26,19 @@
 
 <section id="settings-group-inventory" aria-labelledby="settings-group-inventory-title">
     <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inventory') }}</p>
-                <h2 id="settings-group-inventory-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inventory & provider snapshot') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-clipboard-document-list"
+            :title="__('Inventory & provider snapshot')"
+            :note="__('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.')"
+            title-id="settings-group-inventory-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
+                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Run a fresh check over SSH to count upgradable packages, detect reboot flags, and optionally capture disk/memory/uptime. Apt actions and unattended-upgrades live on Patches.') }}
                 </p>
@@ -61,32 +59,33 @@
                 </p>
             </div>
             @if ($this->canEditServerSettings)
-                <div class="flex shrink-0 flex-wrap gap-2">
-                    <button
+                <div class="flex shrink-0 flex-wrap gap-3">
+                    <x-secondary-button
                         type="button"
+                        size="xs"
                         wire:click="refreshServerInventoryDetails"
                         wire:loading.attr="disabled"
-                        class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                        wire:target="refreshServerInventoryDetails"
                     >
                         <span wire:loading.remove wire:target="refreshServerInventoryDetails">{{ __('Refresh inventory') }}</span>
                         <span wire:loading wire:target="refreshServerInventoryDetails" class="inline-flex items-center gap-2">
                             <x-spinner variant="forest" size="sm" />
                             {{ __('Running…') }}
                         </span>
-                    </button>
-                    <button
+                    </x-secondary-button>
+                    <x-secondary-button
                         type="button"
+                        size="xs"
                         wire:click="checkHealth"
                         wire:loading.attr="disabled"
                         wire:target="checkHealth"
-                        class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                     >
                         <span wire:loading.remove wire:target="checkHealth">{{ __('Test connection') }}</span>
                         <span wire:loading wire:target="checkHealth" class="inline-flex items-center gap-2">
                             <x-spinner variant="forest" size="sm" />
                             {{ __('Probing…') }}
                         </span>
-                    </button>
+                    </x-secondary-button>
                 </div>
             @endif
         </div>
@@ -132,27 +131,22 @@
 
         <div class="mt-8 rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-5">
             <h4 class="text-sm font-semibold text-brand-ink">{{ __('Inventory scan depth') }}</h4>
-            <p class="mt-1 text-sm text-brand-moss">
+            <p class="mt-0.5 text-xs text-brand-moss">
                 {{ __('Basic: OS detection and apt preview. Extended: adds disk usage, memory, uptime, and fail2ban status (slightly longer SSH run).') }}
             </p>
-            <form wire:submit="saveInventoryDepthPreference" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
-                <div class="min-w-[min(100%,20rem)] flex-1">
-                    <x-input-label for="settings-inventory-depth" value="{{ __('Depth') }}" />
-                    <select
-                        id="settings-inventory-depth"
-                        wire:model="settingsInventoryDepth"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    >
-                        @foreach ($inventoryDepths as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <x-input-error :messages="$errors->get('settingsInventoryDepth')" class="mt-2" />
-                </div>
-                @if ($this->canEditServerSettings)
-                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save depth') }}</x-primary-button>
-                @endif
+            <form wire:submit="saveInventoryDepthPreference" class="mt-4 max-w-md">
+                <x-input-label for="settings-inventory-depth" value="{{ __('Depth') }}" />
+                <select
+                    id="settings-inventory-depth"
+                    wire:model="settingsInventoryDepth"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    @disabled(! $this->canEditServerSettings)
+                >
+                    @foreach ($inventoryDepths as $key => $label)
+                        <option value="{{ $key }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('settingsInventoryDepth')" class="mt-2" />
             </form>
         </div>
 
@@ -161,7 +155,7 @@
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h4 class="text-sm font-semibold text-brand-ink">{{ __('Pending updates') }}</h4>
-                        <p class="mt-1 text-sm text-brand-moss">
+                        <p class="mt-0.5 text-xs text-brand-moss">
                             @if ($upgrades !== null)
                                 {{ trans_choice(':count package can be updated.|:count packages can be updated.', $upgrades, ['count' => $upgrades]) }}
                             @endif
@@ -242,11 +236,12 @@
                                 <span class="text-brand-moss"> — {{ $osVersions[$meta['inventory_os_detected_key']] ?? $meta['inventory_os_detected_key'] }}</span>
                             @endif
                             @if ($this->canEditServerSettings && isset($meta['inventory_os_detected_key']) && ($meta['os_version'] ?? '') !== ($meta['inventory_os_detected_key'] ?? ''))
-                                <button
+                                <x-secondary-button
                                     type="button"
+                                    size="xs"
                                     wire:click="applyDetectedOsFromInventory"
-                                    class="ml-2 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                                >{{ __('Use detected label') }}</button>
+                                    class="ml-2"
+                                >{{ __('Use detected label') }}</x-secondary-button>
                             @endif
                         </dd>
                     </div>
@@ -261,8 +256,8 @@
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     @foreach ($extSections as $section)
                         <div class="rounded-lg border border-brand-ink/10 bg-white p-3">
-                            <div class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
-                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
+                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
                         </div>
                     @endforeach
                 </div>
@@ -271,7 +266,7 @@
             <div class="mt-8 border-t border-brand-ink/10 pt-8">
                 <h4 class="text-sm font-semibold text-brand-ink">{{ __('Extended snapshot') }}</h4>
                 <pre
-                    class="mt-3 max-h-64 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink whitespace-pre-wrap break-all"
+                    class="mt-3 max-h-64 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink whitespace-pre-wrap break-all"
                 >{{ $extSnap }}</pre>
             </div>
         @endif

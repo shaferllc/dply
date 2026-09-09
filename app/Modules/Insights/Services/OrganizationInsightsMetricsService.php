@@ -6,20 +6,20 @@ use App\Models\InsightFinding;
 use App\Models\InsightHealthSnapshot;
 use App\Models\Organization;
 use App\Models\Server;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class OrganizationInsightsMetricsService
 {
     /**
-     * @return array{open_by_severity: array{critical: int, warning: int, info: int}, total_open: int, avg_health_score: float|null, worst_servers: array<string, mixed>}
      *   open_by_severity: array{critical: int, warning: int, info: int},
      *   total_open: int,
      *   avg_health_score: float|null,
      *   worst_servers: list<array{id: string, name: string, open: int, worst: string|null}>
      * }|null
      */
-    public function fleetSummary(?Organization $org): ?array
+    public function organizationSummary(?Organization $org): ?array
     {
         if (! $org instanceof Organization) {
             return null;
@@ -33,6 +33,7 @@ class OrganizationInsightsMetricsService
                 'total_open' => 0,
                 'avg_health_score' => null,
                 'worst_servers' => [],
+                'servers_with_findings' => 0,
             ];
         }
 
@@ -61,6 +62,11 @@ class OrganizationInsightsMetricsService
             'total_open' => $totalOpen,
             'avg_health_score' => $avgHealth,
             'worst_servers' => $worstServers,
+            // Derived from the rollup already in hand — no extra query. Counts
+            // servers, where total_open counts findings. Server-scoped like the
+            // /servers badge, so it will not tally against total_open, which
+            // also includes per-site findings.
+            'servers_with_findings' => $perServer->filter(fn (array $row): bool => $row['open'] > 0)->count(),
         ];
     }
 
@@ -113,13 +119,9 @@ class OrganizationInsightsMetricsService
     }
 
     /**
-     * @param  Collection<string, array{open: int, worst: string|null}>  $perServer
+     * @param  Collection<string, covariant array{open: int, worst: string|null}>  $perServer
      * @param  Collection<int, string>  $serverIds
      * @return list<array{id: string, name: string, open: int, worst: string|null}>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<int, array<string, mixed>>
      */
     protected function topWorstServers(Collection $perServer, Collection $serverIds, int $limit): array
     {
@@ -161,25 +163,73 @@ class OrganizationInsightsMetricsService
     }
 
     /**
+     * Latest health score per server, keyed by server id.
+     *
+     * DISTINCT ON picks the newest snapshot per box in one statement; on a tie
+     * it returns a single row, where the old joinSub returned every tied row
+     * and double-counted the box in the average.
+     *
+     * @param  Collection<int, string>  $serverIds
+     * @return Collection<string, float>
+     */
+    public function latestHealthScores(Collection $serverIds): Collection
+    {
+        if ($serverIds->isEmpty()) {
+            return collect();
+        }
+
+        return InsightHealthSnapshot::query()
+            ->selectRaw('distinct on (server_id) server_id, score')
+            ->whereIn('server_id', $serverIds)
+            ->orderBy('server_id')
+            ->orderByDesc('captured_at')
+            ->pluck('score', 'server_id');
+    }
+
+    /**
+     * Fleet-average health per day, oldest first, for the dashboard sparkline.
+     *
+     * Deliberately the most recent $days *days that have snapshots*, not the
+     * last $days calendar days: capture stops when an organization is paused or
+     * its agents disconnect, so a calendar window silently renders an empty
+     * chart on exactly the workspaces most worth looking at. Trading an
+     * even x-axis for a line that still says something.
+     *
+     * @param  Collection<int, string>  $serverIds
+     * @return Collection<int, array{day: Carbon, score: float}>
+     */
+    public function dailyHealthSeries(Collection $serverIds, int $days = 30): Collection
+    {
+        if ($serverIds->isEmpty()) {
+            return collect();
+        }
+
+        // Query builder, not Eloquent: this is a grouped aggregate, so there is
+        // no model to hydrate and the aliases are not columns on one.
+        $rows = DB::table((new InsightHealthSnapshot)->getTable())
+            ->whereIn('server_id', $serverIds)
+            ->whereNotNull('captured_at')
+            ->selectRaw('date(captured_at) as day, avg(score::numeric) as score')
+            ->groupBy('day')
+            ->orderByDesc('day')
+            ->limit($days)
+            ->get();
+
+        return collect($rows)
+            ->reverse()
+            ->values()
+            ->map(fn (object $row): array => [
+                'day' => Carbon::parse((string) $row->day),
+                'score' => round((float) $row->score, 1),
+            ]);
+    }
+
+    /**
      * @param  Collection<int, string>  $serverIds
      */
     protected function averageLatestHealthScore(Collection $serverIds): ?float
     {
-        if ($serverIds->isEmpty()) {
-            return null;
-        }
-
-        $sub = DB::table('insight_health_snapshots')
-            ->select('server_id', DB::raw('MAX(captured_at) as max_captured_at'))
-            ->whereIn('server_id', $serverIds)
-            ->groupBy('server_id');
-
-        $scores = InsightHealthSnapshot::query()
-            ->joinSub($sub, 'latest', function ($join): void {
-                $join->on('insight_health_snapshots.server_id', '=', 'latest.server_id')
-                    ->on('insight_health_snapshots.captured_at', '=', 'latest.max_captured_at');
-            })
-            ->pluck('insight_health_snapshots.score');
+        $scores = $this->latestHealthScores($serverIds);
 
         if ($scores->isEmpty()) {
             return null;

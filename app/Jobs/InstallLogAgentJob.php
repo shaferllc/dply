@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\Server;
+use App\Exceptions\LogAgentInstallCanceledException;
 use App\Models\ServerLogAgent;
+use App\Models\ServerLogAggregator;
+use App\Modules\Logs\Services\LogAggregatorAccess;
+use App\Services\Servers\ManagedFirewallPort;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\VectorLogAgentInstallScripts;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -50,6 +53,7 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         VectorLogAgentInstallScripts $scripts,
+        ManagedFirewallPort $ports,
     ): void {
         // NOTE: intentionally NOT re-checking config('server_logs.enabled') here.
         // The enable action already gates on it; re-checking inside a long-running
@@ -91,6 +95,18 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
                     return;
                 }
                 $lastFlush = $now;
+
+                // Cancellation checkpoint, piggybacked on the flush throttle so it
+                // costs one extra column read every ~3s rather than one per chunk.
+                // The DB row is the signal: an operator hitting Cancel writes
+                // `failed` there, and seeing anything other than `installing` here
+                // means this job no longer owns the row. Note `update()` below
+                // touches only install_output, so it can't resurrect the status.
+                $current = ServerLogAgent::query()->whereKey($agent->id)->value('status');
+                if ($current !== ServerLogAgent::STATUS_INSTALLING) {
+                    throw new LogAgentInstallCanceledException('Install canceled by an operator.');
+                }
+
                 $agent->update(['install_output' => mb_substr($buffer, -32_000)]);
             };
 
@@ -119,6 +135,29 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
                 'config_version' => $scripts->configVersion(),
                 'error_message' => null,
             ]);
+
+            // This edge now ships to the aggregator, so the aggregator has to
+            // admit it. Customer app servers are routinely on another VPC (or
+            // another provider), where the only reachable address is public —
+            // nothing else would ever open the port for them, and the failure is
+            // silent: Vector retries into a closed port while the row reads
+            // running. Re-syncing the whole group also revokes edges that have
+            // gone away.
+            $aggregator = ServerLogAggregator::query()
+                ->with('server')
+                ->where('status', ServerLogAggregator::STATUS_RUNNING)
+                ->orderByDesc('updated_at')
+                ->first();
+
+            if ($aggregator !== null) {
+                LogAggregatorAccess::sync($aggregator, $ports);
+            }
+        } catch (LogAgentInstallCanceledException) {
+            // Leave the row exactly as the operator set it — overwriting it with a
+            // generic failure would erase the explanation they need. Swallowed
+            // rather than rethrown so the queue does not retry a cancelled install
+            // back into existence a minute later.
+            return;
         } catch (\Throwable $e) {
             $agent->update([
                 'status' => ServerLogAgent::STATUS_FAILED,

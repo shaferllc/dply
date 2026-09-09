@@ -10,7 +10,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteRedirect;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
-use App\Modules\Edge\Services\Config\EdgeRepoConfig;
+use App\Services\Sites\RepoConfig\RepoConfig;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
@@ -42,7 +42,6 @@ final class ByoRepoConfigSync
      *     warnings: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function syncAfterDeploy(Site $site, SshConnection $ssh, string $remotePath): array
     {
         $empty = ['applied' => false, 'source_path' => null, 'redirects' => 0, 'crons' => 0, 'server_crons' => 0, 'deploy_hooks' => 0, 'warnings' => []];
@@ -127,7 +126,7 @@ final class ByoRepoConfigSync
         return null;
     }
 
-    private function syncRedirects(Site $site, EdgeRepoConfig $config): int
+    private function syncRedirects(Site $site, RepoConfig $config): int
     {
         SiteRedirect::query()
             ->where('site_id', $site->id)
@@ -141,9 +140,9 @@ final class ByoRepoConfigSync
             SiteRedirect::query()->create([
                 'site_id' => $site->id,
                 'kind' => SiteRedirectKind::Http,
-                'from_path' => (string) ($redirect['from'] ?? ''),
-                'to_url' => (string) ($redirect['to'] ?? ''),
-                'status_code' => (int) ($redirect['status'] ?? 301),
+                'from_path' => (string) $redirect['from'],
+                'to_url' => (string) $redirect['to'],
+                'status_code' => (int) $redirect['status'],
                 'comment' => self::MANAGED_REDIRECT_COMMENT,
                 'sort_order' => $order++,
             ]);
@@ -154,8 +153,8 @@ final class ByoRepoConfigSync
             SiteRedirect::query()->create([
                 'site_id' => $site->id,
                 'kind' => SiteRedirectKind::InternalRewrite,
-                'from_path' => (string) ($rewrite['from'] ?? ''),
-                'to_url' => (string) ($rewrite['to'] ?? ''),
+                'from_path' => (string) $rewrite['from'],
+                'to_url' => (string) $rewrite['to'],
                 'status_code' => 0,
                 'comment' => self::MANAGED_REDIRECT_COMMENT,
                 'sort_order' => $order++,
@@ -167,7 +166,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $crons
+     * @param  list<array<string, string|null>> $crons
      */
     private function syncCrons(Site $site, array $crons): int
     {
@@ -201,7 +200,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $crons
+     * @param  list<array<string, string|null>> $crons
      */
     private function syncServerCrons(Site $site, array $crons): int
     {
@@ -235,7 +234,7 @@ final class ByoRepoConfigSync
     }
 
     /**
-     * @param  array<string, mixed> $hooks
+     * @param  list<array<string, int|string>> $hooks
      */
     private function syncDeployHooks(Site $site, array $hooks): int
     {

@@ -65,7 +65,7 @@ class RecreateDaemonsHandler implements StepHandler
                 }
                 $name = $d['name'] ?? ('worker-'.$d['id']);
                 $command = $d['command'];
-                if ($command !== '' && str_contains($command, '/home/ploi/')) {
+                if (str_contains($command, '/home/ploi/')) {
                     $warnings[] = sprintf('Daemon "%s" references /home/ploi/ — may need path rewrite.', $name);
                 }
                 SiteProcess::create([
@@ -73,7 +73,7 @@ class RecreateDaemonsHandler implements StepHandler
                     'type' => SiteProcess::TYPE_WORKER,
                     'name' => 'imported:'.$name,
                     'command' => $command,
-                    'scale' => max(1, $d['processes'] ?? 1),
+                    'scale' => max(1, $d['processes']),
                     'working_directory' => $d['directory'] ?? null,
                     'user' => $d['user'] ?? null,
                     'is_active' => true,

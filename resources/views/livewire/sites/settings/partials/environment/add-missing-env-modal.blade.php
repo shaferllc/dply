@@ -33,16 +33,16 @@
                             placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
                         />
                         <div class="mt-0.5 flex items-center justify-between gap-2">
-                            <p class="text-[11px] text-brand-mist">{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}</p>
+                            <p class="text-xs text-brand-mist">{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}</p>
                             <div class="flex items-center gap-3">
                                 @if ($entry['key'] === 'APP_KEY')
-                                    <button type="button" wire:click="generateMissingAppKey" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                    <button type="button" wire:click="generateMissingAppKey" class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
                                         <x-heroicon-o-sparkles class="h-3 w-3" />
                                         {{ __('Generate a key') }}
                                     </button>
                                 @endif
                                 @if ($canIgnoreEnv)
-                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-[11px] font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>
+                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-xs font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>
                                 @endif
                             </div>
                         </div>

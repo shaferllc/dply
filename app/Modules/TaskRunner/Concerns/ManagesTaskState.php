@@ -136,7 +136,6 @@ trait ManagesTaskState
     /**
      * Get the task options.
      */
-    /** @return array<string, mixed> */
     public function getOptions(): array
     {
         return $this->options;

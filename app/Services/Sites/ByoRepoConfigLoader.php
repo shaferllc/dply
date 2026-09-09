@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
-use App\Modules\Edge\Services\Config\EdgeRepoConfig;
-use App\Modules\Edge\Services\Config\EdgeRepoConfigLoader;
+use App\Services\Sites\RepoConfig\RepoConfig;
+use App\Services\Sites\RepoConfig\RepoConfigLoader;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Parses shared dply.yaml sections for BYO VM sites — reuses Edge routing
+ * Parses shared dply.yaml sections for BYO VM sites — reuses the shared routing
  * normalization and adds BYO-specific cron commands + deploy hook scripts.
  */
 final class ByoRepoConfigLoader
@@ -17,12 +17,12 @@ final class ByoRepoConfigLoader
     public const MANAGED_HOOK_PREFIX = "# @dply-managed dply.yaml\n";
 
     public function __construct(
-        private EdgeRepoConfigLoader $edgeLoader,
+        private RepoConfigLoader $loader,
     ) {}
 
     /**
      * @return array{
-     *     config: EdgeRepoConfig,
+     *     config: RepoConfig,
      *     crons: list<array{schedule: string, command: string, user: ?string}>,
      *     server_crons: list<array{schedule: string, command: string, user: ?string}>,
      *     deploy_hooks: list<array{phase: string, script: string, timeout: int, sort_order: int}>,
@@ -30,10 +30,9 @@ final class ByoRepoConfigLoader
      *     warnings: list<string>
      * }
      */
-    /** @return array<string, mixed> */
     public function parse(string $sourcePath, string $raw): array
     {
-        $config = $this->edgeLoader->parse($sourcePath, $raw);
+        $config = $this->loader->parse($sourcePath, $raw);
         $decoded = $this->decodeRoot($sourcePath, $raw);
         $parsed = is_array($decoded) ? $decoded : [];
         $warnings = $config->warnings;
@@ -74,8 +73,8 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $parsed
+     * @param  list<string>  $warnings
      * @return list<array{schedule: string, command: string, user: ?string}>
      */
     private function parseCronBlock(array $parsed, string $blockKey, string $label, array &$warnings): array
@@ -96,7 +95,7 @@ final class ByoRepoConfigLoader
             $schedule = is_string($entry['schedule'] ?? null) ? trim($entry['schedule']) : '';
             $command = is_string($entry['command'] ?? null) ? trim($entry['command']) : '';
             if ($schedule === '' || $command === '') {
-                if ($schedule !== '' && $command === '') {
+                if ($schedule !== '') {
                     $warnings[] = sprintf('%s[%d] needs `command` for BYO %s sync.', $blockKey, $index, $label);
                 }
 
@@ -119,8 +118,8 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $parsed
+     * @param  list<string>  $warnings
      * @return list<array{phase: string, script: string, timeout: int, sort_order: int}>
      */
     private function parseDeployHooks(array $parsed, array &$warnings): array
@@ -177,8 +176,8 @@ final class ByoRepoConfigLoader
     }
 
     /**
-     * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $warnings
+     * @param  array<string, mixed>  $parsed
+     * @param  list<string>  $warnings
      * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
      */
     private function parseEnvDeclarations(array $parsed, array &$warnings): array

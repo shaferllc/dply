@@ -26,10 +26,9 @@ trait ManagesDoSpacesRegistry
      * (`bucket: ""`, `permission: "fullaccess"`), which is what lets the key
      * create buckets and read/write objects like a console-created key.
      *
-     * @param  array<string, mixed> $grants
+     * @param  list<array{bucket: string, permission: string}> $grants
      * @return array{access_key: string, secret_key: string}
      */
-    /** @return array<string, mixed> */
     public function createSpacesKey(string $name, array $grants = []): array
     {
         if ($grants === []) {
@@ -59,11 +58,34 @@ trait ManagesDoSpacesRegistry
     }
 
     /**
+     * Revoke a Spaces access key.
+     *
+     * A 404 means it is already gone, which is the outcome a teardown wanted,
+     * so it reports false rather than raising. Every other failure raises —
+     * a key that outlives its bucket is a live credential nobody is watching.
+     */
+    public function deleteSpacesKey(string $accessKey): bool
+    {
+        $accessKey = trim($accessKey);
+        if ($accessKey === '') {
+            return false;
+        }
+
+        $response = $this->request('delete', '/spaces/keys/'.rawurlencode($accessKey));
+        if ($response->status() === 404) {
+            return false;
+        }
+
+        $this->assertSuccess($response, 'delete Spaces key');
+
+        return true;
+    }
+
+    /**
      * Create a container registry in DigitalOcean.
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function createContainerRegistry(string $name, string $subscriptionTier = 'starter'): array
     {
         $response = $this->request('post', '/registry', [
@@ -102,7 +124,6 @@ trait ManagesDoSpacesRegistry
      *
      * @return array{auths: array<string, array{auth: string}>}
      */
-    /** @return array<string, mixed> */
     public function getContainerRegistryCredentials(): array
     {
         $response = $this->request('get', '/registry/docker-credentials');

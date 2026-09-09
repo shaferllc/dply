@@ -19,7 +19,27 @@ use Livewire\Attributes\On;
  */
 trait ManagesMonitorNotifications
 {
+    use ManagesFeatureNotificationMatrix;
 
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the keys of the `server`
+     * category, which is exactly the set this tab's checkbox list already
+     * iterates. The old add-form validated against a narrower hardcoded five,
+     * so a key the UI offered could be rejected on submit; sourcing both sides
+     * from the one list closes that gap.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return array_keys((array) config('notification_events.categories.server.events', []));
+    }
+
+    /** No mount hook on this trait — the host seeds it. */
+    public function mountManagesMonitorNotifications(): void
+    {
+        $this->bootFeatureNotificationMatrix();
+    }
 
     /**
      * After creating a channel inline, auto-select it in the subscription form.
@@ -113,9 +133,7 @@ trait ManagesMonitorNotifications
 
         // Only allow removal when the user can manage the underlying channel
         $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $sub->delete();
         $this->toastSuccess(__('Subscription removed.'));

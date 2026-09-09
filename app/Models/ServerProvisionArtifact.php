@@ -11,10 +11,10 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $server_provision_run_id
  * @property string $type
- * @property string $key
+ * @property ?string $key
  * @property ?string $label
  * @property ?string $content
- * @property array<string, mixed> $metadata
+ * @property ?array<string, mixed> $metadata
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  * @property-read ServerProvisionRun $run

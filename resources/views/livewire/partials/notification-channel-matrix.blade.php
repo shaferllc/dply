@@ -51,7 +51,7 @@
                             </span>
                             <span class="flex shrink-0 items-center gap-2">
                                 <span
-                                    class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                    class="rounded-full px-2 py-0.5 text-xs font-semibold"
                                     :class="count > 0 ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/60 text-brand-mist'"
                                     x-text="count > 0 ? count + ' {{ __('events') }}' : '{{ __('Off') }}'"
                                 ></span>
@@ -66,7 +66,7 @@
                             wire:loading.attr="disabled"
                             wire:target="sendTestChannelNotification('{{ $channel->id }}')"
                             title="{{ __('Send a test notification to this channel') }}"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="sendTestChannelNotification('{{ $channel->id }}')" class="inline-flex items-center gap-1.5">
                                 <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

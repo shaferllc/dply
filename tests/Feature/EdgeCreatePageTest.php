@@ -39,8 +39,12 @@ test('authenticated user can load edge create form', function () {
         ->assertSee('Est. cost')
         ->assertSee('SPA fallback')
         ->assertSee('Deploy on push')
-        ->assertSee('Managed Edge')
+        ->assertSee('Dply Edge (managed)')
         ->assertSee('Your own account')
+        ->assertSee('Or start from an example')
+        ->assertSee('Keel on Edge')
+        ->assertSee('data-testid="edge-example-apps"', false)
+        ->assertSee('data-testid="edge-example-keel-workers"', false)
         ->assertSee('Load sample app')
         ->assertSee('data-testid="load-sample-edge-app"', false);
 });
@@ -54,9 +58,22 @@ test('load sample app prefills public eleventy template in local development', f
         ->assertSet('repo_source', 'manual')
         ->assertSet('repo', '11ty/eleventy-base-blog')
         ->assertSet('branch', 'main')
-        ->assertSet('form.name', 'sample-edge-app')
+        ->assertSet('form.name', 'eleventy-portfolio')
         ->assertSet('form.runtime_mode', 'static')
         ->assertSet('form.output_dir', '_site');
+});
+
+test('load example app prefills keel starter', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->call('loadExampleApp', 'keel-workers')
+        ->assertSet('repo_source', 'manual')
+        ->assertSet('repo', 'shaferllc/keel-site')
+        ->assertSet('branch', 'main')
+        ->assertSet('form.name', 'keel-workers')
+        ->assertSet('form.runtime_mode', 'hybrid');
 });
 
 test('byo delivery without credentials offers in page cloudflare token modal', function () {

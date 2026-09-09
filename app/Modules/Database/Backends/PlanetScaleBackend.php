@@ -6,6 +6,8 @@ namespace App\Modules\Database\Backends;
 
 use App\Models\CloudDatabase;
 use App\Models\Server;
+use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
+use App\Modules\Database\Backends\Concerns\SupportsNoManagedOperations;
 use App\Modules\Database\Services\PlanetScaleService;
 use RuntimeException;
 
@@ -18,6 +20,9 @@ use RuntimeException;
  */
 class PlanetScaleBackend implements DatabaseBackend
 {
+    use CannotResizeManagedDatabase;
+    use SupportsNoManagedOperations;
+
     public function key(): string
     {
         return CloudDatabase::BACKEND_PLANETSCALE;

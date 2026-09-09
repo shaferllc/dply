@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Decorators\AuthenticatedDecorator;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -41,7 +42,13 @@ describe('AuthenticatedDecorator', function () {
         };
         $decorator = new AuthenticatedDecorator($action);
 
-        $this->withHeaders(['Accept' => 'application/json']);
+        // The decorator reads the *bound* request, not the pending test-request
+        // headers withHeaders() sets. Without a JSON-expecting request it takes
+        // the redirect()->send(); exit; branch, which kills the PHPUnit process
+        // outright (silent exit 2, no summary, rest of the suite never runs).
+        $this->app->instance('request', Request::create('/', 'GET', server: [
+            'HTTP_ACCEPT' => 'application/json',
+        ]));
 
         expect(fn () => $decorator->handle())
             ->toThrow(HttpException::class);

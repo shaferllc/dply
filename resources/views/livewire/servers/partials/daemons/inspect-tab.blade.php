@@ -1,17 +1,12 @@
             <div class="{{ $card }}">
-                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <x-icon-badge>
-                        <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inspect') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Supervisor on the server') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Read-only diagnostics: systemd unit status, supervisorctl version + status, and the tail of the supervisord daemon log. When the login user is not root, Dply uses sudo -n (passwordless sudo must be allowed, same as provisioning).') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="space-y-4 p-6 sm:p-8">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-magnifying-glass"
+                    :title="__('Supervisor on the server')"
+                    :note="__('Read-only diagnostics: systemd unit status, supervisorctl version + status, and the tail of the supervisord daemon log. When the login user is not root, Dply uses sudo -n (passwordless sudo must be allowed, same as provisioning).')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="space-y-4 px-4 py-3.5 sm:px-5">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p class="text-sm text-brand-moss">{{ __('Runs systemctl + supervisorctl + tails the daemon log over SSH.') }}</p>
                         <button

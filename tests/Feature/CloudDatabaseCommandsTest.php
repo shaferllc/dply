@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\CloudDatabaseCommandsTest;
 
 use App\Enums\SiteType;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\ProvisionCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\ProvisionCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\ProviderCredential;

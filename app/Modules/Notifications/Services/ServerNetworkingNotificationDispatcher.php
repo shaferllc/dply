@@ -25,8 +25,8 @@ final class ServerNetworkingNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $resourceNames  affected resources (db/cache/network names, route CIDRs)
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string>  $resourceNames  affected resources (db/cache/network names, route CIDRs)
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

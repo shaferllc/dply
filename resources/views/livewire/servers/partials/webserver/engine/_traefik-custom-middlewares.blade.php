@@ -60,7 +60,7 @@
                     <div class="flex justify-between">
                         <p class="font-mono text-sm font-semibold">dply-custom-mw-{{ $mwSlug }}</p>
                         <button type="button" wire:click="openConfirmActionModal('removeTraefikCustomMiddleware', [@js($mwSlug)], @js(__('Remove middleware')), @js(__('Delete this file?')), @js(__('Remove')), true)"
-                            class="text-[11px] text-rose-800">{{ __('Remove') }}</button>
+                            class="text-xs text-rose-800">{{ __('Remove') }}</button>
                     </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <label><span class="text-xs">{{ __('Type') }}</span>

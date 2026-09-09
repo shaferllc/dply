@@ -16,6 +16,32 @@ class ManagedProductCostEstimator
     }
 
     /**
+     * Customer-facing Cloud pricing terms, derived from the same config the
+     * biller reads so the empty-index splash can never quote a price the
+     * invoice contradicts. Container and database rates already have
+     * `cloud_markup_percent` applied.
+     *
+     * @return array{
+     *     flat_cents: int,
+     *     markup_percent: int,
+     *     small_container_cents: int,
+     *     small_database_cents: int,
+     * }
+     */
+    public function cloudPricingSummary(): array
+    {
+        $containerRates = (array) config('subscription.standard.cloud_container_cents', []);
+        $databaseRates = (array) config('subscription.standard.cloud_database_cents', []);
+
+        return [
+            'flat_cents' => (int) config('subscription.standard.cloud_cents', 0),
+            'markup_percent' => max(0, (int) config('subscription.standard.cloud_markup_percent', 0)),
+            'small_container_cents' => $this->withCloudMarkup((int) ($containerRates['small'] ?? 0)),
+            'small_database_cents' => $this->withCloudMarkup((int) ($databaseRates['small'] ?? 0)),
+        ];
+    }
+
+    /**
      * Customer-facing (marked-up) monthly price in USD for a Cloud container
      * size tier, per instance. Used to preview the metered resource cost in
      * the create flow next to the flat platform fee.

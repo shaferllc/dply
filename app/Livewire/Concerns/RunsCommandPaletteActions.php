@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Modules\Cloud\Jobs\RedeployCloudSiteJob;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
@@ -73,7 +72,7 @@ trait RunsCommandPaletteActions
         $this->dispatch('notify', message: __('Deployment queued for :site.', ['site' => $site->name]));
     }
 
-    /** Roll a new container deployment for an org-scoped cloud/container site. */
+    /** Roll a new container deployment for an org-scoped container site. */
     private function runSiteRedeploy(?Organization $org, ?string $id): void
     {
         $site = $this->scopedSite($org, $id);
@@ -82,7 +81,7 @@ trait RunsCommandPaletteActions
         }
         Gate::authorize('update', $site);
 
-        RedeployCloudSiteJob::dispatch($site->id);
+        RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
         $this->dispatch('notify', message: __('Redeploy queued for :site.', ['site' => $site->name]));
     }
 
@@ -116,15 +115,11 @@ trait RunsCommandPaletteActions
                 continue;
             }
 
-            if ($site->usesContainerRuntime()) {
-                RedeployCloudSiteJob::dispatch($site->id);
-            } else {
-                Cache::put('site-deploy-active:'.$site->id, [
-                    'started_at' => now()->toIso8601String(),
-                    'deployment_id' => null,
-                ], 600);
-                RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
-            }
+            Cache::put('site-deploy-active:'.$site->id, [
+                'started_at' => now()->toIso8601String(),
+                'deployment_id' => null,
+            ], 600);
+            RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
             $queued++;
         }
 

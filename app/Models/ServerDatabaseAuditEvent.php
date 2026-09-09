@@ -5,24 +5,28 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
  * @property string $event
- * @property string $ip_address
- * @property array<string, mixed> $meta
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerDatabaseAuditEvent extends Model
 {
     use HasUlids;
 
     public const EVENT_DATABASE_CREATED = 'database_created';
+
+    /** A database that already existed on the server was recorded by dply. */
+    public const EVENT_DATABASE_ADOPTED = 'database_adopted';
 
     public const EVENT_DATABASE_REMOVED_DPLY = 'database_removed_dply';
 

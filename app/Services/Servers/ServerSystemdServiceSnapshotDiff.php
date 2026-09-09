@@ -119,15 +119,13 @@ final class ServerSystemdServiceSnapshotDiff
 
     /**
      * @param  list<array<string, mixed>>  $rows
-     * @param  array<string, mixed> $newUnits
-     * @param  array<string, mixed> $oldUnits
      * @return array<string, array<string, mixed>>
      */
     protected function mapByUnit(array $rows): array
     {
         $map = [];
         foreach ($rows as $row) {
-            if (! is_array($row) || empty($row['unit'])) {
+            if (empty($row['unit'])) {
                 continue;
             }
             $u = (string) $row['unit'];
@@ -139,7 +137,6 @@ final class ServerSystemdServiceSnapshotDiff
 
     /**
      * @param  array<string, mixed> $row
-     * @param  array<string, mixed> $rows
      * @return array{at: string, kind: string, unit: string, label: string, detail: ?string}
      */
     protected function makeEvent(string $at, string $kind, array $row, ?string $detail = null): array
@@ -162,6 +159,6 @@ final class ServerSystemdServiceSnapshotDiff
     {
         $u = preg_replace('/\.service$/i', '', $unit) ?? $unit;
 
-        return is_string($u) ? $u : $unit;
+        return $u;
     }
 }

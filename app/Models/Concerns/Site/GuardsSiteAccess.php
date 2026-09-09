@@ -46,7 +46,7 @@ trait GuardsSiteAccess
 
     public function supportsBasicAuthProvisioning(): bool
     {
-        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
             return false;
         }
 

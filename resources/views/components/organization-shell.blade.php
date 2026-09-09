@@ -11,17 +11,22 @@
     'title' => null,
     'description' => null,
     'icon' => 'heroicon-o-building-office-2',
+    /**
+     * Opt-in dense chrome: one-line workspace-panel-head + stats as their own
+     * strip (same composition as profile-shell dense). Callers unchanged when omitted.
+     */
+    'dense' => false,
 ])
 
 @php
     $org = $organization;
-    $is = fn (string $key): bool => $section === $key;
+    $is = fn (string ...$keys): bool => in_array($section, $keys, true);
     $navBase = 'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors';
-    $link = fn (string $key) => $is($key)
+    // Variadic so one nav item can stay lit across its tabs — Billing & plan
+    // covers both the bill page and the Trends tab.
+    $link = fn (string ...$keys) => $is(...$keys)
         ? 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm'
         : 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent';
-    $docNavOn = 'bg-brand-sand/70 text-brand-ink border border-brand-ink/10 shadow-sm';
-    $docNavOff = 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink border border-transparent';
     $ni = 'h-[1.125rem] w-[1.125rem] shrink-0 opacity-90';
     $useMergedChrome = filled($title);
 @endphp
@@ -41,8 +46,7 @@
 <div class="lg:grid lg:grid-cols-12 lg:gap-10">
     <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
         <div class="dply-surface-nav">
-            <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
-            <div class="mt-1 flex items-center gap-2">
+            <div class="flex items-center gap-2">
                 @if ($org->hasIcon())
                     {{-- onerror: never show the broken-image glyph when the stored
                          icon file is gone — swap to the initials fallback beside it. --}}
@@ -65,16 +69,6 @@
                     <x-heroicon-o-squares-2x2 class="{{ $ni }}" aria-hidden="true" />
                     {{ __('Overview') }}
                 </a>
-                @can('update', $org)
-                    <a
-                        href="{{ route('organizations.settings', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('general')])
-                    >
-                        <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('General') }}
-                    </a>
-                @endcan
                 @if ($org->hasAdminAccess(auth()->user()))
                     <a
                         href="{{ route('organizations.activity', $org) }}"
@@ -84,39 +78,66 @@
                         <x-heroicon-o-clock class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Activity') }}
                     </a>
+                @endif
+                @can('update', $org)
                     <a
-                        href="{{ route('organizations.automation', $org) }}"
+                        href="{{ route('organizations.api-tokens', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('automation')])
+                        @class([$navBase, $link('api-tokens')])
                     >
-                        <x-heroicon-o-bolt class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Automation') }}
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('API tokens') }}
                     </a>
+                @endcan
+                @if ($org->hasAdminAccess(auth()->user()))
+                    {{-- Automation folded into General settings — email defaults,
+                         Cloud alerts, Edge data region, and the org-wide API token
+                         list all live there now. --}}
                 @endif
                 @can('update', $org)
                     <a
                         href="{{ route('billing.show', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('billing')])
+                        @class([$navBase, $link('billing', 'billing-analytics')])
                     >
                         <x-heroicon-o-credit-card class="{{ $ni }}" aria-hidden="true" />
                         {{ __('Billing & plan') }}
                     </a>
+                @endcan
+                {{-- Realtime and Queues moved to the Services nav row (/realtime,
+                     /queues). They are products, not organization settings — see
+                     docs/adr/managed-services-tier.md, decision 1. The old
+                     org-scoped URLs still resolve, via OrgScopedRedirectController. --}}
+                @can('viewAny', \App\Models\ProviderCredential::class)
                     <a
-                        href="{{ route('billing.analytics', $org) }}"
+                        href="{{ route('organizations.credentials', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('billing-analytics')])
+                        @class([$navBase, $link('providers')])
                     >
-                        <x-heroicon-o-chart-bar class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Billing analytics') }}
+                        <x-heroicon-o-key class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Credentials') }}
                     </a>
+                @endcan
+                @can('update', $org)
                     <a
-                        href="{{ route('billing.invoices', $org) }}"
+                        href="{{ route('organizations.settings', $org) }}"
                         wire:navigate
-                        @class([$navBase, $link('invoices')])
+                        @class([$navBase, $link('general')])
                     >
-                        <x-heroicon-o-document-text class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Invoices') }}
+                        <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('General') }}
+                    </a>
+                    {{-- No Invoices entry: invoices are a section of Billing & plan
+                         now, and that page links on to the full history. --}}
+                @endcan
+                @can('viewNotificationChannels', $org)
+                    <a
+                        href="{{ route('organizations.notification-channels', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('notifications')])
+                    >
+                        <x-heroicon-o-bell class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Notification Channels') }}
                     </a>
                 @endcan
                 <a
@@ -125,38 +146,8 @@
                     @class([$navBase, $link('members')])
                 >
                     <x-heroicon-o-users class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Members') }}
+                    {{ __('People') }}
                 </a>
-                @can('viewNotificationChannels', $org)
-                    <a
-                        href="{{ route('organizations.notification-channels', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('notifications')])
-                    >
-                        <x-heroicon-o-bell class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Notification channels') }}
-                    </a>
-                @endcan
-                @if (\Laravel\Pennant\Feature::for($org)->active('surface.realtime') || $org->realtimeApps()->exists())
-                    <a
-                        href="{{ route('organizations.realtime', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('realtime')])
-                    >
-                        <x-heroicon-o-signal class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Realtime') }}
-                    </a>
-                @endif
-                @can('viewAny', \App\Models\ProviderCredential::class)
-                    <a
-                        href="{{ route('organizations.credentials', $org) }}"
-                        wire:navigate
-                        @class([$navBase, $link('providers')])
-                    >
-                        <x-heroicon-o-server class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Server providers') }}
-                    </a>
-                @endcan
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.secrets', $org) }}"
@@ -167,14 +158,7 @@
                         {{ __('Secrets') }}
                     </a>
                 @endcan
-                <a
-                    href="{{ route('organizations.teams', $org) }}"
-                    wire:navigate
-                    @class([$navBase, $link('teams')])
-                >
-                    <x-heroicon-o-rectangle-group class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Teams') }}
-                </a>
+                {{-- Webserver templates nav temporarily hidden.
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.webserver-templates', $org) }}"
@@ -185,100 +169,63 @@
                         {{ __('Webserver templates') }}
                     </a>
                 @endcan
+                --}}
             </nav>
-            <div
-                class="mt-4 border-t border-brand-ink/10 pt-4"
-                x-data="{
-                    _k: 'dply.orgNav.guidesCollapsed:{{ $org->id }}',
-                    collapsed: false,
-                    init() { try { this.collapsed = JSON.parse(localStorage.getItem(this._k)) || false; } catch (e) { this.collapsed = false; } },
-                    toggle() { this.collapsed = ! this.collapsed; localStorage.setItem(this._k, JSON.stringify(this.collapsed)); },
-                }"
-            >
-                <button
-                    type="button"
-                    x-on:click="toggle()"
-                    :aria-expanded="(! collapsed).toString()"
-                    class="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-moss hover:text-brand-ink"
-                >
-                    <span x-bind:class="collapsed ? '' : 'rotate-90'" class="inline-flex transition-transform">
-                        <x-heroicon-o-chevron-right class="h-3 w-3" />
-                    </span>
-                    <span class="flex-1 text-left">{{ __('Guides') }}</span>
-                </button>
-                <nav class="mt-2 space-y-0.5" aria-label="{{ __('Documentation guides') }}" x-show="! collapsed" x-collapse>
-                    <a
-                        href="{{ route('docs.connect-provider') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.connect-provider') ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-cloud class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Connect a provider') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'org-roles-and-limits' ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-user-group class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('Roles & plan limits') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.index') }}"
-                        wire:navigate
-                        @class([$navBase, request()->routeIs('docs.index') ? $docNavOn : $docNavOff])
-                    >
-                        <x-heroicon-o-rectangle-stack class="{{ $ni }}" aria-hidden="true" />
-                        {{ __('All docs') }}
-                    </a>
-                </nav>
-            </div>
         </div>
-        <a
-            href="{{ route('organizations.index') }}"
-            wire:navigate
-            class="mt-4 inline-flex text-sm text-brand-moss hover:text-brand-ink"
-        >
-            ← {{ __('All organizations') }}
-        </a>
     </aside>
     <div {{ $attributes->merge(['class' => 'lg:col-span-9 min-w-0']) }}>
-        <x-trial-pause-banner :organization="$organization" />
 
         @if ($useMergedChrome)
-            {{-- Merged chrome: one outer card. Stats live inside the sand identity
-                 header (one composition) so we don't stack header → stats → body
-                 as three ruled bands. Tabs stay flush; body uses hairline strips. --}}
+            {{-- Merged chrome: one outer card. Dense uses one-line panel head +
+                 stats as their own strip; default keeps stats inside the sand header. --}}
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                <x-dynamic-component :component="$icon" class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <h1 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $title }}</h1>
-                                @if ($description)
-                                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $description }}</p>
-                                @endif
-                            </div>
-                        </div>
+                @if ($dense)
+                    <x-workspace-panel-head
+                        dense
+                        :icon="$icon"
+                        :title="$title"
+                        :note="$description"
+                        class="border-b border-brand-ink/10"
+                    >
                         @isset($actions)
-                            <div class="flex flex-wrap items-center gap-2">
-                                {{ $actions }}
+                            <x-slot:actions>{{ $actions }}</x-slot:actions>
+                        @endisset
+                    </x-workspace-panel-head>
+
+                    @isset($stats)
+                        <div class="border-b border-brand-ink/10">{{ $stats }}</div>
+                    @endisset
+                @else
+                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-dynamic-component :component="$icon" class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <div class="min-w-0">
+                                    <h1 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $title }}</h1>
+                                    @if ($description)
+                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $description }}</p>
+                                    @endif
+                                </div>
+                            </div>
+                            @isset($actions)
+                                <div class="flex flex-wrap items-center gap-2">
+                                    {{ $actions }}
+                                </div>
+                            @endisset
+                        </div>
+
+                        @isset($stats)
+                            <div class="mt-5">
+                                {{ $stats }}
                             </div>
                         @endisset
                     </div>
-
-                    @isset($stats)
-                        <div class="mt-5">
-                            {{ $stats }}
-                        </div>
-                    @endisset
-                </div>
+                @endif
 
                 @isset($tabs)
-                    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                         {{ $tabs }}
                     </div>
                 @endisset
@@ -288,7 +235,11 @@
                 </div>
 
                 @isset($footer)
-                    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <div @class([
+                        'border-t border-brand-ink/10 bg-brand-sand/25',
+                        'px-3 py-2.5 sm:px-4' => $dense,
+                        'px-5 py-4 sm:px-6' => ! $dense,
+                    ])>
                         {{ $footer }}
                     </div>
                 @endisset

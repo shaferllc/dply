@@ -8,7 +8,7 @@
 | product_lines: admin UI + org override tabs grouped by product line.
 | global_groups: cross-cutting app-wide kill switches on /admin/flags/global.
 |
-| Emergency keys (global.vm_enabled, global.edge_delivery_enabled) appear
+| Emergency keys (global.vm_enabled) appear
 | on their product-line pages; orgs cannot override them.
 |
 */
@@ -111,23 +111,24 @@ return [
                     'provider.aws_app_runner' => 'AWS App Runner',
                     'provider.aws_eks' => 'AWS EKS',
                 ],
-                // Cache engines. Redis is always available (no flag). Each leaf
-                // off = "coming soon": Soon badge + teaser in the Caches
-                // workspace, hidden from the server-create cache picker.
+                // Cache engines. Redis and Valkey are always available (no
+                // flag). Each leaf off = "coming soon": Soon badge + teaser in
+                // the Caches workspace, hidden from the server-create picker.
                 'Cache engines' => [
-                    'cache.valkey' => 'Valkey',
                     'cache.memcached' => 'Memcached',
                     'cache.keydb' => 'KeyDB',
                     'cache.dragonfly' => 'Dragonfly',
                 ],
-                // Database engines. MySQL / PostgreSQL / SQLite are always
-                // available (no flag). Each leaf off = "coming soon": Soon
-                // badge + teaser in the Databases workspace, hidden from the
-                // server-create database picker (MariaDB variants).
+                // Database engines. MySQL / MariaDB / PostgreSQL / SQLite are
+                // always available (no flag). Each leaf off = "coming soon":
+                // Soon badge + teaser in the Databases workspace, hidden from
+                // the server-create database picker.
                 'Database engines' => [
-                    'database.mariadb' => 'MariaDB',
                     'database.mongodb' => 'MongoDB',
                     'database.clickhouse' => 'ClickHouse',
+                    'database.upstash' => 'Upstash Redis',
+                    'database.neon' => 'Neon Postgres',
+                    'database.supabase' => 'Supabase Postgres',
                 ],
             ], $serverWorkspaceSections),
         ],
@@ -146,37 +147,21 @@ return [
                 ],
             ],
         ],
-        'cloud' => [
-            'title' => 'Cloud',
-            'description' => 'Managed container apps (DO App Platform, App Runner, dply Cloud).',
+        'databases' => [
+            'title' => 'Databases',
+            'description' => 'Managed database clusters (DigitalOcean, Vultr, Neon, PlanetScale, Supabase, Upstash).',
             'groups' => [
                 'Surface' => [
-                    'surface.cloud' => 'Cloud apps',
+                    'surface.databases' => 'Managed databases',
                 ],
             ],
         ],
-        'edge' => [
-            'title' => 'Edge',
-            'description' => 'Static/SSG Edge delivery, previews, and CDN pipeline.',
-            'emergency' => [
-                'global.edge_delivery_enabled' => 'Emergency: pause Edge delivery pipeline',
-            ],
-            'groups' => [
-                'Edge surface' => [
-                    'surface.edge' => 'Edge',
-                ],
-                'Delivery' => [
-                    'global.edge_deploy_replay' => 'Edge shadow replay',
-                    'global.deploy_contract' => 'Deploy contract (promote gate)',
-                ],
-            ],
-        ],
-        'serverless' => [
-            'title' => 'Serverless',
-            'description' => 'Functions and serverless runtimes.',
+        'queue' => [
+            'title' => 'Queue',
+            'description' => 'The managed job queue any Laravel app can point at.',
             'groups' => [
                 'Surface' => [
-                    'surface.serverless' => 'Serverless',
+                    'surface.queue' => 'dply Queue',
                 ],
             ],
         ],
@@ -185,14 +170,12 @@ return [
             'description' => 'Cross-line org surfaces and launch workflows.',
             'groups' => [
                 'Surfaces' => [
-                    'surface.fleet' => 'Fleet ops views',
                     'surface.marketplace' => 'Marketplace',
                     'surface.projects' => 'Projects',
                     'surface.scripts' => 'Scripts',
                     'surface.status_pages' => 'Status pages',
                 ],
                 'Launch' => [
-                    'launch.full_stack_wizard' => 'Full-stack launch wizard',
                     'launch.standby_blueprint' => 'Standby failover blueprints',
                 ],
             ],
@@ -206,7 +189,6 @@ return [
         ],
         'Product' => [
             'global.byo_repo_config' => 'dply.yaml BYO sync',
-            'global.ops_copilot' => 'Ops Copilot (deploy triage)',
             'global.ai_llm' => 'AI LLM synthesis (Copilot, Shared Host, Docs Ask)',
         ],
         'Operations' => [

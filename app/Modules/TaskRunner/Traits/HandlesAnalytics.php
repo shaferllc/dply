@@ -65,7 +65,6 @@ trait HandlesAnalytics
     /**
      * Get resource usage metrics.
      */
-    /** @return array<string, mixed> */
     public function getResourceMetrics(): array
     {
         return [
@@ -100,7 +99,6 @@ trait HandlesAnalytics
     /**
      * Get optimization recommendations.
      */
-    /** @return array<string, mixed> */
     public function getOptimizationRecommendations(): array
     {
         $recommendations = [];
@@ -156,7 +154,6 @@ trait HandlesAnalytics
     /**
      * Get performance trends.
      */
-    /** @return array<string, mixed> */
     public function getPerformanceTrends(): array
     {
         $taskId = $this->taskModel?->id;
@@ -179,7 +176,6 @@ trait HandlesAnalytics
     /**
      * Get bottleneck analysis.
      */
-    /** @return array<string, mixed> */
     public function getBottleneckAnalysis(): array
     {
         $bottlenecks = [];
@@ -225,7 +221,6 @@ trait HandlesAnalytics
     /**
      * Get cost analysis.
      */
-    /** @return array<string, mixed> */
     public function getCostAnalysis(): array
     {
         $executionTime = $this->getExecutionTime();
@@ -282,7 +277,6 @@ trait HandlesAnalytics
     /**
      * Get performance alerts.
      */
-    /** @return array<string, mixed> */
     public function getPerformanceAlerts(): array
     {
         $alerts = [];
@@ -347,7 +341,6 @@ trait HandlesAnalytics
     /**
      * Compare performance with baseline.
      */
-    /** @return array<string, mixed> */
     public function compareWithBaseline(): array
     {
         $currentMetrics = $this->getPerformanceMetrics();

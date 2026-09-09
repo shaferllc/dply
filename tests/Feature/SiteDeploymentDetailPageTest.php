@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeploymentDetailPageTest;
 
+use App\Livewire\Sites\DeploymentDetail;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
@@ -69,6 +71,43 @@ test('renders friendly message when no phase results', function () {
         ->assertSee('Build')
         ->assertSee('Not started');
 });
+test('step output toggle expands phases and opens step consoles', function () {
+    [$user, $server, $site] = makeUserSite();
+    $deployment = SiteDeployment::query()->create([
+        'site_id' => $site->id,
+        'project_id' => $site->project_id,
+        'trigger' => 'manual',
+        'status' => SiteDeployment::STATUS_SUCCESS,
+        'started_at' => now()->subMinutes(2),
+        'finished_at' => now(),
+    ]);
+    $deployment->recordPhaseResults('build', [
+        [
+            'step_id' => '1',
+            'step_type' => 'install',
+            'command' => 'composer install',
+            'ok' => true,
+            'output' => "Installing dependencies\nDone.",
+            'duration_ms' => 1234,
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(DeploymentDetail::class, [
+            'server' => $server,
+            'site' => $site,
+            'deployment' => $deployment,
+        ])
+        ->assertSet('showOutput', false)
+        ->assertDontSeeHtml('wire:key="deploy-timeline-out"')
+        ->assertSeeHtml('wire:key="deploy-timeline-hid"')
+        ->call('toggleOutput')
+        ->assertSet('showOutput', true)
+        ->assertSeeHtml('wire:key="deploy-timeline-out"')
+        ->assertSee('Installing dependencies')
+        ->assertSee(__('Hide output'));
+});
+
 test('aborts when deployment belongs to different site', function () {
     [$user, $server, $site] = makeUserSite();
     $otherSite = Site::factory()->create([

@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Billing\Services;
 
 use App\Models\BillingSubscriptionSyncEvent;
-use App\Models\EdgeUsageSnapshot;
 use App\Models\Organization;
 use App\Models\OrganizationBillingSnapshot;
 use App\Models\Server;
 use App\Modules\Billing\Models\Subscription;
-use App\Models\Site;
+use App\Modules\Billing\Models\SubscriptionItem;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Invoice;
 use Throwable;
 
@@ -26,7 +24,6 @@ final class BillingAnalytics
 {
     public function __construct(
         private readonly OrganizationBillingStateComputer $billingStateComputer,
-        private readonly EdgeSiteBillingAnalytics $edgeSiteBillingAnalytics,
         private readonly BillingForecastCalculator $forecastCalculator,
         private readonly OrganizationCostObservatory $costObservatory,
     ) {}
@@ -47,8 +44,11 @@ final class BillingAnalytics
             'spend_trend' => $spendTrend,
             'category_breakdown' => $this->categoryBreakdown($state),
             'line_items' => $this->lineItems($state),
-            'edge_usage_daily' => $this->edgeUsageDaily($organization, $state->edgeCount, 30),
-            'edge_sites' => $this->edgeSiteBillingAnalytics->sitesForOrganization($organization),
+            // Edge is removed (remove-cloud-edge-serverless); its snapshot model
+            // and analytics service are gone. Keys stay so the blade's
+            // @forelse/empty branches keep rendering.
+            'edge_usage_daily' => [],
+            'edge_sites' => [],
             'sync_events' => $this->recentSyncEvents($organization),
             'invoice_history' => $this->invoiceHistory($organization),
             'managed_products' => $this->managedProducts($organization),
@@ -83,7 +83,6 @@ final class BillingAnalytics
             'stripe_status' => $defaultSubscription?->stripe_status,
             'next_invoice_at' => $this->nextInvoiceAt($organization)?->toDateString(),
             'server_count' => $state->serverCount(),
-            'serverless_count' => $state->serverlessCount,
             'cloud_count' => $state->cloudCount,
             'edge_count' => $state->edgeCount,
             'realtime_count' => $state->realtimeCount,
@@ -106,24 +105,6 @@ final class BillingAnalytics
                 'color' => 'bg-brand-ink/80',
             ],
         ];
-
-        if ($state->serverlessSubtotalCents > 0) {
-            $segments[] = [
-                'key' => 'serverless',
-                'label' => __('Serverless').' × '.$state->serverlessCount,
-                'cents' => $state->serverlessSubtotalCents,
-                'color' => 'bg-violet-500/70',
-            ];
-        }
-
-        if ($state->serverlessUsageSubtotalCents > 0) {
-            $segments[] = [
-                'key' => 'serverless_usage',
-                'label' => __('Serverless usage'),
-                'cents' => $state->serverlessUsageSubtotalCents,
-                'color' => 'bg-violet-500/40',
-            ];
-        }
 
         if ($state->managedServerSubtotalCents > 0) {
             $segments[] = [
@@ -198,27 +179,6 @@ final class BillingAnalytics
                 ? trans_choice(':count server|:count servers', $serverCount, ['count' => $serverCount])
                 : null,
         ]];
-
-        if ($state->serverlessCount > 0) {
-            $unit = (int) config('subscription.standard.serverless_cents', 200);
-            $items[] = [
-                'label' => __('dply serverless function'),
-                'quantity' => $state->serverlessCount,
-                'unit_cents' => $unit,
-                'line_cents' => $state->serverlessSubtotalCents,
-                'detail' => null,
-            ];
-        }
-
-        if ($state->serverlessUsageSubtotalCents > 0) {
-            $items[] = [
-                'label' => __('dply serverless usage'),
-                'quantity' => 1,
-                'unit_cents' => $state->serverlessUsageSubtotalCents,
-                'line_cents' => $state->serverlessUsageSubtotalCents,
-                'detail' => __('Metered invocations, managed databases & caches'),
-            ];
-        }
 
         if ($state->managedServerSubtotalCents > 0) {
             $items[] = [
@@ -305,53 +265,6 @@ final class BillingAnalytics
         }
 
         return $items;
-    }
-
-    /**
-     * @return list<array{date: string, label: string, requests: int, bytes_egress: int, cost_cents: int}>
-     */
-    private function edgeUsageDaily(Organization $organization, int $edgeSiteCount, int $days): array
-    {
-        $start = now()->subDays(max(1, $days - 1))->startOfDay();
-
-        $rows = EdgeUsageSnapshot::query()
-            ->where('organization_id', $organization->id)
-            ->where('period_start', '>=', $start->toDateString())
-            ->groupBy('period_start')
-            ->orderBy('period_start')
-            ->get([
-                'period_start',
-                DB::raw('COALESCE(SUM(requests), 0) as requests'),
-                DB::raw('COALESCE(SUM(bytes_egress), 0) as bytes_egress'),
-                DB::raw('COALESCE(MAX(r2_storage_bytes), 0) as r2_storage_bytes'),
-                DB::raw('COALESCE(SUM(r2_class_a_ops), 0) as r2_class_a_ops'),
-                DB::raw('COALESCE(SUM(r2_class_b_ops), 0) as r2_class_b_ops'),
-            ]);
-
-        $calculator = app(EdgeUsageCostCalculator::class);
-        $edgeSiteCount = max(1, $edgeSiteCount);
-        $series = [];
-
-        foreach ($rows as $row) {
-            $totals = new EdgeUsageTotals(
-                requests: (int) $row->requests,
-                bytesEgress: (int) $row->bytes_egress,
-                r2StorageBytes: (int) $row->r2_storage_bytes,
-                r2ClassAOps: (int) $row->r2_class_a_ops,
-                r2ClassBOps: (int) $row->r2_class_b_ops,
-            );
-            $date = (string) $row->period_start;
-
-            $series[] = [
-                'date' => $date,
-                'label' => Carbon::parse($date)->format('M j'),
-                'requests' => $totals->requests,
-                'bytes_egress' => $totals->bytesEgress,
-                'cost_cents' => $calculator->estimate($totals, max(1, $edgeSiteCount))['subtotal_cents'],
-            ];
-        }
-
-        return $series;
     }
 
     /**
@@ -478,49 +391,11 @@ final class BillingAnalytics
     }
 
     /**
-     * @return array{serverless: list<array>, cloud: list<array>, edge: list<array>}
+     * @return array{cloud: list<array>, edge: list<array>}
      */
     private function managedProducts(Organization $organization): array
     {
-        $sites = $organization->sites()->orderBy('name')->get();
-
-        $serverless = [];
-        $cloud = [];
-        $edge = [];
-
-        foreach ($sites as $site) {
-            if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
-                $serverless[] = [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'status' => $site->status,
-                    'unit_cents' => (int) config('subscription.standard.serverless_cents', 200),
-                ];
-            }
-
-            if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $site->isDplyCloudSite() && ! $site->isCloudPreview()) {
-                $cloud[] = [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'live_url' => $site->containerLiveUrl(),
-                    'unit_cents' => (int) config('subscription.standard.cloud_cents', 500),
-                ];
-            }
-
-            if ($site->status === Site::STATUS_EDGE_ACTIVE && $site->edge_backend === 'dply_edge' && ! $site->isEdgePreview()) {
-                $runtimeMode = strtolower((string) ($site->edgeMeta()['runtime_mode'] ?? 'static'));
-                $edge[] = [
-                    'id' => $site->id,
-                    'name' => $site->name,
-                    'live_url' => $site->edgeLiveUrl(),
-                    'unit_cents' => $runtimeMode === 'ssr'
-                        ? (int) config('subscription.standard.edge_ssr_cents', 700)
-                        : (int) config('subscription.standard.edge_cents', 200),
-                ];
-            }
-        }
-
-        return compact('serverless', 'cloud', 'edge');
+        return ['cloud' => [], 'edge' => []];
     }
 
     /**
@@ -539,23 +414,18 @@ final class BillingAnalytics
     }
 
     /**
-     * @return list<array{id: string, name: string, tier: string, monthly_cents: int}>
+     * @return list<array{id: string, name: string, monthly_cents: int}>
      */
     private function billableServersList(Organization $organization): array
     {
         return $this->billableServers($organization)
-            ->map(function (Server $server): array {
-                $tier = $server->billingTier();
-
-                return [
-                    'id' => (string) $server->id,
-                    'name' => (string) $server->name,
-                    'tier' => strtoupper($tier->value),
-                    // Per-server dply fee is $0 under the flat-plan model — the
-                    // plan price (by server count) is billed once, not per size.
-                    'monthly_cents' => 0,
-                ];
-            })
+            ->map(fn (Server $server): array => [
+                'id' => (string) $server->id,
+                'name' => (string) $server->name,
+                // Per-server dply fee is $0 under the flat-plan model — the
+                // plan price (by server count) is billed once, not per server.
+                'monthly_cents' => 0,
+            ])
             ->values()
             ->all();
     }
@@ -587,9 +457,6 @@ final class BillingAnalytics
             ->values();
     }
 
-    /**
-     * @return Collection<int, array{server: Server, reason: string}>
-     */
     private function excludedServers(Organization $organization): Collection
     {
         $minAge = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
@@ -600,12 +467,15 @@ final class BillingAnalytics
             ->orderBy('name')
             ->get()
             ->reject(fn (Server $s) => in_array($s->id, $billableIds, true))
+            // Serverless / Functions hosts left this app for their own product;
+            // listing them as "not billed here" is answering a question nobody
+            // in dply can still ask.
+            ->reject(fn (Server $s) => $s->isServerlessHost())
             ->map(function (Server $server) use ($cutoff, $minAge): array {
                 $reason = match (true) {
                     $server->isManagedProductHost() => match (true) {
                         $server->isDplyCloudHost() => __('Billed as dply Cloud app'),
                         $server->isDplyEdgeHost() => __('Billed as dply Edge site'),
-                        $server->isServerlessHost() => __('Billed as serverless function'),
                         default => __('Billed as managed product'),
                     },
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
@@ -635,7 +505,7 @@ final class BillingAnalytics
 
         $items = [];
         foreach ($subscription->items as $item) {
-            /** @var \App\Modules\Billing\Models\SubscriptionItem $item */
+            /** @var SubscriptionItem $item */
             $items[] = [
                 'price_id' => $item->stripe_price,
                 'quantity' => (int) $item->quantity,
@@ -663,7 +533,6 @@ final class BillingAnalytics
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
             array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
-                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),
@@ -694,7 +563,7 @@ final class BillingAnalytics
     }
 
     /**
-     * @param  array<string, mixed> $estimate
+     * @param  array<string, mixed>  $estimate
      */
     private function formatEdgeUsageDetail(array $estimate): ?string
     {
@@ -736,7 +605,6 @@ final class BillingAnalytics
             'is_free' => $state->isFree(),
             'counts' => [
                 'servers' => $state->serverCount(),
-                'serverless' => $state->serverlessCount,
                 'managed_servers' => $state->managedServerCount,
                 'cloud' => $state->cloudCount,
                 'edge' => $state->edgeCount,

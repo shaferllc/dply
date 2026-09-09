@@ -11,6 +11,7 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\SshConnection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
 
@@ -121,14 +122,15 @@ final class SiteManifestCodeShapeSync
     /**
      * @return array{build: int, release: int, processes: int, runtime_change: ?array{field: string, from: ?string, to: ?string}}
      */
-    /** @return array<string, mixed> */
     public function reconcile(Site $site, DplyManifest $manifest): array
     {
         $pipeline = $this->pipelines->ensureDefaultPipeline($site);
 
         $processes = $this->reconcileProcesses($site, $manifest->processes);
-        if ($processes > 0) {
-            // Close the loop: SiteProcess rows alone do not provision daemons.
+        // Site.meta.process_daemons=false: inventory-only (control-plane Phase 1
+        // supervisor templates already own Horizon/scheduler — installing
+        // systemd dply-site-* units would double-run them).
+        if ($processes > 0 && $this->shouldEnsureProcessDaemons($site)) {
             ControlWorkerDaemonJob::dispatch((string) $site->id, 'ensure');
         }
 
@@ -141,7 +143,7 @@ final class SiteManifestCodeShapeSync
     }
 
     /**
-     * @param  array<string, mixed>  $commands
+     * @param  list<string>  $commands
      */
     private function reconcilePhase(Site $site, string $pipelineId, string $phase, array $commands): int
     {
@@ -182,14 +184,20 @@ final class SiteManifestCodeShapeSync
      */
     private function reconcileProcesses(Site $site, array $processes): int
     {
-        SiteProcess::query()
-            ->where('site_id', $site->id)
-            ->where('managed_by_manifest', true)
-            ->delete();
+        $desiredNames = array_keys($processes);
 
-        if ($processes === []) {
+        // Drop manifest-owned rows that are no longer declared. Do not wipe
+        // everything first — a dashboard/UI process with the same name must
+        // be adopted via updateOrCreate (site_id+name is unique).
+        $stale = SiteProcess::query()
+            ->where('site_id', $site->id)
+            ->where('managed_by_manifest', true);
+        if ($desiredNames === []) {
+            $stale->delete();
+
             return 0;
         }
+        $stale->whereNotIn('name', $desiredNames)->delete();
 
         $known = [SiteProcess::TYPE_WEB, SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER];
         $count = 0;
@@ -198,14 +206,13 @@ final class SiteManifestCodeShapeSync
                 ? $process->type
                 : (in_array($name, $known, true) ? $name : SiteProcess::TYPE_CUSTOM);
 
-            SiteProcess::query()->create([
-                'site_id' => $site->id,
+            $this->upsertManifestProcess($site, $name, [
                 'type' => $type,
-                'name' => $name,
                 'command' => $process->command,
                 'scale' => $process->scale,
                 'env_vars' => $process->env !== [] ? $process->env : null,
-                'is_active' => true,
+                // Keep inactive when daemons are owned elsewhere (supervisor templates).
+                'is_active' => $this->shouldEnsureProcessDaemons($site),
                 'managed_by_manifest' => true,
                 'meta' => $process->meta() !== [] ? $process->meta() : null,
             ]);
@@ -213,6 +220,56 @@ final class SiteManifestCodeShapeSync
         }
 
         return $count;
+    }
+
+    /**
+     * Whether manifest processes should be materialised as systemd/supervisor
+     * daemons via {@see ControlWorkerDaemonJob}. Opt out with
+     * Site.meta.process_daemons=false (dogfood Phase 1: dply.yaml
+     * supervisor.use_templates owns the box).
+     */
+    private function shouldEnsureProcessDaemons(Site $site): bool
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        if (array_key_exists('process_daemons', $meta)) {
+            return (bool) $meta['process_daemons'];
+        }
+
+        return true;
+    }
+
+    /**
+     * Adopt or create a process by (site_id, name). Retries via the model when
+     * a concurrent writer wins the unique race (updateOrCreate SELECT → INSERT)
+     * so encrypted casts (env_vars) still apply.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function upsertManifestProcess(Site $site, string $name, array $attributes): void
+    {
+        $keys = [
+            'site_id' => $site->id,
+            'name' => $name,
+        ];
+
+        try {
+            SiteProcess::query()->updateOrCreate($keys, $attributes);
+        } catch (UniqueConstraintViolationException) {
+            $existing = SiteProcess::query()->where($keys)->first();
+            if ($existing !== null) {
+                $existing->fill($attributes)->save();
+
+                return;
+            }
+
+            try {
+                SiteProcess::query()->create($keys + $attributes);
+            } catch (UniqueConstraintViolationException) {
+                $retry = SiteProcess::query()->where($keys)->firstOrFail();
+                $retry->fill($attributes)->save();
+            }
+        }
     }
 
     /**
@@ -260,7 +317,6 @@ final class SiteManifestCodeShapeSync
      *
      * @return array{steps: int, processes: int}
      */
-    /** @return array<string, mixed> */
     public function revertToDashboard(Site $site): array
     {
         $steps = SiteDeployStep::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->delete();

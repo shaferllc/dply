@@ -128,9 +128,8 @@ class OpenLiteSpeedCacheModuleConfig
      * array keyed by the PARAMS keys above. Missing directives use the
      * declared defaults so the UI always renders a populated form.
      *
-     * @return array{values: array<string, string>, exists: bool, raw: string}
+     * @return array{values: array<string, string>, exists: bool, raw: string, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = array_map(fn (array $meta): string => (string) $meta['default'], self::PARAMS);
@@ -344,7 +343,7 @@ class OpenLiteSpeedCacheModuleConfig
             return [];
         }
 
-        return array_values(array_filter(array_map('trim', $matches[1] ?? []), fn (string $v) => $v !== ''));
+        return array_values(array_filter(array_map('trim', $matches[1]), fn (string $v) => $v !== ''));
     }
 
     private function normalizeScalar(string $type, string $raw, string $default): string

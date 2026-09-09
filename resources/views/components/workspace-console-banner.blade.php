@@ -137,7 +137,7 @@
                     type="button"
                     x-on:click="copy()"
                     x-bind:aria-label="copied ? @js(__('Copied')) : @js(__('Copy console output'))"
-                    class="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 py-1 text-[11px] font-medium text-emerald-50/90 backdrop-blur transition hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
+                    class="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-2 py-1 text-xs font-medium text-emerald-50/90 backdrop-blur transition hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
                 >
                     <template x-if="!copied">
                         <span class="inline-flex items-center gap-1.5">

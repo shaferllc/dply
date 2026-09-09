@@ -3,10 +3,9 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\DeploymentMethod;
+use App\Jobs\DetectSiteCloudflareTlsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
-use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
@@ -32,9 +31,10 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
-use App\Services\Servers\ServerPhpManager;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\Sites\SiteShowViewData;
+use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -48,8 +48,6 @@ class Show extends Component
     use DispatchesToastNotifications;
     use HandlesSiteRemovalFlow;
     use InteractsWithScaffoldJourney;
-    use ManagesEdgeRedeploy;
-    use ManagesServerlessRuntime;
     use ManagesSiteDeployExecution;
     use ManagesSiteDeployHooks;
     use ManagesSiteDeploymentSettings;
@@ -75,8 +73,32 @@ class Show extends Component
     /** Active tab on the post-provisioning dashboard (overview|deploys|runtime|logs|ssl). */
     public string $dashboard_tab = 'overview';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setDashboardTab(string $value): void
+    {
+        if ($value === '' || $value === $this->dashboard_tab) {
+            return;
+        }
+
+        $this->dashboard_tab = $value;
+    }
+
     /** Recorded in site meta for Rails apps (e.g. production, staging). */
     public string $rails_env = 'production';
+
+    /** Runtime picker on Settings -> Runtime. See ManagesSiteRuntimeHealth::switchSiteRuntime(). */
+    public string $runtime_choice = '';
+
+    public string $runtime_choice_version = '';
+
+    /** Required when switching to a reverse-proxied runtime (node/python/go/...). */
+    public string $runtime_start_command = '';
+
+    public string $runtime_internal_port = '';
 
     public string $octane_port = '';
 
@@ -122,26 +144,21 @@ class Show extends Component
             return;
         }
 
-        $functionsConfig = $this->site->functionsConfig();
+        // The serverless runtime block that stood here hydrated functions_*
+        // properties from the ManagesServerlessRuntime trait and
+        // Site::functionsConfig(), all deleted with the surface
+        // (remove-cloud-edge-serverless).
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
-        $this->functions_repo_source = (string) ($functionsConfig['repo_source'] ?? 'manual');
-        $this->functions_source_control_account_id = (string) ($functionsConfig['source_control_account_id'] ?? '');
-        $this->functions_repository_selection = '';
-        $this->functions_repository_subdirectory = (string) ($functionsConfig['repository_subdirectory'] ?? '');
-        $this->functions_runtime = (string) ($functionsConfig['runtime'] ?? '');
-        $this->functions_entrypoint = (string) ($functionsConfig['entrypoint'] ?? '');
-        $this->functions_build_command = (string) ($functionsConfig['build_command'] ?? '');
-        $this->functions_artifact_output_path = (string) ($functionsConfig['artifact_output_path'] ?? '');
-        $this->syncServerlessRuntimeFromSite();
-        $this->functionsDetection = is_array($functionsConfig['detected_runtime'] ?? null)
-            ? $functionsConfig['detected_runtime']
-            : [];
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_path_override = (string) ($this->site->env_file_path ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
-        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
+        $this->zero_downtime_enabled = $this->site->isAtomicDeploys()
+            || $this->site->isConvertingAtomicLayout();
+        if ($this->site->isDisablingAtomicLayout()) {
+            $this->zero_downtime_enabled = false;
+        }
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
         $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
         $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);
@@ -162,6 +179,11 @@ class Show extends Component
             : '';
         $railsRuntime = is_array($dm['rails_runtime'] ?? null) ? $dm['rails_runtime'] : [];
         $this->rails_env = (string) ($railsRuntime['env'] ?? 'production');
+        $this->runtime_choice = (string) ($this->site->runtime ?? '');
+        $this->runtime_choice_version = (string) ($this->site->runtime_version ?? '');
+        $this->runtime_start_command = (string) ($this->site->start_command ?? '');
+        $port = $this->site->internal_port ?? $this->site->app_port;
+        $this->runtime_internal_port = $port !== null ? (string) $port : '';
         $this->releases_to_keep = (int) ($this->site->releases_to_keep ?? 5);
         $this->nginx_extra_raw = (string) ($this->site->nginx_extra_raw ?? '');
         $this->engine_http_cache_enabled = (bool) ($this->site->engine_http_cache_enabled ?? false);
@@ -205,6 +227,10 @@ class Show extends Component
         $this->git_provider_kind = in_array($kind, ['github', 'gitlab', 'bitbucket', 'custom'], true) ? $kind : 'custom';
         $this->git_source_control_account_id = (string) ($repoMeta['git_source_control_account_id'] ?? '');
         $this->quick_deploy_enabled_ui = (bool) ($repoMeta['quick_deploy_enabled'] ?? false);
+        $mode = (string) ($repoMeta['quick_deploy_mode'] ?? 'webhook');
+        $this->quick_deploy_mode_ui = $this->quick_deploy_enabled_ui && in_array($mode, ['webhook', 'poll'], true)
+            ? $mode
+            : null;
         $this->deploy_sync_include_peers_on_manual = (bool) ($repoMeta['deploy_sync_include_peers_on_manual'] ?? true);
     }
 
@@ -257,14 +283,10 @@ class Show extends Component
 
     public function shouldShowSystemUserPanel(): bool
     {
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return false;
-        }
-
         return $this->site->shouldShowPhpOctaneRolloutSettings();
     }
 
-    /** Overview SSL card: probe in flight (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}). */
+    /** Overview SSL card: probe in flight (see {@see DetectSiteCloudflareTlsJob}). */
     public bool $ssl_recheck_running = false;
 
     /** `checked_at` seen at dispatch, so the poll can tell when a fresh result lands. */
@@ -283,7 +305,7 @@ class Show extends Component
 
         $this->ssl_recheck_requested_at = $this->site->cloudflareTlsCheckedAt();
         $this->ssl_recheck_running = true;
-        \App\Jobs\DetectSiteCloudflareTlsJob::dispatch($this->site->id);
+        DetectSiteCloudflareTlsJob::dispatch($this->site->id);
     }
 
     /** Driven by wire:poll while a recheck is in flight; resolves once meta updates. */
@@ -324,7 +346,7 @@ class Show extends Component
             $this->server->workspace_id !== null
             && (string) $this->server->workspace_id === (string) $this->site->workspace_id
         ) {
-            $workspace = app(\App\Support\Workspaces\WorkspaceRegistry::class)->for($this->site);
+            $workspace = app(WorkspaceRegistry::class)->for($this->site);
 
             if ($workspace !== null) {
                 if (! $this->site->relationLoaded('workspace')) {
@@ -372,7 +394,11 @@ class Show extends Component
             $this->server->setRelation('organization', $org);
         }
 
-        $workspace = $this->site->workspace;
+        // Through the registry, not `$this->site->workspace`: the policy already
+        // resolved this workspace for another Site instance this request, and a
+        // raw belongsTo here re-SELECTs the same row. The memo also means the
+        // `organization` we set below lands on the instance everyone else holds.
+        $workspace = app(WorkspaceRegistry::class)->for($this->site);
         if (
             $workspace !== null
             && (string) $workspace->organization_id === (string) $org->id
@@ -406,10 +432,6 @@ class Show extends Component
             } else {
                 $relations['deployments'] = fn ($q) => $q->limit(1);
             }
-        }
-
-        if ($this->site->usesEdgeRuntime()) {
-            $relations['edgeDeployments'] = fn ($q) => $q->limit($ready ? 10 : 1);
         }
 
         $this->site->load($relations);
@@ -465,8 +487,7 @@ class Show extends Component
             return 'overview';
         }
 
-        $showRuntimeTab = $this->site->usesFunctionsRuntime()
-            || $this->site->usesDockerRuntime()
+        $showRuntimeTab = $this->site->usesDockerRuntime()
             || $this->site->usesKubernetesRuntime();
         $showSslTab = ! $this->site->usesDockerRuntime()
             && ($this->site->primaryPreviewDomain() || $this->site->certificates()->exists());

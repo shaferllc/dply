@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Sites\EnvImportSources;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,19 +19,20 @@ use Illuminate\Support\Carbon;
  *                      into the deployment environment at deploy time only — they are intentionally
  *                      kept out of the editable Variables list so the binding stays the source of
  *                      truth for them.
- * @property array<string, mixed> $config
+ * @property array<string, mixed>|null $config
+ * @property array<string, mixed>|null $env_customization
  * @property array<string, mixed> $injected_env
- * @property string $last_error
+ * @property string|null $last_error
  * @property string $mode
- * @property string $name
+ * @property string|null $name
  * @property ?string $site_id
  * @property string $status
  * @property ?string $target_id
- * @property string $target_type
+ * @property string|null $target_type
  * @property string $type
  * @property-read ?Site $site
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class SiteBinding extends Model
 {
@@ -56,6 +58,7 @@ class SiteBinding extends Model
         'search',
         'payments',
         'oauth',
+        'connected_app',
     ];
 
     /**
@@ -90,6 +93,7 @@ class SiteBinding extends Model
         // config/mail.php snippet. API providers (Mailgun/SES/…) read global
         // config/services.php creds, so they can't be a second instance.
         'mail',
+        'connected_app',
     ];
 
     public static function isMultiInstance(string $type): bool
@@ -117,6 +121,7 @@ class SiteBinding extends Model
         'target_id',
         'injected_env',
         'config',
+        'env_customization',
         'last_error',
     ];
 
@@ -126,6 +131,9 @@ class SiteBinding extends Model
         return [
             'injected_env' => 'encrypted:array',
             'config' => 'array',
+            // Encrypted: `overrides` can hold a DB_PASSWORD, or a DATABASE_URL
+            // that embeds one. See the migration for why this isn't in `config`.
+            'env_customization' => 'encrypted:array',
         ];
     }
 
@@ -136,7 +144,87 @@ class SiteBinding extends Model
     }
 
     /**
+     * Operator-configured aliases: extra env names that should carry the value
+     * of a key this binding already injects. Keyed by the canonical key.
+     *
+     * Absent (null) and empty ([]) mean different things: absent is "never
+     * configured", which lets stack detection seed a default on attach; empty
+     * is "the operator cleared it", which detection must not undo.
+     *
+     * @return array<string, list<string>>
+     */
+    public function envAliases(): array
+    {
+        $raw = data_get($this->env_customization, 'aliases');
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $canonical => $aliases) {
+            $canonical = (string) $canonical;
+            if ($canonical === '' || ! is_array($aliases)) {
+                continue;
+            }
+            $names = [];
+            foreach ($aliases as $alias) {
+                $alias = trim((string) $alias);
+                if ($alias !== '' && $alias !== $canonical && ! in_array($alias, $names, true)) {
+                    $names[] = $alias;
+                }
+            }
+            if ($names !== []) {
+                $out[$canonical] = $names;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Whether stack detection has ever written an alias map for this binding.
+     * Distinguishes "never seeded" from "seeded then cleared by the operator",
+     * which {@see envAliases()} flattens away.
+     */
+    public function hasEnvAliasMap(): bool
+    {
+        return is_array(data_get($this->env_customization, 'aliases'));
+    }
+
+    /**
+     * Operator-set values that replace what this binding would otherwise
+     * inject for a key it owns. The binding layer stays authoritative over the
+     * editable .env (that merge order is deliberate — it exists to beat stale
+     * scaffold values); this is the escape hatch INSIDE that layer.
+     *
+     * @return array<string, string>
+     */
+    public function envOverrides(): array
+    {
+        $raw = data_get($this->env_customization, 'overrides');
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $key => $value) {
+            $key = (string) $key;
+            if ($key !== '' && (is_scalar($value) || $value === null)) {
+                $out[$key] = (string) $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Connection variables this binding contributes at deploy time.
+     *
+     * Applied in order: the generated base, then operator overrides (which only
+     * ever replace a key the binding already owns), then aliases (which only
+     * ever ADD names, never remove or replace). An alias whose name is already
+     * taken is skipped rather than clobbering — the same guard the hardcoded
+     * stack-detection aliases have always used.
      *
      * @return array<string, string>
      */
@@ -151,12 +239,196 @@ class SiteBinding extends Model
             }
         }
 
-        return $clean;
+        // Managed Redis bindings stored before TLS was injected still have
+        // HOST/PORT/PASSWORD only. Re-derive from the cluster so the next
+        // env push / deploy handshakes with rediss:// instead of 500ing.
+        if ($this->type === 'redis' && $this->target_type === 'cloud_database' && filled($this->target_id)) {
+            $cluster = CloudDatabase::query()->find($this->target_id);
+            if ($cluster instanceof CloudDatabase) {
+                $connection = (string) (data_get($this->config, 'connection') ?? '');
+                $prefix = ($connection === '' || strtolower($connection) === 'primary')
+                    ? 'REDIS'
+                    : 'REDIS_'.strtoupper($connection);
+                foreach ($cluster->connectionEnvVars($prefix) as $key => $value) {
+                    $clean[$key] = $value;
+                }
+            }
+        }
+
+        return $this->applyEnvCustomization($clean);
+    }
+
+    /**
+     * Keys in {@see connectionEnv()} whose value must be masked.
+     *
+     * Callers must NOT infer this from the key name: masking elsewhere is a
+     * name-pattern match, and an operator is free to alias DATABASE_URL (which
+     * embeds the password) to POSTGRES_URL, which matches no pattern. The
+     * binding knows which of its keys are sensitive and which names mirror
+     * them, so it is the only thing that can answer correctly.
+     *
+     * @return list<string>
+     */
+    public function sensitiveEnvKeys(): array
+    {
+        $aliases = $this->envAliases();
+
+        $keys = [];
+        foreach (array_keys($this->connectionEnv()) as $key) {
+            $key = (string) $key;
+            // A name that already looks sensitive is sensitive regardless of
+            // provenance; an alias inherits from the key it mirrors.
+            $canonical = self::canonicalForAlias($aliases, $key) ?? $key;
+            if (EnvImportSources::isSecretKey($key) || EnvImportSources::isSecretKey($canonical)) {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * The canonical key an alias mirrors, or null when $key isn't an alias.
+     *
+     * @param  array<string, list<string>>  $aliases
+     */
+    private static function canonicalForAlias(array $aliases, string $key): ?string
+    {
+        foreach ($aliases as $canonical => $names) {
+            if (in_array($key, $names, true)) {
+                return (string) $canonical;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Apply operator overrides then aliases to a generated env map.
+     *
+     * @param  array<string, string>  $env
+     * @return array<string, string>
+     */
+    private function applyEnvCustomization(array $env): array
+    {
+        foreach ($this->envOverrides() as $key => $value) {
+            // Only keys this binding actually owns — an override is a
+            // replacement, not a way to smuggle arbitrary vars into the
+            // authoritative layer where the editable .env can't reach them.
+            if (array_key_exists($key, $env)) {
+                $env[$key] = $value;
+            }
+        }
+
+        foreach ($this->envAliases() as $canonical => $names) {
+            if (! array_key_exists($canonical, $env)) {
+                continue;
+            }
+            foreach ($names as $alias) {
+                if (! array_key_exists($alias, $env)) {
+                    $env[$alias] = $env[$canonical];
+                }
+            }
+        }
+
+        return $env;
     }
 
     public function wasProvisionedByDply(): bool
     {
         return $this->mode === 'provision_new';
+    }
+
+    /**
+     * Hosted / remote database the operator can still configure (managed
+     * cluster, dedicated DB VM, serverless vendor, or an external host).
+     * On-box and same-server Docker placements are not remote.
+     */
+    public function isRemoteConfigurableDatabase(): bool
+    {
+        if ($this->type !== 'database') {
+            return false;
+        }
+
+        if ($this->target_type === 'cloud_database') {
+            return true;
+        }
+
+        $config = is_array($this->config) ? $this->config : [];
+        if (! empty($config['managed']) || ($config['placement'] ?? '') === 'managed') {
+            return true;
+        }
+
+        $placement = strtolower(trim((string) ($config['placement'] ?? '')));
+        if ($placement !== '' && ! in_array($placement, ['on_box', 'same_server', 'docker'], true)) {
+            return true;
+        }
+
+        $env = is_array($this->injected_env) ? $this->injected_env : [];
+        $host = strtolower(trim((string) ($config['host'] ?? $env['DB_HOST'] ?? '')));
+
+        return $host !== '' && ! in_array($host, ['127.0.0.1', 'localhost', '::1'], true);
+    }
+
+    /**
+     * Dedicated VM this binding is waiting on (database box or Redis-only
+     * cache host). Null for managed/on-server placements.
+     */
+    public function provisionServerId(): ?string
+    {
+        $config = is_array($this->config) ? $this->config : [];
+        $placement = $config['placement'] ?? null;
+
+        $id = match ($placement) {
+            'cache_vm' => $config['cache_vm_server_id'] ?? null,
+            'dedicated_vm', 'docker_vm' => $config['db_vm_server_id'] ?? null,
+            default => $config['cache_vm_server_id'] ?? $config['db_vm_server_id'] ?? null,
+        };
+
+        return filled($id) ? (string) $id : null;
+    }
+
+    public function isProvisioning(): bool
+    {
+        return $this->status === self::STATUS_PROVISIONING;
+    }
+
+    public function isErrored(): bool
+    {
+        return $this->status === self::STATUS_ERROR;
+    }
+
+    /**
+     * Operator-facing failure text: the binding's own last_error plus, when
+     * this row owns a dedicated VM, the provider / setup error from that box.
+     */
+    public function displayError(?Server $provisionServer = null): ?string
+    {
+        $parts = [];
+        if (filled($this->last_error)) {
+            $parts[] = trim((string) $this->last_error);
+        }
+
+        $config = is_array($this->config) ? $this->config : [];
+        if (filled($config['last_error'] ?? null)) {
+            $fromConfig = trim((string) $config['last_error']);
+            if ($fromConfig !== '' && ! in_array($fromConfig, $parts, true)) {
+                $parts[] = $fromConfig;
+            }
+        }
+
+        if ($provisionServer instanceof Server) {
+            $meta = is_array($provisionServer->meta) ? $provisionServer->meta : [];
+            $provisionError = is_array($meta['provision_error'] ?? null) ? $meta['provision_error'] : [];
+            $serverMessage = trim((string) ($provisionError['message'] ?? ''));
+            if ($serverMessage !== '' && ! collect($parts)->contains(
+                static fn (string $part): bool => str_contains($part, $serverMessage)
+            )) {
+                $parts[] = $serverMessage;
+            }
+        }
+
+        return $parts === [] ? null : implode(' — ', $parts);
     }
 
     /**
@@ -187,6 +459,15 @@ class SiteBinding extends Model
                     : null,
                 default => null,
             },
+            'redis' => match ($this->target_type) {
+                'cloud_database' => $this->wasProvisionedByDply()
+                    ? __('Also delete the managed Valkey cluster')
+                    : null,
+                'server_cache_service' => ($this->wasProvisionedByDply() && ($this->config['placement'] ?? '') === 'cache_vm')
+                    ? __('Also destroy the dedicated Redis server')
+                    : null,
+                default => null,
+            },
             'storage' => $this->wasProvisionedByDply()
                 ? __('Also delete the bucket and its contents')
                 : null,
@@ -205,6 +486,11 @@ class SiteBinding extends Model
                     default => __('Runs DROP DATABASE on the server and removes the Dply row. Cannot be undone.'),
                 },
                 'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
+                default => '',
+            },
+            'redis' => match ($this->target_type) {
+                'cloud_database' => __('Tears down the managed cluster at the provider and removes the Dply record. Cannot be undone.'),
+                'server_cache_service' => __('Destroys the Redis server dply provisioned for this binding. Cannot be undone.'),
                 default => '',
             },
             'storage' => __('Empties and deletes the bucket dply provisioned for this disk. Cannot be undone.'),

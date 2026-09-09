@@ -3,7 +3,7 @@ title: "Edge traffic & analytics"
 slug: edge-traffic
 category: "Edge"
 order: 130
-description: "CDN-level visibility for managed Edge sites covering requests, bandwidth, cache hit ratio, Worker performance, Core Web Vitals, and access log samples."
+description: "CDN-level visibility for managed Edge sites covering requests, bandwidth, cache hit ratio, Worker performance, Core Web Vitals, and a live request tail."
 group: edge
 ---
 
@@ -38,9 +38,9 @@ Latency and error metrics from the edge Worker help diagnose slow routes or orig
 
 Real-user **LCP**, **INP**, and **CLS** samples collected from visitor browsers when RUM ingest is enabled. Use these to track front-end performance regressions after deploys.
 
-## Recent access log sample
+## Live requests
 
-A truncated list of recent HTTP requests (method, path, status, cache status) for quick debugging. For full log retention, use platform log export features when configured for your org.
+A real-time access-log tail (method, path, status, cache, country) streamed from Worker log ingest. Pause, filter, clear, or download CSV from the controls. Visit your live Edge URL to generate rows; if nothing ever appears, redeploy the Edge worker so it picks up the ingest URL.
 
 ## Observability navigation
 

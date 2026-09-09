@@ -1,5 +1,17 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| Dply-owned testing / preview zones
+|--------------------------------------------------------------------------
+|
+| These lists live here — not in .env — so adding a zone is a code change.
+| Tests (APP_ENV=testing) use local *.test apexes so the suite never talks
+| to a public zone. DNS is Cloudflare via CLOUDFLARE_KEY.
+*/
+
+$testing = env('APP_ENV') === 'testing';
+
 return [
 
     /*
@@ -23,11 +35,54 @@ return [
     ],
 
     'cloudflare' => [
-        'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-        // Accept either name: the mail transport key was historically provisioned
-        // as CLOUDFLARE_KEY in env, while this config read only CLOUDFLARE_API_KEY —
-        // the mismatch left services.cloudflare.key null and crashed CloudflareTransport.
-        'key' => env('CLOUDFLARE_API_KEY', env('CLOUDFLARE_KEY')),
+        /*
+         * DNS credentials ONLY. Mail lives in config/mail.php under the
+         * 'cloudflare' mailer (CLOUDFLARE_MAIL_ACCOUNT_ID / CLOUDFLARE_MAIL_KEY).
+         *
+         * These two keys used to be shared: Laravel's
+         * MailManager::createCloudflareTransport() falls back to
+         * services.cloudflare.account_id and .key, so the Email Sending
+         * credential was also what the DNS client sent as a Bearer token. It
+         * authenticated as nobody and every zone list came back empty, which
+         * reads exactly like a Zone Resources problem and is not one.
+         *
+         * No fallback to CLOUDFLARE_KEY, deliberately. A shared name is what
+         * caused the bug; leaving it as a fallback would let the collision
+         * quietly persist. Setting CLOUDFLARE_DNS_API_TOKEN is required.
+         */
+        'account_id' => env('CLOUDFLARE_DNS_ACCOUNT_ID'),
+        'key' => env('CLOUDFLARE_DNS_API_TOKEN'),
+
+        /*
+         * Set ONLY when `key` above is a legacy Global API Key.
+         *
+         * Cloudflare has two auth schemes and they are not interchangeable:
+         *   - API token  → Authorization: Bearer <token>
+         *   - Global key → X-Auth-Email: <email> + X-Auth-Key: <key>
+         *
+         * A Global API Key sent as a Bearer token is NOT rejected outright: it
+         * authenticates as nobody, and every list comes back EMPTY. That looks
+         * identical to a Zone Resources problem and sends you into the token
+         * editor for hours. Setting CLOUDFLARE_EMAIL switches the client to
+         * the legacy header pair instead.
+         *
+         * Prefer a scoped API token and leave this unset — a Global API Key
+         * carries full access to the whole account, including billing.
+         */
+        'email' => env('CLOUDFLARE_EMAIL'),
+
+        /*
+         * Kill switch for managed testing hostnames.
+         *
+         * Lived at services.digitalocean.auto_testing_hostname_enabled until
+         * testing hostnames became Cloudflare-only — a DigitalOcean-namespaced
+         * flag gating a Cloudflare feature, which made the "disabled" failure
+         * read as "enable DigitalOcean testing hostnames" on a setup with no
+         * DigitalOcean involvement at all.
+         */
+        'provider' => 'cloudflare',
+        'vm_apex' => $testing ? 'dply.test' : env('CLOUDFLARE_VM_APEX', 'on-dply.cc'),
+        'vm' => env('CLOUDFLARE_VM_TESTING_DOMAINS', ['on-dply.cc']),
     ],
 
     'ses' => [
@@ -36,12 +91,133 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+     | Telegram bot behind the one-click "Connect Telegram" notification channel.
+     | Create with @BotFather (/newbot) to get TELEGRAM_BOT_TOKEN.
+     | TELEGRAM_WEBHOOK_SECRET is invented by you (any random string) — Telegram
+     | echoes it on every delivery and it is the only thing authenticating the
+     | public /hooks/telegram endpoint, so treat it like a password.
+     | Register the webhook with: php artisan telegram:set-webhook
+     | Telegram requires a public HTTPS URL, so use your Expose URL locally.
+     | Optional: without it the button hides and operators paste a bot token +
+     | chat ID by hand instead.
+     */
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET'),
+        'webhook_url' => env('TELEGRAM_WEBHOOK_URL'),
+    ],
+
+    /*
+     | Discord application backing the one-click "Add to Discord" notification
+     | channel. Create at https://discord.com/developers/applications:
+     |   OAuth2 → Redirects: add DISCORD_REDIRECT_URI (Discord rejects `.test`
+     |   hosts — use your Expose URL locally); unset falls back to APP_URL +
+     |   route('notifications.oauth.discord.callback').
+     |   Bot → Reset Token gives DISCORD_BOT_TOKEN.
+     | All three are required: unlike Slack, the bot token is application-wide
+     | and does NOT come out of the OAuth exchange, so without it the flow would
+     | connect a server that can never actually receive a message.
+     | Optional overall: without it the button hides and operators paste a
+     | webhook URL by hand instead.
+     */
+    'discord' => [
+        'client_id' => env('DISCORD_CLIENT_ID'),
+        'client_secret' => env('DISCORD_CLIENT_SECRET'),
+        'redirect' => env('DISCORD_REDIRECT_URI'),
+        'bot_token' => env('DISCORD_BOT_TOKEN'),
+    ],
+
+    /*
+     | Slack app backing the one-click "Add to Slack" notification channel.
+     | Register at https://api.slack.com/apps, add the bot scopes listed in
+     | SlackOAuthController::SCOPES, and set the redirect URL to
+     | SLACK_REDIRECT_URI — or, if unset, route('notifications.oauth.slack.callback')
+     | using APP_URL (use your Expose URL locally; Slack rejects `.test` hosts).
+     | Turn on "Manage Distribution" so workspaces other than your own can install.
+     | Optional: without it the button hides and operators paste an incoming
+     | webhook URL by hand instead. Platform admin can also save these under
+     | /admin/connections (DB overlay; does not write this file).
+     */
     'slack' => [
+        'client_id' => env('SLACK_CLIENT_ID'),
+        'client_secret' => env('SLACK_CLIENT_SECRET'),
+        'redirect' => env('SLACK_REDIRECT_URI'),
+
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+
+    /*
+     | Intercom, behind the "Intercom" notification channel and Laravel's
+     | `intercom` notification driver (App\Modules\Notifications\Channels\Intercom).
+     | Get the token at https://app.intercom.com/a/apps/_/developer-hub → your app
+     | (create one if needed; it never has to be published) → Configure →
+     | Authentication. Enable the "Write conversations" permission there BEFORE
+     | copying the token — changing permissions does not update an already-issued
+     | token. The token is scoped to ONE workspace and ONE region.
+     |
+     | Optional, and normally left unset: operators paste their own token on each
+     | notification channel so every org reaches its own Intercom workspace. This
+     | app-level token is only the fallback for `$user->notify()` on a notifiable
+     | with no Intercom channel of its own — the setup that
+     | laravel-notification-channels/intercom documents. INTERCOM_ADMIN_ID is the
+     | teammate messages are sent as (Intercom → Settings → Teammates, the numeric
+     | ID in the teammate's URL, on the same workspace as the token); Intercom
+     | rejects a message with no `from`, so without it the fallback cannot send.
+     |
+     | INTERCOM_REGION is us (default), eu, or au. A token issued for one region
+     | 401s against the others, which reads exactly like a bad token.
+     | See docs/NOTIFICATIONS_INTERCOM.md.
+     */
+    'intercom' => [
+        'token' => env('INTERCOM_API_KEY'),
+        'region' => env('INTERCOM_REGION', 'us'),
+        'admin_id' => env('INTERCOM_ADMIN_ID'),
+    ],
+
+    /*
+     | PagerDuty, behind the "PagerDuty" notification channel and Laravel's
+     | `PagerDuty` notification driver (App\Modules\Notifications\Channels\PagerDuty).
+     |
+     | The credential is an Events API v2 *integration key*, taken from a single
+     | PagerDuty service: PagerDuty → Services → your service → Integrations →
+     | Add an integration → Events API v2. Note "v2" — the older Events API v1
+     | key has a different payload shape and is not supported.
+     |
+     | Optional, and normally left unset: operators paste their own key on each
+     | notification channel, which is how they choose WHICH service (and so which
+     | escalation policy) an alert pages. This app-level key is only the fallback
+     | for $user->notify() on a notifiable with no PagerDuty channel of its own.
+     |
+     | PAGERDUTY_REGION is us (default) or eu. A key from one region is rejected
+     | by the other with a 400 that names the routing key — so it reads like a
+     | bad key rather than a wrong region.
+     | See docs/NOTIFICATIONS_PAGERDUTY.md.
+     */
+    'pagerduty' => [
+        'routing_key' => env('PAGERDUTY_ROUTING_KEY'),
+        'region' => env('PAGERDUTY_REGION', 'us'),
+    ],
+
+    /*
+     | Microsoft Teams, behind the "Microsoft Teams" notification channel and the
+     | `microsoftTeams` notification driver.
+     |
+     | There is nothing to set here. Each channel stores its own Power Automate
+     | Workflows URL, which already encodes the target team and channel — there is
+     | no app-level credential to share.
+     |
+     | Worth recording why the payload looks the way it does: dply posts an
+     | Adaptive Card to a Workflows webhook, NOT a MessageCard to an Office 365
+     | connector. Microsoft retired connectors between 18 and 22 May 2026, so the
+     | "Incoming Webhook" that most Teams guides still describe no longer
+     | delivers. MicrosoftTeamsClient refuses a *.webhook.office.com URL outright
+     | rather than posting into the void.
+     | See docs/NOTIFICATIONS_MICROSOFT_TEAMS.md.
+     */
 
     'digitalocean' => [
         'default_image' => env('DIGITALOCEAN_DEFAULT_IMAGE', 'ubuntu-24-04-x64'),
@@ -56,29 +232,12 @@ return [
 
         'ssh_user' => env('DIGITALOCEAN_SSH_USER', 'root'),
         /*
-         * Optional personal access token for listing regions & sizes on the server create
-         * wizard when no org credential is selected (read-only catalog). Provisioning still
-         * uses the selected ProviderCredential.
+         * App-level token for the read-only region/size catalog on create (and
+         * similar pickers). Always preferred over a customer credential so a
+         * stale org token cannot empty the wizard. Droplet create still uses
+         * the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
-        'auto_testing_hostname_enabled' => true,
-        /*
-         * Universal testing-zone pool (DO). Legacy callers still read from
-         * here — the provider-routing logic in TestingHostnameProvisioner
-         * folds these into services.dply.testing_domains.digitalocean.
-         */
-        'testing_domains' => array_values(array_filter(array_map(
-            static fn (string $value): string => trim($value),
-            explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
-        ))),
-        'testing_domain_strategy' => 'deterministic',
-        /*
-         * DNS target for a deployed serverless function's friendly hostname
-         * ({slug}.{testing-domain}). An IP becomes an A record; a hostname
-         * becomes a CNAME. When unset, the function host CNAMEs onto the
-         * testing-domain apex (which must already resolve to the dply app).
-         */
-        'serverless_function_dns_target' => env('DPLY_SERVERLESS_FUNCTION_DNS_TARGET'),
     ],
 
     /*
@@ -87,6 +246,27 @@ return [
     | Redirect URI must match DIGITALOCEAN_OAUTH_REDIRECT_URI, or if unset,
     | route('credentials.oauth.digitalocean.callback') using APP_URL (use your Expose URL locally).
     */
+    /*
+     | Dropbox app used for the one-click "Connect Dropbox" backup destination.
+     | Optional: without it the button hides and operators add an app key +
+     | refresh token by hand instead.
+     */
+    /*
+     | Google Cloud OAuth client used for the one-click "Connect Google Drive"
+     | backup destination. Optional, same as Dropbox.
+     */
+    'google_drive' => [
+        'client_id' => env('GOOGLE_DRIVE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_DRIVE_REDIRECT_URI'),
+    ],
+
+    'dropbox' => [
+        'client_id' => env('DROPBOX_APP_KEY'),
+        'client_secret' => env('DROPBOX_APP_SECRET'),
+        'redirect' => env('DROPBOX_REDIRECT_URI'),
+    ],
+
     'digitalocean_oauth' => [
         'client_id' => env('DIGITALOCEAN_OAUTH_CLIENT_ID'),
         'client_secret' => env('DIGITALOCEAN_OAUTH_CLIENT_SECRET'),
@@ -131,7 +311,7 @@ return [
     ],
 
     'vultr' => [
-        'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2152), // Ubuntu 24.04 LTS
+        'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2284), // Ubuntu 24.04 LTS x64
         'ssh_user' => env('VULTR_SSH_USER', 'root'),
 
         /*
@@ -142,6 +322,14 @@ return [
          * server's own ProviderCredential.
          */
         'token' => env('VULTR_TOKEN'),
+    ],
+
+    'namecheap' => [
+        'api_user' => env('NAMECHEAP_API_USER'),
+        'api_key' => env('NAMECHEAP_API_KEY'),
+        'api_username' => env('NAMECHEAP_API_USERNAME', env('NAMECHEAP_API_USER')),
+        'client_ip' => env('NAMECHEAP_CLIENT_IP'),
+        'sandbox' => filter_var(env('NAMECHEAP_SANDBOX', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     'upcloud' => [
@@ -216,16 +404,8 @@ return [
     | Dply testing-hostname pools by DNS provider
     |--------------------------------------------------------------------------
     |
-    | Per-provider lists of Dply-owned zones used to mint testing URLs for
-    | newly provisioned sites. When an organization has a credential for one
-    | of these providers connected, TestingHostnameProvisioner will use that
-    | provider's pool + credential so the testing record lives where the
-    | operator's existing DNS already is. Falls back to the digitalocean
-    | pool (services.digitalocean.token or an org-level DO credential) when
-    | no provider-specific match is available.
-    |
-    | Each env var is a comma-separated list of zones Dply controls on the
-    | given provider, e.g. DPLY_TESTING_DOMAINS_HETZNER="dply.forum".
+    | Dply-owned testing zones live under services.cloudflare above.
+    | Legacy per-provider env lists (DPLY_TESTING_DOMAINS_*) are no longer read.
     |
     */
     /*
@@ -250,23 +430,5 @@ return [
         // Service token + default org for the 'managed' model only.
         'provision_token' => env('LOOKOUT_PROVISION_TOKEN'),
         'managed_organization_id' => env('LOOKOUT_MANAGED_ORG_ID'),
-    ],
-
-    'dply' => [
-        'testing_domains' => [
-            'digitalocean' => array_values(array_unique(array_filter(array_merge(
-                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))),
-                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS_DIGITALOCEAN', ''))),
-            )))),
-            'hetzner' => array_values(array_filter(array_map(
-                static fn (string $v): string => strtolower(trim($v)),
-                explode(',', (string) env('DPLY_TESTING_DOMAINS_HETZNER', ''))
-            ))),
-            'cloudflare' => array_values(array_filter(array_map(
-                static fn (string $v): string => strtolower(trim($v)),
-                explode(',', (string) env('DPLY_TESTING_DOMAINS_CLOUDFLARE', ''))
-            ))),
-        ],
-    ],
-
+    ]
 ];

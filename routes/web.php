@@ -1,44 +1,37 @@
 <?php
 
+use App\Enums\ServerProvider;
+use App\Http\Controllers\AcmeDnsHookController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use App\Http\Controllers\CaddyAdminApiProxyController;
 use App\Http\Controllers\CancelServerProvisionController;
 use App\Http\Controllers\CliInstallController;
-use App\Http\Controllers\CloudDeployWebhookController;
+use App\Http\Controllers\Credentials\BackupStorageOAuthController;
 use App\Http\Controllers\Credentials\ProviderOAuthController;
 use App\Http\Controllers\DatabaseCredentialShareController;
-use App\Modules\Docs\Http\Controllers\DocsController;
-use App\Modules\Edge\Http\Controllers\EdgeAuditLogExportController;
-use App\Modules\Edge\Http\Controllers\EdgeLiveAccessLogPollController;
-use App\Modules\Edge\Http\Controllers\EdgeLogCsvDownloadController;
-use App\Modules\Edge\Http\Controllers\EdgeRepoConfigYamlDownloadController;
-use App\Modules\Edge\Http\Controllers\EdgeDeployHookController;
-use App\Modules\Edge\Http\Controllers\EdgeFormIngestController;
-use App\Modules\Edge\Http\Controllers\EdgeLogIngestController;
-use App\Modules\Edge\Http\Controllers\EdgeLogpushIngestController;
-use App\Modules\Edge\Http\Controllers\EdgePreviewAccessController;
-use App\Modules\Edge\Http\Controllers\EdgePreviewCommentsController;
-use App\Modules\Edge\Http\Controllers\EdgeVitalsIngestController;
 use App\Http\Controllers\EnvoyAdminProxyController;
-use App\Http\Controllers\FunctionLogIngestController;
-use App\Http\Controllers\GithubCloudWebhookController;
-use App\Modules\Edge\Http\Controllers\GithubEdgeWebhookController;
 use App\Http\Controllers\LogViewerShareController;
+use App\Http\Controllers\Notifications\DiscordOAuthController;
+use App\Http\Controllers\Notifications\SlackOAuthController;
+use App\Http\Controllers\Notifications\TelegramWebhookController;
 use App\Http\Controllers\OrganizationComplianceExportController;
+use App\Http\Controllers\OrgScopedRedirectController;
 use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\ServerCredentialShareController;
-use App\Modules\Serverless\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\Sites\DatabaseConnectionUriController;
+use App\Http\Controllers\Sites\DatabaseConnectLinkController;
+use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
+use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
-use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
-use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
-use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
+use App\Livewire\Admin\Connections as AdminConnections;
 use App\Livewire\Admin\Flags\AllFlags as AdminAllFlags;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
@@ -46,76 +39,33 @@ use App\Livewire\Admin\Operations as AdminOperations;
 use App\Livewire\Admin\Organizations\Index as AdminOrganizationsIndex;
 use App\Livewire\Admin\Organizations\Show as AdminOrganizationsShow;
 use App\Livewire\Admin\Overview as AdminOverview;
-use App\Modules\Roadmap\Livewire\Admin\Index as AdminRoadmapIndex;
+use App\Livewire\Admin\Users\Index;
 use App\Livewire\Auth\DeviceApproval as AuthDeviceApproval;
 use App\Livewire\Backups\Databases as BackupsDatabases;
 use App\Livewire\Backups\Files as BackupsFiles;
-use App\Modules\Billing\Livewire\Analytics as BillingAnalytics;
-use App\Modules\Billing\Livewire\Invoices as BillingInvoices;
-use App\Modules\Billing\Livewire\Show as BillingShow;
-use App\Livewire\Cloud\Create as CloudCreate;
-use App\Livewire\Cloud\DatabaseCreate as CloudDatabaseCreate;
-use App\Livewire\Cloud\DatabaseIndex as CloudDatabaseIndex;
-use App\Livewire\Cloud\DeployDetail;
-use App\Livewire\Cloud\Index as CloudIndex;
+use App\Livewire\Backups\Overview as BackupsOverview;
+use App\Livewire\Backups\Snapshots as BackupsSnapshots;
 use App\Livewire\Credentials\Index as CredentialsIndex;
 use App\Livewire\Dashboard;
-use App\Modules\Edge\Livewire\Create as EdgeCreate;
-use App\Modules\Edge\Livewire\Import;
-use App\Modules\Edge\Livewire\Index as EdgeIndex;
-use App\Modules\Edge\Livewire\Templates;
-use App\Modules\Edge\Livewire\Usage;
-use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
-use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
-use App\Livewire\Fleet\Deploys as FleetDeploys;
-use App\Livewire\Fleet\Domains as FleetDomains;
-use App\Livewire\Fleet\EnvDrift as FleetEnvDrift;
-use App\Livewire\Fleet\EnvSearch as FleetEnvSearch;
-use App\Livewire\Fleet\Health as FleetHealth;
-use App\Livewire\Fleet\Intelligence as FleetIntelligence;
-use App\Modules\OpsCopilot\Livewire\OpsCopilot as FleetOpsCopilot;
-use App\Livewire\Fleet\Overview as FleetOverview;
-use App\Livewire\Fleet\Previews as FleetPreviews;
-use App\Modules\Imports\Livewire\Forge\Inventory;
-use App\Modules\Imports\Livewire\Parity as ImportParity;
-use App\Modules\Imports\Livewire\Ploi\Inventory as PloiInventory;
-use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
-use App\Livewire\Infrastructure\Index as InfrastructureIndex;
+use App\Livewire\Databases\DatabaseCreate as CloudDatabaseCreate;
+use App\Livewire\Databases\DatabaseIndex as CloudDatabaseIndex;
+use App\Livewire\Databases\DatabaseShow as CloudDatabaseShow;
 use App\Livewire\Invitations\Accept as InvitationsAccept;
-use App\Modules\Launch\Livewire\Create as LaunchesCreate;
-use App\Modules\Launch\Livewire\FullStack as LaunchesFullStack;
-use App\Modules\Launch\Livewire\Path as LaunchesPath;
-use App\Modules\Launch\Livewire\StandbyBlueprint as LaunchesStandbyBlueprint;
 use App\Livewire\Marketing\ComingSoonSignup as MarketingComingSoonSignup;
-use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
 use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
-use App\Livewire\Organizations\Automation as OrganizationsAutomation;
+use App\Livewire\Organizations\ApiTokens as OrganizationsApiTokens;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Livewire\Organizations\Member as OrganizationsMember;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
-use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
-use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
-use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Organizations\Show as OrganizationsShow;
-use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\OrgNetworking;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
-use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
-use App\Modules\Projects\Livewire\Index as ProjectsIndex;
-use App\Modules\Projects\Livewire\Show as ProjectsShow;
-use App\Modules\Roadmap\Livewire\Index as RoadmapIndex;
-use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
-use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
-use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
-use App\Modules\Marketplace\Livewire\Scripts\Marketplace as ScriptsMarketplace;
-use App\Modules\Serverless\Livewire\Create as ServerlessCreate;
-use App\Modules\Serverless\Livewire\Glue as ServerlessGlue;
-use App\Modules\Serverless\Livewire\Index as ServerlessIndex;
-use App\Modules\Serverless\Livewire\Journey as ServerlessJourney;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
+use App\Livewire\Servers\Create\StepScan as ServerCreateStepScan;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
@@ -172,7 +122,6 @@ use App\Livewire\Servers\WorkspaceSecurityDigestPreview;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSharedHost;
-use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSnapshots;
@@ -180,10 +129,10 @@ use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
+use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceWebserver;
 use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
-use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
 use App\Livewire\Settings\CliAuthentications as SettingsCliAuthentications;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -201,28 +150,19 @@ use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\DeploySyncGroups;
-use App\Livewire\Sites\EdgeDeploymentDetail;
-use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
-use App\Livewire\Live\ApiInventory as LiveApiInventory;
-use App\Livewire\Live\Connect as LiveConnect;
-use App\Livewire\Live\Servers\Index as LiveServersIndex;
-use App\Livewire\Live\Sites\Index as LiveSitesIndex;
-use App\Livewire\Live\Sites\Show as LiveSitesShow;
 use App\Livewire\Sites\Index as SitesIndex;
-use App\Services\ProductionData\ProductionDataMirror;
 use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\ScaffoldJourney;
-use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\SiteEnvironment;
 use App\Livewire\Sites\SitePromote as SitesPromote;
+use App\Livewire\Sites\SiteSetup as SitesSetupWizard;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
-use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
 use App\Livewire\Sites\WorkspaceSystemd;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
@@ -230,13 +170,40 @@ use App\Livewire\StatusPages\Index as StatusPagesIndex;
 use App\Livewire\StatusPages\Manage as StatusPagesManage;
 use App\Livewire\Teams\NotificationChannels as TeamsNotificationChannels;
 use App\Livewire\TwoFactor\Page as TwoFactorPage;
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Modules\Billing\Livewire\Analytics as BillingAnalytics;
+use App\Modules\Billing\Livewire\Invoices as BillingInvoices;
+use App\Modules\Billing\Livewire\Show as BillingShow;
+use App\Modules\Cache\Livewire\Caches as CachesIndex;
+use App\Modules\Cache\Livewire\CacheShow as CachesShow;
+use App\Modules\Docs\Http\Controllers\DocsController;
+use App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController;
+use App\Modules\Feedback\Livewire\Admin\Index as AdminFeedbackIndex;
+use App\Modules\Imports\Livewire\Forge\Inventory;
+use App\Modules\Imports\Livewire\Parity as ImportParity;
+use App\Modules\Imports\Livewire\Ploi\Inventory as PloiInventory;
+use App\Modules\Imports\Livewire\Ploi\MigrationProgress;
+use App\Modules\Launch\Livewire\Path as LaunchesPath;
+use App\Modules\Launch\Livewire\StandbyBlueprint as LaunchesStandbyBlueprint;
+use App\Modules\Marketplace\Livewire\Index as MarketplaceIndex;
+use App\Modules\Marketplace\Livewire\Scripts\Create as ScriptsCreate;
+use App\Modules\Marketplace\Livewire\Scripts\Edit as ScriptsEdit;
+use App\Modules\Marketplace\Livewire\Scripts\Index as ScriptsIndex;
+use App\Modules\Projects\Livewire\Index as ProjectsIndex;
+use App\Modules\Projects\Livewire\Show as ProjectsShow;
+use App\Modules\Queue\Livewire\QueueNamespaceShow as QueuesShow;
+use App\Modules\Queue\Livewire\Queues as QueuesIndex;
+use App\Modules\Realtime\Livewire\Realtime as OrganizationsRealtime;
+use App\Modules\Realtime\Livewire\RealtimeAppShow as OrganizationsRealtimeShow;
+use App\Modules\Referrals\Livewire\Referrals as ProfileReferrals;
+use App\Modules\Secrets\Livewire\Secrets as OrganizationsSecrets;
 use App\Support\Admin\AdminFeatureFlags;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
@@ -245,15 +212,16 @@ Broadcast::routes(['middleware' => ['web', 'auth']]);
 // Standalone diagnostic page for Redis-backend failures. Lives outside the
 // `web` middleware group on purpose — StartSession/CSRF/Pennant all touch
 // Cache, so if Redis is down a normal route would recurse on the very error
-// it tries to render. This handler reads env vars only.
+// it tries to render. Reads only the config repository, which is an in-memory
+// array by this point — no Cache, no Redis, no DB.
 Route::get('/_redis-unreachable', function () {
     return response()->view('errors.redis-unreachable', [
         'message' => __('Connection timed out — see config block below.'),
-        'host' => (string) env('REDIS_HOST', '127.0.0.1'),
-        'port' => (string) env('REDIS_PORT', '6379'),
-        'cacheStore' => (string) env('CACHE_STORE', 'database'),
-        'queueConnection' => (string) env('QUEUE_CONNECTION', 'sync'),
-        'timeout' => (string) env('REDIS_TIMEOUT', '2.0'),
+        'host' => (string) config('database.redis.default.host', '127.0.0.1'),
+        'port' => (string) config('database.redis.default.port', '6379'),
+        'cacheStore' => (string) config('cache.default', 'database'),
+        'queueConnection' => (string) config('queue.default', 'sync'),
+        'timeout' => (string) config('database.redis.default.timeout', '2.0'),
     ], 503);
 })->withoutMiddleware(['web']);
 
@@ -261,121 +229,57 @@ Route::match(['post', 'options'], '/hooks/sites/{site}/deploy', SiteDeployWebhoo
     ->middleware(['throttle:site-webhook'])
     ->name('hooks.site.deploy');
 
-Route::match(['post', 'options'], '/hooks/cloud/{site}/redeploy', CloudDeployWebhookController::class)
+// Telegram bot updates. Under /hooks/* so MachineCallbackPaths exempts it from
+// CSRF and the guest gates in one place. Authenticated by the secret-token
+// header Telegram echoes, checked inside the controller.
+Route::post('/hooks/telegram', TelegramWebhookController::class)
     ->middleware(['throttle:site-webhook'])
-    ->name('hooks.cloud.redeploy');
+    ->name('hooks.telegram');
 
-Route::match(['post', 'options'], '/hooks/cloud/{site}/github', GithubCloudWebhookController::class)
-    ->middleware(['throttle:site-webhook'])
-    ->name('hooks.cloud.github');
-
-Route::match(['post', 'options'], '/hooks/edge/{site}/github', GithubEdgeWebhookController::class)
-    ->middleware(['throttle:site-webhook'])
-    ->name('hooks.edge.github');
-
-// Per-request log records POSTed by a deployed serverless function's handler
-// — the ingest path behind the Logs page's Visits tab. HMAC-authenticated
-// inside the controller; high throttle since it fires once per app request.
-Route::post('/hooks/functions/{site}/log', FunctionLogIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.functions.log');
-
-Route::post('/hooks/edge/{site}/log', EdgeLogIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.log');
-
-Route::post('/hooks/edge/{site}/vitals', EdgeVitalsIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.vitals');
-
-Route::post('/hooks/edge/{site}/forms', EdgeFormIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.forms');
-
-Route::post('/hooks/edge/logpush', EdgeLogpushIngestController::class)
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('hooks.edge.logpush');
-
-// Per-site deploy hooks (P10b). Match POST + GET so CMSes that only
-// emit GET pings (Sanity, some Webflow integrations) still work.
-// Rate-limit by IP via the cheap default throttle to slow brute-force.
-Route::match(['get', 'post'], '/hooks/edge/deploy/{token}', EdgeDeployHookController::class)
+Route::post('/hooks/acme-dns', AcmeDnsHookController::class)
     ->middleware(['throttle:60,1'])
-    ->where('token', '[A-Za-z0-9]{16,64}')
-    ->name('hooks.edge.deploy');
-
-// Preview-comment widget REST endpoints. Public (no Laravel session);
-// auth is per-parent widget token in X-Dply-Preview-Widget. CORS is
-// echoed for testing-domain origins.
-Route::match(['options'], '/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'options']);
-Route::get('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'index'])
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('api.edge.preview-comments.index');
-Route::post('/api/edge/preview-comments/{site}', [EdgePreviewCommentsController::class, 'store'])
-    ->middleware(['throttle:function-log-ingest'])
-    ->name('api.edge.preview-comments.store');
-
-// Friendly public URL for a serverless function — dply proxies it through
-// to the function's raw DigitalOcean Functions invocation URL.
-Route::any('/fn/{slug}/{path?}', ServerlessFunctionProxyController::class)
-    ->where('path', '.*')
-    ->name('serverless.proxy');
-
-// Live function hostnames: a deployed function answers at
-// {slug}.{DPLY_TESTING_DOMAINS entry}. Each configured testing domain gets a
-// wildcard-subdomain route that proxies to the function. (Production needs
-// *.{domain} DNS + TLS pointed at the dply app for these to resolve.)
-foreach ((array) config('services.digitalocean.testing_domains', []) as $functionDomain) {
-    $functionDomain = trim((string) $functionDomain);
-    if ($functionDomain === '') {
-        continue;
-    }
-
-    Route::domain('{slug}.'.$functionDomain)
-        ->any('/{path?}', ServerlessFunctionProxyController::class)
-        ->where('path', '.*')
-        ->withoutMiddleware([
-            ValidateCsrfToken::class,
-            RedirectGuestsToComingSoon::class,
-        ]);
-}
+    ->name('hooks.acme-dns');
 
 Route::get('/', function () {
     // The animated homepage is THE homepage — no classic/animated switching.
-    return view('welcome-v2');
+    // Providers come from the build catalog, not a hand-kept list, so the marketing
+    // page can never advertise a provider that is switched off. Deliberately config-only:
+    // the per-org Pennant rollout in ServerProviderGate has no meaning for a visitor.
+    $providers = collect(ServerProvider::cases())
+        ->filter(fn ($p) => $p->supportsCompute()
+            && filter_var(config('servers.providers.enabled.'.$p->value, false), FILTER_VALIDATE_BOOL))
+        ->map->label()
+        ->values();
+
+    // Real mean wall-clock of successful provisions. Null (stat hidden) until there is data.
+    // ponytail: postgres EXTRACT — swap to TIMESTAMPDIFF if this ever runs on mysql.
+    $avgProvisionSeconds = Cache::remember('home.avg_provision_seconds', now()->addHour(), fn () => DB::table('server_provision_runs')
+        ->where('status', 'succeeded')
+        ->whereNotNull('started_at')
+        ->whereNotNull('completed_at')
+        ->avg(DB::raw('EXTRACT(EPOCH FROM (completed_at - started_at))')));
+
+    return view('welcome-v2', [
+        'providers' => $providers,
+        'avgProvisionSeconds' => $avgProvisionSeconds === null ? null : (float) $avgProvisionSeconds,
+    ]);
 });
 
 Route::get('/pricing', function () {
-    return view('pricing');
+    return view('pricing', require resource_path('views/pricing/data.php'));
 })->name('pricing');
 
 Route::get('/features', function () {
-    return view('features');
+    return view('features', [
+        'features' => require resource_path('views/features/data.php'),
+    ]);
 })->name('features');
-
-Route::get('/changelog', function () {
-    return view('changelog');
-})->name('changelog');
-
-Route::livewire('/roadmap', RoadmapIndex::class)
-    ->middleware(['throttle:60,1'])
-    ->name('roadmap');
 
 Route::get('/migrate', function () {
     return view('migrate.index', [
         'sources' => config('migration_sources', []),
     ]);
 })->name('migrate.index');
-
-Route::get('/deploy', function (Request $request) {
-    $allowed = ['repo', 'branch', 'name', 'runtime_mode', 'build_command', 'output_dir'];
-    $query = array_filter(
-        $request->only($allowed),
-        static fn ($v): bool => is_string($v) && $v !== '',
-    );
-
-    return redirect()->route('edge.create', $query);
-})->name('deploy.shortlink');
 
 Route::get('/migrate/{slug}', function (string $slug) {
     $source = config('migration_sources.'.$slug);
@@ -410,8 +314,14 @@ Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
     Route::get('/version.json', [CliInstallController::class, 'packageVersion'])->name('cli.version');
 });
 
+// Public on purpose: an invited person usually has no account yet. The page
+// shows who invited them and routes to register/login, and only joins the org
+// once they're signed in as the invited address (see Invitations\Accept).
+Route::livewire('invitations/accept/{token}', InvitationsAccept::class)
+    ->middleware('throttle:30,1')
+    ->name('invitations.accept');
+
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
-    Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
     Route::livewire('/networking', OrgNetworking::class)->name('networking.index');
     // OAuth-style device-flow approval page for the dply CLI. The CLI
@@ -419,24 +329,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // confirms scopes + org, and we mint an ApiToken that the polling
     // CLI picks up exactly once via /api/v1/auth/device/poll.
     Route::livewire('/auth/device', AuthDeviceApproval::class)->name('auth.device.show');
-    Route::get('/edge/sites/{site}/preview-access', EdgePreviewAccessController::class)
-        ->name('edge.preview-access');
-    Route::livewire('infrastructure', InfrastructureIndex::class)->name('infrastructure.index');
-    Route::middleware('feature:surface.fleet')->group(function (): void {
-        Route::livewire('/fleet', FleetOverview::class)->name('fleet.index');
-        Route::livewire('/fleet/health', FleetHealth::class)->name('fleet.health');
-        Route::livewire('/fleet/domains', FleetDomains::class)->name('fleet.domains');
-        Route::livewire('/fleet/env-search', FleetEnvSearch::class)->name('fleet.env-search');
-        Route::livewire('/fleet/env-drift', FleetEnvDrift::class)->name('fleet.env-drift');
-        Route::livewire('/fleet/intelligence', FleetIntelligence::class)->name('fleet.intelligence');
-        Route::livewire('/fleet/deploys', FleetDeploys::class)->name('fleet.deploys');
-        Route::livewire('/fleet/blast-radius', FleetBlastRadius::class)->name('fleet.blast-radius');
-        Route::livewire('/fleet/previews', FleetPreviews::class)->name('fleet.previews');
-        Route::livewire('/fleet/deploy-contracts', FleetDeployContracts::class)->name('fleet.deploy-contracts');
-        Route::livewire('/fleet/copilot', FleetOpsCopilot::class)
-            ->middleware('feature:global.ops_copilot')
-            ->name('fleet.copilot');
-    });
     Route::prefix('admin')
         ->middleware('can:viewPlatformAdmin')
         ->name('admin.')
@@ -444,18 +336,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/', AdminOverview::class)->name('overview');
             Route::livewire('/operations', AdminOperations::class)->name('operations');
             Route::livewire('/audit', AdminAuditLog::class)->name('audit');
-            Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
             Route::livewire('/feedback', AdminFeedbackIndex::class)->name('feedback.index');
-            Route::get('/feedback/{report}/screenshot', \App\Modules\Feedback\Http\Controllers\FeedbackScreenshotController::class)->name('feedback.screenshot');
-            Route::livewire('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
-            Route::post('/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('impersonate.start');
+            Route::get('/feedback/{report}/screenshot', FeedbackScreenshotController::class)->name('feedback.screenshot');
+            Route::livewire('/users', Index::class)->name('users.index');
+            Route::post('/impersonate/{user}', [ImpersonationController::class, 'start'])->name('impersonate.start');
             Route::livewire('/flags/all', AdminAllFlags::class)->name('flags.all');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
-            Route::livewire('/flags/cloud', AdminProductLineFlags::class)->defaults('line', 'cloud')->name('flags.cloud');
-            Route::livewire('/flags/edge', AdminProductLineFlags::class)->defaults('line', 'edge')->name('flags.edge');
-            Route::livewire('/flags/serverless', AdminProductLineFlags::class)->defaults('line', 'serverless')->name('flags.serverless');
+            Route::livewire('/flags/databases', AdminProductLineFlags::class)->defaults('line', 'databases')->name('flags.databases');
             Route::livewire('/flags/platform', AdminProductLineFlags::class)->defaults('line', 'platform')->name('flags.platform');
             Route::get('/flags/defaults/{group}', function (string $group) {
                 $target = AdminFeatureFlags::legacyDefaultGroupRedirectTarget($group);
@@ -474,6 +363,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/organizations/{organization}', AdminOrganizationsShow::class)->name('organizations.show');
             Route::livewire('/beta-invites', AdminBetaInvites::class)->name('beta-invites');
             Route::livewire('/coming-soon-access', AdminComingSoonAccess::class)->name('coming-soon-access');
+            Route::livewire('/connections', AdminConnections::class)->name('connections');
         });
     Route::redirect('/admin/dashboard', '/admin')->middleware('can:viewPlatformAdmin')->name('admin.dashboard');
     Route::middleware('feature:surface.marketplace')->group(function (): void {
@@ -491,6 +381,22 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->where('slug', '[a-z0-9-]+')
         ->name('docs.markdown');
 
+    // Legacy homes for backup destinations (/backups/storage, the two /profile
+    // paths, and the short-lived org page) all land on the organization's
+    // Credentials table, filtered to storage. Destinations ARE credentials —
+    // a bucket key is a secret handed to a third party — and Credentials already
+    // listed every one of them, so a second page was the same rows twice.
+    // Shared closure so the legacy routes cannot drift apart.
+    $backupDestinationsRedirect = function () {
+        $organization = auth()->user()?->currentOrganization();
+        abort_unless($organization !== null, 404);
+
+        return redirect()->route('organizations.credentials', [
+            'organization' => $organization,
+            'filter' => 'storage',
+        ]);
+    };
+
     Route::redirect('/settings', '/settings/profile')->name('settings.index');
     Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
     Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
@@ -503,7 +409,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/profile/ssh-keys', SettingsSshKeys::class)->name('profile.ssh-keys');
     Route::livewire('/profile/api-keys', SettingsApiKeys::class)->name('profile.api-keys');
     Route::livewire('/profile/cli', SettingsCliAuthentications::class)->name('profile.cli');
-    Route::livewire('/profile/backup-configurations', SettingsBackupConfigurations::class)->name('profile.backup-configurations');
+    // A BackupConfiguration is a secret handed to a third party, like every
+    // other row on the org Credentials page — that is where destinations are
+    // managed. Both personal paths keep their route names so existing route()
+    // calls resolve.
+    Route::get('/profile/backup-destinations', $backupDestinationsRedirect)->name('profile.backup-destinations');
+    Route::get('/profile/backup-configurations', $backupDestinationsRedirect)->name('profile.backup-configurations');
     Route::livewire('/profile/notification-channels', SettingsNotificationChannels::class)->name('profile.notification-channels');
     Route::livewire('/profile/notification-channels/bulk-assign', BulkNotificationAssignments::class)->name('profile.notification-channels.bulk-assign');
     Route::livewire('/profile/delete-account', ProfileDeleteAccount::class)->name('profile.delete-account');
@@ -514,71 +425,98 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
     Route::livewire('organizations/{organization}/settings', OrganizationsSettings::class)->name('organizations.settings');
+    Route::livewire('organizations/{organization}/api-tokens', OrganizationsApiTokens::class)->name('organizations.api-tokens');
+    Route::livewire('organizations/{organization}/people/{user}', OrganizationsMember::class)->name('organizations.member');
     Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
-    Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
+    // The Teams page folded into People (2026-08-22): a team grants no access,
+    // so it is a filter over the member directory rather than a second copy of
+    // it. Kept as a redirect for bookmarks and for the URLs already sent out in
+    // past invitation notifications.
+    Route::redirect('organizations/{organization}/teams', 'organizations/{organization}/members')
+        ->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
     Route::get('organizations/{organization}/compliance-export', OrganizationComplianceExportController::class)->name('organizations.compliance-export');
-    Route::livewire('organizations/{organization}/automation', OrganizationsAutomation::class)->name('organizations.automation');
+    // The Automation & API tab folded into organization settings (2026-08).
+    // Keeps bookmarks and any missed route() call alive; the settings page
+    // carries the same sections under the same anchors.
+    Route::redirect('organizations/{organization}/automation', 'organizations/{organization}/settings')
+        ->name('organizations.automation');
     Route::livewire('organizations/{organization}/notification-channels', OrganizationsNotificationChannels::class)->name('organizations.notification-channels');
     Route::livewire('organizations/{organization}/teams/{team}/notification-channels', TeamsNotificationChannels::class)->name('teams.notification-channels');
     Route::livewire('organizations/{organization}/billing', BillingShow::class)->name('billing.show');
     Route::livewire('organizations/{organization}/billing/analytics', BillingAnalytics::class)->name('billing.analytics');
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
-    Route::livewire('organizations/{organization}/realtime', OrganizationsRealtime::class)->name('organizations.realtime');
-    Route::livewire('organizations/{organization}/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('organizations.realtime.show');
+    // Legacy org-scoped Realtime and Queue URLs. Not Route::redirect — these
+    // switch the active organization first so a bookmark for org B does not
+    // land on org A's page (docs/adr/managed-services-tier.md, decision 8).
+    // Both products now live in the Services row at session-scoped URLs.
+    Route::get('organizations/{organization}/realtime', [OrgScopedRedirectController::class, 'realtime'])
+        ->name('organizations.realtime');
+    Route::get('organizations/{organization}/realtime/{realtimeApp}', [OrgScopedRedirectController::class, 'realtimeApp'])
+        ->name('organizations.realtime.show');
+    Route::get('organizations/{organization}/queues', [OrgScopedRedirectController::class, 'queues'])
+        ->name('organizations.queues');
+    Route::get('organizations/{organization}/queues/{queueNamespace}', [OrgScopedRedirectController::class, 'queueNamespace'])
+        ->name('organizations.queues.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
+    Route::get('organizations/{organization}/backup-destinations', function (Organization $organization) {
+        // Keeps the org from the URL rather than the session: an org-B bookmark
+        // must not open org A's credentials. Credentials::mount() authorizes it.
+        return redirect()->route('organizations.credentials', [
+            'organization' => $organization,
+            'filter' => 'storage',
+        ]);
+    })->name('organizations.backup-destinations');
     Route::livewire('organizations/{organization}/secrets', OrganizationsSecrets::class)->name('organizations.secrets');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
-    Route::livewire('/backups', BackupsDatabases::class)->name('backups.databases');
-    Route::redirect('/backups/databases', '/backups', 301);
+    // Backups is a five-tab product: an overview hub plus one tab per capture
+    // type, and the destinations they ship to. docs/adr/backups-as-a-product.md
+    Route::livewire('/backups', BackupsOverview::class)->name('backups.overview');
+    Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
+    Route::livewire('/backups/snapshots', BackupsSnapshots::class)->name('backups.snapshots');
+    // Destinations are managed on the org Credentials page. This name stays
+    // because ~10 views across the Backups product link to it. 302, never 301:
+    // /profile/backup-configurations shipped a permanent redirect once and
+    // browsers cache those forever.
+    Route::get('/backups/storage', $backupDestinationsRedirect)->name('backups.storage');
+
+    // Managed services — session-scoped like every other product surface.
+    // Realtime was the one Services product with no surface gate, so parking it
+    // left the pages reachable by URL while the nav said "coming soon".
+    Route::middleware('feature:surface.realtime')->group(function (): void {
+        Route::livewire('/realtime', OrganizationsRealtime::class)->name('realtime.index');
+        Route::livewire('/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('realtime.show');
+    });
+
+    Route::middleware('feature:surface.queue')->group(function (): void {
+        Route::livewire('/queues', QueuesIndex::class)->name('queues.index');
+        Route::livewire('/queues/{queueNamespace}', QueuesShow::class)->name('queues.show');
+    });
+
+    Route::middleware('feature:surface.cache')->group(function (): void {
+        Route::livewire('/caches', CachesIndex::class)->name('caches.index');
+        Route::livewire('/caches/{managedCache}', CachesShow::class)->name('caches.show');
+    });
 
     Route::middleware('feature:surface.scripts')->group(function (): void {
         Route::livewire('scripts', ScriptsIndex::class)->name('scripts.index');
-        Route::livewire('scripts/marketplace', ScriptsMarketplace::class)->name('scripts.marketplace');
+        // Presets folded into the marketplace catalog (category=scripts).
+        Route::redirect('scripts/marketplace', '/marketplace?category=scripts');
         Route::livewire('scripts/create', ScriptsCreate::class)->name('scripts.create');
         Route::livewire('scripts/{script}/edit', ScriptsEdit::class)->name('scripts.edit');
     });
 
     Route::livewire('sites', SitesIndex::class)->name('sites.index');
 
-    // Local-only Production data mirror — proxies remote /api/v1 into Livewire UI.
-    Route::middleware('production.mirror')->prefix('live')->name('live.')->group(function (): void {
-        Route::get('/', function () {
-            $connected = app(ProductionDataMirror::class)->connectionFor(auth()->user()) !== null;
-
-            return redirect()->route($connected ? 'live.sites.index' : 'live.connect');
-        })->name('index');
-        Route::livewire('/connect', LiveConnect::class)->name('connect');
-        Route::livewire('/sites', LiveSitesIndex::class)->name('sites.index');
-        Route::livewire('/sites/{remoteSite}', LiveSitesShow::class)->name('sites.show');
-        Route::livewire('/servers', LiveServersIndex::class)->name('servers.index');
-        Route::livewire('/projects', LiveApiInventory::class)->name('projects.index');
-        Route::livewire('/edge', LiveApiInventory::class)->name('edge.index');
-        Route::livewire('/cloud', LiveApiInventory::class)->name('cloud.index');
-        Route::livewire('/serverless', LiveApiInventory::class)->name('serverless.index');
-    });
-
-    Route::middleware('feature:surface.cloud')->group(function (): void {
-        Route::livewire('cloud', CloudIndex::class)->name('cloud.index');
-        Route::livewire('cloud/create', CloudCreate::class)->name('cloud.create');
+    Route::middleware('feature:surface.databases')->group(function (): void {
         Route::livewire('cloud/databases', CloudDatabaseIndex::class)->name('cloud.databases.index');
         Route::livewire('cloud/databases/create', CloudDatabaseCreate::class)->name('cloud.databases.create');
-    });
-    Route::middleware('feature:surface.edge')->group(function (): void {
-        Route::livewire('edge', EdgeIndex::class)->name('edge.index');
-        Route::livewire('edge/create', EdgeCreate::class)->name('edge.create');
-        Route::livewire('edge/import', Import::class)->name('edge.import');
-        Route::livewire('edge/templates', Templates::class)->name('edge.templates');
-        Route::livewire('edge/usage', Usage::class)->name('edge.usage');
-    });
-    Route::middleware('feature:surface.serverless')->group(function (): void {
-        Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');
-        Route::livewire('serverless/glue', ServerlessGlue::class)->name('serverless.glue');
-        Route::livewire('serverless/create', ServerlessCreate::class)->name('serverless.create');
-        Route::livewire('servers/{server}/sites/{site}/deploying', ServerlessJourney::class)->name('serverless.journey');
+        // Registered after the literal /create leaf so the wizard is not swallowed
+        // by the {cloudDatabase} binding.
+        Route::livewire('cloud/databases/{cloudDatabase}', CloudDatabaseShow::class)->name('cloud.databases.show');
     });
     Route::livewire('imports/parity', ImportParity::class)->name('imports.parity');
     Route::livewire('imports/ploi', PloiInventory::class)->name('imports.ploi.inventory');
@@ -597,10 +535,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('status-pages', StatusPagesIndex::class)->name('status-pages.index');
         Route::livewire('status-pages/{statusPage}', StatusPagesManage::class)->name('status-pages.manage');
     });
-    Route::livewire('launches/create', LaunchesCreate::class)->name('launches.create');
-    Route::middleware('feature:launch.full_stack_wizard')->group(function (): void {
-        Route::livewire('launches/full-stack', LaunchesFullStack::class)->name('launches.full-stack');
-    });
     Route::middleware('feature:launch.standby_blueprint')->group(function (): void {
         Route::livewire('launches/standby', LaunchesStandbyBlueprint::class)->name('launches.standby');
     });
@@ -609,9 +543,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // container via /servers/{id}/sites/create container mode). This route is kept for
     // one release as a 302 to the wizard so external bookmarks don't 404.
     Route::redirect('launches/containers/create', '/servers/create?host_target=docker', 302)->name('launches.containers.create');
-    Route::middleware('feature:surface.serverless')->group(function (): void {
-        Route::livewire('launches/serverless', LaunchesPath::class)->defaults('path', 'serverless')->name('launches.serverless');
-    });
     Route::livewire('launches/kubernetes', LaunchesPath::class)->defaults('path', 'kubernetes')->name('launches.kubernetes');
     Route::livewire('launches/cloud-network', LaunchesPath::class)->defaults('path', 'cloud-network')->name('launches.cloud-network');
 
@@ -624,6 +555,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         // and bills all-in cost-plus. Gated by surface.managed_servers in mount().
         Route::livewire('servers/create/managed', ServerCreateManaged::class)->name('servers.create.managed');
         Route::livewire('servers/create', ServerCreateStepType::class)->name('servers.create');
+        // Import mode's second (and last) step — scan a provider account for
+        // machines dply doesn't manage yet and adopt one.
+        Route::livewire('servers/create/scan', ServerCreateStepScan::class)->name('servers.create.scan');
         Route::livewire('servers/create/where', ServerCreateStepWhere::class)->name('servers.create.where');
         Route::livewire('servers/create/what', ServerCreateStepWhat::class)->name('servers.create.what');
         Route::livewire('servers/create/review', ServerCreateStepReview::class)->name('servers.create.review');
@@ -636,16 +570,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         // overview.
         if (($server->meta['host_kind'] ?? null) === Server::HOST_KIND_KUBERNETES) {
             return redirect()->route('servers.cluster', $server);
-        }
-
-        // A serverless function is not a server — the DO Functions namespace
-        // is an implementation detail. Send the operator straight to the
-        // function workspace instead of a server-shaped overview.
-        if ($server->isDigitalOceanFunctionsHost()) {
-            $function = $server->sites()->orderBy('created_at')->first();
-            if ($function !== null) {
-                return redirect()->route('sites.show', ['server' => $server, 'site' => $function]);
-            }
         }
 
         // Journey page is SSH/VM-shaped — only VM hosts have a provision task
@@ -693,11 +617,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/choose-app', SitesChooseApp::class)->name('sites.choose-app');
-    // The first-deploy setup wizard was folded into the Repository page as a
-    // conditional tab. Keep the route name working by redirecting to it.
-    Route::get('servers/{server}/sites/{site}/setup', function (Server $server, Site $site) {
-        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'setup']);
-    })->name('sites.setup');
+    // The first-deploy setup wizard normally rides along as the Repository
+    // page's conditional "Set up" tab, but it renders standalone too (the
+    // component's non-embedded branch brings its own breadcrumb + sidebar).
+    //
+    // Serving it directly rather than redirecting into the tab means the wizard
+    // stays reachable when the Repository page's lazy mount can't complete —
+    // which is exactly the state a local dev environment ends up in, leaving
+    // the wizard impossible to open at all. Same screen either way.
+    Route::livewire('servers/{server}/sites/{site}/setup', SitesSetupWizard::class)->name('sites.setup');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::middleware('feature:workspace.site_promote')->group(function (): void {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');
@@ -715,9 +643,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('sites.pipeline');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
-    Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
-    Route::livewire('servers/{server}/sites/{site}/cloud/deploys/{deploy}', DeployDetail::class)
-        ->name('sites.cloud.deploys.show');
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
@@ -731,53 +656,31 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Site-level crontab management was removed — cron is a host-level concern,
     // managed on the server Cron page (servers.cron, filterable by ?site=).
     // Site scheduling lives on Schedule (framework scheduler) + Workers (daemons).
-    Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
+    // Queue owns anything that consumes jobs — on-box workers today, attached
+    // pools next. Workers keeps the rest of Supervisor.
+    //
+    // Deliberately NOT a Route::livewire page: a standalone route renders bare,
+    // without the site sidebar. The {section?} catch-all below hands unknown
+    // sections to the Settings workspace, which IS the chrome — so /queue is a
+    // section and looks like part of the site.
     Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
-        return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
+        return redirect()->route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue'] + request()->query());
     })->name('sites.queue-workers');
     Route::livewire('servers/{server}/sites/{site}/backups', WorkspaceBackups::class)->name('sites.backups');
-    // BACKGROUND group for container/serverless workspaces — engine-level
+    // BACKGROUND group for container workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
-    // Site-kind dispatch: VM → WorkspaceSchedule, container/serverless → Schedule
-    // (see SiteScheduleController). One canonical /schedule URL for any site.
-    Route::get('servers/{server}/sites/{site}/schedule', SiteScheduleController::class)->name('sites.schedule');
-    Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
+    Route::livewire('servers/{server}/sites/{site}/schedule', WorkspaceSchedule::class)->name('sites.schedule');
     // Unified Resources surface. Routes through the site workspace controller
-    // (same chrome + Settings/EdgeSettings dispatch as sites.show) on the
-    // `resources` section: VM sites render the new bindings hub, container sites
-    // render the Cloud resources panel — both inside the normal workspace, at
-    // one canonical /resources URL. (Was a standalone Cloud-only component.)
+    // on the `resources` section: the site's bindings hub, inside the normal
+    // workspace, at one canonical /resources URL.
     Route::get('servers/{server}/sites/{site}/resources', SiteWorkspaceController::class)
         ->defaults('section', 'resources')
         ->name('sites.resources');
     // Standalone Environment page — first-class, no longer a Deployments-hub tab.
     Route::livewire('servers/{server}/sites/{site}/environment', SiteEnvironment::class)->name('sites.environment');
-    // NETWORKING group for serverless / container workspaces — manages the dply
-    // edge proxy (hostname/DNS, custom domains, redirects, headers + CORS,
-    // invocation URLs). MUST live on its own path: the generic VM routing surface
-    // is `sites.show` section=routing → `/sites/{site}/routing`. Sharing that path
-    // let this literal route shadow the wildcard for *every* site, so a VM site's
-    // /routing hit ServerlessRouting, which redirects VM sites back to
-    // section=routing → the same URL → an infinite redirect loop.
-    //
-    // Path is `/proxy-routing` (not `/edge-routing`): Edge product sites use
-    // `sites.show` section=edge-routing → `/…/edge-routing` for redirects /
-    // rewrites / headers in EdgeSettings. Reusing `/edge-routing` for this
-    // serverless surface stole that URL and redirected Edge sites to BYO
-    // `/routing` (404). Route name stays `sites.routing`.
-    Route::livewire('servers/{server}/sites/{site}/proxy-routing', ServerlessRouting::class)->name('sites.routing');
-    // Legacy serverless bookmark: `/edge-routing` → proxy routing. Edge sites
-    // fall through to the sites.show wildcard below (section=edge-routing).
-    Route::get('servers/{server}/sites/{site}/edge-routing', function (Server $server, Site $site) {
-        if ($site->usesEdgeRuntime()) {
-            return app(SiteWorkspaceController::class)($server, $site, 'edge-routing');
-        }
-
-        return redirect()->route('sites.routing', ['server' => $server, 'site' => $site]);
-    })->name('sites.routing.legacy-edge-path');
     // Repository now lives as the top-level "Repository" tab on the
     // Deployments page (it used to be the "Settings → Repository" section,
     // but Settings was split into the Webhook/Hooks tabs and Repository was
@@ -806,6 +709,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
+    // Hands a credential-bearing connection URI to a desktop database client.
+    // Signed AND session-authorized: a leaked link alone cannot reach the secret.
+    Route::get('servers/{server}/sites/{site}/databases/{binding}/connect-link', DatabaseConnectLinkController::class)
+        ->middleware('signed')
+        ->name('sites.databases.connect-link');
     // Quick downloads now queue + stage to the download bucket; this signed,
     // login-gated route streams the staged artifact once then deletes it.
     Route::get('quick-downloads/{quickDownload}/fetch', [QuickDownloadController::class, 'fetch'])
@@ -853,27 +761,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             ...$query,
         ]);
     })->name('sites.settings');
-
-    // Edge access log CSV download — session-authed (Gate view-checked
-    // inside the controller) so the dashboard "Download CSV" button
-    // works without minting an API token. Stays out of the section
-    // dispatcher because the .csv extension wouldn't match.
-    Route::get('servers/{server}/sites/{site}/edge/logs.csv', EdgeLogCsvDownloadController::class)
-        ->name('sites.edge.logs.csv');
-
-    Route::get('servers/{server}/sites/{site}/edge/logs/live.json', EdgeLiveAccessLogPollController::class)
-        ->name('sites.edge.logs.live');
-
-    // Per-site audit-log export (CSV/JSON) — session-authed, no row cap,
-    // mirrors the on-screen Audit log panel filters.
-    Route::get('servers/{server}/sites/{site}/edge/audit.export', EdgeAuditLogExportController::class)
-        ->name('sites.edge.audit.export');
-
-    // Generate dply.yaml from the site's current declarative config
-    // (redirects / rewrites / headers / crons). Lets a user export
-    // dashboard-managed state to a repo-checked file.
-    Route::get('servers/{server}/sites/{site}/edge/dply.yaml', EdgeRepoConfigYamlDownloadController::class)
-        ->name('sites.edge.dply-yaml');
 
     Route::get('servers/{server}/sites/{site}/{section?}', SiteWorkspaceController::class)
         ->where('section', '[a-z0-9-]+')
@@ -1010,30 +897,95 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::middleware('feature:workspace.cli')->group(function (): void {
         Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
     });
+    // Teaser gating lives in WorkspaceCliPreview::mount(), which is why that
+    // component must not be #[Lazy] — see the note on the class.
     Route::livewire('servers/{server}/cli-preview', WorkspaceCliPreview::class)->name('servers.cli-preview');
     // Tools — promoted from the dissolved Manage > Tools sub-tab to its own
     // peer workspace. servers.manage stays registered below purely as a
     // back-compat redirector for old /manage deep links + bookmarks.
     Route::livewire('servers/{server}/tools', WorkspaceTools::class)->name('servers.tools');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
-    Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
+    // Settings carries its tab in the query string (?tab=keys), the same shape
+    // servers.notifications uses — the bare URL is the page, the tab is a view
+    // of it. The default tab (connection) is omitted, so /settings is canonical.
+    Route::livewire('servers/{server}/settings', WorkspaceSettings::class)->name('servers.settings');
+    // The tab used to be a path segment; old deep links and bookmarks land here.
+    Route::get('servers/{server}/settings/{section}', function (Server $server, string $section) {
+        return redirect()->route('servers.settings', $section === 'connection'
+            ? ['server' => $server]
+            : ['server' => $server, 'tab' => $section]);
+    })->name('servers.settings.legacy');
 
     Route::get('credentials', function () {
         $user = auth()->user();
         $organization = $user?->currentOrganization();
 
         app(Illuminate\Contracts\Auth\Access\Gate::class)->authorize('viewAny', ProviderCredential::class);
-        abort_unless($organization, 404);
+        abort_unless($organization !== null, 404);
 
         $params = request()->query();
         $params['organization'] = $organization;
 
         return redirect()->route('organizations.credentials', $params);
     })->name('credentials.index');
+    Route::get('credentials/oauth/dropbox', [BackupStorageOAuthController::class, 'redirectDropbox'])
+        ->name('credentials.oauth.dropbox.redirect');
+    Route::get('credentials/oauth/dropbox/callback', [BackupStorageOAuthController::class, 'callbackDropbox'])
+        ->name('credentials.oauth.dropbox.callback');
+    Route::get('credentials/oauth/google-drive', [BackupStorageOAuthController::class, 'redirectGoogleDrive'])
+        ->name('credentials.oauth.google-drive.redirect');
+    Route::get('credentials/oauth/google-drive/callback', [BackupStorageOAuthController::class, 'callbackGoogleDrive'])
+        ->name('credentials.oauth.google-drive.callback');
     Route::get('credentials/oauth/digitalocean', [ProviderOAuthController::class, 'redirectDigitalOcean'])
         ->name('credentials.oauth.digitalocean.redirect');
     Route::get('credentials/oauth/digitalocean/callback', [ProviderOAuthController::class, 'callbackDigitalOcean'])
         ->name('credentials.oauth.digitalocean.callback');
+
+    // "Add to Slack" — one bot token per workspace, backing many notification channels.
+    Route::get('notifications/oauth/slack', [SlackOAuthController::class, 'redirect'])
+        ->name('notifications.oauth.slack.redirect');
+    Route::get('notifications/oauth/slack/callback', [SlackOAuthController::class, 'callback'])
+        ->name('notifications.oauth.slack.callback');
+
+    // "Add to Discord" — the dply bot joined to a guild, backing many channels.
+    Route::get('notifications/oauth/discord', [DiscordOAuthController::class, 'redirect'])
+        ->name('notifications.oauth.discord.redirect');
+    Route::get('notifications/oauth/discord/callback', [DiscordOAuthController::class, 'callback'])
+        ->name('notifications.oauth.discord.callback');
 });
 
 require __DIR__.'/auth.php';
+
+/*
+ * One-shot installer for a purpose-minted, permitopen-restricted database tunnel
+ * key. Deliberately OUTSIDE the authenticated group: it is fetched with
+ * `curl | bash`, which carries no session cookie — a Gate check here just
+ * redirects curl to the login page and pipes HTML into the shell.
+ *
+ * The signed URL is therefore the capability. It is safe to be one because the
+ * key was already authorized when it was minted (in the Connect modal, by an
+ * operator with update rights), the URL expires in minutes, the private key is
+ * cleared on first fetch so a replay yields nothing, and the key itself can only
+ * forward to a single database and can never open a shell.
+ */
+Route::get('database-tunnels/{session}/install', DatabaseTunnelInstallController::class)
+    ->middleware('signed')
+    ->name('database-tunnels.install');
+
+/*
+ * Plain-text connection URI for shell use. Signature-only for the same reason as
+ * the installer above — curl carries no session — and short-lived, because the
+ * response body is a live credential.
+ */
+Route::get('database-connections/{binding}/uri', DatabaseConnectionUriController::class)
+    ->middleware('signed')
+    ->name('database-connections.uri');
+
+/*
+ * Downloadable .command that opens a terminal session on the database. Signed
+ * and short-lived; the credential is fetched by the script at run time, so the
+ * downloaded file never contains one.
+ */
+Route::get('database-connections/{binding}/terminal', DatabaseTerminalScriptController::class)
+    ->middleware('signed')
+    ->name('database-connections.terminal');

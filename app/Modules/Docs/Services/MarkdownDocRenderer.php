@@ -11,7 +11,6 @@ final class MarkdownDocRenderer
     /**
      * @return array{title: string, html: string, headings: list<array{id: string, text: string, level: int}>}
      */
-    /** @return array<string, mixed> */
     public function render(string $slug): array
     {
         [$filename, $title] = $this->resolvePage($slug);
@@ -64,10 +63,6 @@ final class MarkdownDocRenderer
     /**
      * @return list<array{id: string, text: string, level: int}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function headingsFromHtml(string $html): array
     {
         if ($html === '') {
@@ -83,10 +78,6 @@ final class MarkdownDocRenderer
         $headings = [];
 
         foreach ($document->getElementsByTagName('*') as $element) {
-            if (! $element instanceof \DOMElement) {
-                continue;
-            }
-
             $level = match ($element->tagName) {
                 'h2' => 2,
                 'h3' => 3,
@@ -129,10 +120,6 @@ final class MarkdownDocRenderer
         $usedIds = [];
 
         foreach ($document->getElementsByTagName('*') as $element) {
-            if (! $element instanceof \DOMElement) {
-                continue;
-            }
-
             if (! in_array($element->tagName, ['h1', 'h2', 'h3', 'h4'], true)) {
                 continue;
             }
@@ -188,9 +175,7 @@ final class MarkdownDocRenderer
         $tables = [];
 
         foreach ($document->getElementsByTagName('table') as $table) {
-            if ($table instanceof \DOMElement) {
-                $tables[] = $table;
-            }
+            $tables[] = $table;
         }
 
         foreach ($tables as $table) {
@@ -232,27 +217,14 @@ final class MarkdownDocRenderer
         return $this->buildSpecCardList($document, $headers, $rows);
     }
 
-    /**
-     * @return list<array<string, int|string>>
-     */
     private function tableHeaderCells(\DOMDocument $document, \DOMElement $table): array
     {
         $headers = [];
 
         foreach ($table->getElementsByTagName('thead') as $thead) {
-            if (! $thead instanceof \DOMElement) {
-                continue;
-            }
-
             foreach ($thead->getElementsByTagName('tr') as $tr) {
-                if (! $tr instanceof \DOMElement) {
-                    continue;
-                }
-
                 foreach ($tr->getElementsByTagName('th') as $th) {
-                    if ($th instanceof \DOMElement) {
-                        $headers[] = $this->cellInnerHtml($document, $th);
-                    }
+                    $headers[] = $this->cellInnerHtml($document, $th);
                 }
             }
         }
@@ -262,16 +234,10 @@ final class MarkdownDocRenderer
         }
 
         foreach ($table->getElementsByTagName('tr') as $tr) {
-            if (! $tr instanceof \DOMElement) {
-                continue;
-            }
-
             $firstRowHeaders = [];
 
             foreach ($tr->getElementsByTagName('th') as $th) {
-                if ($th instanceof \DOMElement) {
-                    $firstRowHeaders[] = $this->cellInnerHtml($document, $th);
-                }
+                $firstRowHeaders[] = $this->cellInnerHtml($document, $th);
             }
 
             if ($firstRowHeaders !== []) {
@@ -292,15 +258,7 @@ final class MarkdownDocRenderer
         $rows = [];
 
         foreach ($table->getElementsByTagName('tbody') as $tbody) {
-            if (! $tbody instanceof \DOMElement) {
-                continue;
-            }
-
             foreach ($tbody->getElementsByTagName('tr') as $tr) {
-                if (! $tr instanceof \DOMElement) {
-                    continue;
-                }
-
                 $row = $this->rowCells($document, $tr);
 
                 if ($row !== []) {
@@ -316,10 +274,6 @@ final class MarkdownDocRenderer
         $skippedHeader = false;
 
         foreach ($table->getElementsByTagName('tr') as $tr) {
-            if (! $tr instanceof \DOMElement) {
-                continue;
-            }
-
             if (! $skippedHeader && $tr->getElementsByTagName('th')->length > 0) {
                 $skippedHeader = true;
 
@@ -370,7 +324,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function isMatrixComparison(array $headers, array $rows): bool
@@ -388,7 +342,7 @@ final class MarkdownDocRenderer
                 return false;
             }
 
-            if ($this->cellPlainText($row[0] ?? '') === '') {
+            if ($this->cellPlainText($row[0]) === '') {
                 return false;
             }
         }
@@ -397,7 +351,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildMatrixComparison(\DOMDocument $document, array $headers, array $rows): \DOMElement
@@ -448,7 +402,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function isTransposedComparison(array $headers, array $rows): bool
@@ -500,7 +454,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildTransposedComparison(\DOMDocument $document, array $headers, array $rows): \DOMElement
@@ -543,7 +497,7 @@ final class MarkdownDocRenderer
     }
 
     /**
-     * @param  array<string, mixed> $headers
+     * @param  list<string>  $headers
      * @param  list<list<string>>  $rows
      */
     private function buildSpecCardList(\DOMDocument $document, array $headers, array $rows): \DOMElement

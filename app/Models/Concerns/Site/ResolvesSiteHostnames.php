@@ -78,6 +78,7 @@ trait ResolvesSiteHostnames
         }
 
         $meta = $this->meta ?? [];
+
         return (string) ($meta['testing_hostname']['hostname'] ?? '');
     }
 
@@ -212,9 +213,53 @@ trait ResolvesSiteHostnames
      * True when an installed server wildcard already secures the testing
      * hostname — meaning the vhost can emit :443 with no per-site cert.
      */
+    /**
+     * Whether the per-server wildcard covers EVERY hostname this site serves.
+     *
+     * It used to mean only "a wildcard exists for my testing zone", which is a
+     * statement about the preview hostname alone. Callers then treated it as
+     * "this site has TLS": provisioning set ssl_status = active on a site whose
+     * custom domain the wildcard could not cover, so the UI showed an SSL badge
+     * beside a domain with no certificate, and the nginx builder served that
+     * wildcard for it — which browsers reject outright.
+     */
     public function isCoveredByServerWildcard(): bool
     {
-        return $this->coveringServerWildcard() !== null;
+        $wildcard = $this->coveringServerWildcard();
+
+        if ($wildcard === null) {
+            return false;
+        }
+
+        $zone = strtolower(trim((string) ($wildcard->zone ?: ($this->testingZone() ?? '')), ". \t\n\r"));
+
+        if ($zone === '') {
+            return false;
+        }
+
+        foreach ($this->webserverHostnames() as $hostname) {
+            $hostname = strtolower(trim((string) $hostname, ". \t\n\r"));
+
+            if ($hostname === '') {
+                continue;
+            }
+
+            $suffix = '.'.$zone;
+
+            if (! str_ends_with($hostname, $suffix)) {
+                return false;
+            }
+
+            // A wildcard matches exactly one label: *.zone covers a.zone but
+            // not a.b.zone, and never the apex.
+            $label = substr($hostname, 0, -strlen($suffix));
+
+            if ($label === '' || str_contains($label, '.')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @return Collection<int, non-empty-string> */
@@ -275,17 +320,34 @@ trait ResolvesSiteHostnames
     }
 
     /**
-     * Customer domains plus domain aliases for automatic customer-scope certificate issuance (e.g. bulk “issue SSL”).
+     * Every hostname a visitor may type: the site's domains plus its aliases.
+     *
+     * `www` is stored as an alias, not a domain, so anything that iterates
+     * customerDomainHostnames() alone silently skips it. The vhost and the
+     * certificate never did — webserverHostnames() and sslIssuanceHostnames()
+     * both include aliases — which is why a missing `www` A record presented as
+     * "DNS updated but www is still broken": nginx answered for it and the cert
+     * covered it, and the name did not resolve.
      *
      * @return list<string>
      */
-    public function sslIssuanceHostnames(): array
+    public function customerFacingHostnames(): array
     {
         return collect($this->customerDomainHostnames())
             ->merge($this->aliasHostnames())
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Customer domains plus domain aliases for automatic customer-scope certificate issuance (e.g. bulk “issue SSL”).
+     *
+     * @return list<string>
+     */
+    public function sslIssuanceHostnames(): array
+    {
+        return $this->customerFacingHostnames();
     }
 
     /**

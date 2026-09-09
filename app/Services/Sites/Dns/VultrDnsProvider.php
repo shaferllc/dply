@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 
 class VultrDnsProvider implements DnsProvider
 {
@@ -10,7 +10,6 @@ class VultrDnsProvider implements DnsProvider
         private readonly VultrService $service,
     ) {}
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {

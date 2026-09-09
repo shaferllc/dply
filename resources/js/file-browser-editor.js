@@ -22,28 +22,47 @@ import { php } from '@codemirror/lang-php';
 import { xml } from '@codemirror/lang-xml';
 import { yaml } from '@codemirror/lang-yaml';
 import { StreamLanguage } from '@codemirror/language';
+import { css } from '@codemirror/legacy-modes/mode/css';
+import { javascript } from '@codemirror/legacy-modes/mode/javascript';
 import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { nginx } from '@codemirror/legacy-modes/mode/nginx';
 import { properties } from '@codemirror/legacy-modes/mode/properties';
 
 function languageFor(mime, path) {
     const lower = (path || '').toLowerCase();
+    const kind = (mime || '').toLowerCase();
     if (lower.endsWith('.env') || /\.env\.[\w-]+$/.test(lower)) {
         return StreamLanguage.define(properties);
     }
-    if (mime === 'application/json' || lower.endsWith('.json')) return json();
-    if (mime === 'application/xml' || lower.endsWith('.xml') || lower.endsWith('.svg'))
+    if (kind === 'application/json' || lower.endsWith('.json')) return json();
+    if (kind === 'application/xml' || lower.endsWith('.xml') || lower.endsWith('.svg'))
         return xml();
-    if (mime === 'application/x-yaml' || lower.endsWith('.yml') || lower.endsWith('.yaml'))
+    if (kind === 'application/x-yaml' || lower.endsWith('.yml') || lower.endsWith('.yaml'))
         return yaml();
     if (
-        mime === 'application/x-php' ||
-        mime === 'application/x-httpd-php' ||
+        kind === 'application/x-php' ||
+        kind === 'application/x-httpd-php' ||
+        kind === 'text/x-php' ||
+        kind === 'text/php' ||
         lower.endsWith('.php')
     )
         return php();
     if (
-        mime === 'application/x-sh' ||
+        kind === 'text/javascript' ||
+        kind === 'application/javascript' ||
+        kind === 'application/x-javascript' ||
+        kind === 'text/typescript' ||
+        lower.endsWith('.js') ||
+        lower.endsWith('.mjs') ||
+        lower.endsWith('.cjs') ||
+        lower.endsWith('.ts')
+    )
+        return StreamLanguage.define(javascript);
+    if (kind === 'text/css' || lower.endsWith('.css'))
+        return StreamLanguage.define(css);
+    if (
+        kind === 'application/x-sh' ||
+        kind === 'text/x-shellscript' ||
         lower.endsWith('.sh') ||
         lower.endsWith('.bash')
     )

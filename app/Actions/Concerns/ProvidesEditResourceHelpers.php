@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Concerns;
 
-use App\Actions\Concerns\AsReversible;
 use App\Actions\Helpers\ArgumentExtractor;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
@@ -16,8 +15,6 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ProvidesEditResourceHelpers
 {
-
-
     /**
      * Get resource name from class name.
      *
@@ -360,12 +357,10 @@ trait ProvidesEditResourceHelpers
      */
     protected function storeReversalData(mixed $resource, array $additionalData = []): void
     {
-        if (method_exists($this, 'setReversalData')) {
-            $this->setReversalData(array_merge([
-                'resource_id' => $resource->id ?? null,
-                'resource_type' => get_class($resource),
-                'original_state' => $this->getOriginalState($resource),
-            ], $additionalData));
-        }
+        $this->setReversalData(array_merge([
+            'resource_id' => $resource->id ?? null,
+            'resource_type' => get_class($resource),
+            'original_state' => $this->getOriginalState($resource),
+        ], $additionalData));
     }
 }

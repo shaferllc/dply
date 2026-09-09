@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services\VultrServiceTest;
 
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 
@@ -45,7 +45,7 @@ test('create instance sends ssh key ids not raw public keys', function () {
     $id = (new VultrService($credential))->createInstance(
         region: 'ewr',
         plan: 'vc2-1c-1gb',
-        osId: 2152,
+        osId: 2284,
         label: 'web-1',
         sshKeyIds: ['ssh-99'],
     );

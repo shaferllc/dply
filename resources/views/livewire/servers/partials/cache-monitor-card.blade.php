@@ -17,28 +17,29 @@
 @endphp
 
 <div class="{{ $card }}" wire:key="cache-monitor-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Monitor') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — live MONITOR', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Tails redis-cli MONITOR for a bounded window so you can watch traffic against this instance live. Auto-stops when the window ends.') }}</p>
-        </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-signal"
+        :title="__(':engine — live MONITOR', ['engine' => $engineLabel])"
+        :count="$running ? __('Live') : null"
+        :note="__('Tails redis-cli MONITOR for a bounded window so you can watch traffic against this instance live. Auto-stops when the window ends.')"
+        class="border-b border-brand-ink/10"
+    >
         @if (! $running && ($payload !== null))
+        <x-slot:actions>
             <button
                 type="button"
                 wire:click="clearMonitorOutput"
-                class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
+                class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Clear') }}
             </button>
+        </x-slot:actions>
         @endif
-    </div>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
     {{-- Default neutral tone to match the rest of the cache-workspace
          explainers (key browser, REPL, keyspace dashboard, advanced). MONITOR
          is read-only — no destructive action that warrants amber framing —
@@ -46,7 +47,7 @@
          was the original ask. --}}
 
     @if (! $running)
-        <div class="mt-4 flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs text-brand-mist">{{ __('Window') }}</span>
             @foreach ([5, 10, 30] as $opt)
                 <button
@@ -76,7 +77,7 @@
             <button
                 type="button"
                 wire:click="clearMonitorOutput"
-                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2 py-1 text-[11px] font-medium text-sky-900 hover:bg-sky-100"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-sky-300 bg-white px-2 py-1 text-xs font-medium text-sky-900 hover:bg-sky-100"
                 title="{{ __('Stop watching this run. The window itself auto-completes server-side.') }}"
             >
                 <x-heroicon-o-stop-circle class="h-3 w-3" />
@@ -88,30 +89,30 @@
     @if ($payload === null)
         {{-- Pre-run idle state. Operator hasn't picked a window duration
              yet — body would otherwise be blank below the chip row. --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
             </span>
             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No window active') }}</p>
             <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                 {{ __('Pick a window duration above —') }}
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">5s</span>,
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">10s</span>,
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">5s</span>,
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">10s</span>,
                 {{ __('or') }}
-                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-[11px] font-medium text-brand-ink">30s</span>
-                {{ __('— to tail') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">redis-cli MONITOR</code> {{ __('for that bounded window. Auto-stops when the window ends; safe but adds CPU pressure on a busy engine.') }}
+                <span class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-1.5 py-0.5 align-middle text-xs font-medium text-brand-ink">30s</span>
+                {{ __('— to tail') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">redis-cli MONITOR</code> {{ __('for that bounded window. Auto-stops when the window ends; safe but adds CPU pressure on a busy engine.') }}
             </p>
         </div>
     @endif
 
     @if ($payload !== null)
-        <div class="mt-4 max-h-96 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-emerald-100"
+        <div class="mt-4 max-h-96 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100"
              x-data x-init="$el.scrollTop = $el.scrollHeight" x-effect="$el.scrollTop = $el.scrollHeight">
             @if (empty($lines))
                 {{-- Dark-theme empty state: same shape as the REPL "no
                      commands run yet" panel — operator immediately reads
                      this as "still waiting" not "broken". --}}
-                <div class="px-6 py-6 text-center">
+                <div class="px-4 py-3.5 text-center">
                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100/10 text-emerald-200 ring-1 ring-emerald-100/15">
                         <svg class="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <circle cx="12" cy="12" r="3" />

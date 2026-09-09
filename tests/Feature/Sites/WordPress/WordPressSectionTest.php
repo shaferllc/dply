@@ -12,12 +12,15 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\Snapshot;
 use App\Models\User;
-use App\Modules\TaskRunner\ProcessOutput;
+use App\Models\Workspace;
+use App\Models\WorkspaceMember;
 use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Mockery;
 
@@ -46,6 +49,44 @@ function makeWpSite(string $userRole = 'admin'): array
     ]);
 
     return [$user, $site];
+}
+
+/** @return array{0: User, 1: Site} */
+function makeWpProjectViewerSite(): array
+{
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+
+    $viewer = User::factory()->create();
+    $org->users()->attach($viewer->id, ['role' => 'member']);
+
+    $workspace = Workspace::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $owner->id,
+    ]);
+    $workspace->members()->create([
+        'user_id' => $viewer->id,
+        'role' => WorkspaceMember::ROLE_VIEWER,
+    ]);
+    session(['current_organization_id' => $org->id]);
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+        'type' => SiteType::Php,
+        'document_root' => '/home/dply/wp/current',
+        'meta' => ['scaffold' => ['framework' => 'wordpress']],
+    ]);
+
+    return [$viewer, $site];
 }
 test('section renders friendly placeholder for non wordpress site', function () {
     // Same degradation pattern as the Laravel section: we don't
@@ -598,13 +639,88 @@ test('confirm delete theme deletes on confirm', function () {
 test('list action buttons hidden for member role', function () {
     [$user, $site] = makeWpSite(userRole: 'member');
 
-    // Members can run reads + recoverable, so the gate flag we surface
-    // for mutating actions should still be true; only destructive is
-    // gated. Confirm the canMutate flag reaches the view.
+    // Org members on an unrestricted site still have SitePolicy::update
+    // (no project RBAC), so recoverable actions stay available. Only
+    // destructive stays admin-gated.
     Livewire::actingAs($user)
         ->test(WordPressSection::class, ['site' => $site])
         ->assertViewHas('canMutate', true)
         ->assertViewHas('canDestroy', false);
+});
+test('project viewer cannot run mutating wp-cli from the console', function (string $command, string $args) {
+    [$viewer, $site] = makeWpProjectViewerSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($viewer)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('consoleCommand', $command)
+        ->set('consoleArgs', $args)
+        ->call('runConsoleCommand')
+        ->assertForbidden();
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+})->with([
+    ['user create', 'alice alice@example.com --role=administrator'],
+    ['user set-role', 'alice administrator'],
+    ['plugin install', 'evil-plugin --activate'],
+    ['db query', 'SELECT user_pass FROM wp_users'],
+]);
+test('project viewer can run inventory reads but config values stay masked', function () {
+    [$viewer, $site] = makeWpProjectViewerSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->once()
+        ->withArgs(function ($s, $name, $bash, callable $cb) {
+            expect($bash)->toContain('config get');
+            $cb('out', 'super-secret-db-password');
+
+            return true;
+        })
+        ->andReturn(new ProcessOutput('super-secret-db-password', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($viewer)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->assertViewHas('canMutate', false)
+        ->set('consoleCommand', 'config get')
+        ->set('consoleArgs', 'DB_PASSWORD')
+        ->call('runConsoleCommand')
+        ->assertSuccessful()
+        ->assertDontSee('super-secret-db-password')
+        ->assertSee('********');
+
+    $run = RemoteCliRun::query()->where('site_id', $site->id)->sole();
+    expect($run->command)->toBe('config get');
+    expect($run->stdout)->toBe('********');
+    expect($run->stdout)->not->toContain('super-secret-db-password');
+});
+test('project viewer cannot point the console at another run via latestRunId', function () {
+    [$viewer, $site] = makeWpProjectViewerSite();
+
+    expect(fn () => Livewire::actingAs($viewer)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('latestRunId', 999))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+});
+test('project viewer cannot install a plugin from the plugins tab', function () {
+    [$viewer, $site] = makeWpProjectViewerSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($viewer)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'plugins')
+        ->set('pluginInstallSlug', 'wordpress-seo')
+        ->call('installPlugin')
+        ->assertForbidden();
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
 });
 test('switch to system cron records handler on meta', function () {
     [$user, $site] = makeWpSite();

@@ -18,15 +18,17 @@ use Illuminate\Support\Facades\Http;
 /**
  * @property string $id
  * @property array<string, mixed> $credentials
- * @property string $name
+ * @property ?string $name
  * @property ?string $organization_id
  * @property string $provider
  * @property ?string $user_id
+ * @property \Illuminate\Support\Carbon|null $last_validated_at
+ * @property ?string $validation_error
  * @property-read ?User $user
  * @property-read ?Organization $organization
  * @property-read Collection<int, Server> $servers
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ProviderCredential extends Model
 {
@@ -39,6 +41,8 @@ class ProviderCredential extends Model
         'provider',
         'name',
         'credentials',
+        'last_validated_at',
+        'validation_error',
     ];
 
     /** @return array<string, string> */
@@ -46,6 +50,7 @@ class ProviderCredential extends Model
     {
         return [
             'credentials' => 'encrypted:array',
+            'last_validated_at' => 'datetime',
         ];
     }
 
@@ -78,6 +83,58 @@ class ProviderCredential extends Model
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class, 'provider_credential_id');
+    }
+
+    public function isUnhealthy(): bool
+    {
+        return filled($this->validation_error);
+    }
+
+    public static function newestForOrganization(?string $organizationId, string $provider): ?self
+    {
+        if (! filled($organizationId) || trim($provider) === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('organization_id', $organizationId)
+            ->where('provider', $provider)
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
+     * Newest credential that still authenticates. Does not fall back to a
+     * rejected row — callers that must not POST a known-bad token use this.
+     */
+    public static function newestHealthyForOrganization(?string $organizationId, string $provider): ?self
+    {
+        if (! filled($organizationId) || trim($provider) === '') {
+            return null;
+        }
+
+        return static::query()
+            ->where('organization_id', $organizationId)
+            ->where('provider', $provider)
+            ->whereNull('validation_error')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
+     * Newest credential that still authenticates. Falls back to the newest
+     * row (even if rejected) so a picker has something to show.
+     */
+    public static function preferredHealthyForOrganization(?string $organizationId, string $provider): ?self
+    {
+        return static::newestHealthyForOrganization($organizationId, $provider)
+            ?? static::newestForOrganization($organizationId, $provider);
+    }
+
+    public static function preferredForServer(Server $server): ?self
+    {
+        return static::newestForOrganization((string) $server->organization_id, $server->provider->value)
+            ?? $server->providerCredential;
     }
 
     public function getApiToken(): ?string

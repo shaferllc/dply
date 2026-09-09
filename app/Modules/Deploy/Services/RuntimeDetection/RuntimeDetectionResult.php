@@ -18,7 +18,7 @@ namespace App\Modules\Deploy\Services\RuntimeDetection;
 final readonly class RuntimeDetectionResult
 {
     /**
-     * @param  array<string, mixed> $all
+     * @param  list<\App\Modules\Deploy\Services\RuntimeDetection\RuntimeDetection> $all
      */
     public function __construct(
         public ?RuntimeDetection $best,

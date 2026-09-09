@@ -3,10 +3,8 @@
 namespace Tests\Feature\Services\Billing\OrganizationBillingStateComputerTest;
 
 use App\Models\EdgeUsageSnapshot;
-use App\Models\FunctionAction;
 use App\Models\Organization;
 use App\Models\Server;
-use App\Models\ServerlessUsageSnapshot;
 use App\Models\ServerMetricSnapshot;
 use App\Models\Site;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
@@ -34,23 +32,17 @@ test('empty org bills nothing on the free plan', function () {
     expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('classifies each ready server into its tier and resolves the plan by count', function () {
+test('counts each ready server and resolves the plan by count', function () {
     $org = Organization::factory()->create();
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 4, memMb: 8192);
-    // M
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 8, memMb: 16384);
-    // L
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 1, memMb: 2048);
 
-    // XS
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(3);
-    expect($state->tierQuantities['m'])->toBe(1);
-    expect($state->tierQuantities['l'])->toBe(1);
-    expect($state->tierQuantities['xs'])->toBe(1);
 
-    // 3 servers → Starter ($9 flat), size no longer matters.
+    // 3 servers → Starter ($9 flat).
     expect($state->planKey)->toBe('starter');
     expect($state->monthlyTotalCents)->toBe(900);
 });
@@ -63,16 +55,15 @@ test('excludes non ready servers', function () {
     makeServerWithSpecs($org, status: Server::STATUS_PENDING, cpuCount: 4, memMb: 8192);
     makeServerWithSpecs($org, status: Server::STATUS_READY, cpuCount: 2, memMb: 4096);
 
-    // S, only billable — 1 server → Free plan.
+    // Only the ready one is billable — 1 server → Free plan.
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['s'])->toBe(1);
     expect($state->planKey)->toBe('free');
     expect($state->monthlyTotalCents)->toBe(0);
 });
 
-test('servers without metrics classify as xs', function () {
+test('servers without metrics still count toward the plan', function () {
     $org = Organization::factory()->create();
     Server::factory()->create([
         'organization_id' => $org->id,
@@ -82,7 +73,6 @@ test('servers without metrics classify as xs', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['xs'])->toBe(1);
 
     // A single server is the Free plan — $0.
     expect($state->planKey)->toBe('free');
@@ -199,7 +189,6 @@ test('excludes servers younger than min billable age', function () {
     $state = $this->computer->compute($org->fresh());
 
     expect($state->serverCount())->toBe(1);
-    expect($state->tierQuantities['m'])->toBe(1);
 
     // Only the mature server counts → 1 server → Free plan.
     expect($state->planKey)->toBe('free');
@@ -241,7 +230,6 @@ test('serverless host is not counted as a spec tier', function () {
 
     // It would have classified as XS by null-fallback — must not.
     expect($state->serverCount())->toBe(0);
-    expect($state->tierQuantities['xs'])->toBe(0);
     expect($state->monthlyTotalCents)->toBe(0);
 });
 
@@ -361,135 +349,6 @@ test('edge delivery usage adds pass through subtotal when enabled', function () 
     expect($state->monthlyTotalCents)->toBe(400);
 });
 
-test('active serverless functions bill per function', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(3);
-    expect($state->serverlessSubtotalCents)->toBe(600);
-
-    // Free plan ($0, serverless hosts aren't billable servers) + 3 × $2 = $6
-    expect($state->monthlyTotalCents)->toBe(600);
-});
-
-test('non active functions are not billed', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_CONFIGURED);
-    // pre-deploy
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(1);
-});
-
-test('each code action in a package is billed and sequences are not', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-    $site = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    foreach (['a', 'b', 'c'] as $name) {
-        FunctionAction::query()->create([
-            'site_id' => $site->id,
-            'name' => $name,
-            'kind' => FunctionAction::KIND_CODE,
-        ]);
-    }
-
-    // A codeless sequence — composition is free, it must not be metered.
-    FunctionAction::query()->create([
-        'site_id' => $site->id,
-        'name' => 'pipeline',
-        'kind' => FunctionAction::KIND_SEQUENCE,
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(3);
-    expect($state->serverlessSubtotalCents)->toBe(600);
-});
-
-test('an active function site with no enumerated actions still bills once', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    $org = Organization::factory()->create();
-
-    // No function_actions rows — the per-action meter must floor at one
-    // so the bill never regresses below the per-Site model.
-    makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-
-    $state = $this->computer->compute($org->fresh());
-
-    expect($state->serverlessCount)->toBe(1);
-});
-
-test('managed serverless functions add metered invocation usage on top of the flat fee', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    Config::set('dply.serverless.usage_billing.enabled', true);
-    Config::set('dply.serverless.usage_billing.markup_percent', 0);
-    Config::set('dply.serverless.usage_billing.invocations_cents_per_million', 40);
-    Config::set('dply.serverless.usage_billing.included_invocations_per_function', 0);
-
-    $org = Organization::factory()->create();
-    $site = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $site->update(['serverless_backend' => Site::SERVERLESS_BACKEND_DPLY]);
-
-    ServerlessUsageSnapshot::query()->create([
-        'organization_id' => $org->id,
-        'site_id' => $site->id,
-        'period_start' => now()->toDateString(),
-        'period_end' => now()->toDateString(),
-        'invocations' => 2_000_000,
-        'gib_seconds' => 0,
-        'source' => ServerlessUsageSnapshot::SOURCE_FUNCTION_INVOCATIONS,
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    // 2M invocations × 40¢/million = 80¢ usage, on top of the flat $2 fee.
-    expect($state->serverlessCount)->toBe(1);
-    expect($state->serverlessUsageSubtotalCents)->toBe(80);
-    expect($state->monthlyTotalCents)->toBe(280);
-});
-
-test('managed serverless databases are billed cost-plus and BYO functions are not metered', function () {
-    Config::set('subscription.standard.serverless_cents', 200);
-    Config::set('subscription.standard.serverless_markup_percent', 40);
-    Config::set('dply.serverless.usage_billing.enabled', false);
-    Config::set('serverless_pricing.database.db-s-1vcpu-1gb', 15);
-
-    $org = Organization::factory()->create();
-
-    // Managed function with an attached managed database.
-    $managed = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $managed->update([
-        'serverless_backend' => Site::SERVERLESS_BACKEND_DPLY,
-        'meta' => array_merge((array) $managed->meta, [
-            'serverless' => ['database' => ['size' => 'db-s-1vcpu-1gb']],
-        ]),
-    ]);
-
-    // BYO function with the same database config — must NOT be metered.
-    $byo = makeFunctionSite($org, Site::STATUS_FUNCTIONS_ACTIVE);
-    $byo->update([
-        'serverless_backend' => Site::SERVERLESS_BACKEND_BYO,
-        'meta' => array_merge((array) $byo->meta, [
-            'serverless' => ['database' => ['size' => 'db-s-1vcpu-1gb']],
-        ]),
-    ]);
-
-    $state = $this->computer->compute($org->fresh());
-
-    // Only the managed DB: $15 × 1.40 = $21 = 2100¢. BYO contributes nothing.
-    expect($state->serverlessCount)->toBe(2);
-    expect($state->serverlessUsageSubtotalCents)->toBe(2100);
-});
-
 test('managed servers are billed all-in cost-plus and excluded from the plan tier', function () {
     Config::set('subscription.standard.managed_server_markup_percent', 60);
     Config::set('subscription.standard.managed_server_cents', ['cx22' => 450]);
@@ -557,21 +416,6 @@ function makeServerWithSpecs(Organization $org, string $status, int $cpuCount, i
     ]);
 
     return $server;
-}
-
-function makeFunctionSite(Organization $org, string $status): Site
-{
-    $server = Server::factory()->create([
-        'organization_id' => $org->id,
-        'status' => Server::STATUS_READY,
-        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
-    ]);
-
-    return Site::factory()->create([
-        'organization_id' => $org->id,
-        'server_id' => $server->id,
-        'status' => $status,
-    ]);
 }
 
 function makeCloudSite(Organization $org, string $status, bool $preview = false): Site

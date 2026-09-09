@@ -151,6 +151,8 @@ test('security digest flags high auth failure count', function (): void {
             'security_digest_snapshot' => [
                 'checked_at' => now()->subHour()->toIso8601String(),
                 'auth_failed_lines' => 250,
+                'auth_failed_24h_lines' => 80,
+                'auth_failed_24h_ips' => 45,
                 'fail2ban_active' => 'active',
                 'fail2ban_jails' => ['sshd'],
             ],
@@ -160,8 +162,33 @@ test('security digest flags high auth failure count', function (): void {
     $report = app(ServerSecurityDigest::class)->forServer($server);
 
     expect($report['overall'])->toBe('critical')
-        ->and($report['auth']['failed_lines'])->toBe(250)
-        ->and($report['summary']['auth_failed_total'])->toBe(250);
+        ->and($report['auth']['failed_24h_ips'])->toBe(45)
+        ->and($report['summary']['auth_failed_24h_ips'])->toBe(45);
+});
+
+test('security digest does not treat lifetime auth.log line counts as critical', function (): void {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'meta' => [
+            'host_kind' => 'vm',
+            'security_digest_snapshot' => [
+                'checked_at' => now()->subHour()->toIso8601String(),
+                'auth_failed_lines' => 261,
+                'auth_failed_24h_lines' => 40,
+                'auth_failed_24h_ips' => 6,
+                'fail2ban_active' => 'active',
+                'fail2ban_jails' => ['sshd'],
+            ],
+        ],
+    ]);
+
+    $report = app(ServerSecurityDigest::class)->forServer($server);
+
+    expect($report['overall'])->not->toBe('critical')
+        ->and(collect($report['alerts'])->pluck('title'))->not->toContain(__('High SSH auth failure volume'));
 });
 
 test('security digest script parses jail stats and hardening fields', function (): void {
@@ -171,6 +198,8 @@ auth_failed_lines=12
 auth_invalid_user_lines=5
 auth_failed_password_lines=7
 auth_failed_recent=3
+auth_failed_24h_lines=8
+auth_failed_24h_ips=4
 ufw_active=active
 sshd_password_auth=no
 sshd_permit_root=prohibit-password
@@ -200,6 +229,8 @@ OUT;
     expect($snapshot['auth_failed_lines'])->toBe(12)
         ->and($snapshot['auth_invalid_user_lines'])->toBe(5)
         ->and($snapshot['auth_failed_recent'])->toBe(3)
+        ->and($snapshot['auth_failed_24h_lines'])->toBe(8)
+        ->and($snapshot['auth_failed_24h_ips'])->toBe(4)
         ->and($snapshot['ufw_active'])->toBe('active')
         ->and($snapshot['sshd_password_auth'])->toBe('no')
         ->and($snapshot['fail2ban_jail_rows'][0]['name'])->toBe('sshd')

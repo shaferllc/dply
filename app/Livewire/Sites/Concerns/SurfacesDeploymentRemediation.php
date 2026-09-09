@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Models\ConsoleAction;
 use App\Models\SiteDeployment;
+use App\Modules\Remediations\Jobs\ApplyRemediationJob;
 use App\Modules\Remediations\Services\RemediationCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -54,6 +54,10 @@ trait SurfacesDeploymentRemediation
             ->where('subject_id', $this->site->id)
             ->where('kind', 'remediation_apply')
             ->whereNull('dismissed_at')
+            ->orderByRaw('case when status in (?, ?) then 0 else 1 end', [
+                ConsoleAction::STATUS_QUEUED,
+                ConsoleAction::STATUS_RUNNING,
+            ])
             ->orderByDesc('created_at')
             ->first();
     }
@@ -64,24 +68,96 @@ trait SurfacesDeploymentRemediation
         Gate::authorize('update', $this->site);
 
         $deployment = SiteDeployment::query()->where('site_id', $this->site->id)->whereKey($deploymentId)->first();
-        $remediation = $this->remediationForDeployment($deployment);
-        $catalog = app(RemediationCatalog::class);
-        if ($remediation === null || $catalog->action((string) $remediation['code'], $actionKey) === null) {
+        if ($deployment === null || $deployment->status !== SiteDeployment::STATUS_FAILED) {
             $this->toastError(__('That fix is no longer available.'));
 
             return;
         }
 
+        $catalog = app(RemediationCatalog::class);
+        $code = null;
+        foreach ($catalog->matchAll($this->deploymentFailureText($deployment)) as $remediation) {
+            if ($catalog->action((string) $remediation['code'], $actionKey) !== null) {
+                $code = (string) $remediation['code'];
+                break;
+            }
+        }
+
+        if ($code === null) {
+            $this->toastError(__('That fix is no longer available.'));
+
+            return;
+        }
+
+        $this->queueSiteRemediationApply($code, $actionKey);
+    }
+
+    /**
+     * Seed a console row, dispatch the job onto it, and watch the banner.
+     * A second click while the same fix is in flight attaches to that run
+     * instead of starting another job (which would fail the PHP mutex).
+     */
+    protected function queueSiteRemediationApply(string $code, string $actionKey, ?string $errorEventId = null): void
+    {
+        $existing = $this->inFlightRemediationRun();
+        if ($existing !== null) {
+            $this->attachToRemediationRun($existing);
+            $this->toastSuccess(__('That fix is already running — output is in the console above.'));
+
+            return;
+        }
+
+        $run = method_exists($this, 'seedQueuedConsoleAction')
+            ? $this->seedQueuedConsoleAction('remediation_apply', __('Applying fix'))
+            : null;
+
         ApplyRemediationJob::dispatch(
             (string) $this->server->id,
             (string) $this->site->id,
-            (string) $remediation['code'],
+            $code,
             $actionKey,
             (string) (auth()->id() ?? '') ?: null,
+            $errorEventId,
+            $run !== null ? (string) $run->id : null,
         );
 
+        if ($run !== null) {
+            $this->attachToRemediationRun($run);
+        }
+
         unset($this->deploymentRemediationRun);
-        $this->toastSuccess(__('Applying the fix — progress shows below. Re-deploy once it finishes.'));
+        $this->toastSuccess(__('Applying the fix — progress shows in the console above. Re-deploy once it finishes.'));
+    }
+
+    protected function inFlightRemediationRun(): ?ConsoleAction
+    {
+        $run = ConsoleAction::query()
+            ->forSubject($this->site)
+            ->ofKind('remediation_apply')
+            ->notDismissed()
+            ->inFlight()
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($run === null || $run->isStale()) {
+            return null;
+        }
+
+        return $run;
+    }
+
+    protected function attachToRemediationRun(ConsoleAction $run): void
+    {
+        if (method_exists($this, 'watchConsoleAction')) {
+            $this->watchConsoleAction(
+                $run,
+                __('Fix applied. Re-deploy to continue.'),
+                __('The fix did not finish — see the console output.'),
+            );
+            $this->dispatch('dply-console-action-focus');
+        }
+
+        unset($this->deploymentRemediationRun);
     }
 
     /** Full failure output to match against — the overall log plus any step outputs. */

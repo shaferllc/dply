@@ -111,7 +111,6 @@ class TaskStarted
      * Get the task data.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskData(): array
     {
         return $this->task->getData();

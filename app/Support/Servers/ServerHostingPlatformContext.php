@@ -6,14 +6,12 @@ namespace App\Support\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Organization;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\VultrService;
 use RuntimeException;
 
 /**
  * Platform cloud credentials for dply-managed servers — the VM counterpart to
- * {@see App\Modules\Serverless\Support\ServerlessPlatformContext} and
- * {@see App\Modules\Edge\Support\EdgeDeliveryContext} `platform()`.
  *
  * In managed mode dply provisions and pays for the VM on its own platform cloud
  * account (rather than the customer's connected credential), and bills it all-in
@@ -53,7 +51,7 @@ final readonly class ServerHostingPlatformContext
     {
         $key = $provider->value;
         $fallback = $provider === ServerProvider::Vultr
-            ? ['region' => 'ewr', 'image' => '2152']
+            ? ['region' => 'ewr', 'image' => '2284']
             : ['region' => 'fsn1', 'image' => 'ubuntu-24.04'];
 
         return new self(

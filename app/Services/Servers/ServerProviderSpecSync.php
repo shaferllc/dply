@@ -6,9 +6,9 @@ namespace App\Services\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Modules\Cloud\Services\AwsEc2Service;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\AwsEc2Service;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
 
 /**
  * Re-reads a server's hardware facts (size slug, memory, vCPUs, disk, region)
@@ -26,12 +26,11 @@ class ServerProviderSpecSync
     /** Whether this server's provider supports a live spec lookup. */
     public function supports(Server $server): bool
     {
-        return $server->provider instanceof ServerProvider
-            && in_array($server->provider, [
-                ServerProvider::DigitalOcean,
-                ServerProvider::Hetzner,
-                ServerProvider::Aws,
-            ], true)
+        return in_array($server->provider, [
+            ServerProvider::DigitalOcean,
+            ServerProvider::Hetzner,
+            ServerProvider::Aws,
+        ], true)
             && $server->providerCredential !== null
             && filled($server->provider_id);
     }
@@ -76,6 +75,23 @@ class ServerProviderSpecSync
         return $spec;
     }
 
+    /**
+     * Read the provider's current facts WITHOUT writing them.
+     *
+     * Same lookup {@see self::sync()} performs, exposed so diagnostics can
+     * compare the stored row against reality without mutating it — a doctor
+     * command that repaired the thing it was measuring would hide the drift
+     * it exists to find.
+     *
+     * @return array{size: ?string, memory_mb: ?int, vcpus: ?int, disk_gb: ?int, region: ?string}
+     *
+     * @throws \RuntimeException when the server can't be looked up
+     */
+    public function liveSpec(Server $server): array
+    {
+        return $this->fetch($server);
+    }
+
     /** Record a failed sync attempt on the server row (keeps last good snapshot). */
     public function recordFailure(Server $server, \Throwable $e): void
     {
@@ -105,7 +121,7 @@ class ServerProviderSpecSync
             ServerProvider::Aws => $this->fromAws($server, $credential),
             default => throw new \RuntimeException(sprintf(
                 'Spec re-sync is not supported for the %s provider yet.',
-                $server->provider?->value ?? 'unknown',
+                $server->provider->value,
             )),
         };
     }

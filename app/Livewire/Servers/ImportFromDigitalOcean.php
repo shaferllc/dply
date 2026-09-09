@@ -5,7 +5,7 @@ namespace App\Livewire\Servers;
 use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -15,6 +15,13 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Throwable;
 
+/**
+ * The standalone DigitalOcean adopt page. Every entry point re-checks
+ * ServerPolicy::create, not just mount(): a live page survives a mid-session
+ * demotion to deployer, and scan() (which spends the org's DO token) and
+ * adopt() (which writes a Server plus its SSH private key) are each callable
+ * on the hydrated component without a fresh mount. Mirrors StepScan.
+ */
 #[Layout('layouts.app')]
 class ImportFromDigitalOcean extends Component
 {
@@ -66,6 +73,8 @@ class ImportFromDigitalOcean extends Component
 
     public function mount(): void
     {
+        $this->authorize('create', Server::class);
+
         $credentials = $this->availableCredentials();
         if ($credentials->count() === 1) {
             $this->credentialId = (string) $credentials->first()->id;
@@ -74,6 +83,8 @@ class ImportFromDigitalOcean extends Component
 
     public function scan(): void
     {
+        $this->authorize('create', Server::class);
+
         $this->scanError = '';
         $this->droplets = [];
 
@@ -136,6 +147,8 @@ class ImportFromDigitalOcean extends Component
 
     public function adopt(): void
     {
+        $this->authorize('create', Server::class);
+
         if ($this->adoptDropletId === null) {
             return;
         }

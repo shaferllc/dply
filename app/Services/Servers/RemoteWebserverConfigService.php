@@ -25,6 +25,14 @@ use App\Services\SshConnection;
  */
 class RemoteWebserverConfigService
 {
+    /**
+     * Seconds allowed for an engine's own config-validation command. The
+     * webserver_config_layout blocks never carried a per-engine override —
+     * the old `$layout['validate_timeout'] ?? 60` lookup could only ever
+     * resolve to this default.
+     */
+    private const VALIDATE_TIMEOUT_SECONDS = 60;
+
     public function __construct(
         protected ServerManageSshExecutor $executor,
     ) {}
@@ -32,11 +40,6 @@ class RemoteWebserverConfigService
     /**
      * Engines this service knows about. Used to gate which validate/reload
      * commands and globs to apply.
-     * @return array<string, mixed>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<(int|string)>
      */
     public function supportedEngines(): array
     {
@@ -48,16 +51,11 @@ class RemoteWebserverConfigService
      * paths that already exist on the server. The main config is always first
      * (if it exists); the rest come from the engine's globs.
      *
-     * @return list<(int|string)>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, int|string|null>>
      */
     public function listFiles(Server $server, string $engine): array
     {
         $layout = $this->layoutFor($engine);
-        $paths = array_merge([$layout['main']], $layout['globs'] ?? []);
+        $paths = array_merge([$layout['main']], $layout['globs']);
 
         // Build a tiny shell pipeline that expands the globs and reports
         // size+mtime for each existing file. Failure is non-fatal — we just
@@ -109,9 +107,7 @@ class RemoteWebserverConfigService
      * preview size; callers should surface a clear notice when they hit the
      * cap so the operator doesn't silently lose trailing content.
      *
-     * @return list<array<string, int|string|null>>
      */
-    /** @return array<string, mixed> */
     public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -155,7 +151,6 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
-    /** @return array<string, mixed> */
     public function write(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -212,7 +207,7 @@ BASH;
             $server,
             'webserver-config:validate',
             (string) ($layout['validate'] ?? 'true'),
-            (int) ($layout['validate_timeout'] ?? 60),
+            self::VALIDATE_TIMEOUT_SECONDS,
             $emitter,
         );
         $validateOk = $this->validateOutputLooksOk($engine, $validate);
@@ -256,7 +251,6 @@ BASH;
      *
      * @return array{output: string, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function validateContent(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
@@ -308,7 +302,7 @@ BASH;
             $server,
             'webserver-config:validate-buffer',
             $script,
-            (int) ($layout['validate_timeout'] ?? 60) + 10,
+            self::VALIDATE_TIMEOUT_SECONDS + 10,
             $emitter,
         );
         $emitter?->step('config', 'Restoring original (live file is unchanged)');
@@ -378,7 +372,6 @@ BASH;
      * current on-disk config (e.g. after fmt-overwrite or an external edit).
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validate(Server $server, string $engine): array
     {
         $this->assertEngineSupported($engine);
@@ -388,7 +381,7 @@ BASH;
             $server,
             'webserver-config:validate',
             (string) ($layout['validate'] ?? 'true'),
-            (int) ($layout['validate_timeout'] ?? 60),
+            self::VALIDATE_TIMEOUT_SECONDS,
         );
 
         return [
@@ -401,10 +394,6 @@ BASH;
      * List timestamped backups for a single live path.
      *
      * @return array<int, array{path: string, mtime: int, size: int}>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, int|string>>
      */
     public function listBackups(Server $server, string $engine, string $path): array
     {
@@ -440,9 +429,7 @@ BASH;
      * `write()`, this also snapshots the current live file before clobbering
      * it, so a bad restore can be undone by restoring the very last backup.
      *
-     * @return list<array<string, int|string>>
      */
-    /** @return array<string, mixed> */
     public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);

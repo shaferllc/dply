@@ -2,47 +2,35 @@
 
 namespace App\Livewire\Servers;
 
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
-use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Concerns\StagesBackupDownloads;
-use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\BuildsServerBackupView;
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
+use App\Livewire\Servers\Concerns\ManagesBackupNotifications;
 use App\Livewire\Servers\Concerns\ManagesServerBackupDatabases;
 use App\Livewire\Servers\Concerns\ManagesServerBackupRuns;
 use App\Livewire\Servers\Concerns\ManagesServerBackupSchedules;
-use App\Livewire\Servers\Concerns\ManagesBackupNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\BackupConfiguration;
-use App\Models\ConsoleAction;
+use App\Models\BackupSchedule;
 use App\Models\Server;
-use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Models\SiteBinding;
+use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
 use App\Modules\Backups\Models\SiteFileBackup;
-use App\Notifications\BackupFailureNotification;
-use App\Modules\Backups\Services\DatabaseBackupExporter;
-use App\Services\Servers\ServerDatabaseProvisioner;
-use App\Services\Servers\ServerRemovalAdvisor;
-use App\Modules\Backups\Services\SiteFileBackupExporter;
 use App\Support\Servers\DatabaseBackupSettings;
-use App\Support\Servers\ServerDatabaseHostCapabilities;
-use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Notification;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -52,11 +40,13 @@ use Livewire\Component;
 /**
  * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
  * (site-scoped). Surfaces {@see ServerDatabaseBackup} and {@see SiteFileBackup}
- * runs plus recurring schedule CRUD via {@see ServerBackupSchedule}.
+ * runs plus recurring schedule CRUD via {@see BackupSchedule}.
  *
- * Schedules materialize as {@see ServerCronJob} entries that invoke
- * `dply:run-backup-schedule {schedule}` so the cron line stays stable across
- * cadence edits.
+ * Schedules are rows, not cron lines: {@see DispatchDueBackupSchedulesCommand}
+ * ticks every minute on the control plane and runs whichever have come due, so
+ * a cadence edit takes effect immediately and a capture still happens when the
+ * server itself is down. Legacy `system_managed` {@see ServerCronJob} rows from
+ * before that engine existed are inert and are swept in M1.
  */
 #[Layout('layouts.app')]
 #[Lazy]
@@ -66,13 +56,13 @@ class WorkspaceBackups extends Component
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use DismissesServerConsoleActionRun;
-    use ManagesServerBackupDatabases;
-    use ManagesServerBackupRuns;
-    use ManagesServerBackupSchedules;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesBackupDestinationModal;
     use ManagesBackupNotifications;
+    use ManagesServerBackupDatabases;
+    use ManagesServerBackupRuns;
+    use ManagesServerBackupSchedules;
     use QueuesQuickDownloads;
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
@@ -105,7 +95,7 @@ class WorkspaceBackups extends Component
     public string $run_site_id = '';
 
     /** New schedule form. */
-    public string $new_target_type = ServerBackupSchedule::TARGET_DATABASE;
+    public string $new_target_type = BackupSchedule::TARGET_DATABASE;
 
     public string $new_target_id = '';
 
@@ -159,7 +149,6 @@ class WorkspaceBackups extends Component
     /** True once {@see detectLiveDatabases()} has run (drives the card's spinner). */
     public bool $liveDbDetected = false;
 
-
     /**
      * Fired by {@see CreatesNotificationChannelInline} after the inline modal
      * creates a channel. Jump to the Notifications tab and pre-select the new
@@ -178,7 +167,7 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -214,7 +203,7 @@ class WorkspaceBackups extends Component
 
             $this->siteDedicatedContext = true;
             $this->context_site_id = $site->id;
-            $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+            $this->new_target_type = BackupSchedule::TARGET_SITE_FILES;
             $this->new_target_id = $site->id;
         }
 
@@ -246,7 +235,7 @@ class WorkspaceBackups extends Component
                 ->exists();
             if ($exists) {
                 $this->context_site_id = $siteId;
-                $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+                $this->new_target_type = BackupSchedule::TARGET_SITE_FILES;
                 $this->new_target_id = $siteId;
             }
         }
@@ -269,7 +258,6 @@ class WorkspaceBackups extends Component
         $this->db_backup_configuration_id = $destination->id;
     }
 
-
     /**
      * Resolve + authorize a backup for the Hetzner staging download flow. DB
      * backups allow remote-attached databases (their dump runs on the home
@@ -290,9 +278,10 @@ class WorkspaceBackups extends Component
         };
     }
 
-
-    /** Inline-edit form state: schedule id → new cron expression. Empty = not editing. */
+    /**
+     * Inline-edit form state: schedule id → new cron expression. Empty = not editing.
+     *
+     * @var array<string, string>
+     */
     public array $editing_schedules = [];
-
-
 }

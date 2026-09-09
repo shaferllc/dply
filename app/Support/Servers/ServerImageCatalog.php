@@ -18,14 +18,29 @@ use App\Models\Server;
 final class ServerImageCatalog
 {
     /**
-     * @return array<string, array{label: string, family: string, slugs: array<string, string>}>
+     * Every image in the catalog, offered or not. Resolution helpers
+     * ({@see resolveSlug}, {@see labelFor}) read this so a server already
+     * provisioned on a since-retired image keeps resolving and keeps its label.
+     *
+     * @return array<string, array{enabled?: bool, label: string, family: string, slugs: array<string, string>}>
      */
     public static function images(): array
     {
-        /** @var array<string, array{label: string, family: string, slugs: array<string, string>}> $images */
+        /** @var array<string, array{enabled?: bool, label: string, family: string, slugs: array<string, string>}> $images */
         $images = config('server_images.images', []);
 
         return $images;
+    }
+
+    /**
+     * Whether an image is currently offered for selection. Absent `enabled`
+     * means yes — only an explicit `false` withdraws it.
+     */
+    public static function isOffered(string $key): bool
+    {
+        $image = self::images()[$key] ?? null;
+
+        return $image !== null && ($image['enabled'] ?? true) !== false;
     }
 
     /**
@@ -47,9 +62,17 @@ final class ServerImageCatalog
 
     /**
      * Whether a specific image key is offered for the given provider.
+     *
+     * Mirrors {@see optionsForProvider} — a withdrawn image must fail here too,
+     * or a draft holding that key would stay selected while being absent from
+     * the picker and rejected by create validation.
      */
     public static function isValidForProvider(string $provider, string $key): bool
     {
+        if (! self::isOffered($key)) {
+            return false;
+        }
+
         $slug = self::images()[$key]['slugs'][$provider] ?? null;
 
         return is_string($slug) && $slug !== '';
@@ -65,6 +88,9 @@ final class ServerImageCatalog
     {
         $options = [];
         foreach (self::images() as $key => $image) {
+            if (($image['enabled'] ?? true) === false) {
+                continue;
+            }
             $slug = $image['slugs'][$provider] ?? null;
             if (! is_string($slug) || $slug === '') {
                 continue;
@@ -132,6 +158,17 @@ final class ServerImageCatalog
         $key = is_array($meta) ? ($meta['os_image'] ?? null) : null;
 
         return self::resolveSlug($provider, is_string($key) ? $key : null);
+    }
+
+    /**
+     * Org worker-bake snapshot id stamped on {@see Server::$meta} `boot_image_id`.
+     * Provision jobs prefer this over the stock distro so setup skip-fasts.
+     */
+    public static function bootImageForServer(Server $server): ?string
+    {
+        $id = trim((string) data_get($server->meta, 'boot_image_id'));
+
+        return $id !== '' ? $id : null;
     }
 
     /**

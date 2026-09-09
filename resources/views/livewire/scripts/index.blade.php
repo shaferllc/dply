@@ -7,11 +7,12 @@
 @endphp
 
 <div class="contents">
-    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <x-breadcrumb-trail :items="[
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <x-breadcrumb-trail :items="array_values(array_filter([
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            feature('surface.marketplace') ? ['label' => __('Marketplace'), 'href' => route('marketplace.index'), 'icon' => 'rectangle-group'] : null,
             ['label' => __('Scripts'), 'icon' => 'code-bracket'],
-        ]" />
+        ]))" />
 
         <x-profile-shell
             :title="__('Scripts')"
@@ -21,12 +22,12 @@
             @if ($showShellActions)
                 <x-slot:actions>
                     <a
-                        href="{{ route('scripts.marketplace') }}"
+                        href="{{ route('marketplace.index', ['category' => 'scripts']) }}"
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
-                        {{ __('Script presets') }}
+                        {{ __('Browse marketplace') }}
                     </a>
                     @if ($canCreateScript)
                         <a
@@ -45,14 +46,14 @@
                 <x-slot:stats>
                     <dl class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <x-heroicon-o-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('Scripts') }}</span>
                             </dt>
                             <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $scriptsTotal }}</dd>
                         </div>
                         <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2">
-                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            <dt class="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                                 <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span class="truncate">{{ __('VM servers') }}</span>
                             </dt>
@@ -79,12 +80,12 @@
                     </p>
                     <div class="mt-5 flex flex-wrap items-center justify-center gap-2">
                         <a
-                            href="{{ route('scripts.marketplace') }}"
+                            href="{{ route('marketplace.index', ['category' => 'scripts']) }}"
                             wire:navigate
                             class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             <x-heroicon-o-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Script presets') }}
+                            {{ __('Browse marketplace') }}
                         </a>
                         @if ($canCreateScript)
                             <a
@@ -178,7 +179,7 @@
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Saved commands') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Saved commands') }}</p>
                             <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Apply script to a server') }}</h2>
                             <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Copies this organization script into the server Run workspace as a saved command. Existing commands with the same name are updated.') }}

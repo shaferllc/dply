@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
 final class DeployPipelineIssueFixResolver
 {
     /**
-     * @param  Collection<int, array{key?: string, level?: string, message?: string, meta?: array<string, mixed>}>  $checks
+     * @param  Collection<int, covariant array{key?: string, level?: string, message?: string, meta?: array<string, mixed>}>  $checks
      * @return Collection<int, array{key: string, level: string, message: string, fix: array{label: string, url?: string, action?: string}}>
      */
     public static function actionableChecks(Site $site, Server $server, Collection $checks): Collection

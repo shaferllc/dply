@@ -31,7 +31,7 @@ trait ManagesSessionBindings
      * the chosen SESSION_* keys. Every field is optional — a blank one is left
      * out so the framework default applies; redis needs the Redis binding too.
      *
-     * @param  array<string, mixed> $params
+     * @param  array<string, mixed>  $params
      */
     private function attachSession(Site $site, array $params): SiteBinding
     {
@@ -53,6 +53,12 @@ trait ManagesSessionBindings
         $injected = [];
         foreach (self::SESSION_DEFAULTS as $key => $default) {
             $injected[$key] = $raw[$key] === '' ? $default : $raw[$key];
+        }
+        // Blank driver used to materialize as `database`. Only keep that when a
+        // database binding is attached; otherwise fall back to file so we don't
+        // save a store the app can't reach.
+        if ($raw['SESSION_DRIVER'] === '' && ! $site->bindings()->where('type', 'database')->exists()) {
+            $injected['SESSION_DRIVER'] = 'file';
         }
 
         if (! in_array($injected['SESSION_DRIVER'], ['file', 'database', 'cookie', 'redis', 'memcached', 'array'], true)) {

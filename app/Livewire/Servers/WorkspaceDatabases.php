@@ -11,11 +11,13 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesDatabaseAdminCredentials;
 use App\Livewire\Servers\Concerns\ManagesDatabaseBackups;
+use App\Livewire\Servers\Concerns\ManagesDatabaseConnectPanel;
 use App\Livewire\Servers\Concerns\ManagesDatabaseCredentialModals;
 use App\Livewire\Servers\Concerns\ManagesDatabaseCrud;
 use App\Livewire\Servers\Concerns\ManagesDatabaseEdit;
 use App\Livewire\Servers\Concerns\ManagesDatabaseEngineLifecycle;
 use App\Livewire\Servers\Concerns\ManagesDatabaseExtras;
+use App\Livewire\Servers\Concerns\ManagesDatabaseInventory;
 use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
 use App\Livewire\Servers\Concerns\ManagesDatabaseSqliteConsole;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
@@ -27,10 +29,13 @@ use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseEngine;
+use App\Modules\Backups\Services\DatabaseBackupExporter;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\DatabaseWorkspaceViewData;
+use App\Support\Servers\ServerNetworkPeers;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -51,11 +56,13 @@ class WorkspaceDatabases extends Component
     use InteractsWithServerWorkspace;
     use ManagesDatabaseAdminCredentials;
     use ManagesDatabaseBackups;
+    use ManagesDatabaseConnectPanel;
     use ManagesDatabaseCredentialModals;
     use ManagesDatabaseCrud;
     use ManagesDatabaseEdit;
     use ManagesDatabaseEngineLifecycle;
     use ManagesDatabaseExtras;
+    use ManagesDatabaseInventory;
     use ManagesDatabaseNotifications;
     use ManagesDatabaseSqliteConsole;
     use RendersWorkspacePlaceholder;
@@ -150,12 +157,24 @@ class WorkspaceDatabases extends Component
         $this->engine_subtab = in_array($subtab, self::ENGINE_SUBTABS, true) ? $subtab : 'overview';
     }
 
-    /** S3-compatible providers — the only destinations the database exporter can upload to. */
-    public const S3_BACKUP_PROVIDERS = [
-        BackupConfiguration::PROVIDER_AWS_S3,
-        BackupConfiguration::PROVIDER_CUSTOM_S3,
-        BackupConfiguration::PROVIDER_DIGITALOCEAN_SPACES,
-    ];
+    /**
+     * Destinations a database backup can be sent to. Three transports back
+     * these and the exporter already dispatches across all three
+     * ({@see DatabaseBackupExporter::exportToDestination}):
+     *
+     *   S3 / Spaces      — presigned PUT
+     *   SFTP / FTP / Rclone — client binary on the server (FileTransportCommandFactory)
+     *   Dropbox / Google Drive — bearer-token HTTPS API (CloudApiCommandFactory)
+     *
+     * Download works for each too: presignable destinations redirect, the rest
+     * are staged back to the server and streamed (`downloadTarget`).
+     *
+     * This list was S3-only long after the other two transports landed, so the
+     * picker hid destinations the engine could already write to. Derived from
+     * the model rather than restated, so a new provider is offered here the
+     * moment it is supported.
+     */
+    public const S3_BACKUP_PROVIDERS = BackupConfiguration::AVAILABLE_PROVIDERS;
 
     /**
      * Merged Databases card skeleton (hide-hero) so lazy load matches the page
@@ -223,15 +242,21 @@ class WorkspaceDatabases extends Component
         // deferred to wire:init via loadDriftSnapshot() on the Connections subtab so it
         // never blocks first paint. The drift card shows a "checking…" state until then.
 
+        // Second gate on the credential modals: the ids are #[Locked] so only
+        // the open* methods (which authorize) can set them, but re-check here so
+        // a member who loses `update` mid-session stops seeing the password on
+        // the very next render instead of keeping the open modal alive.
+        $canManageDatabases = Gate::allows('update', $this->server);
+
         $credentialsModalDatabase = null;
-        if ($this->credentials_modal_db_id !== null) {
+        if ($canManageDatabases && $this->credentials_modal_db_id !== null) {
             $credentialsModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->credentials_modal_db_id);
         }
 
         $connectionUrlModalDatabase = null;
-        if ($this->connection_url_modal_db_id !== null) {
+        if ($canManageDatabases && $this->connection_url_modal_db_id !== null) {
             $connectionUrlModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->connection_url_modal_db_id);
@@ -254,7 +279,7 @@ class WorkspaceDatabases extends Component
                 ->orderByDesc('created_at')
                 ->limit(60)
                 ->get()
-                ->groupBy(fn ($b) => $b->serverDatabase?->engine ?? 'unknown');
+                ->groupBy(fn ($b) => $b->serverDatabase->engine ?? 'unknown');
         }
 
         $orgAllowsCredentialShares = true;
@@ -313,6 +338,10 @@ class WorkspaceDatabases extends Component
                 'backupS3Destinations' => $backupS3Destinations,
                 'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
                 'existingMysqlUserOptions' => $needsBasics ? $this->existingMysqlUserOptions() : [],
+                // Servers this box can actually reach privately — the pick-list for
+                // engine-level remote access. Same rule the Networking workspace
+                // map uses, so the two can't disagree about who is a peer.
+                'engineRemotePeers' => ServerNetworkPeers::for($this->server),
                 'recentBackupsByEngine' => $recentBackupsByEngine,
                 'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
                 'databaseImportMaxBytes' => $databaseImportMaxBytes,

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\QuickDownload;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Notifications\Concerns\DeliversToIntercom;
+use App\Notifications\Concerns\DeliversToMicrosoftTeams;
+use App\Notifications\Concerns\DeliversToPagerDuty;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,6 +22,9 @@ use Illuminate\Notifications\Notification;
  */
 class QuickDownloadFailedNotification extends Notification implements ShouldQueue
 {
+    use DeliversToIntercom;
+    use DeliversToMicrosoftTeams;
+    use DeliversToPagerDuty;
     use Queueable;
 
     public function __construct(
@@ -33,7 +40,7 @@ class QuickDownloadFailedNotification extends Notification implements ShouldQueu
      */
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return array_merge(['mail'], $this->viaIntercom($notifiable), $this->viaMicrosoftTeams($notifiable), $this->viaPagerDuty($notifiable));
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -52,5 +59,25 @@ class QuickDownloadFailedNotification extends Notification implements ShouldQueu
         }
 
         return $mail->action(__('Open Backups'), $this->backupsUrl);
+    }
+
+    /**
+     * Warning, not error: a failed download blocks one person's restore, it does
+     * not mean the platform is down. Over-cap is a quota decision rather than a
+     * fault, so it does not page at all.
+     */
+    public function pagerDutySeverity(object $notifiable): ?string
+    {
+        return $this->overCap ? null : PagerDutyMessage::SEVERITY_WARNING;
+    }
+
+    public function pagerDutyDedupKey(object $notifiable): ?string
+    {
+        return 'dply:quick-download-failed:'.$this->quickDownload->id;
+    }
+
+    public function pagerDutySource(object $notifiable): string
+    {
+        return $this->label ?: (string) config('app.name');
     }
 }

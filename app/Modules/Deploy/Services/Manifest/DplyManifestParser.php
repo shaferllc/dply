@@ -139,7 +139,40 @@ class DplyManifestParser
             processes: $this->parseProcesses($data['processes'] ?? null),
             warnings: $this->collectWarnings($data),
             healthcheck: $this->parseHealthcheck($data['healthcheck'] ?? null),
+            kind: $this->parseKind($data['kind'] ?? null),
         );
+    }
+
+    /**
+     * `kind:` declares which dply product the repository wants to be, so
+     * `dply init` does not have to ask. Unknown values are reported rather than
+     * silently ignored — a typo here would otherwise send someone to the wrong
+     * product menu with no explanation.
+     */
+    private function parseKind(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw DplyManifestException::invalidField('kind', 'must be a string');
+        }
+
+        $kind = strtolower(trim($value));
+        if ($kind === '') {
+            return null;
+        }
+
+        $allowed = ['vm', 'cloud', 'edge', 'serverless'];
+        if (! in_array($kind, $allowed, true)) {
+            throw DplyManifestException::invalidField(
+                'kind',
+                'must be one of: '.implode(', ', $allowed),
+            );
+        }
+
+        return $kind;
     }
 
     private function parseHealthcheck(mixed $value): ?string
@@ -439,9 +472,6 @@ class DplyManifestParser
     {
         $warnings = [];
         foreach (array_keys($data) as $key) {
-            if (! is_string($key)) {
-                continue;
-            }
             if (! in_array($key, DplyManifest::KNOWN_TOP_LEVEL_KEYS, true)) {
                 $warnings[] = "Unknown top-level key `{$key}` ignored — this version of dply does not recognize it. (Newer manifests may add fields older clients can safely skip.)";
             }

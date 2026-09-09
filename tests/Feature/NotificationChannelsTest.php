@@ -27,7 +27,24 @@ test('user can view profile notification channels', function () {
         ->assertOk();
 });
 
-test('profile notification channels page shows current org and team channels', function () {
+test('the profile page renders once you actually own a channel', function () {
+    // The existing page-load tests use a user with zero personal channels, so
+    // they never reached the paginated list — which is how a missing
+    // $pagedChannels shipped a 500 on the real page.
+    $user = User::factory()->create();
+    $user->notificationChannels()->create([
+        'type' => NotificationChannel::TYPE_EMAIL,
+        'label' => 'My inbox',
+        'config' => ['email' => 'me@example.com'],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('profile.notification-channels'))
+        ->assertOk()
+        ->assertSee('My inbox');
+});
+
+test('profile notification channels page counts the channels you inherit', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create(['name' => 'Acme']);
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -51,15 +68,15 @@ test('profile notification channels page shows current org and team channels', f
         'config' => ['email' => 'team@example.com'],
     ]);
 
+    // The page no longer reprints org- and team-owned channels: they are
+    // managed on their own pages, so this one states the count and links out.
     $this->actingAs($user)
         ->withSession(['current_organization_id' => $org->id])
         ->get(route('profile.notification-channels'))
         ->assertOk()
-        ->assertSee('Available beyond your personal channels')
-        ->assertSee('Acme')
-        ->assertSee('Org alerts')
-        ->assertSee('Engineering')
-        ->assertSee('Team inbox');
+        ->assertSee('inherited from org and teams', false)
+        ->assertSee('2 inherited', false)
+        ->assertDontSee('Org alerts');
 });
 
 test('user can create a personal notification channel', function () {
@@ -242,7 +259,11 @@ test('bulk assign page renders when authenticated', function () {
     $this->actingAs($user)
         ->get(route('profile.notification-channels.bulk-assign'))
         ->assertOk()
-        ->assertSee('Bulk assign notifications', false);
+        ->assertSee('Bulk assign', false)
+        // The stepper's three step headers are the page now.
+        ->assertSee('Channels', false)
+        ->assertSee('Events', false)
+        ->assertSee('Targets', false);
 });
 
 test('bulk assign page can preselect server from query string', function () {
@@ -260,7 +281,8 @@ test('bulk assign page can preselect server from query string', function () {
     $this->actingAs($user)
         ->get(route('profile.notification-channels.bulk-assign', ['server' => $server->id]))
         ->assertOk()
-        ->assertSee('Assigning notifications for server:')
+        // The context note is one line now: "Preselected for web-1".
+        ->assertSee('Preselected for')
         ->assertSee('web-1');
 });
 
@@ -285,4 +307,20 @@ test('bulk assign page can quick add notification channel', function () {
         'type' => NotificationChannel::TYPE_SLACK,
         'label' => 'Ops alerts',
     ]);
+});
+
+test('the settings sidebar keeps notification channels lit on its child pages', function () {
+    $user = User::factory()->create();
+    $href = route('profile.notification-channels');
+
+    foreach ([$href, route('profile.notification-channels.bulk-assign')] as $url) {
+        $html = $this->actingAs($user)->get($url)->assertOk()->getContent();
+
+        // Every anchor pointing at the channels page; at least one (the sidebar
+        // entry) must carry the active class on both the page and its child.
+        preg_match_all('/<a[^>]*href="'.preg_quote($href, '/').'"[^>]*>/', $html, $matches);
+        expect($matches[0])->not->toBeEmpty();
+        expect(collect($matches[0])->contains(fn (string $tag) => str_contains($tag, 'bg-brand-sand/70')))
+            ->toBeTrue("no active sidebar entry while on {$url}");
+    }
 });

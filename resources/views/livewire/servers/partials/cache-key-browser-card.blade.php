@@ -32,18 +32,16 @@
      The header still uses bg-brand-sand/20 + border-b which naturally
      respects rounded corners, so visually nothing else changes. --}}
 <div class="{{ $card }} overflow-visible" wire:key="cache-key-browser-{{ $engine }}">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keys') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — key browser', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.') }}</p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-magnifying-glass"
+        :title="__(':engine — key browser', ['engine' => $engineLabel])"
+        :count="$loaded && is_array($keys) ? (string) count($keys) : null"
+        :note="__('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.')"
+        class="border-b border-brand-ink/10"
+    />
 
-    <div class="px-6 py-6 sm:px-7">
+    <div class="px-4 py-3.5 sm:px-5">
 
     <div
         class="relative mt-4"
@@ -138,7 +136,7 @@
                     class="block w-full border-b border-brand-ink/5 px-3 py-2 text-left last:border-b-0"
                 >
                     <span class="font-mono text-xs font-semibold text-brand-ink" x-text="item.pattern"></span>
-                    <span class="ml-2 text-[11px] text-brand-moss" x-text="item.description"></span>
+                    <span class="ml-2 text-xs text-brand-moss" x-text="item.description"></span>
                 </button>
             </template>
         </div>
@@ -187,7 +185,7 @@
                                         class="flex flex-col items-start gap-1 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5 text-left transition-colors hover:border-brand-forest/30 hover:bg-brand-sand/40"
                                     >
                                         <span class="font-mono text-sm font-semibold text-brand-ink">{{ $entry['pattern'] }}</span>
-                                        <span class="text-[11px] leading-snug text-brand-moss">{{ $entry['description'] }}</span>
+                                        <span class="text-xs leading-snug text-brand-moss">{{ $entry['description'] }}</span>
                                     </button>
                                 @endforeach
                             </div>
@@ -209,7 +207,7 @@
          on the button. This block surfaces the pattern, an explainer line so
          the operator knows SCAN is non-blocking, and a skeleton table that
          lines up with the real result table that lands next. --}}
-    <div wire:loading wire:target="searchKeyBrowser,loadKeyBrowserPage" class="mt-4">
+    <div wire:loading.block wire:target="searchKeyBrowser,loadKeyBrowserPage" class="mt-4">
         <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
             <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <circle cx="12" cy="12" r="10" opacity="0.25" />
@@ -217,13 +215,13 @@
             </svg>
             <div class="min-w-0">
                 <p class="font-semibold">
-                    {{ __('Scanning') }} <code class="rounded bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-sky-900 ring-1 ring-sky-200">{{ $pattern ?: '*' }}</code>{{ __(' on the engine…') }}
+                    {{ __('Scanning') }} <code class="rounded bg-white/70 px-1.5 py-0.5 font-mono text-xs text-sky-900 ring-1 ring-sky-200">{{ $pattern ?: '*' }}</code>{{ __(' on the engine…') }}
                 </p>
                 <p class="mt-0.5 text-sky-800/90">{{ __('Walks the keyspace in bounded SCAN iterations (non-blocking — KEYS * would lock the engine). Empty result so far means no matches in the slice scanned this pass; hit "Load more" if you need to keep walking.') }}</p>
             </div>
         </div>
         <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
-            <div class="bg-brand-sand/40 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Key') }}</div>
+            <div class="bg-brand-sand/40 px-4 py-3 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Key') }}</div>
             <div class="space-y-2 bg-white p-4">
                 @foreach (range(1, 5) as $i)
                     <div class="h-3 w-{{ $i % 2 === 0 ? 'full' : '3/4' }} animate-pulse rounded bg-brand-ink/10"></div>
@@ -242,15 +240,15 @@
         {{-- Matches-empty empty state. Same dashed-border pattern as the
              other cards' idle/empty surfaces so the operator immediately
              recognises this as a "no data" state rather than "load failed". --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
             </span>
             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No keys matched') }}</p>
             <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                 {{ __('SCAN walked the keyspace with pattern') }}
-                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">{{ $pattern ?: '*' }}</code>
-                {{ __('and came back empty. Try a broader pattern like') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">*</code>, {{ __('or open the') }} <strong>{{ __('Pattern guide') }}</strong> {{ __('for common shapes.') }}
+                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">{{ $pattern ?: '*' }}</code>
+                {{ __('and came back empty. Try a broader pattern like') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">*</code>, {{ __('or open the') }} <strong>{{ __('Pattern guide') }}</strong> {{ __('for common shapes.') }}
             </p>
         </div>
     @endif
@@ -258,16 +256,16 @@
     @if (! $loaded && empty($keys) && ! $error)
         {{-- Pre-search idle state. Hides during wire:loading so the
              scanning skeleton above takes over the moment Search fires. --}}
-        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-4 py-6 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
             <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
             </span>
             <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No search yet') }}</p>
             <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
                 {{ __('Pick a pattern above (default') }}
-                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">*</code>
+                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-brand-ink/10">*</code>
                 {{ __('matches everything) and hit') }}
-                <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink px-1.5 py-0.5 align-middle text-[11px] font-medium text-white">{{ __('Search') }}</span>
+                <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink px-1.5 py-0.5 align-middle text-xs font-medium text-white">{{ __('Search') }}</span>
                 {{ __('to walk the keyspace via SCAN — non-blocking, paginated, safe to run on a busy engine.') }}
             </p>
         </div>
@@ -401,7 +399,7 @@
 
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inspecting') }}</p>
+                    <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inspecting') }}</p>
                     <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $selected }}</p>
                 </div>
                 <button
@@ -416,11 +414,11 @@
             @elseif ($value !== null)
                 <dl class="mt-3 grid gap-3 sm:grid-cols-3">
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</dt>
                         <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $value['type'] }}</dd>
                     </div>
                     <div>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('TTL (s)') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('TTL (s)') }}</dt>
                         <dd class="mt-1 font-mono text-sm text-brand-ink">
                             @if ($value['ttl'] === -1)
                                 <span class="text-brand-moss">{{ __('no expiry') }}</span>
@@ -433,14 +431,14 @@
                     </div>
                     @if ($value['truncated'])
                         <div>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Truncated') }}</dt>
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Truncated') }}</dt>
                             <dd class="mt-1 text-xs text-amber-700">{{ __('Showing first 8 KB only') }}</dd>
                         </div>
                     @endif
                 </dl>
 
                 <div class="mt-4">
-                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Value') }}</dt>
+                    <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Value') }}</dt>
                     <dd class="mt-1">
                         @if (is_array($value['value']))
                             <ul class="space-y-0.5 rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100">

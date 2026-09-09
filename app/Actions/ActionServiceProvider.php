@@ -34,7 +34,6 @@ use App\Actions\DesignPatterns\CostTrackingDesignPattern;
 use App\Actions\DesignPatterns\EventDesignPattern;
 use App\Actions\DesignPatterns\FeatureFlaggedDesignPattern;
 use App\Actions\DesignPatterns\FilteredDesignPattern;
-use App\Actions\DesignPatterns\GateDesignPattern;
 use App\Actions\DesignPatterns\IdempotentDesignPattern;
 use App\Actions\DesignPatterns\JWTDesignPattern;
 use App\Actions\DesignPatterns\LazyDesignPattern;
@@ -42,18 +41,12 @@ use App\Actions\DesignPatterns\LifecycleDesignPattern;
 use App\Actions\DesignPatterns\ListenerDesignPattern;
 use App\Actions\DesignPatterns\LockDesignPattern;
 use App\Actions\DesignPatterns\LoggerDesignPattern;
-use App\Actions\DesignPatterns\MiddlewareDesignPattern;
 use App\Actions\DesignPatterns\PasswordConfirmationDesignPattern;
 use App\Actions\DesignPatterns\PermissionDesignPattern;
 use App\Actions\DesignPatterns\PipelineDesignPattern;
-use App\Actions\DesignPatterns\PolicyDesignPattern;
 use App\Actions\DesignPatterns\ProgressiveDesignPattern;
-use App\Actions\DesignPatterns\QueryDesignPattern;
 use App\Actions\DesignPatterns\RateLimiterDesignPattern;
-use App\Actions\DesignPatterns\RequiresBillingFeatureDesignPattern;
-use App\Actions\DesignPatterns\RequiresCapabilityDesignPattern;
 use App\Actions\DesignPatterns\RequiresPlanDesignPattern;
-use App\Actions\DesignPatterns\RequiresRoleDesignPattern;
 use App\Actions\DesignPatterns\RequiresSubscriptionDesignPattern;
 use App\Actions\DesignPatterns\ResourceDesignPattern;
 use App\Actions\DesignPatterns\RetryDesignPattern;
@@ -72,7 +65,6 @@ use App\Actions\DesignPatterns\ValidationDesignPattern;
 use App\Actions\DesignPatterns\VersionDesignPattern;
 use App\Actions\DesignPatterns\WatermarkDesignPattern;
 use App\Actions\DesignPatterns\WebhookDesignPattern;
-use App\Actions\Helpers\ListenerAutoDiscovery;
 use App\Actions\Macros\ActionRouteMacros;
 use App\Actions\Tracers\ActionTracer;
 use Illuminate\Foundation\Application;
@@ -111,7 +103,6 @@ class ActionServiceProvider extends ServiceProvider
             new EventDesignPattern,
             new FeatureFlaggedDesignPattern,
             new FilteredDesignPattern,
-            new GateDesignPattern,
             new IdempotentDesignPattern,
             new JWTDesignPattern,
             new LazyDesignPattern,
@@ -121,22 +112,15 @@ class ActionServiceProvider extends ServiceProvider
             new LoggerDesignPattern,
             new CommandDesignPattern,
             new PipelineDesignPattern,
-            new MiddlewareDesignPattern,
             new EventDesignPattern,
             new ScheduleDesignPattern,
             new RuleDesignPattern,
-            new PolicyDesignPattern,
             new PasswordConfirmationDesignPattern,
             new PermissionDesignPattern,
             new ProgressiveDesignPattern,
-            new GateDesignPattern,
-            new RequiresBillingFeatureDesignPattern,
-            new RequiresCapabilityDesignPattern,
             new RequiresPlanDesignPattern,
-            new RequiresRoleDesignPattern,
             new RequiresSubscriptionDesignPattern,
             new ResourceDesignPattern,
-            new QueryDesignPattern,
             new ActionRateLimiterDesignPattern,
             new RateLimiterDesignPattern,
             new ReversibleDesignPattern,
@@ -195,31 +179,10 @@ class ActionServiceProvider extends ServiceProvider
 
         Route::mixin(new ActionRouteMacros);
 
-        // Auto-discover and register action listeners
-        $this->autoDiscoverListeners();
-    }
-
-    /**
-     * Auto-discover and register action listeners.
-     */
-    protected function autoDiscoverListeners(): void
-    {
-        // Only auto-discover if enabled in config (default: true)
-        if (config('actions.auto_discover_listeners', true) === false) {
-            return;
-        }
-
-        // Get paths to scan from config, default to app/Actions
-        $paths = config('actions.listener_paths', [app_path('Actions')]);
-
-        try {
-            ListenerAutoDiscovery::discoverAndRegister($paths);
-        } catch (\Exception $e) {
-            // Log error but don't break application if discovery fails
-            if (app()->bound('log')) {
-                app('log')->warning('Failed to auto-discover action listeners: '.$e->getMessage());
-            }
-        }
+        // Listener auto-discovery was removed along with ListenerAutoDiscovery,
+        // which scanned via lorisleiva/lody — a package that was never installed,
+        // so every scan threw and was swallowed by the catch below it. Register
+        // action listeners explicitly in an EventServiceProvider instead.
     }
 
     protected function extendActions(): void

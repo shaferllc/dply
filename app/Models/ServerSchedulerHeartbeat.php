@@ -25,9 +25,9 @@ use Illuminate\Support\Carbon;
  * @property int $consecutive_misses
  * @property string $cron_expression
  * @property ?Carbon $first_seen_at
- * @property int $last_duration_ms
- * @property int $last_exit_code
- * @property int $last_memory_peak_kb
+ * @property ?int $last_duration_ms
+ * @property ?int $last_exit_code
+ * @property ?int $last_memory_peak_kb
  * @property ?Carbon $last_tick_at
  * @property bool $output_capture_enabled
  * @property string $scheduler_kind
@@ -36,8 +36,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Server $server
  * @property-read ?Site $site
  * @property-read Collection<int, SchedulerTickOutput> $tickOutputs
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerSchedulerHeartbeat extends Model
 {

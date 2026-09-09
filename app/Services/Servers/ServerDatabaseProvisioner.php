@@ -17,10 +17,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function listMysqlDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -57,10 +53,6 @@ class ServerDatabaseProvisioner
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function listPostgresDatabaseNames(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -85,10 +77,6 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
-    /**
-     * @return list<string>
-     */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -117,10 +105,6 @@ class ServerDatabaseProvisioner
         return array_values(array_unique($names));
     }
 
-    /**
-     * @return list<string>
-     */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -264,7 +248,7 @@ class ServerDatabaseProvisioner
 
             // CREATE DATABASE can't run inside a DO block / transaction, so guard
             // it with an existence check rather than catching a duplicate error.
-            $exists = trim((string) ($this->remoteExec->postgresTuples($server, "SELECT 1 FROM pg_database WHERE datname = '{$nameLit}'", 120)[0] ?? ''));
+            $exists = trim((string) ($this->remoteExec->postgresTuples($server, "SELECT 1 FROM pg_database WHERE datname = '{$nameLit}'", 120)[0]));
             $dbOut = '';
             if ($exists === '') {
                 $dbOut = $this->remoteExec->postgresRun($server, "CREATE DATABASE {$name} OWNER {$user};", 120)[0];

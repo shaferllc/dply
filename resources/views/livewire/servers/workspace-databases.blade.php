@@ -20,6 +20,11 @@
         {{-- Probe installed engines off the render path so the workspace paints
              instantly; badges + create buttons appear once loadCapabilities() returns. --}}
         <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
+        {{-- Second deferred loader: the database scan needs the capability
+             result, and keeping it separate means a slow scan never delays the
+             engine badges. --}}
+        <div wire:init="loadDatabaseInventory" class="hidden" aria-hidden="true"></div>
+        @include('livewire.servers.partials.databases._connect-modal')
     @endif
 
     @if ($opsReady && $databaseConsoleBannerRun)
@@ -30,24 +35,48 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-800 ring-1 ring-sky-200">
-                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Databases') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Create databases on this server, then reveal credentials and copy connection details for your apps.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching Caches / Cron / Firewall. The tall icon-badge +
+             title + prose stack this replaced restated the page title the
+             breadcrumb already shows. --}}
+        @php
+            $trackedDatabaseCount = $server->serverDatabases->count();
+            $anyEngineInstalled = in_array(true, $capabilities, true);
+        @endphp
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-circle-stack"
+            :title="__('Databases')"
+            :count="$trackedDatabaseCount > 0
+                ? trans_choice('{1} :count database|[2,*] :count databases', $trackedDatabaseCount, ['count' => $trackedDatabaseCount])
+                : null"
+            :note="__('Create databases on this server, then reveal credentials and copy connection details for your apps.')"
+            class="border-b border-brand-ink/10"
+        >
+            {{-- Create rides the page head instead of its own full-width section:
+                 it was a lone button under a header that restated the modal's own
+                 explainer. Gated on a detected engine — there is nothing to create
+                 a database on until one is installed. --}}
+            @if ($opsReady && $capabilitiesLoaded && $anyEngineInstalled)
+                <x-slot:actions>
+                    <button
+                        type="button"
+                        wire:click="openDatabaseCreate"
+                        wire:loading.attr="disabled"
+                        wire:target="openDatabaseCreate"
+                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <x-heroicon-m-plus wire:loading.remove wire:target="openDatabaseCreate" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span wire:loading wire:target="openDatabaseCreate" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-spinner variant="cream" size="sm" />
+                        </span>
+                        {{ __('Create database') }}
+                    </button>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll bare class="!mb-0">
                 <x-server-workspace-tab
                     id="db-tab-basics"
                     icon="heroicon-o-circle-stack"
@@ -68,38 +97,41 @@
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
                             ], true));
                     @endphp
+                    {{-- Icon rides the component's `icon` prop rather than the
+                         slot: x-server-workspace-tab already swaps the icon for a
+                         spinner on its own wire:target. Hand-rolling that pair in
+                         the slot rendered a SECOND spinner beside the component's,
+                         so switching engine tabs showed two side by side — and a
+                         tab that looks permanently busy reads as a stuck install.
+                         The caches tab strip carries the same note. --}}
                     <x-server-workspace-tab
                         :id="'db-tab-'.$engine"
                         :active="$workspace_tab === $engine"
+                        :icon="$engine === 'sqlite' ? 'heroicon-o-archive-box' : 'heroicon-o-circle-stack'"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
+                        {{-- Icon goes through the component's `icon` prop, not the
+                             slot: x-server-workspace-tab already swaps the icon
+                             for a spinner on its own wire:target. Hand-rolling
+                             that pair in here rendered a SECOND spinner beside
+                             the component's, so a tab click showed two. --}}
                         <span class="inline-flex items-center gap-2">
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
-                                @if ($engine === 'sqlite')
-                                    <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                @else
-                                    <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                @endif
-                            </span>
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
-                                <x-spinner class="h-4 w-4" />
-                            </span>
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! ($capabilities[$engine] ?? false) && ! $engineRow)
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                             @elseif ($engineRow && in_array($engineRow->status, [
                                 \App\Models\ServerDatabaseEngine::STATUS_PENDING,
                                 \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
                             ], true))
-                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700">
                                     <x-spinner variant="forest" />
                                     {{ __('Working') }}
                                 </span>
                             @elseif ($engineRow && $engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_FAILED)
-                                <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('Failed') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold text-rose-700">{{ __('Failed') }}</span>
                             @elseif ($capabilities[$engine] ?? false)
-                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Active') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('Active') }}</span>
                             @endif
                         </span>
                     </x-server-workspace-tab>
@@ -123,22 +155,23 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div wire:loading.block wire:target="setWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
+        {{-- Tab-switch skeleton — same rhythm as the dense rows it replaces, so
+             switching tabs doesn't jump the card height. --}}
+        <div wire:loading.block wire:target="setWorkspaceTab" aria-busy="true">
             <span class="sr-only">{{ __('Loading…') }}</span>
-            <div class="space-y-3" aria-hidden="true">
-                <div class="flex items-start gap-3">
-                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    </div>
+            <div aria-hidden="true">
+                <div class="border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+                    <div class="h-2.5 w-72 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
                 </div>
                 @foreach (range(1, 3) as $row)
-                    <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
-                        <span class="mt-1 h-5 w-14 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
-                        <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex items-center gap-3 border-b border-brand-ink/10 py-3 pl-5 pr-3 sm:pl-6 sm:pr-4">
+                        <div class="min-w-0 flex-1">
                             <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
+                        </div>
+                        <div class="flex shrink-0 gap-1.5">
+                            @foreach (range(1, 3) as $btn)
+                                <span class="h-7 w-16 animate-pulse rounded-md bg-brand-ink/10"></span>
+                            @endforeach
                         </div>
                     </div>
                 @endforeach
@@ -147,7 +180,7 @@
 
         <div wire:loading.remove wire:target="setWorkspaceTab">
             @if (! $opsReady)
-                <div class="px-5 py-5 sm:px-6">
+                <div class="px-4 py-5 sm:px-5">
                     @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
                 </div>
             @else
@@ -238,8 +271,8 @@
                             <div class="grid gap-3 px-6 py-5 sm:grid-cols-2">
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
                                     <div class="flex items-center justify-between">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
-                                        <button class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->username), 'user')">
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
+                                        <button class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->username), 'user')">
                                             <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
                                             <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
                                         </button>
@@ -248,10 +281,10 @@
                                 </div>
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3" x-data="{ showPw: false }">
                                     <div class="flex items-center justify-between">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
                                         <div class="flex items-center gap-3">
-                                            <button class="text-[11px] font-medium text-brand-sage hover:underline" x-show="showPw" x-cloak @click="showPw = false">{{ __('Hide') }}</button>
-                                            <button class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->password), 'pw')">
+                                            <button class="text-xs font-medium text-brand-sage hover:underline" x-show="showPw" x-cloak @click="showPw = false">{{ __('Hide') }}</button>
+                                            <button class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->password), 'pw')">
                                                 <span x-show="copiedKey !== 'pw'">{{ __('Copy') }}</span>
                                                 <span x-show="copiedKey === 'pw'" x-cloak>{{ __('Copied!') }}</span>
                                             </button>
@@ -269,19 +302,19 @@
                             {{-- Local connection --}}
                             @if ($cEngine !== 'sqlite')
                                 <div class="px-6 py-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                         {{ __('Local') }} <span class="font-normal normal-case">— {{ __('for apps on this server') }}</span>
                                     </p>
                                     <div class="space-y-2">
                                         <div class="flex items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5">
                                             <div>
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
                                                 <code class="font-mono text-sm text-brand-ink">127.0.0.1:{{ $cPort }}</code>
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
                                             <div class="min-w-0 flex-1">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
                                                 <code
                                                     class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
                                                     :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
@@ -289,7 +322,7 @@
                                                     :title="showUrl ? '' : 'Click to reveal'"
                                                 >{{ $localUrl }}</code>
                                             </div>
-                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($localUrl), 'local_url')">
+                                            <button class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($localUrl), 'local_url')">
                                                 <span x-show="copiedKey !== 'local_url'">{{ __('Copy') }}</span>
                                                 <span x-show="copiedKey === 'local_url'" x-cloak>{{ __('Copied!') }}</span>
                                             </button>
@@ -302,11 +335,11 @@
                             @if ($privateIp)
                                 @php $privateUrl = $buildUrl($privateIp); @endphp
                                 <div class="px-6 py-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                         {{ __('Private network') }}
                                         <span class="ml-1 font-normal normal-case text-emerald-600">— {{ $privateIp }}</span>
                                         @if (! $remoteEnabled)
-                                            <span class="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ __('remote access off') }}</span>
+                                            <span class="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-700 ring-1 ring-amber-200">{{ __('remote access off') }}</span>
                                         @endif
                                     </p>
                                     @if (! $remoteEnabled)
@@ -315,7 +348,7 @@
                                     <div class="space-y-2">
                                         <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
                                             <div class="min-w-0 flex-1">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
                                                 <code
                                                     class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
                                                     :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
@@ -323,7 +356,7 @@
                                                     :title="showUrl ? '' : 'Click to reveal'"
                                                 >{{ $privateUrl }}</code>
                                             </div>
-                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($privateUrl), 'priv_url')">
+                                            <button class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($privateUrl), 'priv_url')">
                                                 <span x-show="copiedKey !== 'priv_url'">{{ __('Copy') }}</span>
                                                 <span x-show="copiedKey === 'priv_url'" x-cloak>{{ __('Copied!') }}</span>
                                             </button>
@@ -342,14 +375,14 @@
                             @if ($remoteEnabled && $publicIp)
                                 @php $publicUrl = $buildUrl($publicIp); @endphp
                                 <div class="px-6 py-4">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                         {{ __('Remote (public)') }}
                                         <span class="ml-1 font-normal normal-case text-amber-700">— {{ $publicIp }} · {{ $cDb->allowed_from ?: __('no source set') }}</span>
                                     </p>
                                     <div class="space-y-2">
                                         <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
                                             <div class="min-w-0 flex-1">
-                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
                                                 <code
                                                     class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
                                                     :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
@@ -357,7 +390,7 @@
                                                     :title="showUrl ? '' : 'Click to reveal'"
                                                 >{{ $publicUrl }}</code>
                                             </div>
-                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($publicUrl), 'pub_url')">
+                                            <button class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($publicUrl), 'pub_url')">
                                                 <span x-show="copiedKey !== 'pub_url'">{{ __('Copy') }}</span>
                                                 <span x-show="copiedKey === 'pub_url'" x-cloak>{{ __('Copied!') }}</span>
                                             </button>
@@ -384,7 +417,7 @@
                             @if ($cEngine === 'sqlite' && filled($cDb->host))
                                 <div class="px-6 py-4">
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
                                         <code class="mt-0.5 break-all font-mono text-sm text-brand-ink">{{ $cDb->host }}</code>
                                     </div>
                                 </div>
@@ -441,7 +474,7 @@
                         </div>
                         <div class="px-6 py-6">
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link') }}</p>
                                 <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $share_link_modal_url }}</p>
                             </div>
                         </div>
@@ -486,7 +519,7 @@
                         </div>
                         <div class="px-6 py-6">
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('URL') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('URL') }}</p>
                                 <p class="mt-1 break-all font-mono text-sm leading-relaxed text-brand-ink">{{ $connectionUrlModalDatabase->connectionUrl() }}</p>
                             </div>
                         </div>
@@ -693,7 +726,7 @@
                                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Output') }}</p>
                                     @if ($sqlite_console_exit_code !== null)
                                         <span @class([
-                                            'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1',
+                                            'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
                                             'bg-emerald-50 text-emerald-800 ring-emerald-200' => $sqlite_console_exit_code === 0,
                                             'bg-red-50 text-red-800 ring-red-200' => $sqlite_console_exit_code !== 0,
                                         ])>
@@ -785,7 +818,7 @@
                             <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database created') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database created') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':name credentials', ['name' => $credDb]) }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 @if ($credEmailed)
@@ -795,7 +828,7 @@
                                 @endif
                             </p>
                         </div>
-                        <button type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                        <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                             <x-heroicon-o-x-mark class="h-5 w-5" />
                         </button>
                     </div>
@@ -806,8 +839,8 @@
                             @if (filled($credUser))
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
                                     <div class="flex items-center justify-between">
-                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
-                                        <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credUser), 'user')">
+                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
+                                        <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($credUser), 'user')">
                                             <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
                                             <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
                                         </button>
@@ -818,9 +851,9 @@
                             @if (filled($credPlainPw) || $credPwHidden)
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
                                     <div class="flex items-center justify-between">
-                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
                                         @if ($credShowPw)
-                                            <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credPlainPw), 'pw')">
+                                            <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($credPlainPw), 'pw')">
                                                 <span x-show="copiedKey !== 'pw'">{{ __('Copy') }}</span>
                                                 <span x-show="copiedKey === 'pw'" x-cloak>{{ __('Copied!') }}</span>
                                             </button>
@@ -830,7 +863,7 @@
                                         <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $credPlainPw }}</dd>
                                     @else
                                         <dd class="mt-0.5 font-mono text-sm tracking-widest text-brand-mist">••••••••••••••••</dd>
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Retrieve from Credentials on the database row.') }}</p>
+                                        <p class="mt-0.5 text-xs text-brand-mist">{{ __('Retrieve from Credentials on the database row.') }}</p>
                                     @endif
                                 </div>
                             @endif
@@ -839,20 +872,20 @@
                         {{-- Local connection --}}
                         @if ($credEngine !== 'sqlite')
                             <div class="px-6 py-5">
-                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local connection') }} <span class="ml-1 font-normal normal-case text-brand-mist">{{ __('— for apps running on this server') }}</span></p>
+                                <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local connection') }} <span class="ml-1 font-normal normal-case text-brand-mist">{{ __('— for apps running on this server') }}</span></p>
                                 <div class="space-y-2">
                                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
                                             <code class="font-mono text-sm font-semibold text-brand-ink">127.0.0.1:{{ $credPort }}</code>
                                         </div>
                                     </div>
                                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
                                             <code class="break-all font-mono text-xs text-brand-ink">{{ $localConnStr }}</code>
                                         </div>
-                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($localConnStr), 'local_url')">
+                                        <button type="button" class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($localConnStr), 'local_url')">
                                             <span x-show="copiedKey !== 'local_url'">{{ __('Copy') }}</span>
                                             <span x-show="copiedKey === 'local_url'" x-cloak>{{ __('Copied!') }}</span>
                                         </button>
@@ -868,7 +901,7 @@
                         {{-- Remote connection --}}
                         @if ($remoteConnStr)
                             <div class="px-6 py-5">
-                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">
                                     {{ __('Remote connection') }}
                                     @if ($credPrivateIp)
                                         <span class="ml-1 font-normal normal-case text-emerald-600">{{ __('— via private network') }}</span>
@@ -884,20 +917,20 @@
                                 <div class="space-y-2">
                                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
                                             <code class="font-mono text-sm font-semibold text-brand-ink">{{ $remoteHost }}:{{ $credPort }}</code>
                                         </div>
-                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteHost.':'.$credPort), 'remote_host')">
+                                        <button type="button" class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($remoteHost.':'.$credPort), 'remote_host')">
                                             <span x-show="copiedKey !== 'remote_host'">{{ __('Copy') }}</span>
                                             <span x-show="copiedKey === 'remote_host'" x-cloak>{{ __('Copied!') }}</span>
                                         </button>
                                     </div>
                                     <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
                                             <code class="break-all font-mono text-xs text-brand-ink">{{ $remoteConnStr }}</code>
                                         </div>
-                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteConnStr), 'remote_url')">
+                                        <button type="button" class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($remoteConnStr), 'remote_url')">
                                             <span x-show="copiedKey !== 'remote_url'">{{ __('Copy') }}</span>
                                             <span x-show="copiedKey === 'remote_url'" x-cloak>{{ __('Copied!') }}</span>
                                         </button>
@@ -923,10 +956,10 @@
                             <div class="px-6 py-5">
                                 <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
                                     <div class="min-w-0 flex-1">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
                                         <code class="break-all font-mono text-sm font-semibold text-brand-ink">{{ $creds['host'] }}</code>
                                     </div>
-                                    <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($creds['host']), 'sqlite_path')">
+                                    <button type="button" class="shrink-0 text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($creds['host']), 'sqlite_path')">
                                         <span x-show="copiedKey !== 'sqlite_path'">{{ __('Copy') }}</span>
                                         <span x-show="copiedKey === 'sqlite_path'" x-cloak>{{ __('Copied!') }}</span>
                                     </button>
@@ -937,7 +970,7 @@
 
                     {{-- Footer --}}
                     <div class="flex items-center justify-between border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4">
-                        <p class="text-[11px] text-brand-mist">{{ __('Password hides when you close this dialog.') }}</p>
+                        <p class="text-xs text-brand-mist">{{ __('Password hides when you close this dialog.') }}</p>
                         <button
                             type="button"
                             x-on:click="$dispatch('close-modal', 'database-credentials-modal')"

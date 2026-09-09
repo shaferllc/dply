@@ -133,6 +133,21 @@ class SiteSystemdUnitBuilder
 
         $userLine = $user !== '' ? "User={$user}\nGroup={$user}\n" : '';
 
+        // systemd requires an absolute ExecStart and applies no shell, so a
+        // start command like `npm run start` exits 203/EXEC. Node and its
+        // package managers are mise shims under the deploy user's home — never
+        // on the system PATH — so the unit has to say where to look and run the
+        // command through a shell. `exec` keeps the shell from lingering as an
+        // extra PID between systemd and the app.
+        $shims = $user !== '' ? "/home/{$user}/.local/share/mise/shims" : '';
+        $pathLine = $shims !== ''
+            ? "Environment=PATH={$shims}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+            : '';
+
+        if (! str_starts_with(trim($execStart), '/')) {
+            $execStart = '/bin/sh -lc '.escapeshellarg('exec '.trim($execStart));
+        }
+
         return <<<UNIT
 # Managed by Dply — do not edit.
 [Unit]
@@ -143,7 +158,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 {$userLine}WorkingDirectory={$workingDirectory}
-{$portLine}ExecStart={$execStart}
+{$portLine}{$pathLine}ExecStart={$execStart}
 # `always`, not `on-failure`: these are long-running daemons (Horizon, queue
 # workers, web server). A deploy runs `horizon:terminate`, which exits 0 — a
 # clean exit that `on-failure` would NOT restart, leaving the daemon dead after

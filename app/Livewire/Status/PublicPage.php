@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Status;
 
+use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
@@ -39,7 +40,7 @@ class PublicPage extends Component
         /** @var Collection<int, array{monitor: StatusPageMonitor, state: string, label: string}> $rows */
         $rows = $this->statusPage->monitors->map(function ($monitor) use ($resolver) {
             $m = $monitor->monitorable;
-            if (! $m) {
+            if (! $m instanceof Server && ! $m instanceof Site && ! $m instanceof SiteUptimeMonitor) {
                 return [
                     'monitor' => $monitor,
                     'state' => MonitorOperationalState::UNKNOWN,

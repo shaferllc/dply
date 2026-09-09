@@ -5,18 +5,20 @@ declare(strict_types=1);
 namespace App\Modules\Scaffold\Services;
 
 use App\Livewire\Sites\ChooseApp;
+use App\Models\Organization;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
-use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
+use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\AppCatalog;
-use App\Modules\Scaffold\Support\DatabaseConnectionEnv;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -52,7 +54,6 @@ class ScaffoldComposerPipeline
     /**
      * @return array{ok: bool, failed_step: ?string, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function run(Site $site): array
     {
         $recipe = $this->recipe($site);
@@ -192,7 +193,7 @@ class ScaffoldComposerPipeline
         $assignment = $this->placeholderDns->assign($site);
 
         $hostname = $assignment['hostname'];
-        if (! is_string($hostname) || $hostname === '') {
+        if ($hostname === '') {
             throw new \RuntimeException('Placeholder DNS assignment returned no hostname.');
         }
 
@@ -287,11 +288,15 @@ class ScaffoldComposerPipeline
         if (! $organization || ! $organization->email_database_credentials_enabled) {
             return;
         }
-        if (! $creator || ! filled($creator->email)) {
+        // Creator-only was the rule; it is now the default, and the org can
+        // widen it. The password in this mail is plain text, so recipients are
+        // always organization members — never a notification channel.
+        $recipients = $organization->emailRecipients(Organization::EMAIL_DATABASE_CREDENTIALS, $creator);
+        if ($recipients->isEmpty()) {
             return;
         }
 
-        $creator->notify(new SiteDatabaseCredentialsNotification(
+        Notification::send($recipients, new SiteDatabaseCredentialsNotification(
             site: $site,
             engine: $engine,
             password: $password,

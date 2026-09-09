@@ -18,13 +18,14 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\VultrService;
 use App\Services\Servers\ServerNetworkMap;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\RemoteCidr;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Lazy;
@@ -56,23 +57,43 @@ class WorkspaceNetworking extends Component
     /** @var list<string> */
     public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
 
-    /** @var 'servers'|'access'|'attached'|'routes'|'notifications' */
+    /**
+     * Database engines the network map and per-database panels account for.
+     *
+     * ClickHouse is included: a dedicated logs-store host runs nothing else, so
+     * leaving it out made the map report "No tracked services" for a server that
+     * is very much running one. Its exposure is engine-level only — the
+     * per-database panel renders a pointer to the engine's Networking tab rather
+     * than a toggle (see DatabaseEngineInstallScripts::supportsPerDatabaseRemoteAccess).
+     *
+     * MongoDB stays out: still feature-gated, and supportsRemoteAccess() has no
+     * path for it, so there would be nothing to show or act on.
+     *
+     * @var list<string>
+     */
+    private const NETWORK_MAP_ENGINES = ['postgres', 'mysql', 'mariadb', 'clickhouse'];
+
     #[Url(as: 'tab', except: 'servers', history: true)]
     public string $networking_tab = 'servers';
 
     /** CIDR inputs keyed by database ID. */
+    /** @var array<string, string> */
     public array $db_networking_allowed_from = [];
 
     /** Selected jump-host server ID per database ID (jump-host access helper). */
+    /** @var array<string, string> */
     public array $db_jump_host = [];
 
     /** Chosen local tunnel port per database ID (jump-host access helper). */
+    /** @var array<string, string> */
     public array $db_jump_local_port = [];
 
     /** Network ID inputs keyed by server ID (for attach-to-network forms). */
+    /** @var array<string, string> */
     public array $attach_network_id = [];
 
     /** Available Hetzner networks for the attach dropdown — loaded on demand. */
+    /** @var list<array<string, mixed>> */
     public array $hetzner_networks = [];
 
     public bool $hetzner_networks_loading = false;
@@ -83,9 +104,11 @@ class WorkspaceNetworking extends Component
     public string $new_network_ip_range = '10.0.0.0/8';
 
     /** dply Server IDs to attach when creating a new network. */
+    /** @var list<string> */
     public array $new_network_server_ids = [];
 
     /** CIDR inputs keyed by cache service ID (for inline cache expose form). */
+    /** @var array<string, string> */
     public array $cache_networking_allowed_from = [];
 
     // ── Network routes ────────────────────────────────────────────────────────
@@ -157,7 +180,7 @@ class WorkspaceNetworking extends Component
             ? $this->server
             : Server::query()->where('organization_id', $this->server->organization_id)->find($serverId);
 
-        if (! $target || ! ($target->provider?->supportsPrivateIpLookup() ?? false)) {
+        if (! $target || ! $target->provider->supportsPrivateIpLookup()) {
             $this->toastError(__('Server not found or its provider does not support private IP lookup.'));
 
             return;
@@ -536,14 +559,67 @@ class WorkspaceNetworking extends Component
 
     public function render(): View
     {
-        // All ready servers in this org except the current one — potential network peers.
-        $peerServers = Server::query()
+        // Peers on the SAME private network as this server — not simply every
+        // server in the org.
+        //
+        // The map exists to answer "what can I reach over private networking,
+        // and at which address?", and its own copy tells you to put these IPs in
+        // connection strings. Listing org-wide made that advice wrong: a
+        // DigitalOcean box on 10.136.0.2/nyc3 appeared alongside Hetzner boxes on
+        // 10.0.0.x/fsn1 as though they shared a fabric, and servers with no
+        // private IP at all were listed as peers.
+        //
+        // Identity is matched on either key: private_network_id is the canonical
+        // FK, but it is only backfilled on some rows (of the four servers sharing
+        // hetzner_network_id 12288346 on the dogfood org, two have a null
+        // private_network_id), so keying on it alone would drop real peers.
+        // Compared per-column rather than with a combined whereIn so a numeric
+        // Hetzner id can never collide with a ULID private-network id.
+        $privateNetworkId = $this->server->private_network_id;
+        $hetznerNetworkId = $this->server->hetzner_network_id;
+        $onPrivateNetwork = filled($privateNetworkId) || filled($hetznerNetworkId);
+
+        // Two different questions, so two lists. Conflating them is what made
+        // this page claim a host could reach servers it cannot:
+        //
+        //   $networkCandidates — "which servers could I put on a network with?"
+        //                        Feeds the create/attach modal. Org-wide, and
+        //                        deliberately includes hosts with no private IP
+        //                        — an unattached Hetzner box is the whole point
+        //                        of that flow.
+        //   $peerServers       — "what can THIS server reach right now?"
+        //                        Feeds the map. Empty until it is attached.
+        //
+        // The map's copy tells you to paste these IPs into connection strings,
+        // so it must never list a host that isn't on this server's network.
+        $networkCandidates = Server::query()
             ->where('organization_id', $this->server->organization_id)
             ->where('id', '!=', $this->server->id)
             ->where('status', Server::STATUS_READY)
-            ->whereNotIn('provider', ['digitalocean_functions', 'aws_lambda'])
+            // Synthetic Edge / Cloud / Serverless hosts are not machines on a
+            // network — they exist so a Site has something to hang off. The old
+            // filter keyed on `provider`, which misses them: an Edge host is
+            // provider=digitalocean with host_kind=dply_edge_delivery, so it
+            // sailed through. Key on host_kind, the field that actually says
+            // what this row is (see AGENTS.md on excluding synthetic hosts from
+            // server inventories).
+            ->where(function ($q): void {
+                $q->whereNull('meta->host_kind')
+                    ->orWhere('meta->host_kind', Server::HOST_KIND_VM);
+            })
             ->orderBy('name')
             ->get();
+
+        // A peer needs a private address to be reachable at all, and must sit
+        // on the same network. Some synthetic hosts are recorded as
+        // host_kind=vm, so the address check is what actually keeps those out.
+        $peerServers = $onPrivateNetwork
+            ? $networkCandidates
+                ->filter(fn (Server $peer): bool => filled($peer->private_ip_address)
+                    && ((filled($privateNetworkId) && $peer->private_network_id === $privateNetworkId)
+                        || (filled($hetznerNetworkId) && (string) $peer->hetzner_network_id === (string) $hetznerNetworkId)))
+                ->values()
+            : $networkCandidates->take(0);
 
         $peerServerIds = $peerServers->pluck('id')->all();
 
@@ -553,13 +629,13 @@ class WorkspaceNetworking extends Component
         $databaseEnginesByServer = ServerDatabaseEngine::query()
             ->whereIn('server_id', $allServerIds)
             ->where('status', ServerDatabaseEngine::STATUS_RUNNING)
-            ->whereIn('engine', ['postgres', 'mysql', 'mariadb'])
+            ->whereIn('engine', self::NETWORK_MAP_ENGINES)
             ->get()
             ->groupBy('server_id');
 
         $databasesByServer = ServerDatabase::query()
             ->whereIn('server_id', $allServerIds)
-            ->whereIn('engine', ['postgres', 'mysql', 'mariadb'])
+            ->whereIn('engine', self::NETWORK_MAP_ENGINES)
             ->get()
             ->groupBy('server_id');
 
@@ -591,7 +667,7 @@ class WorkspaceNetworking extends Component
                 try {
                     $hetzner = new HetznerService($credential);
                     $networkInfo = $hetzner->getNetwork($networkId);
-                    $networkRoutes = $networkInfo['routes'] ?? [];
+                    $networkRoutes = $networkInfo['routes'];
                 } catch (\Throwable) {
                     // API unavailable — show empty routes, don't crash the page.
                 }
@@ -611,6 +687,18 @@ class WorkspaceNetworking extends Component
 
         return view('livewire.servers.workspace-networking', [
             'peerServers' => $peerServers,
+            // Org-wide attach candidates for the create/attach-network flow —
+            // deliberately NOT the map's list.
+            'networkCandidates' => $networkCandidates,
+            // Drives the map's copy: with no network of its own, the rows below
+            // are attach candidates, not reachable peers, and saying otherwise
+            // sends operators to put unreachable IPs in connection strings.
+            'onPrivateNetwork' => $onPrivateNetwork,
+            // Third state: a host can hold a private address while its network
+            // identity is unknown here — a Production mirror carries the address
+            // but never the network ids. "Not on a private network" would be
+            // wrong for it; so would promising the list is narrowed to peers.
+            'hasPrivateAddress' => filled($this->server->private_ip_address),
             'networkMap' => $networkMap,
             'databaseEnginesByServer' => $databaseEnginesByServer,
             'databasesByServer' => $databasesByServer,
@@ -641,7 +729,7 @@ class WorkspaceNetworking extends Component
         $destination = trim($this->route_destination);
         $gateway = trim($this->route_gateway);
 
-        if (! $this->isValidRemoteCidr($destination)) {
+        if (! RemoteCidr::isValid($destination)) {
             $this->addError('route_destination', __('Enter a valid CIDR (e.g. 192.168.1.0/24).'));
 
             return;

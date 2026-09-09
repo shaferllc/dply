@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
-use App\Modules\Deploy\Services\ServerlessDeployHookRunner;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -18,6 +18,7 @@ use Livewire\Component;
  */
 class DeployHooks extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public string $siteId = '';
@@ -67,6 +68,26 @@ class DeployHooks extends Component
         $this->toastSuccess(__('Deploy hook added.'));
     }
 
+    public function confirmDeleteHook(string $id): void
+    {
+        $site = $this->site();
+        $this->authorize('update', $site);
+
+        $hook = SiteDeployHook::query()
+            ->where('site_id', $site->id)
+            ->whereKey($id)
+            ->firstOrFail();
+
+        $this->openConfirmActionModal(
+            'deleteHook',
+            [$hook->id],
+            __('Remove deploy hook'),
+            __('Remove this custom build step? It will no longer run on the next deploy.'),
+            __('Remove hook'),
+            true,
+        );
+    }
+
     public function deleteHook(string $id): void
     {
         $site = $this->site();
@@ -80,10 +101,25 @@ class DeployHooks extends Component
         $this->toastSuccess(__('Deploy hook removed.'));
     }
 
+    /**
+     * Deploy-hook phases, in run order.
+     *
+     * Lifted off ServerlessDeployHookRunner, which was deleted with the
+     * serverless surface (remove-cloud-edge-serverless). The phases belong to
+     * SiteDeployHook, not to serverless — every runtime runs them.
+     *
+     * @var array<string, string>
+     */
+    private const PHASE_LABELS = [
+        SiteDeployHook::PHASE_BEFORE_CLONE => 'Before build',
+        SiteDeployHook::PHASE_AFTER_CLONE => 'After build',
+        SiteDeployHook::PHASE_AFTER_ACTIVATE => 'After deploy',
+    ];
+
     public function render(): View
     {
         return view('livewire.sites.deploy-hooks', [
-            'phaseLabels' => ServerlessDeployHookRunner::PHASE_LABELS,
+            'phaseLabels' => self::PHASE_LABELS,
             'hooksByPhase' => SiteDeployHook::query()
                 ->where('site_id', $this->siteId)
                 ->orderBy('sort_order')

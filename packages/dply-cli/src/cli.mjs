@@ -4,12 +4,18 @@ import * as billingCommands from './billing-commands.mjs';
 import * as accountCommands from './account-commands.mjs';
 import * as serverCommands from './server-commands.mjs';
 import * as siteCommands from './site-commands.mjs';
+import * as errorsCommands from './errors-commands.mjs';
+import * as uptimeCommands from './uptime-commands.mjs';
+import * as notificationsCommands from './notifications-commands.mjs';
+import * as updateCommands from './update-command.mjs';
+import * as initCommand from './init-command.mjs';
+import * as instanceCommands from './instance-commands.mjs';
 import { expandArgv, shortcutCommandLines } from './shortcuts.mjs';
 import { readSiteLink } from './config.mjs';
 import { linkedSiteProduct } from './site-context.mjs';
 import { c, info } from './print.mjs';
 
-const TOP_LEVEL = {
+export const TOP_LEVEL = {
   login: { handler: commands.login, summary: 'Browser login, then drop into interactive shell.' },
   refresh: { handler: commands.refreshAuth, summary: 'Re-approve CLI scopes for more permissions (device flow).' },
   auth: { handler: runAuth, summary: 'CLI authentication (refresh scopes).' },
@@ -20,14 +26,22 @@ const TOP_LEVEL = {
   account: { handler: runAccount, summary: 'Profile, orgs, CLI sessions (show, orgs, sessions, revoke).' },
   project: { handler: runProject, summary: 'Org projects — group servers/sites, deploy, health, members.' },
   billing: { handler: runBilling, summary: 'Plan estimate, breakdown, invoices (org admin).' },
-  link: { handler: commands.link, summary: 'Link this repo to a BYO or Edge site (.dply/site.json).' },
-  sites: { handler: commands.sites, summary: 'List Edge sites visible to your token.' },
+  init: { handler: initCommand.init, summary: 'Set this folder up on dply — pick a kind, create the site, deploy it.' },
+  use: { handler: instanceCommands.useCommand, summary: 'Switch which dply instance the CLI talks to (list, <name>, <url>, forget).' },
+  link: { handler: commands.link, summary: 'Link this folder to a site that already exists (.dply/site.json).' },
+  sites: { handler: commands.sites, summary: 'List every site — VM, Edge (--kind, name filter).' },
   site: { handler: runSite, summary: 'BYO VM site commands (list, deploy, deployments).' },
+  errors: { handler: errorsCommands.errorsCommand, summary: 'Open error events for a site (--full, --watch, --json).' },
+  uptime: { handler: uptimeCommands.uptimeCommand, summary: 'Uptime monitors for a site (history, check, --watch).' },
+  monitor: { handler: uptimeCommands.uptimeCommand, summary: 'Alias for `uptime` — the workspace Monitor tab.' },
+  notifications: { handler: notificationsCommands.notificationsCommand, summary: 'Channels + event routing for a site or server.' },
+  notify: { handler: notificationsCommands.notificationsCommand, summary: 'Alias for `notifications`.' },
   deploy: { handler: runLinkedDeploy, summary: 'Deploy linked repo (BYO or Edge, from .dply/site.json).' },
   server: { handler: runServer, summary: 'BYO server commands (list, system-users, …).' },
+  update: { handler: updateCommands.updateCommand, summary: 'Install the CLI build your instance is serving (--check).' },
 };
 
-const EDGE_COMMANDS = {
+export const EDGE_COMMANDS = {
   deploy: { handler: commands.deploy, summary: 'Queue a deploy (--commit / --branch / --prod).' },
   deployments: { handler: commands.deployments, summary: 'List recent deployments.' },
   status: { handler: commands.edgeStatus, summary: 'Edge site + latest deployment (--wait to block).' },
@@ -35,7 +49,7 @@ const EDGE_COMMANDS = {
   open: { handler: commands.open, summary: 'Open live URL (--dashboard for workspace).' },
   rollback: { handler: commands.rollback, summary: 'Re-point production at a prior deployment.' },
   promote: { handler: commands.promote, summary: 'Promote a preview to production.' },
-  previews: { handler: commands.previews, summary: 'list | create --commit X | rm <id>' },
+  previews: { handler: commands.previews, summary: 'list | create [--commit|--branch] [--wait] | rm <id>' },
   domains: { handler: commands.domains, summary: 'list | add <host> | verify <host> | rm <host>' },
   aliases: { handler: commands.aliases, summary: 'List per-deploy stable URLs.' },
   purge: { handler: commands.purge, summary: 'Purge edge cache by tag (--tag X).' },
@@ -44,7 +58,7 @@ const EDGE_COMMANDS = {
   env: { handler: commands.env, summary: 'list | set KEY=val | rm KEY | push --file .env | pull' },
 };
 
-const SERVER_COMMANDS = {
+export const SERVER_COMMANDS = {
   list: { handler: serverCommands.serverList, summary: 'List servers in your organization.' },
   show: { handler: serverCommands.serverShow, summary: 'Show one server and its BYO sites.' },
   health: { handler: serverCommands.serverHealth, summary: 'Server status + open insight findings.' },
@@ -54,7 +68,7 @@ const SERVER_COMMANDS = {
   'system-users': { handler: serverCommands.serverSystemUsers, summary: 'list | sync | add | update | remove' },
 };
 
-const ACCOUNT_SUBCOMMANDS = ['show', 'orgs', 'projects', 'sessions', 'refresh', 'revoke', 'logout', 'help'];
+export const ACCOUNT_SUBCOMMANDS = ['show', 'orgs', 'projects', 'sessions', 'refresh', 'revoke', 'logout', 'help'];
 
 /**
  * @param {string[]} argv
@@ -80,7 +94,9 @@ export async function run(argv) {
     return printCommandList(argv[1]);
   }
   if (argv[0] === '--version' || argv[0] === '-V') {
-    info('dply CLI 0.1.0');
+    // Read, not hardcoded: `dply update` compares this against what the
+    // instance serves, so a stale literal here would report a false match.
+    info(`dply CLI ${await updateCommands.localVersion()}`);
 
     return 0;
   }
@@ -185,19 +201,62 @@ async function runLinkedDeploy(argv) {
     return commands.deploy(args, flags);
   }
 
-  const link = await readSiteLink();
   if (flags.site) {
     return siteCommands.siteCommand(['deploy', ...args], flags);
   }
 
-  throw linkedDeployError(link);
+  return deployUnlinked(args, flags);
+}
+
+/**
+ * `dply deploy` in a folder that is not linked to anything.
+ *
+ * Deploying and creating are different verbs, but "deploy this folder" is a
+ * reasonable thing to type before a site exists — especially when the repo
+ * already declares what it wants in dply.yaml. So rather than erroring at
+ * someone who is one step away, hand them to `dply init`, which creates the
+ * site, links the folder, and deploys it.
+ */
+async function deployUnlinked(args, flags) {
+  const link = await readSiteLink();
+
+  if (link) {
+    throw linkedDeployError(link);
+  }
+
+  const noPrompt = Boolean(flags['no-prompt'] || flags.quiet || flags.json || process.env.DPLY_NO_PROMPT)
+    || ! (process.stdin.isTTY && process.stdout.isTTY);
+
+  if (noPrompt) {
+    throw linkedDeployError(null);
+  }
+
+  info('');
+  info('This folder is not linked to a dply site yet.');
+  info(c.dim('`dply init` creates one, links the folder, and deploys it.'));
+  info('');
+
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  let answer;
+  try {
+    answer = (await rl.question('Set it up now? [Y/n] ')).trim();
+  } finally {
+    rl.close();
+  }
+
+  if (/^n(o)?$/i.test(answer)) {
+    throw linkedDeployError(null);
+  }
+
+  return initCommand.init(args, flags);
 }
 
 function linkedDeployError(link) {
   const err = new Error(
     link
-      ? 'Linked site has no product type. Re-link with `dply link --byo <id>` or `dply link --edge <id>`.'
-      : 'No linked site. Run `dply link` in your repo, or `dply site deploy --site <id>` / `dply edge deploy --site <id>`.',
+      ? 'Linked site has no product type. Re-link with `dply link`.'
+      : 'No linked site. Run `dply init` to create one, `dply link` to attach an existing one, or pass --site <id>.',
   );
   err.exitCode = 2;
 
@@ -281,22 +340,44 @@ export function parse(tokens) {
   const args = [];
   const flags = {};
 
+  // Repeated flags collect into an array — `--header 'A: 1' --header 'B: 2'`
+  // and `--param K=v --param J=w` are documented as repeatable, and last-wins
+  // dropped every value but the last without saying so.
+  const put = (name, value) => {
+    if (! Object.hasOwn(flags, name)) {
+      flags[name] = value;
+
+      return;
+    }
+
+    flags[name] = Array.isArray(flags[name]) ? [...flags[name], value] : [flags[name], value];
+  };
+
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
+    // Everything after a bare `--` is the remote command, kept out of both
+    // args and flag parsing so it keeps its own flags AND stays distinguishable
+    // from this CLI's own positionals: `dply site artisan shop -- migrate --force`
+    // is a site plus a command, which is unrecoverable once the two are merged.
+    if (token === '--') {
+      flags['--'] = tokens.slice(i + 1);
+
+      break;
+    }
     if (token.startsWith('--')) {
       const eq = token.indexOf('=');
       if (eq !== -1) {
-        flags[token.slice(2, eq)] = token.slice(eq + 1);
+        put(token.slice(2, eq), token.slice(eq + 1));
 
         continue;
       }
       const name = token.slice(2);
       const next = tokens[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
-        flags[name] = next;
+        put(name, next);
         i++;
       } else {
-        flags[name] = true;
+        put(name, true);
       }
 
       continue;
@@ -305,10 +386,10 @@ export function parse(tokens) {
       const name = token.slice(1);
       const next = tokens[i + 1];
       if (next !== undefined && !next.startsWith('-')) {
-        flags[name] = next;
+        put(name, next);
         i++;
       } else {
-        flags[name] = true;
+        put(name, true);
       }
 
       continue;
@@ -357,11 +438,15 @@ function printTopLevelHelp() {
   info(`  ${'server firewall'.padEnd(18)} ${c.dim('Show/apply UFW rules (network.read/write)')}`);
   info(`  ${'server system-users'.padEnd(18)} ${c.dim('Manage Linux accounts (see `dply server system-users help`)')}`);
   info('');
-  info(c.bold('Sites (BYO):'));
-  info(`  ${'site list'.padEnd(18)} ${c.dim('List VM-hosted sites')}`);
+  info(c.bold('Sites:'));
+  info(`  ${'sites'.padEnd(18)} ${c.dim('Every site: vm · cloud · edge (--kind X · `sites <name>` filters)')}`);
+  info(`  ${'site list'.padEnd(18)} ${c.dim('List VM-hosted sites only')}`);
   info(`  ${'site deploy'.padEnd(18)} ${c.dim('Queue a deploy (--site or linked repo)')}`);
   info(`  ${'site logs'.padEnd(18)} ${c.dim('Latest deploy log · --follow to tail')}`);
   info(`  ${'site status'.padEnd(18)} ${c.dim('Site + latest deployment summary')}`);
+  info(`  ${'errors [site]'.padEnd(18)} ${c.dim('Open error events · picks a site when omitted · --full · --watch')}`);
+  info(`  ${'uptime [site]'.padEnd(18)} ${c.dim('Monitors: status, history, check now · any kind of site')}`);
+  info(`  ${'notifications'.padEnd(18)} ${c.dim('Channels, the event catalog, and what routes where')}`);
   info(`  ${'deploy'.padEnd(18)} ${c.dim('Deploy linked repo (BYO or Edge via .dply/site.json)')}`);
   info(`  ${'link --byo <id>'.padEnd(18)} ${c.dim('Link repo for bare `dply deploy`')}`);
   info('');
@@ -370,8 +455,12 @@ function printTopLevelHelp() {
     info(`  edge ${name.padEnd(12)} ${c.dim(summary)}`);
   }
   info('');
+  info(c.dim('One model, one noun: `dply sites` spans vm/cloud/edge · product verbs stay under `edge`'));
   info(c.dim('Site context: BYO `--site` / $DPLY_SITE / link --byo · Edge `--site` / $DPLY_EDGE_SITE / link --edge'));
   info(c.dim('Shortcuts: projects · site · deploy · me · r · `dply ls shortcuts`'));
+  info(c.dim('Colon form: any `dply a b` also works as `dply a:b` — e.g. `dply sites:errors acme`'));
+  info(c.dim('Leave the site off and you get a picker: `dply errors`'));
+  info(c.dim('Act on what you see: `dply errors dismiss|retry|fix` — or pick an action from the list on a TTY'));
   info(c.dim('Interactive mode: run `dply` with no args · `dply menu` · `dply ls` · `dply help`'));
 
   return 0;
@@ -394,13 +483,19 @@ export function allCommandLines() {
     'whoami',
     'ls',
     'help',
-    'guide',
+    'update',
+    'init',
+    'use',
     'link',
     'sites',
     'account',
     'project',
     'site',
     'deploy',
+    'errors',
+    'uptime',
+    'monitor',
+    'notifications',
     'billing',
     'server',
     'edge',
@@ -424,7 +519,16 @@ export function allCommandLines() {
     'project help',
   );
 
-  lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
+  lines.push('sites', 'sites --kind', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site help', 'deploy', 'link');
+
+  lines.push('errors', 'errors --full', 'errors --watch', 'errors dismiss', 'errors retry', 'errors fix', 'errors help');
+
+  lines.push('uptime', 'uptime history', 'uptime check', 'uptime check --all', 'uptime --watch', 'uptime help', 'monitor');
+
+  for (const name of notificationsCommands.NOTIFICATIONS_SUBCOMMANDS) {
+    lines.push(`notifications ${name}`);
+  }
+  lines.push('notifications', 'notify');
 
   for (const name of Object.keys(SERVER_COMMANDS)) {
     lines.push(`server ${name}`);
@@ -438,7 +542,15 @@ export function allCommandLines() {
 
   lines.push(...shortcutCommandLines());
 
-  return lines;
+  // Every two-word route also answers to `ns:sub`, so completion should offer it.
+  for (const line of [...lines]) {
+    const parts = line.split(' ');
+    if (parts.length === 2 && ! parts[1].startsWith('-')) {
+      lines.push(parts.join(':'));
+    }
+  }
+
+  return [...new Set(lines)];
 }
 
 /**
@@ -471,7 +583,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'top') {
-    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'guide', 'link', 'deploy', 'sites', 'site', 'account', 'project', 'server', 'edge');
+    lines.push('login', 'refresh', 'auth', 'logout', 'menu', 'shell', 'whoami', 'ls', 'help', 'update', 'init', 'use', 'link', 'deploy', 'errors', 'uptime', 'monitor', 'notifications', 'sites', 'site', 'account', 'project', 'server', 'edge');
   }
 
   if (!normalized || normalized === 'account') {
@@ -494,7 +606,7 @@ function printCommandList(scope) {
   }
 
   if (!normalized || normalized === 'site' || normalized === 'byo') {
-    lines.push('site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo');
+    lines.push('sites', 'sites --kind vm', 'sites --kind edge', 'site list', 'site show', 'site status', 'site logs', 'site deploy', 'site deployments', 'site deployment', 'site help', 'deploy', 'link --byo', 'errors', 'errors dismiss', 'errors retry', 'errors fix', 'uptime', 'uptime history', 'uptime check', 'notifications', 'notifications channels', 'notifications events', 'notifications subscribe', 'notifications test');
   }
 
   if (!normalized || normalized === 'project' || normalized === 'projects') {

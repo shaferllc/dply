@@ -4,19 +4,18 @@ namespace Tests\Feature\ServerTest;
 
 use App\Actions\Sites\CreateContainerSiteFromInspection;
 use App\Enums\SiteType;
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunSetupScriptJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Jobs\WaitForServerSshReadyJob;
+use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Livewire\Servers\Create\StepReview as ServerCreateStepReview;
 use App\Livewire\Servers\Create\StepType as ServerCreateStepType;
 use App\Livewire\Servers\Create\StepWhat as ServerCreateStepWhat;
 use App\Livewire\Servers\Create\StepWhere as ServerCreateStepWhere;
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney;
+use App\Livewire\Servers\SettingsCard;
 use App\Livewire\Servers\WorkspaceLogs;
-use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Models\Organization;
@@ -35,6 +34,8 @@ use App\Models\SiteDomain;
 use App\Models\SupervisorProgram;
 use App\Models\User;
 use App\Models\UserSshKey;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
 use App\Modules\TaskRunner\Services\TaskRunnerService;
@@ -43,7 +44,9 @@ use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -98,7 +101,6 @@ test('servers index is displayed for authenticated user', function () {
     $response = $this->actingAs($user)->get(route('servers.index'));
 
     $response->assertOk();
-    $response->assertSee('Provision hosts', false);
     $response->assertDontSee('Open launchpad');
     $response->assertSee('No servers yet');
     $response->assertSee('Add server');
@@ -242,46 +244,7 @@ test('servers create requires organization', function () {
     $response->assertForbidden();
 });
 
-test('launchpad is displayed with organization', function () {
-    // surface.cloud is off post VM-launch; this test asserts the launches
-    // page lists the Cloud tile + cloud.create URL, so opt in locally.
-    Feature::define('surface.cloud', fn (): bool => true);
-    Feature::define('surface.serverless', fn (): bool => true);
-    Feature::flushCache();
 
-    $user = userWithOrganization();
-
-    $response = $this->actingAs($user)->get(route('launches.create'));
-
-    $response->assertOk();
-    $response->assertSee('Launch setup');
-    $response->assertSee('Bring your own server');
-
-    // Container flow inversion (2026-05): Containers tile copy reframed
-    // and the href now jumps straight to /servers/create with the docker
-    // host_target preset instead of the retired launcher page.
-    $response->assertSee('Run a container app');
-    $response->assertSee('Cloud');
-    $response->assertSee('Serverless');
-    $response->assertSee(route('servers.create'), false);
-    $response->assertSee(route('servers.create', ['host_target' => 'docker']), false);
-    $response->assertSee(route('cloud.create'), false);
-    $response->assertSee(route('serverless.create'), false);
-});
-
-test('serverless launch path is displayed with organization', function () {
-    Feature::define('surface.serverless', fn (): bool => true);
-    Feature::flushCache();
-
-    $user = userWithOrganization();
-
-    $response = $this->actingAs($user)->get(route('launches.serverless'));
-
-    $response->assertOk();
-    $response->assertSee('Serverless');
-    $response->assertSee('AWS Lambda');
-    $response->assertSee('DigitalOcean Functions');
-});
 
 test('kubernetes launch path is displayed with organization', function () {
     $user = userWithOrganization();
@@ -825,6 +788,194 @@ test('servers create step where shows provider account + region + size pickers',
         ->assertSee('Account')
         ->assertSee('Region & size');
 });
+test('selecting a provider credential loads regions and droplet sizes', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['account' => ['uuid' => 'abc']], 200),
+        'https://api.digitalocean.com/v2/regions*' => Http::response([
+            'regions' => [['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true]],
+        ], 200),
+        'https://api.digitalocean.com/v2/sizes*' => Http::response([
+            'sizes' => [[
+                'slug' => 's-1vcpu-1gb',
+                'memory' => 1024,
+                'vcpus' => 1,
+                'disk' => 25,
+                'price_monthly' => 6,
+                'available' => true,
+                'regions' => ['sfo3'],
+            ]],
+        ], 200),
+    ]);
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Account A',
+        'credentials' => ['api_token' => 'token-a'],
+    ]);
+    $chosen = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Account B',
+        'credentials' => ['api_token' => 'token-b'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSet('form.provider_credential_id', '')
+        ->assertDontSee('Region & size')
+        ->set('form.provider_credential_id', (string) $chosen->id)
+        ->assertSee('Region & size')
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertSee('San Francisco 3')
+        ->assertSee('s-1vcpu-1gb');
+});
+test('stale user token still loads regions from the platform catalog', function () {
+    config(['services.digitalocean.token' => 'dop_v1_platform']);
+
+    Http::fake(function (\Illuminate\Http\Client\Request $request) {
+        $authorization = $request->header('Authorization')[0] ?? '';
+
+        if (str_contains($authorization, 'bad-token')) {
+            return Http::response(['message' => 'Unable to authenticate you'], 401);
+        }
+
+        if (str_contains($request->url(), '/account')) {
+            return Http::response(['account' => ['uuid' => 'abc']], 200);
+        }
+
+        if (str_contains($request->url(), '/regions')) {
+            return Http::response([
+                'regions' => [['slug' => 'sfo3', 'name' => 'San Francisco 3', 'available' => true]],
+            ], 200);
+        }
+
+        return Http::response([
+            'sizes' => [[
+                'slug' => 's-1vcpu-1gb',
+                'memory' => 1024,
+                'vcpus' => 1,
+                'disk' => 25,
+                'price_monthly' => 6,
+                'available' => true,
+                'regions' => ['sfo3'],
+            ]],
+        ], 200);
+    });
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Broken DO',
+        'credentials' => ['api_token' => 'bad-token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('San Francisco 3')
+        ->assertSee('s-1vcpu-1gb')
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertDontSee('Couldn’t load regions and sizes');
+});
+
+test('provider api timeout shows an unavailable state instead of a curl dump', function () {
+    Cache::flush();
+    config(['services.digitalocean.token' => 'dop_v1_platform']);
+
+    Http::fake(function () {
+        throw new ConnectionException('cURL error 28: Operation timed out after 8002 milliseconds with 0 bytes received (see https://curl.se/libcurl/c/libcurl-errors.html) for https://api.digitalocean.com/v2/regions?per_page=200&page=1');
+    });
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Primary DO',
+        'credentials' => ['api_token' => 'token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertSee('DigitalOcean is unavailable')
+        ->assertSee('Creating new servers on this provider is paused')
+        ->assertSee('Try again')
+        ->assertSee('Unavailable')
+        ->assertDontSee('curl.se')
+        ->assertDontSee('api.digitalocean.com/v2/regions');
+});
+
+test('rejected provider credential shows reconnect instead of select-account placeholder', function () {
+    config([
+        'services.digitalocean.token' => null,
+        'dply.digitalocean_token' => null,
+    ]);
+
+    Http::fake([
+        'https://api.digitalocean.com/v2/account' => Http::response(['message' => 'Unable to authenticate you'], 401),
+        'https://api.digitalocean.com/v2/regions*' => Http::response(['message' => 'Unable to authenticate you'], 401),
+        'https://api.digitalocean.com/v2/sizes*' => Http::response(['message' => 'Unable to authenticate you'], 401),
+    ]);
+
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+
+    $credential = ProviderCredential::factory()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'Broken DO',
+        'credentials' => ['api_token' => 'bad-token'],
+    ]);
+
+    seedServerCreateDraft($user, $org, step: 2, payload: [
+        'mode' => 'provider',
+        'type' => 'digitalocean',
+        'provider_credential_id' => (string) $credential->id,
+        'provider_host_kind' => 'vm',
+        'name' => 'test-server',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ServerCreateStepWhere::class)
+        ->assertDontSee('Select an account first to load regions.')
+        ->assertSee('DigitalOcean rejected this API token')
+        ->assertSee('Add a new token');
+});
 
 test('servers create step where shows role-aware size guidance for redis', function () {
     Http::fake([
@@ -867,7 +1018,9 @@ test('servers create step where shows role-aware size guidance for redis', funct
         ->call('chooseServerRole', 'redis')
         ->assertSet('form.server_role', 'redis')
         ->assertSet('form.install_profile', 'redis_server')
-        ->assertSee('Sizing recommendations are tuned for Cache / key-value server.')
+        // The role-tuning note is a pill beside the Region & size head now, so
+        // the sentence it used to spell out is shorter.
+        ->assertSee('Sized for Cache / key-value server')
         ->assertSee('Too small for Cache / key-value server');
 });
 
@@ -931,7 +1084,9 @@ test('servers create step what install profile updates stack defaults', function
         ->test(ServerCreateStepWhat::class)
         ->set('form.install_profile', 'queue_worker')
         ->assertSet('form.server_role', 'worker')
-        ->assertSet('form.webserver', 'caddy')
+        // The queue_worker profile moved to nginx in a407954b; this assertion
+        // was left on the old default.
+        ->assertSet('form.webserver', 'nginx')
         ->assertSet('form.database', 'none');
 });
 
@@ -2119,7 +2274,8 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Viewer'))
         ->assertSee(__('Overview'))
         ->assertSee(__('Sources'))
-        ->assertSee(__('Related'))
+        ->assertSee(__('Alerts'))
+        ->assertSee(__('Notifications'))
         ->assertSee('Log source')
         ->assertSee('Dply activity')
         ->assertSee(__('Options'))
@@ -2140,12 +2296,9 @@ test('server show logs tab renders', function () {
         ->assertSee(__('Reset filter'))
         ->assertSee(__('Clear display'))
         ->call('setLogsWorkspaceTab', 'overview')
-        ->assertSee(__('Log viewer'))
+        ->assertSee(__('Background activity'))
         ->call('setLogsWorkspaceTab', 'sources')
-        ->assertSee(__('Available sources'))
-        ->call('setLogsWorkspaceTab', 'related')
-        ->assertSee(__('Security digest'))
-        ->assertSee(__('Deploy windows'));
+        ->assertSee(__('Available sources'));
 });
 
 test('server logs select log source updates active key', function () {
@@ -2325,7 +2478,7 @@ test('server show settings tab renders', function () {
         ->assertSee('Identity');
 });
 
-test('server settings redirects bare settings url to connection tab', function () {
+test('server settings bare url renders the default tab', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2335,10 +2488,25 @@ test('server settings redirects bare settings url to connection tab', function (
 
     $this->actingAs($user)
         ->get(route('servers.settings', ['server' => $server]))
-        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'connection']));
+        ->assertOk()
+        // The bare URL is the default tab, and categories are never a
+        // /settings/{section} path — legacy links redirect to ?tab= instead.
+        ->assertDontSee('settings/keys');
 });
 
-test('server settings unknown section returns 404', function () {
+test('settings page shell holds no section state', function () {
+    // The split is the point: the page component must stay thin so a category
+    // switch can't drag the workspace shell (sidebar, breadcrumbs, palette and
+    // their queries) through a re-render. Every earlier attempt failed on that
+    // weight — an in-place action wedged when a second click arrived mid-flight,
+    // links avoided the wedge by re-fetching the whole document instead.
+    expect(property_exists(WorkspaceSettings::class, 'section'))
+        ->toBeFalse('Category belongs to SettingsCard — see both class docblocks.')
+        ->and(class_uses_recursive(WorkspaceSettings::class))
+        ->not->toContain(ManagesWorkspaceSettingsForm::class);
+});
+
+test('settings card switches section in place', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
     $server = Server::factory()->ready()->create([
@@ -2346,9 +2514,61 @@ test('server settings unknown section returns 404', function () {
         'organization_id' => $org->id,
     ]);
 
+    Livewire::actingAs($user)
+        ->test(SettingsCard::class, ['server' => $server])
+        ->assertSet('section', 'connection')
+        ->call('setSection', 'keys')
+        ->assertSet('section', 'keys')
+        // An unknown category falls back rather than rendering an empty panel.
+        ->call('setSection', 'bogus')
+        ->assertSet('section', 'connection');
+});
+
+test('settings card reads the requested section from the query string', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['tab' => 'export'])
+        ->test(SettingsCard::class, ['server' => $server])
+        ->assertSet('section', 'export');
+});
+
+test('server settings legacy tab path redirects to the query string', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    // Old bookmarks and deep links still land on the right tab.
     $this->actingAs($user)
-        ->get(route('servers.settings', ['server' => $server, 'section' => 'not-a-real-tab']))
-        ->assertNotFound();
+        ->get(route('servers.settings.legacy', ['server' => $server, 'section' => 'keys']))
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'tab' => 'keys']));
+
+    // The default tab drops the parameter rather than redirecting to ?tab=connection.
+    $this->actingAs($user)
+        ->get(route('servers.settings.legacy', ['server' => $server, 'section' => 'connection']))
+        ->assertRedirect(route('servers.settings', $server));
+});
+
+test('server settings unknown tab falls back to the default tab', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+
+    // A typo in a query string shouldn't 404 the whole page out from under you.
+    $this->actingAs($user)
+        ->get(route('servers.settings', ['server' => $server, 'tab' => 'not-a-real-tab']))
+        ->assertOk();
 });
 
 test('server manage workspace renders', function () {

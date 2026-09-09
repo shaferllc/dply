@@ -3,7 +3,6 @@
 namespace App\Actions\Concerns;
 
 use App\Actions\Decorators\MiddlewareDecorator;
-use App\Actions\DesignPatterns\MiddlewareDesignPattern;
 use Illuminate\Http\Middleware;
 
 /**
@@ -461,7 +460,6 @@ use Illuminate\Http\Middleware;
  * });
  *
  * @see MiddlewareDecorator
- * @see MiddlewareDesignPattern
  * @see Middleware
  */
 trait AsMiddleware

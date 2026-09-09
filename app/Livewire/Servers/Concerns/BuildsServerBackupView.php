@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\ConsoleAction;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
@@ -100,10 +100,10 @@ trait BuildsServerBackupView
         // Schedules narrow to those targeting this site (site_files target_type with matching
         // target_id). Database schedules don't surface in site-context because databases
         // belong to the server, not to any one site.
-        $schedules = ServerBackupSchedule::query()
+        $schedules = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->when($this->context_site_id !== null, function ($q): void {
-                $q->where('target_type', ServerBackupSchedule::TARGET_SITE_FILES)
+                $q->where('target_type', BackupSchedule::TARGET_SITE_FILES)
                     ->where('target_id', $this->context_site_id);
             })
             ->orderBy('created_at')

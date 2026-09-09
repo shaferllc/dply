@@ -1,7 +1,6 @@
 @php
     use App\Models\Server;
     $isVmHost = ! in_array($server->hostKind(), [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES], true)
-        && ! $site->usesFunctionsRuntime()
         && ! $site->usesEdgeRuntime();
 @endphp
 

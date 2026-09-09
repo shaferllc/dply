@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Support\Servers\ServerRegistry;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 
@@ -18,8 +19,6 @@ use Laravel\Pennant\Feature;
  */
 trait ResolvesCommandPaletteItems
 {
-
-
     /** Best doc slug for a site when the palette wasn't opened on its page. */
     private function siteFallbackDocSlug(Site $site): ?string
     {
@@ -59,11 +58,7 @@ trait ResolvesCommandPaletteItems
         return [
             'create' => [
                 ['New server', 'create add provision vm droplet host', 'servers.create', 'plus-circle'],
-                ['New launch', 'create launch wizard stack', 'launches.create', 'plus-circle'],
-                ['New cloud app', 'create cloud paas deploy', 'cloud.create', 'cube', [], 'surface.cloud'],
-                ['New cloud database', 'create database postgres mysql redis', 'cloud.databases.create', 'circle-stack', [], 'surface.cloud'],
-                ['New serverless app', 'create serverless laravel app faas', 'serverless.create', 'bolt', [], 'surface.serverless'],
-                ['New edge app', 'create edge worker', 'edge.create', 'globe-alt', [], 'surface.edge'],
+                ['New database', 'create database postgres mysql redis', 'cloud.databases.create', 'circle-stack', [], 'surface.databases'],
                 ['New project', 'create project workspace', 'projects.index', 'rectangle-stack', [], 'surface.projects'],
                 ['New organization', 'create organization team', 'organizations.create', 'building-office-2'],
                 ['New script', 'create script automation', 'scripts.create', 'code-bracket', [], 'surface.scripts'],
@@ -74,16 +69,11 @@ trait ResolvesCommandPaletteItems
             'go' => [
                 ['Dashboard', 'home overview', 'dashboard', 'squares-2x2'],
                 ['Networking', 'firewall dns network load balancer', 'networking.index', 'share'],
-                ['Infrastructure', 'infrastructure fleet overview', 'infrastructure.index', 'rectangle-group'],
-                ['Fleet health', 'fleet health monitoring', 'fleet.health', 'heart', [], 'surface.fleet'],
-                ['Cloud apps', 'cloud paas managed', 'cloud.index', 'cube', [], 'surface.cloud'],
-                ['Cloud databases', 'database postgres mysql redis', 'cloud.databases.index', 'circle-stack', [], 'surface.cloud'],
-                ['Serverless', 'functions faas', 'serverless.index', 'bolt', [], 'surface.serverless'],
-                ['Edge', 'workers cdn edge', 'edge.index', 'globe-alt', [], 'surface.edge'],
+                ['Databases', 'database postgres mysql redis', 'cloud.databases.index', 'circle-stack', [], 'surface.databases'],
                 // ['Deploy sync', 'deploy groups sync', 'deploy-sync.index', 'arrows-right-left'],
                 ['Scripts', 'scripts automation', 'scripts.index', 'code-bracket', [], 'surface.scripts'],
-                ['Script marketplace', 'scripts marketplace presets', 'scripts.marketplace', 'rectangle-group', [], 'surface.scripts'],
-                ['Marketplace', 'marketplace apps', 'marketplace.index', 'rectangle-group', [], 'surface.marketplace'],
+                ['Marketplace', 'marketplace apps recipes script presets', 'marketplace.index', 'rectangle-group', [], 'surface.marketplace'],
+                ['Script presets', 'scripts marketplace presets', 'marketplace.index', 'rectangle-group', ['category' => 'scripts'], 'surface.marketplace'],
                 ['Backups — databases', 'backup database restore', 'backups.databases', 'circle-stack'],
                 ['Backups — files', 'backup files restore', 'backups.files', 'document-text'],
                 ['Status pages', 'status incident uptime', 'status-pages.index', 'document-text', [], 'surface.status_pages'],
@@ -95,15 +85,14 @@ trait ResolvesCommandPaletteItems
                 ['Two-factor auth', '2fa mfa two factor authentication', 'two-factor.setup', 'shield-check'],
                 ['SSH keys', 'ssh keys access', 'profile.ssh-keys', 'key'],
                 ['API keys', 'api tokens keys', 'profile.api-keys', 'key'],
-                ['CLI tokens', 'cli command line tokens', 'profile.cli', 'command-line'],
+                // ['CLI tokens', 'cli command line tokens', 'profile.cli', 'command-line'], // hidden for now — bringing CLI back later
                 ['Source control', 'github gitlab source control git', 'profile.source-control', 'code-bracket'],
                 ['Notification channels', 'slack email webhook channels', 'profile.notification-channels', 'bell'],
-                ['Backup configurations', 'backup config s3 storage', 'profile.backup-configurations', 'circle-stack'],
-                ['Referrals', 'referral invite friends', 'profile.referrals', 'user'],
+                ['Backup destinations', 'backup config destination bucket s3 storage credentials', 'organizations.credentials', 'circle-stack', ['org' => true]],
+                // ['Referrals', 'referral invite friends', 'profile.referrals', 'user'], // hidden for now
                 ['Billing', 'billing invoices payment plan', 'billing.show', 'credit-card', ['org' => true]],
                 ['Invoices', 'invoices billing receipts', 'billing.invoices', 'credit-card', ['org' => true]],
-                ['Org members', 'organization members invite', 'organizations.members', 'building-office-2', ['org' => true]],
-                ['Org teams', 'organization teams', 'organizations.teams', 'building-office-2', ['org' => true]],
+                ['Org people', 'organization people members teams invite', 'organizations.members', 'building-office-2', ['org' => true]],
             ],
             'admin' => [
                 ['Admin overview', 'admin platform overview', 'admin.overview', 'wrench-screwdriver', [], null, true],
@@ -202,7 +191,8 @@ trait ResolvesCommandPaletteItems
      */
     private function resolveUrl(string $routeName, array $params, ?Organization $org): ?string
     {
-        $routeParams = [];
+        // Everything but the 'org' marker is passed through as query/route params.
+        $routeParams = array_diff_key($params, ['org' => true]);
         if (($params['org'] ?? false) === true) {
             if ($org === null) {
                 return null;
@@ -243,10 +233,15 @@ trait ResolvesCommandPaletteItems
             return $this->scopedSiteMemo[$key];
         }
 
-        return $this->scopedSiteMemo[$key] = Site::query()
+        $site = Site::query()
             ->whereIn('server_id', $org->serverIds())
-            ->with('server')
             ->find($id);
+
+        // Shared Server instance rather than a per-call eager load — see
+        // ServerRegistry; the site page resolved this same row already.
+        app(ServerRegistry::class)->attachTo($site);
+
+        return $this->scopedSiteMemo[$key] = $site;
     }
 
     /** Org-scoped server lookup. */

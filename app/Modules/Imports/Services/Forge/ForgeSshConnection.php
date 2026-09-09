@@ -93,7 +93,7 @@ class ForgeSshConnection implements RemoteShell
         }
 
         $privateKey = Crypt::decryptString($this->migration->ssh_key_private_encrypted);
-        $key = PublicKeyLoader::load($privateKey);
+        $key = PublicKeyLoader::loadPrivateKey($privateKey);
 
         $this->ssh = new SSH2($this->sourceServer->ip_address, 22, $timeout);
         if (! $this->ssh->login('forge', $key)) {

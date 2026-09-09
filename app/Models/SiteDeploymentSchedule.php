@@ -21,16 +21,16 @@ use Illuminate\Support\Carbon;
  *                      deploys are control-plane orchestrated (SSH out), so this is NOT a remote crontab.
  * @property string $consecutive_failures
  * @property string $cron_expression
- * @property string $git_branch
+ * @property string|null $git_branch
  * @property string $is_active
  * @property ?Carbon $last_run_at
  * @property string $notify_on_failure
  * @property ?string $server_id
  * @property ?string $site_id
- * @property string $timezone
+ * @property string|null $timezone
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteDeploymentSchedule extends Model
 {

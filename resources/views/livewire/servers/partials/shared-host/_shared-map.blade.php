@@ -8,7 +8,7 @@
             <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shared stack map') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shared stack map') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What breaks together') }}</h2>
             <p class="mt-1 text-sm text-brand-moss">{{ __('Database, Redis, and queue bindings shared by multiple sites on this host.') }}</p>
         </div>
@@ -24,7 +24,7 @@
                 <li class="px-6 py-5 sm:px-7">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-sage">{{ ucfirst((string) ($resource['type'] ?? 'service')) }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-sage">{{ ucfirst((string) ($resource['type'] ?? 'service')) }}</p>
                             <h3 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $resource['label'] }}</h3>
                             <p class="mt-1 text-sm text-brand-moss">{{ $resource['restart_impact'] }}</p>
                         </div>

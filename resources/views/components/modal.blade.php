@@ -4,6 +4,7 @@
     'maxWidth' => '2xl',
     'overlayClass' => 'bg-black/50',
     'panelClass' => 'dply-modal-panel overflow-hidden shadow-xl',
+    'label' => null,
 ])
 
 @php
@@ -51,6 +52,11 @@ $maxWidth = [
     x-on:open-modal.window="$event.detail == '{{ $name }}' ? show = true : null"
     x-on:close-modal.window="$event.detail == '{{ $name }}' ? show = false : null"
     x-on:close.stop="show = false"
+    {{-- Teleported nodes survive a wire:navigate page swap, so without this the
+         overlay stays fixed over the new page and the body keeps its scroll lock
+         — which reads as a blank white screen. destroy() does not fire for
+         teleported content here, so close on the navigation event itself. --}}
+    x-on:livewire:navigating.window="show = false; document.body.classList.remove('overflow-y-hidden')"
     x-on:keydown.escape.window="show = false"
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable().focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
@@ -72,7 +78,12 @@ $maxWidth = [
         <div class="absolute inset-0 {{ $overlayClass }}"></div>
     </div>
 
+    {{-- The panel is the dialog: the focus trap above only works for assistive tech
+         once the boundary is announced. Pass label="…" to name it. --}}
     <div
+        role="dialog"
+        aria-modal="true"
+        @if ($label) aria-label="{{ $label }}" @endif
         x-show="show"
         class="relative z-10 mb-6 transform transition-all sm:w-full {{ $maxWidth }} sm:mx-auto {{ $panelClass }}"
         x-transition:enter="ease-out duration-300"

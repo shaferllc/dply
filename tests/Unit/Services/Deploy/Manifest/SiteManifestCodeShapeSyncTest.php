@@ -77,6 +77,57 @@ test('reconcile creates managed build/release steps and processes', function () 
     Queue::assertPushed(ControlWorkerDaemonJob::class, fn (ControlWorkerDaemonJob $job) => $job->siteId === (string) $site->id && $job->action === 'ensure');
 });
 
+test('reconcile skips daemon ensure when site meta process_daemons is false', function () {
+    $site = manifestSite();
+    $site->forceFill([
+        'meta' => array_merge(is_array($site->meta) ? $site->meta : [], [
+            'process_daemons' => false,
+        ]),
+    ])->save();
+
+    $result = sync()->reconcile($site, manifest(<<<'YAML'
+    processes:
+      horizon:
+        command: php artisan horizon
+        type: worker
+    YAML));
+
+    expect($result['processes'])->toBe(1);
+    expect(SiteProcess::query()->where('site_id', $site->id)->where('name', 'horizon')->value('is_active'))->toBeFalse();
+    Queue::assertNotPushed(ControlWorkerDaemonJob::class);
+});
+
+test('reconcile adopts an existing process with the same name instead of colliding', function () {
+    $site = manifestSite();
+
+    SiteProcess::query()->create([
+        'site_id' => $site->id,
+        'type' => SiteProcess::TYPE_CUSTOM,
+        'name' => 'horizon',
+        'command' => 'php artisan horizon --old',
+        'scale' => 1,
+        'is_active' => true,
+        'managed_by_manifest' => false,
+    ]);
+
+    $result = sync()->reconcile($site, manifest(<<<'YAML'
+    processes:
+      horizon:
+        command: php artisan horizon
+        type: worker
+        scale: 2
+    YAML));
+
+    expect($result['processes'])->toBe(1);
+
+    $rows = SiteProcess::query()->where('site_id', $site->id)->where('name', 'horizon')->get();
+    expect($rows)->toHaveCount(1);
+    expect($rows->first()->command)->toBe('php artisan horizon');
+    expect($rows->first()->type)->toBe(SiteProcess::TYPE_WORKER);
+    expect($rows->first()->scale)->toBe(2);
+    expect($rows->first()->managed_by_manifest)->toBeTrue();
+});
+
 test('a category dropped from the manifest clears its managed rows but keeps user rows', function () {
     $site = manifestSite();
 

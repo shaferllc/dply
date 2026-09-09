@@ -1,24 +1,4 @@
-@php
-    $productionMirrorSite = data_get($site->meta, 'production_data_mirror') === true;
-    $productionConnection = $productionMirrorSite && production_data_mirror_connected()
-        ? app(\App\Services\ProductionData\ProductionDataMirror::class)->connectionFor(auth()->user())
-        : null;
-@endphp
 <div>
-    @if ($productionConnection)
-        <x-production-data-banner
-            :connection="$productionConnection"
-            :writes-unlocked="app(\App\Services\ProductionData\ProductionDataMirror::class)->writesUnlocked()"
-        >
-            <x-slot:actions>
-                <a href="{{ route('live.sites.index') }}" wire:navigate class="rounded-lg bg-amber-950/10 px-3 py-1.5 text-sm font-semibold hover:bg-amber-950/15">
-                    {{ __('Production sites') }}
-                </a>
-            </x-slot:actions>
-        </x-production-data-banner>
-        <x-production-data-nav :connection="$productionConnection" />
-    @endif
-
     @if ($site->server_id)
         <div
             id="dply-site-provisioning-context"
@@ -32,20 +12,16 @@
     <div class="dply-page-shell pt-6">
         <x-breadcrumb-trail
             :items="$siteHeaderBreadcrumbs"
+            :site="$site"
             doc-contextual
         />
     </div>
     <div class="dply-page-shell pt-4">
         <x-page-header
-            :eyebrow="$productionConnection ? __('Production') : null"
-            :title="$productionConnection
-                ? __('Site workspace')
-                : ($readyForWorkspace
-                    ? ($site->usesEdgeRuntime() ? __('Edge site') : __('Site workspace'))
-                    : ($site->usesEdgeRuntime() ? __('Edge deployment') : __('Site setup')))"
-            :description="$productionConnection
-                ? __('You are viewing a Production site — mutations can affect the live control plane.')
-                : ($readyForWorkspace
+            :title="$readyForWorkspace
+                ? ($site->usesEdgeRuntime() ? __('Edge site') : __('Site workspace'))
+                : ($site->usesEdgeRuntime() ? __('Edge deployment') : __('Site setup'))"
+            :description="($readyForWorkspace
                     ? ($site->usesEdgeRuntime()
                         ? __('Manage builds, domains, deploys, and delivery for this Edge site.')
                         : __('Manage this site from one workspace with General as the default landing section.'))
@@ -67,44 +43,6 @@
                 </span>
             </x-slot>
             <x-slot name="actions">
-                @if ($readyForWorkspace && $site->usesEdgeRuntime())
-                    <x-outline-link :href="route('edge.index')" wire:navigate>
-                        <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('All Edge sites') }}
-                    </x-outline-link>
-                    @if ($liveUrlForHeader = ($edgeLiveUrl ?? $site->edgeLiveUrl()))
-                        <a
-                            href="{{ $liveUrlForHeader }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 font-mono text-xs text-brand-ink hover:bg-brand-sand/40"
-                            title="{{ __('Open the live edge site in a new tab') }}"
-                        >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 opacity-70" />
-                            {{ preg_replace('#^https?://#', '', $liveUrlForHeader) }}
-                        </a>
-                    @endif
-                    @can('update', $site)
-                        <button
-                            type="button"
-                            wire:click="redeployEdge"
-                            wire:loading.attr="disabled"
-                            wire:target="redeployEdge"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
-                        >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
-                            <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
-                            <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
-                        </button>
-                    @endcan
-                @elseif ($readyForWorkspace && $site->workspace)
-                    @feature('surface.projects')
-                        <x-outline-link :href="route('projects.resources', $site->workspace)" wire:navigate>
-                            <x-heroicon-o-folder-open class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Open project') }}
-                        </x-outline-link>
-                    @endfeature
-                @endif
                 @if ($showWebserverConfigEditor && ! $site->isCustom() && ! $site->usesEdgeRuntime())
                     <x-outline-link :href="route('sites.webserver-config', [$server, $site])" wire:navigate>
                         <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
@@ -120,7 +58,7 @@
                         <x-heroicon-o-light-bulb class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Insights') }}
                         @if ($openSiteInsightsCount > 0)
-                            <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
+                            <span class="inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold leading-none text-white" title="{{ trans_choice(':count open finding|:count open findings', $openSiteInsightsCount, ['count' => $openSiteInsightsCount]) }}">{{ $openSiteInsightsCount }}</span>
                         @endif
                     </x-outline-link>
                     <x-outline-link :href="route('sites.monitor', [$server, $site])" wire:navigate>
@@ -158,7 +96,7 @@
                                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP version mismatch') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This site references PHP :version, but that version is not currently installed on this server.', ['version' => $sitePhpData['mismatch_version']]) }}</p>
                                 <p class="mt-2 text-sm">
@@ -203,7 +141,6 @@
                         @include('livewire.sites.partials.show.finish-setup-banner')
                     @endif
 
-                    <x-ops-copilot-callout :site="$site" compact class="mt-6" />
 
                     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">
 

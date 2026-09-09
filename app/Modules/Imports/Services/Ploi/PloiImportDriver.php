@@ -54,9 +54,6 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
-    /**
-     * @return list<array<string, array<int<0, max>|string, mixed>|int|string|null>>
-     */
     public function fetchServerDetail(int $sourceServerId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}");
@@ -77,9 +74,6 @@ class PloiImportDriver implements ImportDriver
         );
     }
 
-    /**
-     * @return list<array<string, array<string, mixed>|int|string|null>>
-     */
     public function fetchSiteDetail(int $sourceServerId, int $sourceSiteId): array
     {
         $response = $this->client->get("/servers/{$sourceServerId}/sites/{$sourceSiteId}");
@@ -139,7 +133,7 @@ class PloiImportDriver implements ImportDriver
     {
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/crons");
 
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'schedule' => (string) ($r['frequency'] ?? $r['schedule'] ?? ''),
@@ -148,7 +142,7 @@ class PloiImportDriver implements ImportDriver
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     /**
@@ -160,7 +154,7 @@ class PloiImportDriver implements ImportDriver
         // depending on API version. Try site-scoped first; the index normalises to a list.
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/daemons");
 
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'name' => $this->nullableString($r['name'] ?? null),
@@ -171,7 +165,7 @@ class PloiImportDriver implements ImportDriver
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     /**
@@ -181,7 +175,7 @@ class PloiImportDriver implements ImportDriver
     {
         $rows = $this->paginated("/servers/{$sourceServerId}/sites/{$sourceSiteId}/databases");
 
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'name' => (string) ($r['name'] ?? ''),
@@ -189,7 +183,7 @@ class PloiImportDriver implements ImportDriver
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     public function fetchSiteCertificate(int $sourceServerId, int $sourceSiteId): ?array
@@ -257,14 +251,14 @@ class PloiImportDriver implements ImportDriver
         // Ploi's deploy-keys endpoint also reports webhooks; some accounts use a separate
         // /webhooks endpoint. Use the deploy-keys API as the primary source — it includes
         // the webhook URLs used by repository auto-deploy.
-        return array_values(array_map(
+        return array_map(
             fn (array $r): array => [
                 'id' => (int) ($r['id'] ?? 0),
                 'url' => (string) ($r['url'] ?? ''),
                 'raw' => $r,
             ],
             $rows,
-        ));
+        );
     }
 
     public function deleteSiteWebhook(int $sourceServerId, int $sourceSiteId, int $webhookId): void
@@ -396,7 +390,6 @@ class PloiImportDriver implements ImportDriver
 
     /**
      * @param  mixed  $payload
-     * @param  array<string, mixed> $row
      * @return array<string, mixed>
      */
     protected function extractObject($payload, string $envelopeKey): array

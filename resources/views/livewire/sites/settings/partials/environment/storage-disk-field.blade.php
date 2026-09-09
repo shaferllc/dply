@@ -26,10 +26,10 @@
     @if (! $diskIsPrimary && $diskSnippet !== '')
         <div x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js($diskSnippet)); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }" class="mt-2">
             <div class="flex items-center justify-between">
-                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/filesystems.php → disks') }}</p>
-                <button type="button" @click="copy()" class="text-[11px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/filesystems.php → disks') }}</p>
+                <button type="button" @click="copy()" class="text-xs font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
             </div>
-            <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $diskSnippet }}</pre>
+            <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-2xs leading-relaxed text-brand-cream">{{ $diskSnippet }}</pre>
         </div>
     @endif
 </div>

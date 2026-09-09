@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Support\Servers\ServerHostingPlatformContextTest;
 
 use App\Enums\ServerProvider;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use App\Support\Servers\ServerHostingPlatformContext;
 
 test('fromConfig defaults to the hetzner backend and its catalog', function () {
@@ -33,7 +33,7 @@ test('fromConfig resolves the vultr backend with its catalog, defaults and servi
     expect($ctx->provider)->toBe(ServerProvider::Vultr)
         ->and($ctx->configured())->toBeTrue()
         ->and($ctx->defaultRegion)->toBe('ewr')
-        ->and($ctx->defaultImage)->toBe('2152')
+        ->and($ctx->defaultImage)->toBe('2284')
         ->and($ctx->regions())->toHaveKey('ewr')
         ->and(collect($ctx->sizes())->pluck('slug'))->toContain('vc2-2c-4gb')
         ->and($ctx->vultr())->toBeInstanceOf(VultrService::class);

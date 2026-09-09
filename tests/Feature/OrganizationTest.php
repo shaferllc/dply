@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\OrganizationTest;
 
-use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
+use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Models\ApiToken;
 use App\Models\Organization;
 use App\Models\User;
@@ -67,24 +67,38 @@ test('organization show is displayed for member', function () {
 
     $response->assertOk();
     $response->assertSee($org->name);
-    $response->assertSee('Organization sections');
+    // The overview is a ledger of workspace facts, one row per label.
+    $response->assertSee('Plan');
+    $response->assertSee('Fleet');
+    $response->assertSee('People');
+    $response->assertSee('Automation');
     $response->assertSee('Members');
 });
 
-test('organization automation page shows webhook and deploy controls for admins', function () {
+test('organization settings page shows email defaults and api tokens for admins', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
 
-    $response = $this->actingAs($user)->get(route('organizations.automation', $org));
+    $response = $this->actingAs($user)->get(route('organizations.settings', $org));
 
     $response->assertOk();
-    $response->assertSee('Deploy emails');
-    $response->assertSee('Webhook destinations');
+    $response->assertSee('Email defaults');
+    $response->assertSee('Deploy-finish emails');
     $response->assertSee('API tokens');
 });
 
-test('organization automation prompt revoke api token opens confirm modal', function () {
+test('the retired automation url redirects to organization settings', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $this->actingAs($user)
+        ->get(route('organizations.automation', $org))
+        ->assertRedirect(route('organizations.settings', $org));
+});
+
+test('organization settings prompt revoke api token opens confirm modal', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -92,7 +106,7 @@ test('organization automation prompt revoke api token opens confirm modal', func
     ['token' => $token] = ApiToken::createToken($user, $org, 'CI token', null, ['*'], null);
 
     Livewire::actingAs($user)
-        ->test(OrganizationsAutomation::class, ['organization' => $org])
+        ->test(OrganizationsSettings::class, ['organization' => $org])
         ->call('promptRevokeApiToken', (string) $token->id)
         ->assertSet('showConfirmActionModal', true)
         ->assertSet('confirmActionModalMethod', 'revokeApiToken');
@@ -142,4 +156,32 @@ test('organization switch returns 403 for non member', function () {
         return;
     }
     $this->assertNotEquals((string) $org->id, session('current_organization_id'), 'Non-member must not be able to switch to organization.');
+});
+
+test('route-bound organization reuses the memoized currentOrganization instance', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $this->actingAs($user);
+    session(['current_organization_id' => $org->id]);
+
+    $memoized = $user->currentOrganization();
+    $bound = (new Organization)->resolveRouteBinding($org->id);
+
+    expect($bound)->toBe($memoized);
+});
+
+test('route binding still resolves an organization outside the session scope', function () {
+    $user = User::factory()->create();
+    $own = Organization::factory()->create();
+    $own->users()->attach($user->id, ['role' => 'owner']);
+    $other = Organization::factory()->create();
+
+    $this->actingAs($user);
+    session(['current_organization_id' => $own->id]);
+
+    $bound = (new Organization)->resolveRouteBinding($other->id);
+
+    expect($bound?->id)->toBe($other->id);
 });

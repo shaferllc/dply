@@ -11,7 +11,10 @@ use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionOracleServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
+use App\Jobs\ReconcileWorkerPoolJob;
+use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Models\Site;
 use App\Models\WorkerPool;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -82,6 +85,9 @@ class WorkerCloneProvisioner
             $meta['placement'] = ['region' => $region, 'source_region' => (string) $source->region, 'provider' => $provider->value];
         }
 
+        $meta = $this->withParentPhp($meta, $source, $pool->originSite());
+        $meta = $this->withBootImage($meta, $source->organization_id, $provider, $region);
+
         $clone = Server::query()->create([
             'user_id' => $source->user_id,
             'organization_id' => $source->organization_id,
@@ -108,6 +114,104 @@ class WorkerCloneProvisioner
         $this->dispatchProvisioning($clone);
 
         return $clone;
+    }
+
+    /**
+     * First worker for a site-sourced pool: same provider as the app server,
+     * worker install profile, optional smaller size. Same-region workers join
+     * the app VPC; another region is for managed Redis/DB over public hostnames.
+     */
+    public function provisionWorkerFromApp(WorkerPool $pool, Server $app, string $size = '', string $region = ''): Server
+    {
+        $size = trim($size) !== '' ? trim($size) : (string) $app->size;
+        $region = trim($region) !== '' ? trim($region) : (string) $app->region;
+        $sameRegion = $region === (string) $app->region;
+        $name = $pool->servers()->exists()
+            ? $this->nextName($pool)
+            : $this->firstSiteWorkerName($app);
+
+        $meta = $this->cloneableMeta($app);
+        unset($meta['database'], $meta['cache_service']);
+        $meta['server_role'] = 'worker';
+        $meta['install_profile'] = 'queue_worker';
+        $meta['cloned_from_server_id'] = (string) $app->id;
+        $meta['cloned_at'] = now()->toIso8601String();
+        $meta['pool'] = ['state' => WorkerPool::MEMBER_PROVISIONING];
+        $meta['site_sourced_fleet'] = true;
+        if (! $sameRegion) {
+            $meta['cross_region'] = true;
+            $meta['placement'] = [
+                'region' => $region,
+                'source_region' => (string) $app->region,
+                'provider' => $app->provider->value,
+            ];
+        }
+
+        $meta = $this->withParentPhp($meta, $app, $pool->originSite());
+        $meta = $this->withBootImage($meta, $app->organization_id, $app->provider, $region);
+
+        $worker = Server::query()->create([
+            'user_id' => $app->user_id,
+            'organization_id' => $app->organization_id,
+            'worker_pool_id' => $pool->id,
+            'pool_role' => WorkerPool::ROLE_PRIMARY,
+            'name' => $name,
+            'provider' => $app->provider,
+            'hosting_backend' => $app->hosting_backend,
+            'provider_credential_id' => ProviderCredential::preferredForServer($app)?->id ?? $app->provider_credential_id,
+            'region' => $region,
+            'size' => $size,
+            'hetzner_network_id' => $sameRegion ? $app->hetzner_network_id : null,
+            'private_network_id' => $sameRegion ? $app->private_network_id : null,
+            'ssh_port' => $app->ssh_port,
+            'ssh_user' => $app->ssh_user,
+            'setup_script_key' => $app->setup_script_key,
+            'meta' => $meta,
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        $this->dispatchProvisioning($worker);
+
+        return $worker;
+    }
+
+    /**
+     * Re-run cloud create for a worker that failed before a provider instance
+     * existed (e.g. DigitalOcean rejected the API token while adding the SSH key).
+     */
+    public function retryCloudProvision(Server $server): void
+    {
+        if ($server->status !== Server::STATUS_ERROR || filled($server->provider_id)) {
+            throw new RuntimeException(__('This worker cannot be retried — it already exists at the provider, or is not in a failed cloud-provision state.'));
+        }
+
+        $meta = is_array($server->meta) ? $server->meta : [];
+        unset($meta['provision_error'], $meta['auto_retry_at'], $meta['auto_retry_attempt'], $meta['auto_retry_max']);
+        $meta['pool'] = array_merge(is_array($meta['pool'] ?? null) ? $meta['pool'] : [], [
+            'state' => WorkerPool::MEMBER_PROVISIONING,
+            'state_since' => now()->toIso8601String(),
+        ]);
+
+        $originId = data_get($meta, 'cloned_from_server_id');
+        $origin = filled($originId) ? Server::query()->find($originId) : null;
+        $originSite = filled($server->worker_pool_id)
+            ? WorkerPool::query()->find($server->worker_pool_id)?->originSite()
+            : null;
+        $meta = $this->withParentPhp($meta, $origin instanceof Server ? $origin : $server, $originSite);
+        $meta = $this->withBootImage($meta, $server->organization_id, $server->provider, (string) $server->region);
+
+        $server->forceFill([
+            'status' => Server::STATUS_PENDING,
+            'provider_credential_id' => ProviderCredential::preferredForServer($origin ?? $server)?->id
+                ?? $server->provider_credential_id,
+            'meta' => $meta,
+        ])->save();
+
+        $this->dispatchProvisioning($server->fresh() ?? $server);
+
+        if (filled($server->worker_pool_id)) {
+            ReconcileWorkerPoolJob::dispatch((string) $server->worker_pool_id);
+        }
     }
 
     private function resolveProvider(?string $provider, Server $source): ServerProvider
@@ -150,7 +254,35 @@ class WorkerCloneProvisioner
     }
 
     /**
-     * @return array<string, mixed><string, mixed>
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function withParentPhp(array $meta, Server $source, ?Site $originSite): array
+    {
+        return app(WorkerPhpVersion::class)->applyToMeta($meta, $source, $originSite);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function withBootImage(array $meta, ?string $organizationId, ServerProvider $provider, string $region): array
+    {
+        $probe = new Server([
+            'organization_id' => $organizationId,
+            'provider' => $provider,
+            'region' => $region,
+        ]);
+        $imageId = app(WorkerBootImage::class)->providerImageIdFor($probe);
+        if ($imageId !== null) {
+            $meta['boot_image_id'] = $imageId;
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @return array<string, mixed>
      */
     private function cloneableMeta(Server $source): array
     {
@@ -163,6 +295,20 @@ class WorkerCloneProvisioner
         }
 
         return $cloned;
+    }
+
+    private function firstSiteWorkerName(Server $app): string
+    {
+        $stem = trim((string) preg_replace('/-\d+$/', '', (string) $app->name));
+        $base = $stem !== '' ? $stem : 'worker';
+        $n = 1;
+        $name = $base.'-worker-'.$n;
+        while (Server::query()->where('organization_id', $app->organization_id)->where('name', $name)->exists()) {
+            $n++;
+            $name = $base.'-worker-'.$n;
+        }
+
+        return $name;
     }
 
     private function nextName(WorkerPool $pool): string

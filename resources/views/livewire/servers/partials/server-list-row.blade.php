@@ -20,7 +20,7 @@
                 @feature('workspace.insights')
                     @php $insOpenList = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
                     @if ($insOpenList > 0)
-                        <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">
+                        <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold leading-none {{ $insightBadgeClass($server->id) }}">
                             {{ trans_choice(':count insight|:count insights', $insOpenList, ['count' => $insOpenList]) }}
                         </a>
                     @endif
@@ -49,7 +49,7 @@
                         <button
                             type="button"
                             wire:click="$set('tagFilter', @js($tag))"
-                            class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
+                            class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10 transition hover:bg-brand-sage/15 hover:text-brand-ink"
                             title="{{ __('Filter fleet by :tag', ['tag' => $tag]) }}"
                         >
                             {{ $tag }}
@@ -66,12 +66,12 @@
                  keeps ticking the elapsed counter on a dead provision. --}}
             @if ($isSetupFailed($server))
                 <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
                         <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                         {{ __('Setup failed') }}
                     </span>
                     <span class="text-brand-ink">{{ __('Provisioning did not finish — open the journey to see the failing step.') }}</span>
-                    <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900">
+                    <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:text-red-900">
                         {{ __('Open journey') }}
                         <x-heroicon-m-arrow-right class="h-3 w-3" />
                     </a>
@@ -86,7 +86,7 @@
             @php $digest = $provisioningDigests[$server->id] ?? null; @endphp
             @if ($digest && ! $isSetupFailed($server))
                 <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
                         <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
                         {{ $digest->phaseLabel }}
                     </span>
@@ -99,7 +99,7 @@
                         <span class="text-brand-mist">·</span>
                         <span class="tabular-nums">{{ __(':elapsed elapsed', ['elapsed' => $digest->elapsedHuman()]) }}</span>
                     @endif
-                    <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 hover:text-sky-900">
+                    <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:text-sky-900">
                         {{ __('Open journey') }}
                         <x-heroicon-m-arrow-right class="h-3 w-3" />
                     </a>

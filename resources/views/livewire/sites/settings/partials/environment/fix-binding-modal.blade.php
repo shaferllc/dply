@@ -27,16 +27,16 @@
                 <div class="mt-4 space-y-3">
                     <button type="button" wire:click="fixBindingConnectivity(@js($fixBindingId))" wire:loading.attr="disabled" class="w-full rounded-lg bg-brand-ink px-3 py-2 text-left text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-60">
                         {{ __('Fix in place (keep current target)') }}
-                        <span class="mt-0.5 block text-[11px] font-normal text-brand-cream/70">{{ __('Open remote access + firewall this app server, then re-probe.') }}</span>
+                        <span class="mt-0.5 block text-xs font-normal text-brand-cream/70">{{ __('Open remote access + firewall this app server, then re-probe.') }}</span>
                     </button>
                     @if (! empty($fixCands))
                         <div>
-                            <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Wrong server? Re-point to:') }}</p>
+                            <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Wrong server? Re-point to:') }}</p>
                             <div class="space-y-1">
                                 @foreach ($fixCands as $c)
                                     <button type="button" wire:click="fixBindingConnectivity(@js($fixBindingId), '{{ $c['id'] }}')" wire:loading.attr="disabled" class="flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-left hover:bg-brand-sand/40 disabled:opacity-60">
                                         <span class="min-w-0 truncate text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
-                                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ $c['host'] }}</span>
+                                        <span class="shrink-0 font-mono text-2xs text-brand-mist">{{ $c['host'] }}</span>
                                     </button>
                                 @endforeach
                             </div>

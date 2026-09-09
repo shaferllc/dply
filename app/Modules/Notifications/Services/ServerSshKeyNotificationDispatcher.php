@@ -22,8 +22,8 @@ final class ServerSshKeyNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $keyNames  affected authorized-key labels
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string>  $keyNames  affected authorized-key labels
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

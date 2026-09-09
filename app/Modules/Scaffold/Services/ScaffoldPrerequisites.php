@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Modules\Scaffold\Services;
 
 use App\Models\Server;
-use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
 
@@ -164,6 +163,6 @@ class ScaffoldPrerequisites
             return false;
         }
 
-        return $out instanceof ProcessOutput && $out->getExitCode() === 0;
+        return $out->getExitCode() === 0;
     }
 }

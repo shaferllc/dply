@@ -277,7 +277,14 @@ class ServerFileBrowserRemoteReader
      */
     protected function mergeListings(array $resolved, array $linkInfo): array
     {
-        $names = array_unique(array_merge(array_keys($resolved), array_keys($linkInfo)));
+        // parseLsLines() keys its arrays by filename, and PHP silently coerces
+        // a numeric-string array key to int — so an atomic release directory
+        // (`20260803143955`) came back as an int and blew up FileBrowserEntry's
+        // string $name. Cast back before use; listing `releases/` depends on it.
+        $names = array_map(
+            static fn ($name): string => (string) $name,
+            array_unique(array_merge(array_keys($resolved), array_keys($linkInfo))),
+        );
         $entries = [];
 
         foreach ($names as $name) {

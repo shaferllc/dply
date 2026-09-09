@@ -28,6 +28,11 @@ trait DecorateActions
         return $this->action->{$property};
     }
 
+    protected function setProperty(string $property, mixed $value): void
+    {
+        $this->action->{$property} = $value;
+    }
+
     protected function hasMethod(string $method): bool
     {
         return isset($this->action) && method_exists($this->action, $method);
@@ -38,6 +43,22 @@ trait DecorateActions
      */
     protected function callMethod(string $method, array $parameters = []): mixed
     {
+        // Reflection when the method really exists, because a decorator calls
+        // the action from outside its scope. Every hook the framework documents
+        // -- getAuthGuard(), getAuthRedirectRoute(), handleUnauthenticated(),
+        // see the examples in AsAuthenticated -- is documented as `protected`,
+        // and call_user_func_array() cannot reach those: the call falls through
+        // to the base class's __call(), which throws BadMethodCallException for
+        // a method that plainly exists. hasMethod() uses method_exists(), which
+        // ignores visibility, so the hook passes the guard and then dies.
+        //
+        // The call_user_func_array() fallback is kept for names that do NOT
+        // exist as real methods, which is the case __call() legitimately serves.
+        if (method_exists($this->action, $method)) {
+            return (new \ReflectionMethod($this->action, $method))
+                ->invokeArgs($this->action, $parameters);
+        }
+
         return call_user_func_array([$this->action, $method], $parameters);
     }
 

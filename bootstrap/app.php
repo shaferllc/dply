@@ -2,18 +2,20 @@
 
 use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
-use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
+use App\Http\Middleware\AuthenticateCacheCredential;
+use App\Http\Middleware\AuthenticateQueueCredential;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
-use App\Http\Middleware\EnsureProductionDataMirror;
 use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
-use App\Modules\Edge\Http\Middleware\ResolveEdgeCustomDomain;
-use App\Modules\Serverless\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
+use App\Http\Middleware\StampDebugReference;
+use App\Http\Middleware\ValidateBundleServiceToken;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
+use App\Modules\Referrals\Http\Middleware\CaptureReferralCode;
+use App\Support\Debug\DebugExceptionDetail;
 use App\Support\DplyRuntime;
 use App\Support\Http\ScannerProbePaths;
 use App\Support\MachineCallbackPaths;
@@ -51,19 +53,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Stamp X-Dply-Ref (the Lookout occurrence id) on 5xx responses so a
         // reference can be quoted by users and resolved by admins.
-        $middleware->append(\App\Http\Middleware\StampDebugReference::class);
+        $middleware->append(StampDebugReference::class);
 
         $middleware->alias([
             'org' => SetCurrentOrganization::class,
             'auth.api' => AuthenticateApiToken::class,
             'ability' => EnsureApiTokenAbility::class,
             'fleet.operator' => ValidateFleetOperatorToken::class,
-            'bundle.service' => \App\Http\Middleware\ValidateBundleServiceToken::class,
+            'bundle.service' => ValidateBundleServiceToken::class,
             'metrics.ingest' => ValidateMetricsIngestToken::class,
+            'auth.cache' => AuthenticateCacheCredential::class,
+            'auth.queue' => AuthenticateQueueCredential::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
-            'production.mirror' => EnsureProductionDataMirror::class,
         ]);
         // Machine/external callback paths come from the single canonical list
         // (App\Support\MachineCallbackPaths) the guest gates also use, so a new
@@ -82,14 +85,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // so a request to `api.acme.com/` doesn't fall through to the
         // marketing welcome view (which has no host constraint on /).
         $middleware->prependToGroup('web', [
-            ResolveServerlessCustomDomain::class,
-            ResolveEdgeCustomDomain::class,
+            // Outermost: strip session cookies after StartSession so hashed
+            // /build files stay CDN-cacheable on function hostnames.
         ]);
 
         $middleware->appendToGroup('web', [
             EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
+            // Function / leftover FaaS hosts must leave /servers/{id}/… before
+            // the tag/role workspace gate 404s a deep link (or Lazy overview
+            // paints Servers chrome). Address bar stays on /serverless/….
             // Workspace deep-link guard: 404s requests for workspace routes the
             // bound server can't reach (tag-gated rows that lack the required
             // installed-service tag; role-gated rows hidden by role_nav_keys).
@@ -99,6 +105,15 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Stash a short exception summary for the branded 500 page's
+        // collapsible "Technical details" panel (signed-in operators).
+        // Runs on every render path (return null = keep default handling).
+        $exceptions->render(function (Throwable $e) {
+            DebugExceptionDetail::remember($e);
+
+            return null;
+        });
+
         // Friendly handler for cache/queue backend connection failures. With
         // CACHE_STORE=redis (or QUEUE_CONNECTION=redis) pointing at a managed
         // Redis box, an outage means every page render touches a dead Redis

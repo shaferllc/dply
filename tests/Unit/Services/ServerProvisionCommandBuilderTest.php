@@ -458,3 +458,133 @@ test('build database role with remote access opens port and bootstraps credentia
         ->and($joined)->toContain('CREATE DATABASE app')
         ->and($joined)->not->toContain('ufw deny 5432/tcp');
 });
+
+test('worker provision installs the pinned php and makes it the cli default', function () {
+    config(['server_provision.install_supervisor_on_provision' => false]);
+
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'worker',
+            'webserver' => 'caddy',
+            'php_version' => '8.4',
+            'database' => 'none',
+            'cache_service' => 'none',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    expect($joined)->toContain('[dply-step] Installing PHP 8.4')
+        ->and($joined)->toContain('php8.4-cli')
+        ->and($joined)->toContain("update-alternatives --set php '/usr/bin/php8.4'");
+});
+
+test('mariadb 11.4 pins MariaDB own repo instead of the distro package', function () {
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'application',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mariadb114',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    $this->assertStringContainsString('mariadb-server/11.4/repo/ubuntu', $joined);
+    $this->assertStringContainsString('/usr/share/keyrings/dply-mariadb.gpg', $joined);
+    $this->assertStringContainsString('/etc/apt/sources.list.d/dply-mariadb.list', $joined);
+    // Its own keyring, never MySQL's — the fallback paths rm -f these, and
+    // sharing a filename would have one engine delete the other's key.
+    $this->assertStringNotContainsString('dply-mysql.gpg', $joined);
+});
+
+test('mariadb series map does not cross the wires', function () {
+    $script = function (string $database): string {
+        $server = Server::factory()->create([
+            'provider' => ServerProvider::DigitalOcean,
+            'meta' => [
+                'server_role' => 'application',
+                'webserver' => 'nginx',
+                'php_version' => '8.3',
+                'database' => $database,
+                'cache_service' => 'redis',
+            ],
+        ]);
+
+        return implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+    };
+
+    $eleven = $script('mariadb11');
+    $this->assertStringContainsString('mariadb-server/11/repo/ubuntu', $eleven);
+    $this->assertStringNotContainsString('mariadb-server/11.4/repo/ubuntu', $eleven);
+
+    $lts = $script('mariadb1011');
+    $this->assertStringContainsString('mariadb-server/10.11/repo/ubuntu', $lts);
+    $this->assertStringNotContainsString('mariadb-server/11.4/repo/ubuntu', $lts);
+});
+
+test('mariadb version comparisons strip the debian epoch', function () {
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'application',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mariadb114',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    // Both Ubuntu's mariadb-server ("1:10.11.14-…") and MariaDB's own
+    // ("1:11.4.13+maria~ubu2404") carry an epoch. Matching the raw candidate
+    // never matches, which re-adds the repo and warns on every provision.
+    $this->assertStringContainsString('${DPLY_MARIADB_CANDIDATE#*:}', $joined);
+    $this->assertStringNotContainsString('case "${DPLY_MARIADB_CANDIDATE:-}" in', $joined);
+});
+
+test('mariadb install restores the mysql compat shims dply shells out to', function () {
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'application',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mariadb114',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    // MariaDB 11 demotes mysql/mysqldump/mysqladmin to Recommends-only
+    // *-compat packages, and every install here is --no-install-recommends.
+    $this->assertStringContainsString('mariadb-client-compat mariadb-server-compat', $joined);
+    // The version probe must not depend on those shims existing.
+    $this->assertStringContainsString('mariadb --version 2>/dev/null || mysqladmin --version', $joined);
+});
+
+test('mariadb prefetch does not warm the wrong package family', function () {
+    config(['server_provision.prefetch_packages' => true]);
+
+    $server = Server::factory()->create([
+        'provider' => ServerProvider::DigitalOcean,
+        'meta' => [
+            'server_role' => 'application',
+            'webserver' => 'nginx',
+            'php_version' => '8.3',
+            'database' => 'mariadb114',
+            'cache_service' => 'redis',
+        ],
+    ]);
+
+    $joined = implode("\n", app(ServerProvisionCommandBuilder::class)->build($server));
+
+    $prefetch = substr($joined, (int) strpos($joined, 'prefetching stock packages'), 400);
+    $this->assertStringNotContainsString('mysql-server', $prefetch);
+});

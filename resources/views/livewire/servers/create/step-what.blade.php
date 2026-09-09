@@ -9,11 +9,11 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="3" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-      <div class="space-y-6 min-w-0">
+      <div class="space-y-4 min-w-0">
         {{-- Hero --}}
         @php
             if ($isKubernetes) {
@@ -50,7 +50,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan sizing') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan sizing') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $sizeRoleMismatch['label'] }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $sizeRoleMismatch['detail'] }}</p>
                     </div>
@@ -58,7 +58,7 @@
                 <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7">
                     @if ($sizeRoleMismatch['suggested_size'] !== '')
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss/70">{{ __('Suggested plan') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss/70">{{ __('Suggested plan') }}</p>
                             <p class="mt-0.5 text-sm font-medium text-brand-ink">{{ $sizeRoleMismatch['suggested_label'] }}</p>
                         </div>
                         <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
@@ -93,26 +93,21 @@
 
             {{-- K8s host: pick an existing cluster OR have dply create one. --}}
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $isCreatingNew
-                            ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in "provisioning" until it\'s ready.')
-                            : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.') }}</p>
-                    </div>
-                </div>
-                <div class="space-y-5 p-6 sm:p-7">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-server-stack"
+                    :title="$isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster')"
+                    :note="$isCreatingNew ? __('Dply will provision a new DOKS cluster in your DigitalOcean account on submit. Provisioning takes 5–10 minutes; the server will land in “provisioning” until it\'s ready.') : __('Dply lists managed DOKS clusters from your DigitalOcean account. Pick one and the region is inherited.')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="space-y-3 px-4 py-3.5 sm:px-5">
                     @if ($canCreateNew)
                         {{-- Source toggle: use existing vs create new. --}}
                         <x-server-workspace-tablist :aria-label="__('Cluster source')" class="!mb-0">
-                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'existing')">
+                            <x-server-workspace-tab icon="heroicon-o-link" :active="! $isCreatingNew" wire:click="setKubernetesSource('existing')">
                                 {{ __('Use existing cluster') }}
                             </x-server-workspace-tab>
-                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="$set('form.do_kubernetes_source', 'new')">
+                            <x-server-workspace-tab icon="heroicon-o-plus" :active="$isCreatingNew" wire:click="setKubernetesSource('new')">
                                 {{ __('Create new') }}
                             </x-server-workspace-tab>
                         </x-server-workspace-tablist>
@@ -299,21 +294,18 @@
 
         {{-- 1. THE CHOICE: stack template (was "preset"). --}}
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.') }}</p>
-                </div>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-cube"
+                :title="__('Pick a stack template')"
+                :note="__('Each template pre-fills the package bundle, machine job, and stack details. Click to choose.')"
+                class="border-b border-brand-ink/10"
+            />
             <div class="relative space-y-5 p-6 sm:p-7">
                 @if ($orgBlueprints->isNotEmpty())
                     <div class="space-y-3">
                         <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Your blueprints') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Your blueprints') }}</p>
                             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Golden-server snapshots saved from ready VMs in your organization.') }}</p>
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -329,7 +321,7 @@
                                         'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md' => $selectedBlueprintId !== $blueprint['id'],
                                     ])
                                 >
-                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700 ring-1 ring-violet-200">{{ __('Blueprint') }}</span>
+                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-violet-700 ring-1 ring-violet-200">{{ __('Blueprint') }}</span>
                                     <span class="text-sm font-semibold text-brand-ink">{{ $blueprint['name'] }}</span>
                                     <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $blueprint['description'] }}</span>
                                     <span
@@ -347,22 +339,33 @@
                     @foreach ($featuredPresets as $preset)
                         <button
                             type="button"
-                            wire:click="applyPreset('{{ $preset['id'] }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="applyPreset"
+                            @if ($preset['available'])
+                                wire:click="applyPreset('{{ $preset['id'] }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="applyPreset"
+                            @else
+                                disabled
+                                aria-disabled="true"
+                                title="{{ __('Coming soon') }}"
+                            @endif
                             @class([
                                 'group relative flex flex-col items-start rounded-2xl border-2 p-5 text-left shadow-sm transition-all disabled:cursor-wait',
-                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
-                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
+                                'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $preset['available'] && $selectedPreset === $preset['id'],
+                                'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $preset['available'] && $selectedPreset !== $preset['id'],
+                                // Coming soon: readable but plainly inert — no hover
+                                // lift, no pointer, muted body copy.
+                                'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $preset['available'],
                             ])
                         >
-                            @if ($preset['id'] === 'polyglot')
-                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-gold ring-1 ring-brand-gold/30">{{ __('Differentiator') }}</span>
+                            @if (! $preset['available'])
+                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                            @elseif ($preset['id'] === 'polyglot')
+                                <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-gold/15 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-gold ring-1 ring-brand-gold/30">{{ __('Differentiator') }}</span>
                             @endif
-                            <span class="text-sm font-semibold text-brand-ink">{{ $preset['name'] }}</span>
-                            <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $preset['description'] }}</span>
-                            @if ($selectedPreset === $preset['id'])
-                                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                            <span @class(['text-sm font-semibold', 'text-brand-ink' => $preset['available'], 'text-brand-moss' => ! $preset['available']])>{{ $preset['name'] }}</span>
+                            <span @class(['mt-1 text-xs leading-5', 'text-brand-moss' => $preset['available'], 'text-brand-mist' => ! $preset['available']])>{{ $preset['description'] }}</span>
+                            @if ($preset['available'] && $selectedPreset === $preset['id'])
+                                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                                     <x-heroicon-m-check class="h-3 w-3" />
                                     {{ __('Picked') }}
                                 </span>
@@ -373,7 +376,7 @@
                             <span
                                 wire:loading
                                 wire:target="applyPreset('{{ $preset['id'] }}')"
-                                class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-[10px] font-semibold text-brand-cream shadow-sm"
+                                class="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-2xs font-semibold text-brand-cream shadow-sm"
                             >
                                 <x-spinner variant="cream" size="sm" />
                                 {{ __('Applying…') }}
@@ -388,21 +391,31 @@
                         @foreach ($otherPresets as $preset)
                             <button
                                 type="button"
-                                wire:click="applyPreset('{{ $preset['id'] }}')"
-                                wire:loading.attr="disabled"
-                                wire:target="applyPreset"
+                                @if ($preset['available'])
+                                    wire:click="applyPreset('{{ $preset['id'] }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="applyPreset"
+                                @else
+                                    disabled
+                                    aria-disabled="true"
+                                    title="{{ __('Coming soon') }}"
+                                @endif
                                 @class([
-                                    'relative flex flex-col items-start rounded-2xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait',
-                                    'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selectedPreset === $preset['id'],
-                                    'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $selectedPreset !== $preset['id'],
+                                    'relative flex flex-col items-start rounded-2xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait',
+                                    'border-brand-sage bg-gradient-to-br from-brand-sage/15 via-brand-sage/5 to-white shadow-brand-sage/15 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $preset['available'] && $selectedPreset === $preset['id'],
+                                    'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md' => $preset['available'] && $selectedPreset !== $preset['id'],
+                                    'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $preset['available'],
                                 ])
                             >
-                                <span class="text-sm font-semibold text-brand-ink">{{ $preset['name'] }}</span>
-                                <span class="mt-1 text-xs leading-5 text-brand-moss">{{ $preset['description'] }}</span>
+                                @unless ($preset['available'])
+                                    <span class="mb-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                                @endunless
+                                <span @class(['text-sm font-semibold', 'text-brand-ink' => $preset['available'], 'text-brand-moss' => ! $preset['available']])>{{ $preset['name'] }}</span>
+                                <span @class(['mt-1 text-xs leading-5', 'text-brand-moss' => $preset['available'], 'text-brand-mist' => ! $preset['available']])>{{ $preset['description'] }}</span>
                                 <span
                                     wire:loading
                                     wire:target="applyPreset('{{ $preset['id'] }}')"
-                                    class="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-[10px] font-semibold text-brand-cream shadow-sm"
+                                    class="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand-ink/85 px-2 py-0.5 text-2xs font-semibold text-brand-cream shadow-sm"
                                 >
                                     <x-spinner variant="cream" size="sm" />
                                     {{ __('Applying…') }}
@@ -434,75 +447,72 @@
              masquerade as a chosen template before any click. --}}
         @if ($selectedPreset !== '')
             <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filled in') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Template filled in') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Override below if needed') }}</p>
-                    </div>
-                </div>
-                <div class="p-6 sm:p-7">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-sparkles"
+                    :title="__('Template filled in')"
+                    :note="__('Override below if needed')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="px-3 py-3 sm:px-4">
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         @if ($selectedInstallProfile)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $selectedInstallProfile['label'] }}</span>
                             </span>
                         @endif
                         @if ($selectedServerRole)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $selectedServerRole['label'] }}</span>
                             </span>
                         @endif
                         @if ($form->webserver)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->webserver }}</span>
                             </span>
                         @endif
                         @if ($form->php_version)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->php_version }}</span>
                             </span>
                         @endif
                         @if ($form->database)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->database }}</span>
                             </span>
                         @endif
                         @if ($form->cache_service)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
                             </span>
                         @endif
                         @if ($form->ruby_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ruby') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Ruby') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->ruby_version }}</span>
                             </span>
                         @endif
                         @if ($form->node_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Node') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Node') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->node_version }}</span>
                             </span>
                         @endif
                         @if ($form->python_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Python') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Python') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->python_version }}</span>
                             </span>
                         @endif
                         @if ($form->go_version !== '')
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Go') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Go') }}</span>
                                 <span class="font-medium text-brand-ink">{{ $form->go_version }}</span>
                             </span>
                         @endif
@@ -514,17 +524,14 @@
         {{-- 2b. OPERATING SYSTEM: only for provider-provisioned VMs (catalog-backed). --}}
         @if ($showOsImagePicker)
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Operating system') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Choose an OS image') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.') }}</p>
-                </div>
-            </div>
-            <div class="p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-server-stack"
+                :title="__('Choose an OS image')"
+                :note="__('The base image the VM boots from. Ubuntu LTS is the dply default — pick Debian or an older Ubuntu if your app needs it.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-3 py-3 sm:px-4">
                 <div class="sm:max-w-md">
                     @include('livewire.servers.create._rich-select', [
                         'id' => 'os_image',
@@ -550,24 +557,20 @@
             >
                 <summary
                     x-on:click.prevent="open = ! open"
-                    class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7"
+                    class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4"
                 >
-                    <x-icon-badge>
-                        <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overrides') }}</p>
-                        <div class="flex items-baseline justify-between gap-3">
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Override the template') }}</h3>
-                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                        </div>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
-                    </div>
+                    <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                        {{ __('Override the template') }}
+                    </h3>
+                    <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                    <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('Pick a different package bundle, change the machine\'s job, or swap individual stack components. Most setups don\'t need this.') }}</p>
+                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
 
-                <div class="space-y-6 p-6 sm:p-7">
+                <div class="space-y-3.5 px-4 py-3.5 sm:px-5">
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('High-level controls') }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ __('Profile bundles a default package set; role narrows what actually installs (web vs db node vs LB).') }}</p>
                         <div class="mt-3 grid gap-4 sm:grid-cols-2">
                             @include('livewire.servers.create._rich-select', [
@@ -622,7 +625,7 @@
 
                     @if ($hasComponents)
                         <div class="border-t border-brand-ink/10 pt-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Individual stack components') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Individual stack components') }}</p>
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Swap a single piece (e.g. switch from Nginx to Caddy) without leaving the bundle.') }}</p>
                             <div class="mt-3 grid gap-4 sm:grid-cols-2">
                                 @if ($showWebserver)
@@ -671,7 +674,7 @@
 
                     @if ($hasRuntimes)
                         <div class="border-t border-brand-ink/10 pt-6">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Language runtimes') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Language runtimes') }}</p>
                             <p class="mt-1 text-xs text-brand-mist">{{ __('Templates pre-fill these (Rails → Ruby, Next.js → Node, etc.); pick "Not installed" to drop one.') }}</p>
                             <div class="mt-3 grid gap-4 sm:grid-cols-2">
                                 @if ($showRuby)
@@ -776,10 +779,10 @@
       </div>
 
       {{-- Sidebar: explain the new vocabulary so the user gets it. --}}
-      <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+      <aside class="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                     <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('Cluster + namespace') }}
                 </p>
@@ -797,7 +800,7 @@
         @else
             @if ($isDedicatedServerPurpose ?? false)
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                    <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                         <x-heroicon-m-academic-cap class="h-4 w-4" />
                         {{ __('Dedicated server') }}
                     </p>
@@ -807,7 +810,7 @@
                 </div>
             @else
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                     <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('How these fit together') }}
                 </p>
@@ -830,7 +833,7 @@
 
             @if ($selectedServerRole && ! empty($selectedServerRole['installs']) && is_array($selectedServerRole['installs']))
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ __('Will install') }}</p>
                     <p class="mt-1 text-xs text-brand-mist">{{ __('From your current job choice') }}</p>
                     <ul class="mt-2 space-y-1 text-xs text-brand-moss">
                         @foreach (array_slice($selectedServerRole['installs'], 0, 6) as $item)

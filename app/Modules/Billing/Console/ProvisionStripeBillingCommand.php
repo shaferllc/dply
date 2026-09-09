@@ -104,15 +104,6 @@ class ProvisionStripeBillingCommand extends Command
                 $annualPct,
             ));
         }
-        $serverless = (int) ($standard['serverless_cents'] ?? 0);
-        if ($serverless > 0) {
-            $this->line('  Product: dply serverless function');
-            $this->line(sprintf(
-                '    Per function $%s/mo   $%s/yr',
-                number_format($serverless / 100, 2),
-                number_format($yearlyOf($serverless) / 100, 2),
-            ));
-        }
         $cloud = (int) ($standard['cloud_cents'] ?? 0);
         if ($cloud > 0) {
             $this->line('  Product: dply Cloud app');

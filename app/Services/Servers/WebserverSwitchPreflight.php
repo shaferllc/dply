@@ -37,14 +37,6 @@ final class WebserverSwitchPreflight
     ];
 
     /**
-     * Webservers that proxy to PHP-FPM via FastCGI. Sites on FPM stay put when
-     * switching among these — the new webserver just rewires its upstream.
-     *
-     * @var list<string>
-     */
-    private const FPM_COMPATIBLE = ['nginx', 'caddy', 'apache'];
-
-    /**
      * Per-instance memo of plan() results keyed by `{server_id}|{target}`.
      * Why: the webserver picker blade calls isBlocked()/plan() once per known
      * webserver across multiple loops in a single render — without this each
@@ -90,7 +82,6 @@ final class WebserverSwitchPreflight
      *   drift_sites: list<array{id: string, name: string, reason: string}>,
      * }
      */
-    /** @return array<string, mixed> */
     public function plan(Server $server, string $target): array
     {
         $cacheKey = $server->id.'|'.strtolower(trim($target));

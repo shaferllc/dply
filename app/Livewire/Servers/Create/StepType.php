@@ -21,6 +21,32 @@ class StepType extends Component
 {
     use InteractsWithServerCreateDraft;
 
+    /**
+     * "Scan & import existing" is switched off in config/server_create.php: the
+     * tile renders as a disabled "Coming soon" card, the action refuses, and
+     * the mode drops out of the accepted values so a stale draft can't walk
+     * into the scan step either.
+     *
+     * {@see StepScan} is untouched and still works
+     * the moment the switch flips back.
+     */
+    public static function importModeEnabled(): bool
+    {
+        return (bool) config('server_create.import_mode_enabled', true);
+    }
+
+    /**
+     * Server-create modes on offer right now.
+     *
+     * @return list<string>
+     */
+    public static function availableModes(): array
+    {
+        return self::importModeEnabled()
+            ? ['provider', 'custom', 'import']
+            : ['provider', 'custom'];
+    }
+
     public ServerCreateForm $form;
 
     public ?string $launchSource = null;
@@ -55,12 +81,18 @@ class StepType extends Component
 
         $this->hydrateFormFromDraft($this->form, $draft);
 
+        // A draft saved while a mode was still on the menu must not strand the
+        // operator on a step whose only selection is now refused.
+        if (! in_array($this->form->mode, self::availableModes(), true)) {
+            $this->form->mode = 'provider';
+        }
+
         if ($draft === null) {
             // Defaults for a brand-new draft.
             if ($this->form->name === '') {
                 $this->form->name = ServerNameGenerator::generate();
             }
-            if ($this->form->mode === '' || ! in_array($this->form->mode, ['provider', 'custom'], true)) {
+            if ($this->form->mode === '' || ! in_array($this->form->mode, self::availableModes(), true)) {
                 $this->form->mode = 'provider';
             }
 
@@ -183,14 +215,38 @@ class StepType extends Component
         $this->form->type = 'custom';
     }
 
+    /**
+     * Adopt a machine that already exists on a provider account. Like custom
+     * mode in that dply doesn't create the VM, but the name, address, region
+     * and size come from the provider API instead of being typed in.
+     */
+    public function chooseImportMode(): void
+    {
+        // The tile is rendered disabled while import is off, but wire:click is
+        // still reachable — refuse here rather than trusting the markup.
+        if (! self::importModeEnabled()) {
+            return;
+        }
+
+        $this->form->mode = 'import';
+        // The provider is chosen on the scan step, alongside the credential.
+        if ($this->form->type === 'custom') {
+            $this->form->type = '';
+        }
+    }
+
     public function next(): mixed
     {
         $this->authorize('create', Server::class);
 
-        $this->validate([
-            'form.mode' => ['required', Rule::in(['provider', 'custom'])],
-            'form.name' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'],
-        ], attributes: [
+        // Import mode adopts the provider's own name, so there is nothing to
+        // validate here — the name field isn't even shown.
+        $rules = ['form.mode' => ['required', Rule::in(self::availableModes())]];
+        if ($this->form->mode !== 'import') {
+            $rules['form.name'] = ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._-]+$/'];
+        }
+
+        $this->validate($rules, attributes: [
             'form.mode' => __('server type'),
             'form.name' => __('server name'),
         ]);
@@ -199,10 +255,18 @@ class StepType extends Component
             $this->form->type = 'custom';
         }
 
+        // Import mode leaves the draft wizard here: the remaining steps ask
+        // what to build, and there is nothing to build — the machine exists.
+        if ($this->form->mode === 'import') {
+            $this->saveDraftFromForm($this->form, advanceTo: 1);
+
+            return $this->redirect(route('servers.create.scan'), navigate: true);
+        }
+
         $draft = $this->saveDraftFromForm($this->form, advanceTo: 2);
 
         // Stash the migration source on the draft so it survives subsequent steps.
-        $payload = is_array($draft->payload) ? $draft->payload : [];
+        $payload = $draft->payload;
         $payloadChanged = false;
         if ($this->migrationSourcePloiServerId !== null) {
             $payload['_ploi_migration_source_id'] = $this->migrationSourcePloiServerId;

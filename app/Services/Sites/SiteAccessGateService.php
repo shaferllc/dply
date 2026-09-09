@@ -186,7 +186,7 @@ final class SiteAccessGateService
         }
 
         $hostnames = collect($site->webserverHostnames())
-            ->filter(fn ($h): bool => ($h) && $h !== '')
+            ->filter()
             ->map(fn (string $h): string => strtolower($h))
             ->unique()
             ->values()

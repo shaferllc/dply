@@ -71,7 +71,7 @@ trait ManagesSiteAliases
         $this->new_alias_label = '';
         $this->new_alias_comment = '';
         $this->site->load('domainAliases');
-        $this->finalizeRoutingMutation('Alias added.');
+        $this->finalizeRoutingMutation('Alias added.', closeModal: 'add-alias-modal');
     }
 
     public function confirmRemoveAlias(string $aliasId): void
@@ -168,7 +168,7 @@ trait ManagesSiteAliases
                 continue;
             }
             $parts = array_map('trim', explode(',', $line, 2));
-            $hostname = strtolower($parts[0] ?? '');
+            $hostname = strtolower($parts[0]);
             $label = $parts[1] ?? null;
             if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
                 $this->addError('bulk_alias_input', sprintf('Line %d: "%s" is not a valid hostname.', $i + 1, $hostname));
@@ -207,6 +207,6 @@ trait ManagesSiteAliases
 
         $this->bulk_alias_input = '';
         $this->site->load('domainAliases');
-        $this->finalizeRoutingMutation(__(':count alias(es) imported.', ['count' => $imported]));
+        $this->finalizeRoutingMutation(__(':count alias(es) imported.', ['count' => $imported]), closeModal: 'add-alias-modal');
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\AuditLog;
 use App\Models\User;
@@ -106,7 +106,7 @@ class Operations extends Component
                     foreach ($logs as $log) {
                         fputcsv($out, [
                             $log->id,
-                            $log->created_at?->toIso8601String(),
+                            $log->created_at->toIso8601String(),
                             $log->action,
                             $log->user?->email,
                             $log->organization?->name,
@@ -143,7 +143,7 @@ class Operations extends Component
                             $u->name,
                             $u->email,
                             $u->email_verified_at?->toIso8601String(),
-                            $u->created_at?->toIso8601String(),
+                            $u->created_at->toIso8601String(),
                             $u->two_factor_confirmed_at?->toIso8601String(),
                         ]);
                     }

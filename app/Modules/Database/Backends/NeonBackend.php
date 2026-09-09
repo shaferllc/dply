@@ -6,6 +6,8 @@ namespace App\Modules\Database\Backends;
 
 use App\Models\CloudDatabase;
 use App\Models\Server;
+use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
+use App\Modules\Database\Backends\Concerns\SupportsNoManagedOperations;
 use App\Modules\Database\Services\NeonService;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -21,6 +23,9 @@ use RuntimeException;
  */
 class NeonBackend implements DatabaseBackend
 {
+    use CannotResizeManagedDatabase;
+    use SupportsNoManagedOperations;
+
     public function key(): string
     {
         return CloudDatabase::BACKEND_NEON;
@@ -58,7 +63,7 @@ class NeonBackend implements DatabaseBackend
 
         $database->forceFill([
             'backend_id' => (string) $result['id'],
-            'connection' => is_array($result['connection']) ? $result['connection'] : [],
+            'connection' => $result['connection'],
         ])->save();
     }
 

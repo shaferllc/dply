@@ -20,8 +20,8 @@
 @endphp
 
 
-<div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-<x-server-workspace-tablist :aria-label="__('Routing sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+<div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+<x-server-workspace-tablist :aria-label="__('Routing sections')" scroll bare class="!mb-0 w-full">
     @foreach ($routingTabs as $tab)
         <x-server-workspace-tab
             as="a"
@@ -30,7 +30,7 @@
             :icon="$routingTabIcons[$tab] ?? 'heroicon-o-share'"
             href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => $tab]) }}"
             wire:navigate
-        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
+        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-3xs font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
 </div>
@@ -40,30 +40,19 @@
 
     {{-- Domains: slim header card with count pill + Add CTA --}}
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domains') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Customer-facing hostnames. Aliases, redirects, preview, and tenant domains live in their own tabs so routing intent stays explicit.') }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no domains|{1} :count domain|[2,*] :count domains', $domainCount, ['count' => $domainCount]) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" x-on:click="$dispatch('open-modal', 'add-domain-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-4 w-4" />
+        <x-workspace-panel-head
+            icon="heroicon-o-globe-alt"
+            :title="__('Domains')"
+            :count="trans_choice('{0} no domains|{1} :count domain|[2,*] :count domains', $domainCount, ['count' => $domainCount])"
+            :note="__('Customer-facing hostnames. Aliases, redirects, preview, and tenant domains live in their own tabs so routing intent stays explicit.')"
+        >
+            <x-slot:actions>
+                <button type="button" x-on:click="$dispatch('open-modal', 'add-domain-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add domain') }}
                 </button>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
     </div>
 
     {{-- Add modal: single hostname + comment, plus bulk-paste disclosure --}}
@@ -84,6 +73,13 @@
                     <x-text-input id="new_domain_hostname" wire:model="new_domain_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="www.example.com" />
                     <x-input-error :messages="$errors->get('new_domain_hostname')" class="mt-1" />
                 </div>
+                <label for="new_domain_with_www" class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
+                    <input id="new_domain_with_www" type="checkbox" wire:model="new_domain_with_www" class="mt-0.5 h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40" />
+                    <span class="text-sm leading-5 text-brand-ink">
+                        {{ __('Also serve www') }}
+                        <span class="mt-0.5 block text-xs leading-5 text-brand-moss">{{ __('Adds the www alias too, so it gets a vhost entry, a certificate and an A record. Untick for a subdomain like api.example.com.') }}</span>
+                    </span>
+                </label>
                 <div>
                     <x-input-label for="new_domain_comment" :value="__('Comment (optional)')" />
                     <textarea id="new_domain_comment" wire:model="new_domain_comment" rows="2" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="{{ __('e.g. EU CDN — primary marketing domain') }}"></textarea>
@@ -136,21 +132,21 @@
     @endphp
     @if ($testingZone)
         <div class="{{ $card }}">
-            <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $wildcardInstalled ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-amber-50 text-amber-700 ring-amber-200/70' }}">
+            <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 py-3.5 sm:px-6">
+                <div class="flex min-w-0 items-start gap-2.5">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ring-1 {{ $wildcardInstalled ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-amber-50 text-amber-700 ring-amber-200/70' }}">
                         <x-heroicon-o-shield-check class="h-4 w-4" />
                     </span>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed testing host') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed testing host') }}</p>
                         <p class="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-sm font-semibold text-brand-ink">
                             <span>{{ $testingHost ?? '*.'.$testingZone }}</span>
                             @if ($wildcardInstalled)
-                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('TLS active') }}</span>
+                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('TLS active') }}</span>
                             @elseif ($wildcard)
-                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('Wildcard :status', ['status' => $wildcard->status]) }}</span>
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('Wildcard :status', ['status' => $wildcard->status]) }}</span>
                             @else
-                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('No wildcard yet') }}</span>
+                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('No wildcard yet') }}</span>
                             @endif
                         </p>
                         <p class="mt-1 text-xs leading-relaxed text-brand-moss">
@@ -165,17 +161,19 @@
                             </p>
                         @endunless
                         @if ($wildcard && trim((string) $wildcard->last_output) !== '')
-                            <details class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                <summary class="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last issuance output') }}</summary>
-                                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] leading-relaxed text-brand-ink">{{ $wildcard->last_output }}</pre>
+                            {{-- w-fit so a collapsed disclosure doesn't read as an
+                                 empty full-width field. --}}
+                            <details class="mt-2 w-fit max-w-full rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5">
+                                <summary class="cursor-pointer list-none text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last issuance output') }}</summary>
+                                <pre class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs leading-relaxed text-brand-ink">{{ $wildcard->last_output }}</pre>
                             </details>
                         @endif
                     </div>
                 </div>
                 @can('update', $site)
                     <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <button type="button" wire:click="reissueTestingWildcard" wire:loading.attr="disabled" wire:target="reissueTestingWildcard" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="reissueTestingWildcard" />
+                        <button type="button" wire:click="reissueTestingWildcard" wire:loading.attr="disabled" wire:target="reissueTestingWildcard" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="reissueTestingWildcard" />
                             <span wire:loading.remove wire:target="reissueTestingWildcard">{{ $wildcard ? __('Reissue TLS') : __('Issue TLS') }}</span>
                             <span wire:loading wire:target="reissueTestingWildcard">{{ __('Queuing…') }}</span>
                         </button>
@@ -188,8 +186,8 @@
     {{-- Domains list --}}
     <div class="{{ $card }}">
         @if ($domainCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-globe-alt class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-globe-alt class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No domains yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above so the webserver knows where to listen.') }}</p>
             </div>
@@ -204,7 +202,7 @@
                         $behindCloudflare = ! $hasSsl && $domain->is_primary && $site->cloudflareTerminatesTls();
                         $isEditing = $editing_domain_id === (string) $domain->id;
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="domain-row-{{ $domain->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="domain-row-{{ $domain->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedDomain" class="space-y-3">
                                 <div class="flex flex-wrap items-end gap-3">
@@ -229,39 +227,75 @@
                             </form>
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
+                                {{-- No per-row globe badge: every row in this list is a
+                                     domain, so the icon carried no information. --}}
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-globe-alt class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $domain->hostname }}</span>
                                             @if ($domain->is_primary)
-                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
+                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
                                             @endif
                                             @if ($hasSsl)
-                                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
+                                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
                                             @elseif ($behindCloudflare)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70" title="{{ __('Cloudflare terminates HTTPS at its edge for this hostname — an origin certificate here is optional.') }}">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-sky-800 ring-1 ring-inset ring-sky-200/70" title="{{ __('Cloudflare terminates HTTPS at its edge for this hostname — an origin certificate here is optional.') }}">
                                                     <x-heroicon-o-cloud class="h-3 w-3" aria-hidden="true" /> {{ __('Cloudflare edge') }}
                                                 </span>
                                             @else
-                                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
+                                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
                                             @endif
                                         </p>
                                         @if ($domain->comment)
-                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $domain->comment }}</p>
+                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $domain->comment }}</p>
+                                        @endif
+                                        {{-- The record to create at the DNS host. Static (no live
+                                             lookup) so it renders on first paint; the "is it actually
+                                             pointing here" answer lives on the DNS tab. Without this
+                                             a freshly added domain gave no hint of what to do next
+                                             unless you knew to go looking on another tab. --}}
+                                        @php
+                                            $dnsHint = $this->dnsRecordHintFor($domain->hostname);
+                                        @endphp
+                                        @if ($dnsHint)
+                                            <details class="mt-1.5 w-fit max-w-full rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-2.5 py-1.5">
+                                                <summary class="cursor-pointer list-none text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DNS record') }}</summary>
+                                                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-brand-ink">
+                                                    <span><span class="text-brand-mist">{{ __('Type') }}</span> {{ $dnsHint['type'] }}</span>
+                                                    <span><span class="text-brand-mist">{{ __('Name') }}</span> {{ $dnsHint['name'] }}</span>
+                                                    <span
+                                                        x-data="{ copied: false, async copyVal() { try { await navigator.clipboard.writeText(@js($dnsHint['value'])); this.copied = true; setTimeout(() => this.copied = false, 1400); } catch (e) {} } }"
+                                                        class="inline-flex items-center gap-1.5"
+                                                    >
+                                                        <span class="text-brand-mist">{{ __('Value') }}</span> {{ $dnsHint['value'] }}
+                                                        <button type="button" x-on:click="copyVal()" class="text-2xs font-semibold uppercase tracking-wide text-brand-sage hover:text-brand-forest">
+                                                            <span x-show="! copied">{{ __('Copy') }}</span>
+                                                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                        </button>
+                                                    </span>
+                                                </div>
+                                                <p class="mt-1.5 font-sans text-2xs leading-relaxed text-brand-moss">
+                                                    @if ($dnsHint['zone'] !== '')
+                                                        {{ __('Add this at whoever hosts :zone.', ['zone' => $dnsHint['zone']]) }}
+                                                    @else
+                                                        {{ __('Add this at whoever hosts the domain — use the full hostname if the form wants an FQDN.') }}
+                                                    @endif
+                                                    @unless ($dnsHint['apex'])
+                                                        {{ __('A CNAME to the testing host works too; an A record is simpler.') }}
+                                                    @endunless
+                                                </p>
+                                            </details>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
-                                        <button type="button" wire:click="openQuickDomainSslModal('{{ $domain->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openQuickDomainSslModal('{{ $domain->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
-                                    <button type="button" wire:click="editDomain('{{ $domain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <button type="button" wire:click="editDomain('{{ $domain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
@@ -279,7 +313,7 @@
         @endif
     </div>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:domains:add '.$site->slug.' new.example.com --primary'],
         ['label' => __('Remove'), 'command' => 'dply sites:domains:remove '.$site->slug.' old.example.com'],
@@ -315,30 +349,19 @@
     @php $aliasCount = $site->domainAliases->count(); @endphp
 
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domain aliases') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Aliases extend the webserver server_name list. They are not redirects and not automatically primary customer domains.') }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no aliases|{1} :count alias|[2,*] :count aliases', $aliasCount, ['count' => $aliasCount]) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" x-on:click="$dispatch('open-modal', 'add-alias-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-4 w-4" />
+        <x-workspace-panel-head
+            icon="heroicon-o-link"
+            :title="__('Domain aliases')"
+            :count="trans_choice('{0} no aliases|{1} :count alias|[2,*] :count aliases', $aliasCount, ['count' => $aliasCount])"
+            :note="__('Aliases extend the webserver server_name list. They are not redirects and not automatically primary customer domains.')"
+        >
+            <x-slot:actions>
+                <button type="button" x-on:click="$dispatch('open-modal', 'add-alias-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add alias') }}
                 </button>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
     </div>
 
     <x-modal name="add-alias-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
@@ -421,8 +444,8 @@
 
     <div class="{{ $card }}">
         @if ($aliasCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-link class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No aliases yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above to extend the webserver server_name list.') }}</p>
             </div>
@@ -433,7 +456,7 @@
                         $hasSsl = $coversWithSsl($alias->hostname);
                         $isEditing = $editing_alias_id === (string) $alias->id;
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="alias-row-{{ $alias->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="alias-row-{{ $alias->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedAlias" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-2">
@@ -462,34 +485,31 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-link class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $alias->hostname }}</span>
                                             @if ($alias->label)
-                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $alias->label }}</span>
+                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $alias->label }}</span>
                                             @endif
                                             @if ($hasSsl)
-                                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
+                                                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-inset ring-emerald-200/70">{{ __('SSL configured') }}</span>
                                             @else
-                                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
+                                                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-amber-900 ring-1 ring-inset ring-amber-200/70">{{ __('SSL missing') }}</span>
                                             @endif
                                         </p>
                                         @if ($alias->comment)
-                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $alias->comment }}</p>
+                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $alias->comment }}</p>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
-                                        <button type="button" wire:click="openQuickDomainSslModal('{{ $alias->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <button type="button" wire:click="openQuickDomainSslModal('{{ $alias->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
-                                    <button type="button" wire:click="editAlias('{{ $alias->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <button type="button" wire:click="editAlias('{{ $alias->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
@@ -505,7 +525,7 @@
         @endif
     </div>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:aliases:add '.$site->slug.' alt.example.com --label=Marketing'],
         ['label' => __('Remove'), 'command' => 'dply sites:aliases:remove '.$site->slug.' alt.example.com'],
@@ -537,30 +557,19 @@
     @php $redirectCount = $site->redirects->count(); @endphp
 
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-arrow-uturn-right class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Redirects') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('HTTP 3xx redirects (browser-visible) and internal rewrites (transparent path remap). Bulk-paste accepts CSV-style rows for the HTTP variant.') }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no rules|{1} :count rule|[2,*] :count rules', $redirectCount, ['count' => $redirectCount]) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" x-on:click="$dispatch('open-modal', 'add-redirect-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-4 w-4" />
+        <x-workspace-panel-head
+            icon="heroicon-o-arrow-uturn-right"
+            :title="__('Redirects')"
+            :count="trans_choice('{0} no rules|{1} :count rule|[2,*] :count rules', $redirectCount, ['count' => $redirectCount])"
+            :note="__('HTTP 3xx redirects (browser-visible) and internal rewrites (transparent path remap). Bulk-paste accepts CSV-style rows for the HTTP variant.')"
+        >
+            <x-slot:actions>
+                <button type="button" x-on:click="$dispatch('open-modal', 'add-redirect-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add redirect') }}
                 </button>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
     </div>
 
     <x-modal name="add-redirect-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
@@ -680,8 +689,8 @@
 
     <div class="{{ $card }}">
         @if ($redirectCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-arrow-uturn-right class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No redirects yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above or paste a list via Bulk import.') }}</p>
             </div>
@@ -693,7 +702,7 @@
                         $isInternal = $redirect->kind === \App\Enums\SiteRedirectKind::InternalRewrite;
                         $headerCount = is_array($redirect->response_headers) ? count($redirect->response_headers) : 0;
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="redirect-row-{{ $redirect->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="redirect-row-{{ $redirect->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedRedirect" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-[10rem_1fr_1fr_8rem]">
@@ -772,30 +781,27 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-arrow-uturn-right class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 break-all font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $redirect->from_path }}</span>
                                             <x-heroicon-m-arrow-right class="h-3.5 w-3.5 text-brand-mist" />
                                             <span>{{ $redirect->to_url }}</span>
                                             @if ($isInternal)
-                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Rewrite') }}</span>
+                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Rewrite') }}</span>
                                             @else
-                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $redirect->status_code }}</span>
+                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ $redirect->status_code }}</span>
                                                 @if ($headerCount > 0)
-                                                    <span class="text-[10px] text-brand-mist">{{ trans_choice('{1} :count header|[2,*] :count headers', $headerCount, ['count' => $headerCount]) }}</span>
+                                                    <span class="text-2xs text-brand-mist">{{ trans_choice('{1} :count header|[2,*] :count headers', $headerCount, ['count' => $headerCount]) }}</span>
                                                 @endif
                                             @endif
                                         </p>
                                         @if ($redirect->comment)
-                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $redirect->comment }}</p>
+                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $redirect->comment }}</p>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
-                                    <button type="button" wire:click="editRedirect('{{ $redirect->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <button type="button" wire:click="editRedirect('{{ $redirect->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
@@ -811,7 +817,7 @@
         @endif
     </div>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Add'), 'command' => 'dply sites:redirects:add '.$site->slug.' /old /new --code=301'],
         ['label' => __('Remove'), 'command' => 'dply sites:redirects:remove '.$site->slug.' /old'],
@@ -852,42 +858,31 @@
     @endphp
 
     <div class="{{ $card }}" x-data="{ addOpen: false }">
-        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview URLs') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Shareable, auto-SSL hostnames that point at this live site — hand out a working link before the real domain’s DNS is live. dply provisions the DNS and certificate for each one.') }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no preview URLs|{1} :count URL|[2,*] :count URLs', $previewCount, ['count' => $previewCount]) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            @can('update', $site)
-                @if ($this->canAddManagedPreview())
-                    <div class="flex shrink-0 items-center">
+        <x-workspace-panel-head
+            icon="heroicon-o-eye"
+            :title="__('Preview URLs')"
+            :count="trans_choice('{0} no preview URLs|{1} :count URL|[2,*] :count URLs', $previewCount, ['count' => $previewCount])"
+            :note="__('Shareable, auto-SSL hostnames that point at this live site — hand out a working link before the real domain’s DNS is live. dply provisions the DNS and certificate for each one.')"
+        >
+            <x-slot:actions>
+                @can('update', $site)
+                    @if ($this->canAddManagedPreview())
                         <button type="button" x-on:click="addOpen = ! addOpen"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
                             title="{{ __('Provision another dply-managed preview URL (DNS + auto-SSL).') }}">
-                            <x-heroicon-o-plus class="h-4 w-4 transition-transform" x-bind:class="addOpen && 'rotate-45'" />
+                            <x-heroicon-o-plus class="h-3.5 w-3.5 transition-transform" x-bind:class="addOpen && 'rotate-45'" />
                             {{ __('Add preview URL') }}
                         </button>
-                    </div>
-                @endif
-            @endcan
-        </div>
+                    @endif
+                @endcan
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
         {{-- Inline expansion (not a floating popover) so the card's overflow-hidden
              doesn't clip it; the card just grows when open. --}}
         @can('update', $site)
             @if ($this->canAddManagedPreview())
-                <div x-show="addOpen" x-cloak class="flex flex-col gap-3 border-t border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-end sm:px-7">
+                <div x-show="addOpen" x-cloak class="flex flex-col gap-2 border-t border-brand-ink/10 px-5 py-3 sm:flex-row sm:items-end sm:px-6">
                     <div class="min-w-0 flex-1">
                         <x-input-label for="new_preview_label" :value="__('Label (optional)')" />
                         <input id="new_preview_label" type="text" wire:model="newPreviewLabel" maxlength="255" placeholder="{{ __('e.g. Client review') }}" class="dply-input mt-1 w-full text-sm" />
@@ -903,13 +898,13 @@
     </div>
 
     <div class="{{ $card }}">
-        <form wire:submit="savePreviewSettings" class="space-y-5 px-6 py-6 sm:px-8">
-            <div class="grid gap-4 sm:grid-cols-2">
+        <form wire:submit="savePreviewSettings" class="space-y-3 px-5 py-4 sm:px-6">
+            <div class="grid gap-3 sm:grid-cols-2">
                 <div>
                     <x-input-label for="preview_primary_hostname" :value="__('Primary preview hostname')" />
                     @if ($this->previewHostnameLocked())
                         <x-text-input id="preview_primary_hostname" :value="$preview_primary_hostname" readonly class="mt-1 block w-full cursor-not-allowed bg-brand-sand/20 font-mono text-sm text-brand-moss" />
-                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Auto-provisioned managed hostname — DNS and the certificate are tied to this exact name, so it can’t be renamed here.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Auto-provisioned managed hostname — DNS and the certificate are tied to this exact name, so it can’t be renamed here.') }}</p>
                     @else
                         <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
                     @endif
@@ -922,12 +917,12 @@
                 </div>
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
-                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="preview_auto_ssl" class="mt-1 rounded border-slate-300" />
+                <label class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 px-3 py-2 text-xs text-brand-ink">
+                    <input type="checkbox" wire:model="preview_auto_ssl" class="mt-0.5 rounded border-slate-300" />
                     <span>{{ __('Automatically request SSL once the preview domain is reachable.') }}</span>
                 </label>
-                <label class="flex items-start gap-3 rounded-xl border border-brand-ink/10 p-4 text-sm text-brand-ink">
-                    <input type="checkbox" wire:model="preview_https_redirect" class="mt-1 rounded border-slate-300" />
+                <label class="flex items-start gap-2.5 rounded-lg border border-brand-ink/10 px-3 py-2 text-xs text-brand-ink">
+                    <input type="checkbox" wire:model="preview_https_redirect" class="mt-0.5 rounded border-slate-300" />
                     <span>{{ __('Redirect preview traffic to HTTPS once a preview certificate is active.') }}</span>
                 </label>
             </div>
@@ -940,9 +935,9 @@
         </form>
 
         @if ($previewCount > 0)
-            <div class="border-t border-brand-ink/10 px-6 py-5 sm:px-8">
-                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
-                <ul class="mt-3 space-y-2">
+            <div class="border-t border-brand-ink/10 px-5 py-4 sm:px-6">
+                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Known preview hosts') }}</p>
+                <ul class="mt-2 space-y-1.5">
                     @foreach ($site->previewDomains as $previewDomain)
                         @php
                             $pdOnWildcard = $previewDomain->managed_by_dply
@@ -964,18 +959,18 @@
                                 };
                             }
                         @endphp
-                        <li class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 px-4 py-3">
+                        <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-ink/10 px-3 py-2">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="truncate font-mono text-sm text-brand-ink">{{ $previewDomain->hostname }}</span>
                                     @if ($previewDomain->is_primary)
-                                        <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
+                                        <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Primary') }}</span>
                                     @endif
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $pdSsl['cls'] }}" @if ($pdCert?->status === \App\Models\SiteCertificate::STATUS_FAILED) title="{{ \Illuminate\Support\Str::limit((string) $pdCert->last_output, 240) }}" @endif>
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $pdSsl['cls'] }}" @if ($pdCert?->status === \App\Models\SiteCertificate::STATUS_FAILED) title="{{ \Illuminate\Support\Str::limit((string) $pdCert->last_output, 240) }}" @endif>
                                         <x-dynamic-component :component="$pdSsl['icon']" class="h-3 w-3" /> {{ $pdSsl['label'] }}
                                     </span>
                                 </div>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">{{ $previewDomain->label ? $previewDomain->label.' · ' : '' }}{{ __('DNS: :dns', ['dns' => $previewDomain->dns_status]) }}</p>
+                                <p class="mt-0.5 text-xs text-brand-moss">{{ $previewDomain->label ? $previewDomain->label.' · ' : '' }}{{ __('DNS: :dns', ['dns' => $previewDomain->dns_status]) }}</p>
                             </div>
                             @if (! $previewDomain->is_primary)
                                 <button type="button" wire:click="confirmRemovePreviewDomain('{{ $previewDomain->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -989,7 +984,7 @@
         @endif
     </div>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
         ['label' => __('Set preview'), 'command' => 'dply sites:preview:set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
         ['label' => __('Remove preview'), 'command' => 'dply sites:preview:remove '.$site->slug.' preview.example.dply.cc'],
@@ -1035,30 +1030,19 @@
     @endphp
 
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
-            <div class="flex min-w-0 items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Tenants') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Tenant domains') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Multi-tenant hostnames published at the webserver. Your application is responsible for resolving the tenant from the hostname or tenant key.') }}</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                        <span class="inline-flex items-center gap-1">
-                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                            {{ trans_choice('{0} no tenants|{1} :count tenant|[2,*] :count tenants', $tenantCount, ['count' => $tenantCount]) }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" x-on:click="$dispatch('open-modal', 'add-tenant-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-4 w-4" />
+        <x-workspace-panel-head
+            icon="heroicon-o-building-office-2"
+            :title="__('Tenant domains')"
+            :count="trans_choice('{0} no tenants|{1} :count tenant|[2,*] :count tenants', $tenantCount, ['count' => $tenantCount])"
+            :note="__('Multi-tenant hostnames published at the webserver. Your application is responsible for resolving the tenant from the hostname or tenant key.')"
+        >
+            <x-slot:actions>
+                <button type="button" x-on:click="$dispatch('open-modal', 'add-tenant-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add tenant') }}
                 </button>
-            </div>
-        </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
     </div>
 
     <x-modal name="add-tenant-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
@@ -1147,8 +1131,8 @@
 
     <div class="{{ $card }}">
         @if ($tenantCount === 0)
-            <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
-                <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-6 w-6" /></span>
+            <div class="flex flex-col items-center justify-center gap-1.5 px-5 py-8 text-center sm:px-6">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-building-office-2 class="h-5 w-5" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('No tenant domains yet.') }}</p>
                 <p class="text-xs text-brand-moss">{{ __('Add one above or paste a list via Bulk import.') }}</p>
             </div>
@@ -1165,7 +1149,7 @@
                             default => ['label' => __('SSL missing'), 'cls' => 'bg-amber-50 text-amber-900 ring-amber-200/70', 'icon' => 'heroicon-o-lock-open'],
                         };
                     @endphp
-                    <li class="px-6 py-3 sm:px-8" wire:key="tenant-row-{{ $tenantDomain->id }}">
+                    <li class="px-5 py-2.5 sm:px-6" wire:key="tenant-row-{{ $tenantDomain->id }}">
                         @if ($isEditing)
                             <form wire:submit="saveEditedTenantDomain" class="space-y-3">
                                 <div class="grid gap-3 sm:grid-cols-2">
@@ -1198,32 +1182,29 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
-                                        <x-heroicon-o-building-office-2 class="h-4 w-4" />
-                                    </span>
                                     <div class="min-w-0">
                                         <p class="flex flex-wrap items-center gap-2 truncate font-mono text-sm font-semibold text-brand-ink">
                                             <span>{{ $tenantDomain->hostname }}</span>
-                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $tSsl['cls'] }}">
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $tSsl['cls'] }}">
                                                 <x-dynamic-component :component="$tSsl['icon']" class="h-3 w-3" /> {{ $tSsl['label'] }}
                                             </span>
                                             @if ($tenantDomain->tenant_key)
-                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('key: :key', ['key' => $tenantDomain->tenant_key]) }}</span>
+                                                <span class="rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('key: :key', ['key' => $tenantDomain->tenant_key]) }}</span>
                                             @endif
                                             @if ($tenantDomain->label)
-                                                <span class="text-[11px] font-normal text-brand-mist">· {{ $tenantDomain->label }}</span>
+                                                <span class="text-xs font-normal text-brand-mist">· {{ $tenantDomain->label }}</span>
                                             @endif
                                         </p>
                                         @if ($tenantDomain->comment)
-                                            <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $tenantDomain->comment }}</p>
+                                            <p class="mt-1 whitespace-pre-line text-xs italic text-brand-mist"># {{ $tenantDomain->comment }}</p>
                                         @endif
                                         @if ($tenantDomain->testingHostname())
                                             @php $tenantTestStatus = $tenantDomain->testingDnsStatus() ?? 'pending'; @endphp
-                                            <p class="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-brand-moss">
+                                            <p class="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-brand-moss">
                                                 <x-heroicon-o-beaker class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                                 <a href="https://{{ $tenantDomain->testingHostname() }}" target="_blank" rel="noopener" class="font-mono text-brand-ink hover:underline">{{ $tenantDomain->testingHostname() }}</a>
                                                 <span @class([
-                                                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                                    'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em]',
                                                     'bg-emerald-100 text-emerald-900' => $tenantTestStatus === 'ready',
                                                     'bg-rose-100 text-rose-900' => $tenantTestStatus === 'failed',
                                                     'bg-amber-100 text-amber-900' => ! in_array($tenantTestStatus, ['ready', 'failed'], true),
@@ -1234,23 +1215,23 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($tenantDomain->testingHostname())
-                                        <button type="button" wire:click="removeTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="removeTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40" title="{{ __('Delete the managed testing hostname for this tenant') }}">
+                                        <button type="button" wire:click="removeTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="removeTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40" title="{{ __('Delete the managed testing hostname for this tenant') }}">
                                             <x-heroicon-o-beaker class="h-4 w-4" />
                                             {{ __('Remove testing URL') }}
                                         </button>
                                     @else
-                                        <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
+                                        <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
                                             <x-heroicon-o-beaker class="h-4 w-4" />
                                             {{ __('Create testing URL') }}
                                         </button>
                                     @endif
                                     @if (in_array($tCertStatus, [null, \App\Models\SiteCertificate::STATUS_FAILED], true))
-                                        <button type="button" wire:click="issueTenantCertificate('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="issueTenantCertificate('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Issue a Let’s Encrypt certificate for this tenant’s domain (point its DNS here first).') }}">
+                                        <button type="button" wire:click="issueTenantCertificate('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="issueTenantCertificate('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Issue a Let’s Encrypt certificate for this tenant’s domain (point its DNS here first).') }}">
                                             <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ $tCertStatus === \App\Models\SiteCertificate::STATUS_FAILED ? __('Retry SSL') : __('Add SSL') }}
                                         </button>
                                     @endif
-                                    <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
@@ -1266,11 +1247,12 @@
         @endif
     </div>
 
-    <div class="px-5 py-5 sm:px-6">
+    <div class="px-5 py-3 sm:px-6">
     <x-cli-snippet :commands="[
-        ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
-        ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
-        ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'php artisan dply:site:tenant-add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
+        ['label' => __('Remove'), 'command' => 'php artisan dply:site:tenant-remove '.$site->slug.' acme.example.com'],
+        ['label' => __('List'), 'command' => 'php artisan dply:site:tenant-list '.$site->slug],
+        ['label' => __('Reconcile tenant DNS'), 'command' => 'php artisan dply:tenants:reconcile-dns'],
     ]" />
 </div>
 
@@ -1296,7 +1278,7 @@
         <div class="space-y-5 px-6 py-6">
             {{-- Auto cascades — always-on, read-only checks --}}
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
                 <ul class="mt-2 space-y-1.5">
                     @foreach ($rename_plan['auto'] as $row)
                         <li class="flex items-start gap-2 text-sm text-brand-ink">
@@ -1310,13 +1292,12 @@
             {{-- Opt-in cascades — operator selects which heavier cleanups to run --}}
             @if (! empty($rename_plan['optIn']))
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
                     <ul class="mt-2 space-y-2">
                         @foreach ($rename_plan['optIn'] as $row)
                             @php
                                 $wireModel = match ($row['key']) {
                                     'reissue_cert' => 'rename_reissue_cert',
-                                    'cycle_backend' => 'rename_cycle_backend',
                                     default => null,
                                 };
                             @endphp
@@ -1334,7 +1315,7 @@
             {{-- Manual / external — informational; dply cannot fix these from here --}}
             @if (! empty($rename_plan['manual']))
                 <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-                    <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
+                    <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-900">
                         <x-heroicon-m-information-circle class="h-4 w-4" />
                         {{ __('Cannot be fixed from here') }}
                     </p>

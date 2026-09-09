@@ -27,7 +27,7 @@ class Fail2banInsightRunner implements InsightRunnerInterface
     ) {}
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * @return array<int, \App\Modules\Insights\Services\InsightCandidate>
      */
     public function run(Server $server, ?Site $site, array $parameters): array
     {
@@ -111,7 +111,9 @@ BASH;
     }
 
     /**
-     * @return array<int, App\Modules\Insights\Services\InsightCandidate>
+     * Parsed `key=value` lines from the probe buffer — not candidates.
+     *
+     * @return array<string, string>
      */
     private function parseKeyValues(string $buffer): array
     {

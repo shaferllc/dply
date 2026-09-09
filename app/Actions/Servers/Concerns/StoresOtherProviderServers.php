@@ -18,7 +18,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -30,8 +30,6 @@ use Illuminate\Validation\ValidationException;
  */
 trait StoresOtherProviderServers
 {
-
-
     /**
      * @param  list<string>  $scriptKeys
      */
@@ -159,6 +157,15 @@ trait StoresOtherProviderServers
 
         [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
 
+        $meta = $this->meta($form);
+        $vpcId = trim($form->vultr_vpc_id);
+        if ($vpcId !== '') {
+            $meta['vultr'] = array_merge(
+                is_array($meta['vultr'] ?? null) ? $meta['vultr'] : [],
+                ['vpc_id' => $vpcId],
+            );
+        }
+
         $server = $user->servers()->create([
             'organization_id' => $org->id,
             'name' => $form->name,
@@ -168,7 +175,7 @@ trait StoresOtherProviderServers
             'size' => $form->size,
             'setup_script_key' => $setupScriptKey,
             'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
+            'meta' => $meta,
             'status' => Server::STATUS_PENDING,
         ]);
 
@@ -398,7 +405,7 @@ trait StoresOtherProviderServers
         }
 
         foreach ($serverTypes as $st) {
-            if (! is_array($st) || (string) ($st['name'] ?? '') !== $size) {
+            if ((string) ($st['name'] ?? '') !== $size) {
                 continue;
             }
 

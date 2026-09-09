@@ -59,21 +59,43 @@
         x-on:keydown.window="logViewerShortcut($event)"
         x-on:keydown.escape.window="$wire.closeLogSourceMenu(); $wire.closeLogOptionsMenu()"
     >
-        <div class="min-h-0 w-full min-w-0 px-4 py-3 sm:px-5">
+        <div class="min-h-0 w-full min-w-0 px-4 py-2.5 sm:px-5">
             {{-- Compact toolbar: source + actions on one row (source flex-1 + truncate so
                  the label never collapses to a single letter), filter strip underneath. --}}
-            <div class="space-y-2.5">
+            <div class="space-y-2">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div
                         class="relative min-w-0 flex-1"
-                        x-data
-                        x-on:click.outside="$wire.closeLogSourceMenu()"
+                        x-data="{
+                            position: { top: 0, left: 0, width: 0 },
+                            compute() {
+                                const trigger = this.$refs.logSourceTrigger;
+                                if (! trigger) {
+                                    return;
+                                }
+                                const r = trigger.getBoundingClientRect();
+                                const width = Math.min(Math.max(r.width, 320), window.innerWidth - 32);
+                                this.position = {
+                                    top: r.bottom + 6,
+                                    left: Math.max(16, Math.min(r.left, window.innerWidth - width - 16)),
+                                    width,
+                                };
+                            },
+                        }"
+                        x-on:click.outside="
+                            const menu = document.getElementById('log-source-menu');
+                            if (menu && menu.contains($event.target)) {
+                                return;
+                            }
+                            $wire.closeLogSourceMenu();
+                        "
                     >
                         <button
                             type="button"
+                            x-ref="logSourceTrigger"
                             wire:click="toggleLogSourceMenu"
                             title="{{ __('Log source') }}"
-                            class="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-left text-sm font-medium leading-snug text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
+                            class="flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-left text-xs font-medium leading-snug text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
                             aria-haspopup="listbox"
                             aria-label="{{ __('Log source: :name', ['name' => $activeLogTitle]) }}"
                             @if ($logSourceMenuOpen) aria-expanded="true" @else aria-expanded="false" @endif
@@ -88,9 +110,14 @@
                             </span>
                         </button>
                         @if ($logSourceMenuOpen)
+                            <template x-teleport="body">
                             <div
-                                wire:transition
-                                class="absolute start-0 z-50 mt-1.5 w-[min(calc(100vw-2rem),32rem)] max-h-[min(70dvh,28rem)] overflow-y-auto dply-flyout-panel p-3"
+                                id="log-source-menu"
+                                x-init="compute()"
+                                x-on:scroll.window.passive="compute()"
+                                x-on:resize.window.passive="compute()"
+                                x-bind:style="`top: ${position.top}px; left: ${position.left}px; width: ${position.width}px;`"
+                                class="fixed z-[80] max-h-[min(70dvh,28rem)] overflow-y-auto dply-flyout-panel p-3"
                                 role="listbox"
                                 @click.stop
                             >
@@ -105,32 +132,33 @@
                                         @php $g = $def['group'] ?? 'other'; @endphp
                                         @if ($g !== $lastGroup)
                                             @php $lastGroup = $g; @endphp
-                                            <p class="mb-1 mt-3 px-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-brand-mist first:mt-0">{{ str_replace('_', ' ', $g) }}</p>
+                                            <p class="mb-1 mt-3 px-2 pt-1 text-2xs font-bold uppercase tracking-wider text-brand-mist first:mt-0">{{ str_replace('_', ' ', $g) }}</p>
                                         @endif
                                         <button
                                             type="button"
                                             wire:click="selectLogSourceFromMenu('{{ $sourceKey }}')"
                                             wire:key="log-src-dd-{{ $sourceKey }}"
                                             @class([
-                                                'flex w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                                                'flex w-full flex-col gap-0.5 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors',
                                                 'bg-brand-sand/60 text-brand-ink' => $logKey === $sourceKey,
                                                 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $logKey !== $sourceKey,
                                             ])
                                         >
                                             <span class="font-medium leading-snug">{{ __($def['label'] ?? $sourceKey) }}</span>
                                             @if (! empty($def['path']))
-                                                <span class="break-all font-mono text-[10px] leading-relaxed text-brand-mist">{{ $def['path'] }}</span>
+                                                <span class="break-all font-mono text-2xs leading-relaxed text-brand-mist">{{ $def['path'] }}</span>
                                             @elseif (($def['type'] ?? '') === 'dply')
-                                                <span class="text-[10px] text-brand-moss">{{ __('Control plane audit trail') }}</span>
+                                                <span class="text-2xs text-brand-moss">{{ __('Control plane audit trail') }}</span>
                                             @elseif (($def['type'] ?? '') === 'dply_site')
-                                                <span class="text-[10px] text-brand-moss">{{ __('Deploy, webhook, and audit activity for this site') }}</span>
+                                                <span class="text-2xs text-brand-moss">{{ __('Deploy, webhook, and audit activity for this site') }}</span>
                                             @elseif (($def['type'] ?? '') === 'journal')
-                                                <span class="break-all font-mono text-[10px] leading-relaxed text-brand-mist">journalctl -u {{ $def['unit'] ?? $def['unit_template'] ?? '' }}</span>
+                                                <span class="break-all font-mono text-2xs leading-relaxed text-brand-mist">journalctl -u {{ $def['unit'] ?? $def['unit_template'] ?? '' }}</span>
                                             @endif
                                         </button>
                                     @endforeach
                                 </nav>
                             </div>
+                            </template>
                         @endif
                     </div>
                     <div class="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -139,7 +167,7 @@
                             <select
                                 id="log-time-range"
                                 wire:change="setLogTimeRangeFromSelect($event.target.value)"
-                                class="box-border h-9 min-w-[7.5rem] rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/25"
+                                class="box-border h-8 min-w-[7.5rem] rounded-lg border border-brand-ink/10 bg-white px-2 text-xs font-medium text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/25"
                                 title="{{ __('Time range') }}"
                             >
                                 <option value="" @selected($logTimeRangeMinutes === null)>{{ __('Time: All') }}</option>
@@ -152,7 +180,7 @@
                             type="button"
                             wire:click="refreshSystemLog"
                             wire:loading.attr="disabled"
-                            class="box-border inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium leading-none text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
+                            class="box-border inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium leading-none text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
                         >
                             <span wire:loading.remove wire:target="refreshSystemLog,refreshSystemLogAndCloseMenu" class="inline-flex items-center gap-1.5">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-moss" />
@@ -165,13 +193,35 @@
                         </button>
                         <div
                             class="relative min-w-0"
-                            x-data
-                            x-on:click.outside="$wire.closeLogOptionsMenu()"
+                            x-data="{
+                                position: { top: 0, left: 0, width: 0 },
+                                compute() {
+                                    const trigger = this.$refs.logOptionsTrigger;
+                                    if (! trigger) {
+                                        return;
+                                    }
+                                    const r = trigger.getBoundingClientRect();
+                                    const width = Math.min(32 * 16, window.innerWidth - 32);
+                                    this.position = {
+                                        top: r.bottom + 8,
+                                        left: Math.max(16, Math.min(r.right - width, window.innerWidth - width - 16)),
+                                        width,
+                                    };
+                                },
+                            }"
+                            x-on:click.outside="
+                                const menu = document.getElementById('log-options-menu');
+                                if (menu && menu.contains($event.target)) {
+                                    return;
+                                }
+                                $wire.closeLogOptionsMenu();
+                            "
                         >
                             <button
                                 type="button"
+                                x-ref="logOptionsTrigger"
                                 wire:click="toggleLogOptionsMenu"
-                                class="box-border inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium leading-none text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
+                                class="box-border inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2.5 text-xs font-medium leading-none text-brand-ink shadow-sm hover:border-brand-ink/15 hover:bg-brand-sand/25"
                                 aria-haspopup="true"
                                 @if ($logOptionsMenuOpen) aria-expanded="true" @else aria-expanded="false" @endif
                             >
@@ -185,13 +235,18 @@
                                 </span>
                             </button>
                             @if ($logOptionsMenuOpen)
+                                <template x-teleport="body">
                                 <div
-                                    wire:transition
-                                    class="absolute end-0 z-50 mt-2 w-[min(calc(100vw-2rem),32rem)] dply-flyout-panel p-4"
+                                    id="log-options-menu"
+                                    x-init="compute()"
+                                    x-on:scroll.window.passive="compute()"
+                                    x-on:resize.window.passive="compute()"
+                                    x-bind:style="`top: ${position.top}px; left: ${position.left}px; width: ${position.width}px;`"
+                                    class="fixed z-[80] dply-flyout-panel p-4"
                                     @click.stop
                                 >
                                     <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 p-3">
-                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Fetch & display') }}</p>
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <div>
                                             <label for="log-tail-lines" class="mb-2 block text-xs font-medium text-brand-moss">{{ __('Lines to tail') }}</label>
@@ -237,7 +292,7 @@
                                                 </select>
                                             </div>
                                         </div>
-                                        <p class="mt-2 text-[11px] leading-5 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
+                                        <p class="mt-2 text-xs leading-5 text-brand-mist">{{ __('Follows the log by re-fetching on an interval. Backs off after errors.') }}</p>
                                     </div>
                                     <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <button
@@ -284,6 +339,7 @@
                                         </button>
                                     </div>
                                 </div>
+                                </template>
                             @endif
                         </div>
                     </div>
@@ -297,19 +353,19 @@
                             type="search"
                             wire:model.live.debounce.300ms="logFilter"
                             placeholder="{{ __('Filter visible lines') }}"
-                            class="box-border h-9 min-w-0 flex-1 rounded-lg border border-brand-ink/10 bg-white px-3 text-sm leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/25"
+                            class="box-border h-8 min-w-0 flex-1 rounded-lg border border-brand-ink/10 bg-white px-3 text-xs leading-none text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/25"
                             autocomplete="off"
                         />
                         <div class="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-brand-moss">
-                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-1">
+                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
                                 <input type="checkbox" wire:model.live="logFilterUseRegex" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                                 <span>{{ __('Regex') }}</span>
                             </label>
-                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-1">
+                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
                                 <input type="checkbox" wire:model.live="logFilterInvert" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                                 <span>{{ __('Invert') }}</span>
                             </label>
-                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-1">
+                            <label class="inline-flex cursor-pointer items-center gap-1 rounded-md border border-brand-ink/10 bg-white px-2 py-0.5">
                                 <input type="checkbox" wire:model.live="logShowLineNumbers" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage/40" />
                                 <span>{{ __('Lines #') }}</span>
                             </label>
@@ -323,7 +379,7 @@
                     @endif
                     @if ($currentLogIsAccessLog && $logTotalLines > 0)
                         <div class="mt-2 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2">
-                            <span class="me-1 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Traffic') }}</span>
+                            <span class="me-1 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Traffic') }}</span>
                             @php
                                 $trafficFilters = [
                                     'all' => ['label' => __('All'), 'count' => $logTotalLines],
@@ -340,7 +396,7 @@
                                     wire:click="setLogTrafficFilter('{{ $filterKey }}')"
                                     wire:key="log-traffic-{{ $filterKey }}"
                                     @class([
-                                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors',
+                                        'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
                                         'border-brand-sage/30 bg-brand-sage text-white shadow-sm' => $activeTrafficFilter === $filterKey,
                                         'border-brand-ink/10 bg-white text-brand-moss hover:border-brand-ink/15 hover:bg-brand-sand/40 hover:text-brand-ink' => $activeTrafficFilter !== $filterKey,
                                     ])
@@ -359,7 +415,7 @@
             </div>
 
             @if ($remoteLogError)
-                <div class="mt-3 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2.5 text-sm text-amber-950">{{ $remoteLogError }}</div>
+                <div class="mt-2.5 rounded-lg border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs leading-relaxed text-amber-950">{{ $remoteLogError }}</div>
             @endif
             @php
                 $logViewerVisibleLines = max(2, min(50, (int) $logDisplayLines));
@@ -370,7 +426,7 @@
                 }
             @endphp
             <div
-                class="relative mt-3 overflow-hidden rounded-xl border border-zinc-300 bg-zinc-50 shadow-inner"
+                class="relative mt-2.5 overflow-hidden rounded-xl border border-zinc-300 bg-zinc-50 shadow-inner"
             >
                 <div
                     wire:loading.delay.shortest
@@ -386,12 +442,12 @@
                     x-ref="logOutputPre"
                     data-log-viewer-output
                     style="height: {{ $logViewerHeightRem }}rem; color: #166534; background-color: #fafafa; line-height: {{ $logLineHeightRem }}rem;"
-                    class="overflow-y-auto px-4 py-3 font-mono text-xs leading-6 whitespace-pre-wrap break-all [scrollbar-color:rgb(82 82 91 / 0.45)_transparent]"
+                    class="overflow-y-auto px-3 py-2 font-mono text-xs leading-6 whitespace-pre-wrap break-all [scrollbar-color:rgb(82 82 91 / 0.45)_transparent]"
                     role="log"
                 >{{ $remoteLogOutput !== null && $remoteLogOutput !== '' ? $remoteLogOutput : ($remoteLogError ? '' : __('No output yet. Choose a log and press Refresh.')) }}</pre>
             </div>
             @if ($logFetchedHuman)
-                <p class="mt-2 text-xs text-brand-mist">
+                <p class="mt-1.5 text-xs text-brand-mist">
                     {{ __('Last fetch: :time — :lines lines, :kb KB', [
                         'time' => $logFetchedHuman,
                         'lines' => $logTotalLines,

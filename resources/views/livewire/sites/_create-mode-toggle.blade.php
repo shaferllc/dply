@@ -33,7 +33,7 @@
             <span class="mt-3 block text-base font-semibold text-brand-ink">{{ __('Import an existing repo') }}</span>
             <span class="mt-1 block text-sm leading-relaxed text-brand-moss">{{ __('Connect a Git repository and dply will deploy whatever is on the chosen branch.') }}</span>
             @if ($form->mode === 'import')
-                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                     <x-heroicon-m-check class="h-3 w-3" />
                     {{ __('Picked') }}
                 </span>
@@ -59,7 +59,7 @@
             <span class="mt-3 block text-base font-semibold text-brand-ink">{{ __('Scaffold a new app') }}</span>
             <span class="mt-1 block text-sm leading-relaxed text-brand-moss">{{ __('Spin up a fresh Laravel or WordPress install — no repo needed. Database, admin user, and SSL all wired automatically.') }}</span>
             @if ($form->mode === 'scaffold')
-                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                     <x-heroicon-m-check class="h-3 w-3" />
                     {{ __('Picked') }}
                 </span>

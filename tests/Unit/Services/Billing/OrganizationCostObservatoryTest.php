@@ -30,7 +30,7 @@ test('cost observatory sums dply fees and parsed provider notes', function () {
     // Two servers → Starter ($9 flat) under the plan model.
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: ['key' => 'starter', 'label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3],
-        tierQuantities: ['xs' => 2],
+        billableServerCount: 2,
     );
 
     $observatory = new OrganizationCostObservatory(
@@ -44,7 +44,9 @@ test('cost observatory sums dply fees and parsed provider notes', function () {
         ->and($result['provider_infrastructure_cents'])->toBe(1800)
         ->and($result['stack_total_cents'])->toBe(2700)
         ->and($result['provider_partial'])->toBeFalse()
-        ->and($result['comparison']['forge_baseline_cents'])->toBe(2400);
+        // The Forge comparison baseline was removed; the observatory now reports
+        // dply's own numbers only.
+        ->and($result)->not->toHaveKey('comparison');
 });
 
 test('cost observatory marks servers without notes as unknown', function () {
@@ -59,7 +61,7 @@ test('cost observatory marks servers without notes as unknown', function () {
     // One server → Free plan ($0).
     $state = DesiredBillingState::fromPlanAndUsage(
         plan: ['key' => 'free', 'label' => 'Free', 'price_cents' => 0, 'max_servers' => 1],
-        tierQuantities: ['xs' => 1],
+        billableServerCount: 1,
     );
 
     $observatory = new OrganizationCostObservatory(

@@ -6,18 +6,18 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\PreflightSiteSetupJob;
-use App\Modules\Scaffold\Jobs\RunComposerScaffoldJob;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Scaffold\Jobs\RunComposerScaffoldJob;
+use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
-use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -98,10 +98,10 @@ class ChooseApp extends Component
         $this->tiles = $catalog->forServer($server);
 
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
-            $this->phpVersion = (string) ($phpManager->siteCreationPhpData($server)['preselected_version'] ?? '');
+            $this->phpVersion = (string) $phpManager->siteCreationPhpData($server)['preselected_version'];
         }
 
-        $this->scaffold_admin_email = (string) (auth()->user()?->email ?? '');
+        $this->scaffold_admin_email = (string) (auth()->user()->email ?? '');
 
         // Drop bogus values supplied by the URL — they would leave the picker
         // in a "tile selected but config invisible" state.
@@ -138,13 +138,6 @@ class ChooseApp extends Component
     protected function onManualRepoUrlChanged(): void
     {
         $this->git_ref_kind = null;
-        $this->clearRepoRefSelection();
-        $this->syncRepoUrlToSite();
-    }
-
-    /** Trait hook: after the first repo is auto-selected on account load. */
-    protected function onRepositoryAutoselected(): void
-    {
         $this->clearRepoRefSelection();
         $this->syncRepoUrlToSite();
     }
@@ -202,9 +195,7 @@ class ChooseApp extends Component
     {
         $this->syncRepoUrlToSite();
         if (trim((string) $this->site->git_repository_url) === '') {
-            if (method_exists($this, 'toastError')) {
-                $this->toastError(__('Choose a repository first.'));
-            }
+            $this->toastError(__('Choose a repository first.'));
 
             return;
         }
@@ -428,10 +419,19 @@ class ChooseApp extends Component
      */
     private function runBlank(array $tile, SiteProvisioner $siteProvisioner): mixed
     {
+        // "Start blank" only keeps the splash page, so follow what the server
+        // can actually run rather than always claiming PHP — a php_version=none
+        // box was getting a PHP site with PHP-FPM controls for an interpreter
+        // it doesn't have. See Server::defaultSiteRuntime().
+        [$blankType, $blankRuntimeVersion] = $this->server->defaultSiteRuntime();
+        $blankVersion = $blankType === 'php'
+            ? ($this->phpVersion !== '' ? $this->phpVersion : null)
+            : $blankRuntimeVersion;
+
         $this->site->forceFill([
-            'type' => SiteType::Php,
-            'runtime' => 'php',
-            'runtime_version' => $this->phpVersion !== '' ? $this->phpVersion : null,
+            'type' => SiteType::from($blankType),
+            'runtime' => $blankType,
+            'runtime_version' => $blankVersion,
             'document_root' => $this->documentRoot($tile),
             'status' => Site::STATUS_PENDING,
             'meta' => $this->mergedMeta([
@@ -444,7 +444,7 @@ class ChooseApp extends Component
             ]),
         ])->save();
 
-        $this->seedDeployStepsAndProvision($tile, 'php', $siteProvisioner);
+        $this->seedDeployStepsAndProvision($tile, $blankType, $siteProvisioner);
 
         $this->auditChosen($tile, 'blank');
 

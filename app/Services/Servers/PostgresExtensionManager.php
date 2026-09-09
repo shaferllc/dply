@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
+use App\Support\Servers\AptSourceRepairScript;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\PostgresExtensionCatalog;
 use Illuminate\Support\Str;
@@ -62,9 +63,9 @@ class PostgresExtensionManager
             };
         }
 
-        $script = $repo.
+        $script = AptSourceRepairScript::tolerantUpdateFunction()."\n".$repo.
             "export DEBIAN_FRONTEND=noninteractive\n".
-            "apt-get update -y\n".
+            "dply_apt_update\n".
             $versionedPackages.
             "apt-get install -y {$packages} 2>/dev/null || true\n".
             'sudo -u postgres psql -v ON_ERROR_STOP=1 -c '.escapeshellarg("CREATE EXTENSION IF NOT EXISTS {$extension};").' 2>&1';

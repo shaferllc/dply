@@ -27,7 +27,7 @@
     <div class="space-y-6">
         @foreach ($groups as $group)
             <section class="dply-card-compact" wire:key="group-{{ $group['title'] }}">
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</h2>
+                <h2 class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $group['title'] }}</h2>
                 @if ($group['mode'] === 'global')
                     <p class="mt-1 text-xs text-brand-moss">{{ __('App-wide flag set in config — not overridable per org.') }}</p>
                 @else
@@ -49,7 +49,7 @@
                                                         <button
                                                             type="button"
                                                             wire:click="requestClearOrgOverridesForFlag('{{ $flag['key'] }}')"
-                                                            class="text-[10px] font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
+                                                            class="text-2xs font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
                                                         >
                                                             {{ __('Clear :count org override(s)', ['count' => $orgOverrideCounts[$flag['key']]]) }}
                                                         </button>
@@ -66,14 +66,14 @@
                                                     <button
                                                         type="button"
                                                         wire:click="requestClearOrgOverridesForFlag('{{ $flag['preview']['key'] }}')"
-                                                        class="text-[10px] font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
+                                                        class="text-2xs font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
                                                     >
                                                         {{ __('Clear :count org override(s)', ['count' => $orgOverrideCounts[$flag['preview']['key']]]) }}
                                                     </button>
                                                 @endif
                                             </div>
                                         </x-admin-flag-row>
-                                        <p class="mt-1.5 ps-0.5 text-[10px] leading-relaxed text-brand-moss">{{ __('Shows Soon badge + teaser page when the full workspace above is off. Overridable per org.') }}</p>
+                                        <p class="mt-1.5 ps-0.5 text-2xs leading-relaxed text-brand-moss">{{ __('Shows Soon badge + teaser page when the full workspace above is off. Overridable per org.') }}</p>
                                     </div>
                                 </div>
                             @else
@@ -87,7 +87,7 @@
                                                 <button
                                                     type="button"
                                                     wire:click="requestClearOrgOverridesForFlag('{{ $flag['key'] }}')"
-                                                    class="text-[10px] font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
+                                                    class="text-2xs font-semibold text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900"
                                                 >
                                                     {{ __('Clear :count org override(s)', ['count' => $orgOverrideCounts[$flag['key']]]) }}
                                                 </button>

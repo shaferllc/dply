@@ -24,6 +24,14 @@ class ImportedCertificateInstaller implements CertificateEngine
             throw new \InvalidArgumentException('A certificate and private key are required.');
         }
 
+        // The PEM is already in hand, so the expiry costs nothing to read and
+        // both exit paths below can persist it.
+        $expiresAt = app(CertificateExpiryReader::class)->readFromPem($certificatePem);
+        $expiryMeta = [
+            'expires_at_source' => $expiresAt !== null ? 'imported_pem' : null,
+            'expiry_checked_at' => now()->toIso8601String(),
+        ];
+
         $certificate->forceFill([
             'status' => SiteCertificate::STATUS_INSTALLING,
             'last_requested_at' => now(),
@@ -34,6 +42,8 @@ class ImportedCertificateInstaller implements CertificateEngine
                 'status' => SiteCertificate::STATUS_ACTIVE,
                 'last_output' => 'Stored imported certificate metadata without host installation because SSH is unavailable.',
                 'last_installed_at' => now(),
+                'expires_at' => $expiresAt,
+                'meta' => array_merge($certificate->meta ?? [], $expiryMeta),
             ])->save();
 
             $site->update(['ssl_status' => Site::SSL_ACTIVE]);
@@ -59,6 +69,8 @@ class ImportedCertificateInstaller implements CertificateEngine
             'chain_path' => trim((string) $certificate->chain_pem) !== '' ? $remoteBase.'.chain.pem' : null,
             'last_output' => 'Imported certificate uploaded to the host.',
             'last_installed_at' => now(),
+            'expires_at' => $expiresAt,
+            'meta' => array_merge($certificate->meta ?? [], $expiryMeta),
         ])->save();
 
         $site->update([

@@ -171,9 +171,6 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         $emit->step('edge', sprintf('syncing %d site backend(s) for %s edge', $sites->count(), $edgeProxy));
 
         $anchor = $sites->first();
-        if ($anchor === null) {
-            throw new \RuntimeException('No sites on this server to sync.');
-        }
 
         $ssh = $this->systemSsh($anchor);
         $sitesEnabled = rtrim((string) config('sites.caddy_sites_enabled'), '/');
@@ -181,7 +178,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
         $syncedSiteIds = [];
 
         foreach ($sites as $site) {
-            if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            if ($site->usesKubernetesRuntime()) {
                 continue;
             }
             if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {
@@ -370,6 +367,7 @@ class SiteEdgeBackendProvisioner extends AbstractSiteWebserverProvisioner
             'haproxy' => $this->writeHaproxyConfig($server, $ssh, $sites, $listenPort),
             'envoy' => $this->writeEnvoyConfig($server, $ssh, $sites, $listenPort),
             'openresty' => $this->writeOpenRestyConfig($server, $ssh, $sites, $listenPort),
+            default => throw new \InvalidArgumentException("Unsupported edge proxy: {$edgeProxy}"),
         };
     }
 

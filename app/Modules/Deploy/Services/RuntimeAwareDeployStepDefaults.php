@@ -47,11 +47,18 @@ class RuntimeAwareDeployStepDefaults
      *     sort_order: int,
      * }>
      */
-    public function defaultsFor(?string $runtime, ?string $framework = null): array
+    public function defaultsFor(
+        ?string $runtime,
+        ?string $framework = null,
+        ?string $packageManager = null,
+        ?string $migrationTool = null,
+    ): array
     {
+        $framework = self::canonicalFramework($framework);
+
         $steps = match ($runtime) {
             'php' => $this->phpSteps($framework),
-            'node' => $this->nodeSteps($framework),
+            'node' => $this->nodeSteps($framework, $packageManager, $migrationTool),
             'python' => $this->pythonSteps($framework),
             'ruby' => $this->rubySteps($framework),
             'go' => $this->goSteps(),
@@ -116,11 +123,119 @@ class RuntimeAwareDeployStepDefaults
     /**
      * @return list<array<string, mixed>>
      */
-    private function nodeSteps(?string $framework): array
+    /**
+     * Frameworks whose defaults differ from their language's baseline.
+     *
+     * Declared here because this service owns the step tables; anything that
+     * needs to recognise "these steps were auto-seeded" asks via
+     * {@see knownBuildSignatures()} rather than re-deriving the knowledge.
+     *
+     * @var array<string, list<string|null>>
+     */
+    private const FRAMEWORKS_BY_LANGUAGE = [
+        'php' => [null, 'laravel'],
+        'node' => [null, 'next', 'nuxt', 'sveltekit', 'remix', 'astro', 'nest'],
+        'python' => [null, 'django', 'flask', 'fastapi'],
+        'ruby' => [null, 'rails', 'jekyll'],
+        'go' => [null],
+        'static' => [null, 'hugo', 'eleventy'],
+    ];
+
+    /**
+     * Every build step this service could have auto-seeded, per language, as
+     * "step_type|custom_command" signatures.
+     *
+     * Python, Ruby, Go and Static all emit TYPE_CUSTOM steps, so step type
+     * alone cannot tell an auto-seeded `go build` from a hand-written one.
+     * Comparing the full signature can: if a pipeline's build steps are all
+     * signatures this service emits for some other language, nobody edited
+     * them and they are safe to replace.
+     *
+     * @return array<string, list<string>>
+     */
+    public function knownBuildSignatures(): array
     {
+        $signatures = [];
+
+        foreach (self::FRAMEWORKS_BY_LANGUAGE as $language => $frameworks) {
+            $seen = [];
+
+            // Node release steps vary by package manager AND migration tool, so
+            // enumerate those combinations too — otherwise a `pnpm exec payload
+            // migrate` step this service emitted would read as hand-written and
+            // block reconciliation of the pipeline it belongs to.
+            if ($language === 'node') {
+                foreach ([null, 'npm', 'pnpm', 'yarn', 'bun'] as $manager) {
+                    foreach ([null, 'payload', 'prisma', 'drizzle'] as $tool) {
+                        foreach ($this->defaultsFor('node', null, $manager, $tool) as $step) {
+                            $seen[self::signature(
+                                (string) $step['step_type'],
+                                isset($step['custom_command']) ? (string) $step['custom_command'] : null,
+                            )] = true;
+                        }
+                    }
+                }
+            }
+
+            foreach ($frameworks as $framework) {
+                foreach ($this->defaultsFor($language, $framework) as $step) {
+                    $seen[self::signature(
+                        (string) $step['step_type'],
+                        isset($step['custom_command']) ? (string) $step['custom_command'] : null,
+                    )] = true;
+                }
+            }
+
+            $signatures[$language] = array_keys($seen);
+        }
+
+        return $signatures;
+    }
+
+    /** Stable identity for a build step: its type plus any custom command. */
+    public static function signature(string $stepType, ?string $customCommand): string
+    {
+        return $stepType.'|'.trim((string) $customCommand);
+    }
+
+    /**
+     * One vocabulary for framework names.
+     *
+     * RepositoryRuntimeDetector emits `nextjs`; the step tables below key on
+     * `next`. Unreconciled, a Next.js repo got `npm ci` and NO build step — a
+     * silent half-deploy. Normalising here rather than at each call site means
+     * every consumer of the defaults gets it, not just whoever remembered.
+     */
+    private static function canonicalFramework(?string $framework): ?string
+    {
+        $framework = strtolower(trim((string) $framework));
+
+        if ($framework === '') {
+            return null;
+        }
+
+        return match ($framework) {
+            'nextjs' => 'next',
+            'nuxtjs' => 'nuxt',
+            'sveltekit', 'svelte-kit' => 'sveltekit',
+            'node_generic', 'php_generic', 'python_generic', 'go_generic' => null,
+            default => $framework,
+        };
+    }
+
+    private function nodeSteps(?string $framework, ?string $packageManager = null, ?string $migrationTool = null): array
+    {
+        // Install with the tool the repository actually uses. `npm ci` against a
+        // pnpm project fails outright ("package.json and package-lock.json are
+        // not in sync"), which is what a Next.js + pnpm repo hit here.
         $steps = [
             [
-                'step_type' => SiteDeployStep::TYPE_NPM_CI,
+                'step_type' => match (strtolower((string) $packageManager)) {
+                    'pnpm' => SiteDeployStep::TYPE_PNPM_INSTALL,
+                    'yarn' => SiteDeployStep::TYPE_YARN_INSTALL,
+                    'bun' => SiteDeployStep::TYPE_BUN_INSTALL,
+                    default => SiteDeployStep::TYPE_NPM_CI,
+                },
                 'phase' => SiteDeployStep::PHASE_BUILD,
                 'timeout_seconds' => 900,
             ],
@@ -138,7 +253,52 @@ class RuntimeAwareDeployStepDefaults
             ];
         }
 
+        // Release-phase migration. Node projects had none at all, so schema
+        // changes simply never applied on deploy — the PHP side has shipped
+        // artisan_migrate since forever.
+        //
+        // Only for a migration tool actually detected in the repo's
+        // dependencies: running the wrong migrate command against a production
+        // database is worse than running none. Seeding is deliberately absent —
+        // it is not idempotent, and running it on every deploy would overwrite
+        // live data.
+        $migrate = self::nodeMigrateCommand($migrationTool, $packageManager);
+
+        if ($migrate !== null) {
+            $steps[] = [
+                'step_type' => SiteDeployStep::TYPE_CUSTOM,
+                'custom_command' => $migrate,
+                'phase' => SiteDeployStep::PHASE_RELEASE,
+                'timeout_seconds' => 900,
+            ];
+        }
+
         return $steps;
+    }
+
+    /**
+     * The migrate command for a detected Node migration tool, run through the
+     * repo's package manager so it resolves the locally-installed binary.
+     */
+    private static function nodeMigrateCommand(?string $migrationTool, ?string $packageManager): ?string
+    {
+        // pnpm and yarn are not installed alongside Node — mise installs the
+        // runtime, not the alternate package managers — and this is a CUSTOM
+        // step, so it does not pass through the corepack fallback that the
+        // install step types get. A bare `pnpm exec` here exits 127.
+        $runner = match (strtolower((string) $packageManager)) {
+            'pnpm' => '{ command -v pnpm >/dev/null 2>&1 && pnpm exec || corepack pnpm exec; }',
+            'yarn' => '{ command -v yarn >/dev/null 2>&1 && yarn || corepack yarn; }',
+            'bun' => 'bunx',
+            default => 'npx --no-install',
+        };
+
+        return match (strtolower((string) $migrationTool)) {
+            'payload' => $runner.' payload migrate',
+            'prisma' => $runner.' prisma migrate deploy',
+            'drizzle' => $runner.' drizzle-kit migrate',
+            default => null,
+        };
     }
 
     /**

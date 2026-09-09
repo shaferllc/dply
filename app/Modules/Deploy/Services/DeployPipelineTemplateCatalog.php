@@ -25,10 +25,6 @@ final class DeployPipelineTemplateCatalog
      *     steps: list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>,
      * }>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<string, mixed>
-     */
     public function templatesForSite(Site $site): array
     {
         $templates = [];
@@ -68,20 +64,13 @@ final class DeployPipelineTemplateCatalog
         return $templates;
     }
 
-    /**
-     * @return list<array<string, array|string|null>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function stepsForTemplateKey(string $key): array
     {
         $meta = config("site_deploy_pipeline_templates.templates.{$key}");
         if (! is_array($meta)) {
             if (str_starts_with($key, 'runtime-')) {
                 $parts = explode('-', substr($key, 8), 2);
-                $runtime = $parts[0] ?? null;
+                $runtime = $parts[0];
                 $framework = $parts[1] ?? null;
 
                 return $this->stripSortOrder($this->runtimeDefaults->defaultsFor($runtime, $framework));
@@ -128,8 +117,8 @@ final class DeployPipelineTemplateCatalog
 
     /**
      * @param  array<string, mixed> $meta
-     * @param  array<string, mixed> $steps
-     * @return array{key: string, label: string, description: string, runtime: string|null, framework: string|null, steps: array<string, mixed>}
+     * @param  list<array<string, int|string>> $steps
+     * @return array{key: string, label: string, description: string, runtime: string|null, framework: string|null, steps: list<array<string, int|string>>}
      */
     private function formatTemplate(string $key, array $meta, array $steps): array
     {
@@ -144,8 +133,7 @@ final class DeployPipelineTemplateCatalog
     }
 
     /**
-     * @param  array<string, mixed> $steps
-     * @return list<array{step_type: string, phase: string, custom_command?: string, timeout_seconds: int}>
+     * @param  list<array<string, int|string>> $steps
      */
     private function stripSortOrder(array $steps): array
     {

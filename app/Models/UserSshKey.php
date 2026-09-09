@@ -57,6 +57,43 @@ class UserSshKey extends Model
         return $this->morphMany(ServerAuthorizedKey::class, 'managed_key');
     }
 
+    /**
+     * The algorithm the key was generated with — "ed25519", "rsa", "ecdsa".
+     * Rows list it because "Work laptop" and "Work laptop (old)" are otherwise
+     * only tellable apart by opening the edit form.
+     */
+    public function keyType(): string
+    {
+        $prefix = (string) (preg_split('/\s+/', trim($this->public_key), 2)[0] ?? '');
+
+        return match (true) {
+            str_starts_with($prefix, 'sk-ssh-ed25519') => 'ed25519-sk',
+            str_starts_with($prefix, 'ssh-ed25519') => 'ed25519',
+            str_starts_with($prefix, 'ssh-rsa') => 'rsa',
+            str_starts_with($prefix, 'ssh-dss') => 'dsa',
+            str_starts_with($prefix, 'ecdsa-sha2-') => 'ecdsa',
+            default => '',
+        };
+    }
+
+    /**
+     * OpenSSH-style fingerprint (SHA256:…), the same string `ssh-keygen -lf`
+     * prints, so an operator can match a row against a key on their machine.
+     * Empty when the stored blob is not decodable rather than throwing — this
+     * is display-only.
+     */
+    public function fingerprint(): string
+    {
+        $parts = preg_split('/\s+/', trim($this->public_key), 3);
+        $blob = base64_decode((string) ($parts[1] ?? ''), true);
+
+        if ($blob === false || $blob === '') {
+            return '';
+        }
+
+        return 'SHA256:'.rtrim(base64_encode(hash('sha256', $blob, true)), '=');
+    }
+
     public static function publicKeyLooksValid(string $key): bool
     {
         $key = trim($key);

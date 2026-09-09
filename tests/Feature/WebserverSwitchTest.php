@@ -27,7 +27,20 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    config(['server_workspace.webserver_coming_soon' => []]);
+    // Every alternative engine ships parked today: `webserver_hidden` lists
+    // caddy/apache/openlitespeed and `webserver_switch_hidden` blocks the whole
+    // Change flow (openSwitchWebserver refuses before touching state, so the
+    // component-level assertions below all see nulls).
+    //
+    // These tests cover the switch preflight + job wiring, which is live code
+    // regardless of which engines are currently offered, so un-park it here.
+    // `webserver_coming_soon` is the older key this file already cleared; keep
+    // it for engines that are listed but not hidden.
+    config([
+        'server_workspace.webserver_coming_soon' => [],
+        'server_workspace.webserver_hidden' => [],
+        'server_workspace.webserver_switch_hidden' => false,
+    ]);
 });
 
 function makeUser(): User

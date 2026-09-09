@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Servers\Concerns;
 
 use App\Models\Server;
+use App\Services\Servers\PhpRedisExtensionScripts;
 use App\Support\Servers\ServerPhpMutationLock;
 
 /**
@@ -14,8 +15,6 @@ use App\Support\Servers\ServerPhpMutationLock;
  */
 trait BuildsPhpScripts
 {
-
-
     protected function privilegedShellScript(Server $server, string $quotedVersions): string
     {
         $inner = <<<'BASH'
@@ -68,12 +67,28 @@ fi
 
 default_version=""
 if command -v php >/dev/null 2>&1; then
-  default_version="$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null || true)"
+  default_version="$(php -r "echo PHP_MAJOR_VERSION, chr(46), PHP_MINOR_VERSION;" 2>/dev/null || true)"
 fi
 
 printf "supported=%s\n" "$supported"
 printf "installed_versions=%s\n" "$(IFS=,; echo "${installed_versions[*]}")"
 printf "detected_default_version=%s\n" "$default_version"
+
+for extdir in /etc/php/*/; do
+  extver="$(basename "$extdir")"
+  [ -d "/etc/php/${extver}/mods-available" ] || continue
+  ext_available="$(ls -1 "/etc/php/${extver}/mods-available" 2>/dev/null | sed -n "s/\.ini\$//p" | sort -u | paste -sd, -)"
+  ext_enabled=""
+  for extsapi in cli fpm; do
+    if [ -d "/etc/php/${extver}/${extsapi}/conf.d" ]; then
+      ext_enabled="${ext_enabled}$(ls -1 "/etc/php/${extver}/${extsapi}/conf.d" 2>/dev/null | sed -n "s/^[0-9]*-//;s/\.ini\$//p")
+"
+    fi
+  done
+  ext_enabled="$(printf %s "$ext_enabled" | grep -v "^\$" | sort -u | paste -sd, -)"
+  printf "extensions_available[%s]=%s\n" "$extver" "$ext_available"
+  printf "extensions_enabled[%s]=%s\n" "$extver" "$ext_enabled"
+done
 '
 BASH;
 
@@ -139,28 +154,99 @@ BASH;
     }
 
     /**
-     * Install a PHP version *after* initial provisioning (the Manage → PHP UI).
+     * Install a PHP version *after* initial provisioning (the Manage → PHP UI
+     * and the failed-deploy “Upgrade PHP” remediation).
      *
-     * Mirrors the optional-extension set from first-boot provisioning
-     * (BuildsProvisionWebserverPhp::$optionalPkgs) so an added version isn't
-     * left with only cli+fpm — without phpredis a Laravel app on the new
-     * version hits `Class "Redis" not found`. Core is strict (fails the action
-     * if cli/fpm can't install); extensions are best-effort, filtered to what
-     * apt can actually see, so a single unavailable package (e.g. the bundled
-     * php8.5-opcache) can't abort the whole install.
+     * Ubuntu stock repos (e.g. noble) only ship php8.3. Newer catalog IDs
+     * (8.4, 8.5, …) need Ondřej Surý’s builds — the same ondrej/sury source
+     * first-boot uses in BuildsProvisionWebserverPhp::ensureOndrejPhpRepository.
+     * This script adds that repo when apt cannot see php{version}-cli, then
+     * installs cli+fpm plus the first-boot required extensions (mysql/pgsql/
+     * sqlite3/curl/mbstring/xml/redis). phpredis is required — Laravel defaults
+     * to REDIS_CLIENT=phpredis, and a follow-up “Install php-redis” remediation
+     * after switching the site to this version is too late. Remaining extras
+     * (gd, sodium, …) stay best-effort so one missing package cannot abort
+     * the install. FPM is enabled and restarted so the new pool actually
+     * loads redis.
      */
     protected function installPhpScript(string $version): string
     {
+        $stem = 'php'.$version;
+
         return implode("\n", [
             'set -e',
             'export DEBIAN_FRONTEND=noninteractive',
-            "apt-get install -y php{$version}-cli php{$version}-fpm",
-            'for ext in common mysql pgsql curl mbstring xml redis gd sodium gmp apcu igbinary zip intl bcmath opcache; do',
-            "  pkg=\"php{$version}-\$ext\"",
+            $this->ensureOndrejPhpPackagesAvailableScript($version),
+            'echo "[dply] installing '.$stem.' runtime and required extensions (incl. phpredis)..."',
+            'apt-get install -y '
+                .$stem.'-cli '.$stem.'-fpm '.$stem.'-common '
+                .$stem.'-mysql '.$stem.'-pgsql '.$stem.'-sqlite3 '
+                .$stem.'-curl '.$stem.'-mbstring '.$stem.'-xml '.$stem.'-redis',
+            'for ext in gd sodium gmp apcu igbinary zip intl bcmath opcache; do',
+            "  pkg=\"{$stem}-\$ext\"",
             '  if apt-cache show "$pkg" >/dev/null 2>&1; then',
             '    apt-get install -y "$pkg" || true',
             '  fi',
             'done',
+            'phpenmod -v '.escapeshellarg($version).' redis 2>/dev/null || true',
+            PhpRedisExtensionScripts::dedupe($version),
+            'systemctl enable --now '.$stem.'-fpm',
+            'systemctl restart '.$stem.'-fpm',
+            'if ! '.$stem.' -m 2>/dev/null | grep -qi "^redis$"; then',
+            '  echo "[dply] ERROR: phpredis is not loaded in '.$stem.' after install." >&2',
+            '  exit 1',
+            'fi',
+            'systemctl is-active --quiet '.$stem.'-fpm',
+            'echo "[dply] '.$stem.'-fpm is active with phpredis."',
+        ]);
+    }
+
+    /**
+     * Refresh apt, then add packages.sury.org (Launchpad fallback) when the
+     * requested php{version}-cli package is not in the distro cache.
+     */
+    protected function ensureOndrejPhpPackagesAvailableScript(string $version): string
+    {
+        $pkg = 'php'.$version.'-cli';
+
+        return implode("\n", [
+            'echo "[dply] refreshing apt metadata..."',
+            'apt-get update -y -o Acquire::Retries=3 || true',
+            "if apt-cache show '{$pkg}' >/dev/null 2>&1; then",
+            "  echo '[dply] {$pkg} is already available in apt; skipping ondrej/sury setup.'",
+            'else',
+            "  echo '[dply] {$pkg} is not in distro repos — adding ondrej/sury PHP repository.'",
+            '  command -v curl >/dev/null 2>&1 || apt-get install -y curl ca-certificates',
+            '  command -v gpg >/dev/null 2>&1 || apt-get install -y gnupg',
+            '  command -v lsb_release >/dev/null 2>&1 || apt-get install -y lsb-release',
+            '  install -d -m 0755 /etc/apt/keyrings',
+            '  if curl -fsI -m 5 https://packages.sury.org/php/ >/dev/null 2>&1; then',
+            '    echo "[dply] using packages.sury.org (primary upstream)"',
+            '    curl -fsSL --retry 3 --retry-delay 2 --max-time 60 https://packages.sury.org/php/apt.gpg \\',
+            '      | gpg --dearmor --yes -o /etc/apt/keyrings/sury-php.gpg',
+            '    chmod 0644 /etc/apt/keyrings/sury-php.gpg',
+            '    echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ $(lsb_release -cs) main" \\',
+            '      > /etc/apt/sources.list.d/sury-php.list',
+            '    rm -f /etc/apt/sources.list.d/ondrej-php.list',
+            '  elif curl -fsI -m 5 https://ppa.launchpadcontent.net/ondrej/php/ubuntu/ >/dev/null 2>&1; then',
+            '    echo "[dply] sury.org unreachable — falling back to ppa.launchpadcontent.net"',
+            '    curl -fsSL --retry 3 --retry-delay 2 --max-time 60 \\',
+            '      "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x14aa40ec0831756756d7f66c4f4ea0aae5267a6c" \\',
+            '      | gpg --dearmor --yes -o /etc/apt/keyrings/ondrej-php.gpg',
+            '    chmod 0644 /etc/apt/keyrings/ondrej-php.gpg',
+            '    echo "deb [signed-by=/etc/apt/keyrings/ondrej-php.gpg] https://ppa.launchpadcontent.net/ondrej/php/ubuntu $(lsb_release -cs) main" \\',
+            '      > /etc/apt/sources.list.d/ondrej-php.list',
+            '    rm -f /etc/apt/sources.list.d/sury-php.list',
+            '  else',
+            '    echo "[dply] ERROR: neither packages.sury.org nor ppa.launchpadcontent.net is reachable from this host." >&2',
+            '    exit 1',
+            '  fi',
+            '  apt-get update -y -o Acquire::Retries=3',
+            "  if ! apt-cache show '{$pkg}' >/dev/null 2>&1; then",
+            "    echo '[dply] ERROR: {$pkg} is still not available after adding ondrej/sury.' >&2",
+            '    exit 1',
+            '  fi',
+            'fi',
         ]);
     }
 

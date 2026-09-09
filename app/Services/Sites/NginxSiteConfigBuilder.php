@@ -82,7 +82,12 @@ class NginxSiteConfigBuilder
      */
     public function build(Site $site, ?SiteWebserverConfigProfile $profile = null, ?int $listenPort = null, bool $httpOnly = false): string
     {
-        if ($site->type === SiteType::Custom) {
+        // Container sites are served by their container backend (App Platform /
+        // App Runner / local Docker), never by this box's webserver — and the
+        // match below has no Container arm, so letting one through threw an
+        // UnhandledMatchError and aborted the whole webserver switch. The
+        // provision query fetches every site on the server, unfiltered.
+        if ($site->type === SiteType::Custom || $site->type === SiteType::Container) {
             return '';
         }
 
@@ -141,7 +146,7 @@ class NginxSiteConfigBuilder
         $redirects = $site->redirects->sortBy('sort_order')->values();
         $redirectBlock = '';
         foreach ($redirects as $r) {
-            $kind = $r->kind instanceof SiteRedirectKind ? $r->kind : SiteRedirectKind::Http;
+            $kind = $r->kind;
             $from = SiteRedirectConfigSupport::sanitizeFromPath((string) $r->from_path);
             if ($from === '') {
                 continue;
@@ -177,7 +182,7 @@ class NginxSiteConfigBuilder
 
         $useLayerIncludes = $profile && $profile->mode === SiteWebserverConfigProfile::MODE_LAYERED;
         $mainSource = $profile ? ($profile->main_snippet_body ?? $site->nginx_extra_raw) : $site->nginx_extra_raw;
-        $extra = trim((string) ($mainSource ?? ''));
+        $extra = trim((string) $mainSource);
         $layerPrefix = '';
         if ($useLayerIncludes) {
             $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
@@ -197,11 +202,11 @@ class NginxSiteConfigBuilder
             ? "\n    # php-fpm pool user (configure pool on server): {$poolUser}\n"
             : '';
 
-        $config = match ($site->type) {
+        $config = match ($site->configSiteType()) {
             SiteType::Php => $this->phpBlock($basename, $names, $root, $phpSock, $redirectBlock, $layerPrefix, $extraBlock, $poolNote, $site),
             SiteType::Static => $this->staticBlock($basename, $names, $root, $redirectBlock, $layerPrefix, $extraBlock, $site),
             SiteType::Node => $this->nodeBlock($basename, $names, $this->resolveUpstreamPort($site), $redirectBlock, $layerPrefix, $extraBlock, $site),
-            SiteType::Custom => null,
+            SiteType::Custom, SiteType::Container => null,
         };
 
         if ($config === null) {

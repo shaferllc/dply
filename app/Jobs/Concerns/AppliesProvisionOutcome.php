@@ -8,22 +8,24 @@ use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Jobs\CheckServerHealthJob;
 use App\Jobs\InstallMetricsAgentJob;
 use App\Jobs\RefreshServerInventoryJob;
-use App\Modules\Insights\Jobs\RunServerInsightsJob;
-use App\Jobs\SyncServerSystemUsersJob;
 use App\Jobs\SyncServerSystemdServicesJob;
+use App\Jobs\SyncServerSystemUsersJob;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerCredentialShare;
 use App\Models\UserSshKey;
-use App\Notifications\RedisServerProvisionedNotification;
-use App\Notifications\ServerProvisionFailedNotification;
-use App\Notifications\ServerProvisionedCredentialsNotification;
+use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Notifications\RedisServerProvisionedNotification;
+use App\Notifications\ServerProvisionedCredentialsNotification;
+use App\Notifications\ServerProvisionFailedNotification;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
 use App\Services\Servers\ServerMetricsGuestPushService;
 use App\Services\Servers\ServerProvisionCommandBuilder;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -34,8 +36,6 @@ use Illuminate\Support\Str;
  */
 trait AppliesProvisionOutcome
 {
-
-
     /**
      * Apply provision outcome to the server (setup_status, optional deploy ssh_user).
      * On transient failures, schedules an automatic retry with backoff up to MAX_AUTO_RETRY_ATTEMPTS.
@@ -69,12 +69,13 @@ trait AppliesProvisionOutcome
             // session (see ServerProvisionedCredentialsNotification).
             $organization = $server->organization;
             $creator = $server->user;
-            if ($organization
-                && $organization->email_server_credentials_enabled
-                && $creator
-                && filled($creator->email)
-            ) {
-                $creator->notify(new ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
+            if ($organization && $organization->email_server_credentials_enabled) {
+                // Was creator-only; that is still the default, but the org can
+                // widen it to owners/admins or a hand-picked set of members.
+                Notification::send(
+                    $organization->emailRecipients(Organization::EMAIL_SERVER_CREDENTIALS, $creator),
+                    new ServerProvisionedCredentialsNotification($server->fresh() ?? $server),
+                );
             }
 
             // Dedicated redis servers get a tailored "your cache is live" email

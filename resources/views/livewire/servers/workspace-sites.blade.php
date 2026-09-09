@@ -1,11 +1,21 @@
 @php
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+    $isWorkerHost = $workerHost->isWorkerHost;
+    $showAddSite = $this->canAddSite && ! $workerHost->isSiteSourced;
     $addCtaLabel = $isContainerHost ? __('Add container') : __('Add site');
-    $listHeading = $isContainerHost ? __('Container apps') : __('Site directory');
-    $emptyHeadline = $isContainerHost ? __('No container apps yet') : __('No sites yet');
-    $emptyLead = $isContainerHost
-        ? __('Add one to deploy a Git repo onto this host.')
-        : __('Add a site to manage web server config, SSL, Git deploys, and environment files.');
+    $listHeading = $isWorkerHost
+        ? __('Queue workload')
+        : ($isContainerHost ? __('Container apps') : __('Site directory'));
+    $emptyHeadline = $isWorkerHost
+        ? __('No queue workload yet')
+        : ($isContainerHost ? __('No container apps yet') : __('No sites yet'));
+    $emptyLead = $isWorkerHost
+        ? ($workerHost->isSiteSourced
+            ? __('This worker copies the origin site automatically. Open Worker Servers on that site to retry.')
+            : __('Deploy the app onto this worker so it can run queue jobs.'))
+        : ($isContainerHost
+            ? __('Add one to deploy a Git repo onto this host.')
+            : __('Add a site to manage web server config, SSL, Git deploys, and environment files.'));
     $siteCount = $server->sites->count();
     $siteType = $server->siteType();
 @endphp
@@ -13,8 +23,10 @@
 <x-server-workspace-layout
     :server="$server"
     active="sites"
-    :title="__('Sites')"
-    :description="__('Manage sites, databases, automation, and deploy tools for this server.')"
+    :title="$isWorkerHost ? __('Workload') : __('Sites')"
+    :description="$isWorkerHost
+        ? __('Queue workers from deployed code — not a public web front.')
+        : __('Manage sites, databases, automation, and deploy tools for this server.')"
     hide-hero
 >
     @include('livewire.servers.partials.workspace-flashes')
@@ -23,118 +35,158 @@
     <div class="space-y-4">
         {{-- Merged: page identity + directory in one card (same pattern as Run/Console). --}}
         <section class="dply-card min-w-0 overflow-hidden p-0">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                <div class="flex flex-wrap items-start justify-between gap-4">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            @switch($siteType)
-                                @case('container')
-                                    <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('php')
-                                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('static')
-                                    <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @case('node')
-                                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                                    @break
-                                @default
-                                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            @endswitch
+            @php
+                $sitesIcon = $isWorkerHost
+                    ? 'heroicon-o-square-3-stack-3d'
+                    : match ($siteType) {
+                        'container' => 'heroicon-o-cube-transparent',
+                        'php' => 'heroicon-o-code-bracket',
+                        'static' => 'heroicon-o-photo',
+                        'node' => 'heroicon-o-bolt',
+                        default => 'heroicon-o-globe-alt',
+                    };
+                $sitesNote = $isWorkerHost
+                    ? ($workerHost->originSite
+                        ? __('Queue workers for :site — same repo and queues, no public site.', ['site' => $workerHost->originSite->name])
+                        : __('Queue workers from deployed code — same repo and queues, no public site.'))
+                    : match ($siteType) {
+                        'container' => __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.'),
+                        'php' => __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.'),
+                        'static' => __('Host static sites from Git with zero-config builds.'),
+                        'node' => __('Deploy Node.js apps from Git, with build and NPM support.'),
+                        default => __('Manage sites on this server — deploys, env, and settings per workspace.'),
+                    };
+                $sitesRuntimeLabel = $isWorkerHost
+                    ? __('Worker')
+                    : match ($siteType) {
+                        'container' => __('Container'),
+                        'php' => __('VM · PHP'),
+                        'static' => __('VM · Static'),
+                        'node' => __('VM · Node'),
+                        default => ucfirst((string) $server->hostKind()),
+                    };
+            @endphp
+
+            {{-- Dense head, matching the rest of the workspace. The site count,
+                 runtime label and type badge were three separate lines under the
+                 title; they're the pill + note now. --}}
+            <x-workspace-panel-head
+                dense
+                :icon="$sitesIcon"
+                :title="$isWorkerHost ? __('Workload') : ($isContainerHost ? __('Container apps') : __('Sites'))"
+                :count="($isWorkerHost
+                    ? trans_choice('{0} no workload|{1} :count workload|[2,*] :count workloads', $siteCount, ['count' => $siteCount])
+                    : trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $siteCount, ['count' => $siteCount]))
+                    .' · '.$sitesRuntimeLabel"
+                :note="$sitesNote"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
+                    @if ($showAddSite)
+                        <button
+                            type="button"
+                            wire:click="openAddSiteModal"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                        >
+                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $addCtaLabel }}
+                        </button>
+                    @elseif (! $workerHost->isSiteSourced)
+                        <span
+                            class="inline-flex h-6 cursor-not-allowed items-center gap-1 whitespace-nowrap rounded-md bg-brand-mist/30 px-2 text-xs font-semibold text-brand-moss"
+                            title="{{ $this->addSiteBlockedReason }}"
+                        >
+                            <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $addCtaLabel }}
                         </span>
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">
-                                    {{ $isContainerHost ? __('Container apps') : __('Sites') }}
-                                </h2>
-                                <span class="rounded-md bg-white/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
-                                    {{ ucfirst($siteType) }}
-                                </span>
-                            </div>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                @switch($siteType)
-                                    @case('container')
-                                        {{ __('Point dply at a Git repo. We inspect the Dockerfile or Kubernetes manifest and deploy onto this host.') }}
-                                        @break
-                                    @case('php')
-                                        {{ __('Deploy PHP/Laravel apps from Git — config, SSL, and deploys in each site workspace.') }}
-                                        @break
-                                    @case('static')
-                                        {{ __('Host static sites from Git with zero-config builds.') }}
-                                        @break
-                                    @case('node')
-                                        {{ __('Deploy Node.js apps from Git, with build and NPM support.') }}
-                                        @break
-                                    @default
-                                        {{ __('Manage sites on this server — deploys, env, and settings per workspace.') }}
-                                @endswitch
+                    @endif
+                </x-slot:actions>
+            </x-workspace-panel-head>
+
+            @include('livewire.servers.partials._worker-host-banner')
+
+            {{-- The blocker used to be a thin tinted line that read as chrome and
+                 got skipped, which is worse for a quota block than for any other
+                 reason: the ceiling is ORG-wide, so it fires on a server showing
+                 "No sites yet" and looks like a bug. Full-bleed callout, where the
+                 usage actually is, and a route out. --}}
+            @if (! $workerHost->isSiteSourced && ! $this->canAddSite && $this->addSiteBlockedReason !== '')
+                @php
+                    $quotaBlock = $this->siteQuotaBlock;
+                    $blockOrg = auth()->user()?->currentOrganization();
+                @endphp
+                <div class="border-b border-amber-300 bg-amber-50 px-4 py-3.5 sm:px-5" role="alert">
+                    <div class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700 ring-1 ring-amber-300">
+                            <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-amber-950">
+                                @if ($quotaBlock)
+                                    {{ __(':plan plan :noun limit reached — :used of :max used', [
+                                        'plan' => $quotaBlock['plan'],
+                                        'noun' => $quotaBlock['noun'],
+                                        'used' => $quotaBlock['used'],
+                                        'max' => $quotaBlock['limit'] ?? __('unlimited'),
+                                    ]) }}
+                                @else
+                                    {{ $isContainerHost ? __('Cannot add a container app') : __('Cannot add a site') }}
+                                @endif
                             </p>
-                            <p class="mt-2 text-xs text-brand-mist">
-                                <span class="font-mono font-semibold tabular-nums text-brand-ink">{{ $siteCount }}</span>
-                                {{ $isContainerHost ? __('on this host') : __('on this server') }}
-                                ·
-                                @switch($siteType)
-                                    @case('container')
-                                        {{ __('Container') }}
-                                        @break
-                                    @case('php')
-                                        {{ __('VM · PHP') }}
-                                        @break
-                                    @case('static')
-                                        {{ __('VM · Static') }}
-                                        @break
-                                    @case('node')
-                                        {{ __('VM · Node') }}
-                                        @break
-                                    @default
-                                        {{ ucfirst((string) $server->hostKind()) }}
-                                @endswitch
-                            </p>
-                            @if (! $this->canAddSite && $this->addSiteBlockedReason !== '')
-                                <div class="mt-3 inline-flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-relaxed text-amber-900">
-                                    <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    <span>{{ $this->addSiteBlockedReason }}</span>
+                            <p class="mt-1 text-xs leading-relaxed text-amber-900">{{ $this->addSiteBlockedReason }}</p>
+
+                            @if ($quotaBlock && $quotaBlock['elsewhere'] > 0)
+                                <p class="mt-1.5 text-xs leading-relaxed text-amber-900/90">
+                                    {{ trans_choice(
+                                        '{1} The limit is org-wide, not per server — :count of them is on another server.'
+                                            .'|[2,*] The limit is org-wide, not per server — :count of them are on other servers.',
+                                        $quotaBlock['elsewhere'],
+                                        ['count' => $quotaBlock['elsewhere']],
+                                    ) }}
+                                </p>
+                            @endif
+
+                            @if ($quotaBlock)
+                                <div class="mt-3 flex flex-wrap items-center gap-2">
+                                    @if ($blockOrg !== null)
+                                        <a
+                                            href="{{ route('subscription.show', $blockOrg) }}"
+                                            wire:navigate
+                                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
+                                        >
+                                            <x-heroicon-m-arrow-up-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            {{ __('Upgrade plan') }}
+                                        </a>
+                                    @endif
+                                    <a
+                                        href="{{ route($quotaBlock['index_route']) }}"
+                                        wire:navigate
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition-colors hover:bg-amber-100/70"
+                                    >
+                                        <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        {{ __('Review all :nouns', ['nouns' => $quotaBlock['noun_plural']]) }}
+                                    </a>
                                 </div>
                             @endif
                         </div>
                     </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        @if ($this->canAddSite)
-                            <button
-                                type="button"
-                                wire:click="openAddSiteModal"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $addCtaLabel }}
-                            </button>
-                        @else
-                            <span
-                                class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-brand-mist/30 px-3 py-1.5 text-xs font-semibold text-brand-moss"
-                                title="{{ $this->addSiteBlockedReason }}"
-                            >
-                                <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ $addCtaLabel }}
-                            </span>
-                        @endif
-                    </div>
                 </div>
-            </div>
+            @endif
 
-            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            <div class="border-b border-brand-ink/10 px-4 py-2 sm:px-5">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <x-heroicon-o-rectangle-stack class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listHeading }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $listHeading }}</p>
                     </div>
                     @if ($siteCount > 0)
-                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
+                        <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
                     @endif
                 </div>
                 <p class="mt-1 text-xs text-brand-moss">
-                    @if ($bulkActionsEnabled && ! $isContainerHost)
+                    @if ($isWorkerHost)
+                        {{ __('This is the copied app this worker deploys — queues only, not a public site.') }}
+                    @elseif ($bulkActionsEnabled && ! $isContainerHost)
                         {{ __('Select sites to run bulk actions, or click a row to open that workspace.') }}
                     @else
                         {{ __('Click a row to open that workspace.') }}
@@ -144,7 +196,7 @@
 
             @php $bulkSelectedCount = count(array_filter($selectedSiteIds ?? [])); @endphp
             @if ($bulkActionsEnabled && ! $isContainerHost && $bulkSelectedCount > 0)
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-5 py-3 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/15 px-4 py-2 sm:px-5">
                     <span class="text-xs font-medium uppercase tracking-wide text-brand-moss">{{ trans_choice(':count site selected|:count sites selected', $bulkSelectedCount, ['count' => $bulkSelectedCount]) }}</span>
                     <button
                         type="button"
@@ -196,17 +248,23 @@
             @endif
 
             @if ($server->sites->isEmpty())
-                <div class="px-5 py-12 text-center sm:px-6">
+                <div class="px-4 py-8 text-center sm:px-5">
                     <span class="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                        @if ($isContainerHost)
+                        @if ($isWorkerHost)
+                            <x-heroicon-o-square-3-stack-3d class="h-6 w-6" aria-hidden="true" />
+                        @elseif ($isContainerHost)
                             <x-heroicon-o-cube-transparent class="h-6 w-6" aria-hidden="true" />
                         @else
                             <x-heroicon-o-globe-alt class="h-6 w-6" aria-hidden="true" />
                         @endif
                     </span>
                     <p class="mt-4 text-sm font-semibold text-brand-ink">{{ $emptyHeadline }}</p>
-                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">{{ $emptyLead }}</p>
-                    @if ($this->canAddSite)
+                    <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                        {{-- "Add a site to…" next to a disabled Add button reads as a
+                             broken page; point at the callout above instead. --}}
+                        {{ $showAddSite ? $emptyLead : ($workerHost->isSiteSourced ? $emptyLead : $this->addSiteBlockedReason) }}
+                    </p>
+                    @if ($showAddSite)
                         <button
                             type="button"
                             wire:click="openAddSiteModal"
@@ -215,6 +273,15 @@
                             <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ $addCtaLabel }}
                         </button>
+                    @elseif ($workerHost->isSiteSourced && filled($workerHost->manageUrl))
+                        <a
+                            href="{{ $workerHost->manageUrl }}"
+                            wire:navigate
+                            class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            {{ __('Open Worker Servers') }}
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </a>
                     @endif
                 </div>
             @else
@@ -234,8 +301,8 @@
                             // to this row: a VM site (not a functions/edge runtime)
                             // the viewer may update. The action handlers re-check
                             // this, so a stale click is a safe no-op either way.
+                            $isWorkerReplica = $isWorkerHost || $s->isFleetReplica();
                             $siteDeployable = $server->isVmHost()
-                                && ! $s->usesFunctionsRuntime()
                                 && ! $s->usesEdgeRuntime()
                                 && auth()->user()?->can('update', $s);
 
@@ -248,12 +315,13 @@
                             // left bar so the row matches the family pattern.
                             $statusChip = match (true) {
                                 $s->status === \App\Models\Site::STATUS_ERROR => ['tone' => 'border-rose-200 bg-rose-50 text-rose-700', 'icon' => 'm-x-circle', 'label' => __('Error')],
-                                $statusOk => ['tone' => 'border-emerald-200 bg-emerald-50 text-emerald-700', 'icon' => 'm-check-circle', 'label' => __('Ready')],
+                                $statusOk => ['tone' => 'border-emerald-200 bg-emerald-50 text-emerald-700', 'icon' => 'm-check-circle', 'label' => $isWorkerReplica ? __('Running') : __('Ready')],
+                                $isWorkerReplica => ['tone' => 'border-amber-200 bg-amber-50 text-amber-800', 'icon' => 'm-clock', 'label' => __('Installing')],
                                 default => ['tone' => 'border-amber-200 bg-amber-50 text-amber-800', 'icon' => 'm-clock', 'label' => __('Pending')],
                             };
                         @endphp
                         <li wire:key="site-{{ $s->id }}" class="flex items-stretch">
-                            @if ($bulkActionsEnabled && ! $isContainerHost)
+                            @if ($bulkActionsEnabled && ! $isContainerHost && ! $isWorkerReplica)
                                 <label class="flex shrink-0 items-center px-4 sm:px-5">
                                     <input
                                         type="checkbox"
@@ -267,7 +335,7 @@
                             <a
                                 href="{{ route('sites.show', [$server, $s]) }}"
                                 wire:navigate
-                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 pr-6 transition-colors hover:bg-brand-sand/15 sm:pr-7 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-6 sm:px-7' }}"
+                                class="flex min-w-0 flex-1 items-center justify-between gap-4 py-3 pr-4 transition-colors hover:bg-brand-sand/15 sm:pr-5 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-4 sm:px-5' }}"
                             >
                                 <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-sand/40 text-sm font-semibold text-brand-moss">
                                     @if ($s->logoUrl())
@@ -279,31 +347,37 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $s->isCustom() ? $s->name : $displayHost }}</span>
+                                        @if ($isWorkerReplica)
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800">
+                                                <x-heroicon-o-square-3-stack-3d class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Worker') }}
+                                            </span>
+                                        @endif
                                         @if ($s->isCustom())
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/10 bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 <x-heroicon-m-wrench-screwdriver class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Custom') }}
                                             </span>
-                                        @elseif ($sslOn)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
+                                        @elseif ($sslOn && ! $isWorkerReplica)
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-700" title="{{ __('SSL active') }}">
                                                 <x-heroicon-s-lock-closed class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('SSL') }}
                                             </span>
                                         @endif
                                         @if ($debugOn)
-                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800">
+                                            <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800">
                                                 <x-heroicon-m-bug-ant class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Debug') }}
                                             </span>
                                         @endif
                                         @if ($isWaitingOnHost)
-                                            <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">
+                                            <span data-testid="container-site-waiting-host" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-700">
                                                 <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Waiting for host') }}
                                             </span>
                                         @endif
                                     </div>
-                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-brand-moss">
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-brand-moss">
                                         @if ($gitShort)
                                             <span class="inline-flex items-center gap-1">
                                                 <x-heroicon-m-code-bracket class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -325,14 +399,14 @@
                                         </span>
                                         @if ($s->type?->value === 'php' && $s->php_version)
                                             <span class="inline-flex items-center gap-1">
-                                                <span class="text-[10px] uppercase tracking-wide text-brand-mist">PHP</span>
+                                                <span class="text-2xs uppercase tracking-wide text-brand-mist">PHP</span>
                                                 <span class="font-mono text-brand-ink">{{ $s->php_version }}</span>
                                             </span>
                                         @endif
                                     </div>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-2">
-                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusChip['tone'] }}">
+                                    <span class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $statusChip['tone'] }}">
                                         @if ($statusChip['icon'] === 'm-check-circle')
                                             <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         @elseif ($statusChip['icon'] === 'm-x-circle')
@@ -369,7 +443,7 @@
                                         </span>
                                         {{ __('Deploy') }}
                                     </button>
-                                    @if ($syncCount > 1)
+                                    @if ($syncCount > 1 && ! $isWorkerReplica)
                                         <button
                                             type="button"
                                             wire:click="deploySyncedSites('{{ $s->id }}')"
@@ -415,23 +489,23 @@
                 focusable
             >
                 <form wire:submit="addSite" x-data="{ showAdvanced: false }" class="flex min-h-0 flex-1 flex-col">
-                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                         <x-icon-badge>
                             <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New site') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('New site') }}</p>
                             {{-- $sites is not passed to this view; the rest of the file reads $server->sites (eager-loaded in render()). --}}
                             @if($server->sites->count() > 0)
-                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
-                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('Add a site to :server', ['server' => $server->name]) }}</h2>
+                                <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                     {{ __('Enter a primary domain. Stack, paths, and PHP options are available below.') }}
                                 </p>
                             @endif
                         </div>
                     </div>
 
-                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3.5 sm:px-5">
                         <div>
                             <x-input-label for="add-site-hostname" :value="__('Primary domain')" />
                             <x-text-input
@@ -582,7 +656,7 @@
                         </div>
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-4 py-2.5 sm:px-5">
                         <x-secondary-button type="button" wire:click="closeAddSiteModal">
                             {{ __('Cancel') }}
                         </x-secondary-button>
@@ -608,13 +682,13 @@
 
         @if ($bulkActionsEnabled && ! $isContainerHost)
             <x-modal name="redeploy-all-sites" maxWidth="lg" overlayClass="bg-brand-ink/40">
-                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-4 py-3 sm:px-5">
                     <div class="flex items-start gap-3 pr-10">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Bulk deploy') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Bulk deploy') }}</p>
                             <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Redeploy selected sites?') }}</h2>
                             <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Queues a manual deploy for each selected site that is ready for traffic. Suspended or still-provisioning sites in your selection are skipped.') }}
@@ -626,7 +700,7 @@
                     </button>
                 </div>
                 @if (count($this->selectedBulkPreview['site_names'] ?? []) > 0)
-                    <div class="max-h-48 overflow-y-auto border-b border-brand-ink/10 px-6 py-4 sm:px-7">
+                    <div class="max-h-48 overflow-y-auto border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sites included') }}</p>
                         <ul class="mt-2 space-y-1 text-sm text-brand-moss">
                             @foreach ($this->selectedBulkPreview['site_names'] as $siteName)
@@ -635,7 +709,7 @@
                         </ul>
                     </div>
                 @endif
-                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 sm:px-5">
                     <button type="button" wire:click="closeRedeployAllModal" class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                         {{ __('Cancel') }}
                     </button>

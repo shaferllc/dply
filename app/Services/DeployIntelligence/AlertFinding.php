@@ -42,7 +42,6 @@ final class AlertFinding
     /**
      * @return AlertFindingArray
      */
-    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

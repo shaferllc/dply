@@ -48,6 +48,14 @@ final class ProvisioningDigest
             return null;
         }
 
+        // Adopted hosts were already running before dply met them: there is no
+        // journey and there never will be, so "waiting for setup to start"
+        // describes work that is not coming. Covers rows adopted before the
+        // import flow started marking setup as done.
+        if (is_array($server->meta) && ($server->meta['adopted'] ?? false)) {
+            return null;
+        }
+
         // Error / disconnected servers have their own error chips; the
         // digest is only for in-flight provisioning.
         if (in_array($server->status, [Server::STATUS_ERROR, Server::STATUS_DISCONNECTED], true)) {

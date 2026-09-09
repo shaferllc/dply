@@ -2,10 +2,10 @@
 
 namespace App\Services\Sites;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploySyncGroup;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 
@@ -32,17 +32,27 @@ class SiteDeploySyncCoordinator
     public function queuePeerDeploysFromWebhook(Site $triggeredSite): void
     {
         $group = $this->findGroupForSite($triggeredSite);
-        if ($group === null) {
+        $fleet = $this->fleetReplicas($triggeredSite);
+
+        if ($group === null && $fleet->isEmpty()) {
             return;
         }
 
-        if ($group->leader_site_id !== null && (string) $triggeredSite->id !== (string) $group->leader_site_id) {
+        if ($group !== null) {
+            if ($group->leader_site_id !== null && (string) $triggeredSite->id !== (string) $group->leader_site_id) {
+                return;
+            }
+
+            $group->loadMissing('sites');
+            $peers = $group->sites->reject(fn (Site $p): bool => (string) $p->id === (string) $triggeredSite->id);
+            $this->rollOut($group, $peers->concat($fleet)->unique('id')->values(), SiteDeployment::TRIGGER_SYNC_PEER);
+
             return;
         }
 
-        $group->loadMissing('sites');
-        $peers = $group->sites->reject(fn (Site $p): bool => (string) $p->id === (string) $triggeredSite->id);
-        $this->rollOut($group, $peers, SiteDeployment::TRIGGER_SYNC_PEER);
+        foreach ($fleet as $replica) {
+            RunSiteDeploymentJob::dispatch($replica->fresh(), SiteDeployment::TRIGGER_SYNC_PEER);
+        }
     }
 
     /**
@@ -51,14 +61,27 @@ class SiteDeploySyncCoordinator
     public function dispatchManualForGroup(Site $site): void
     {
         $group = $this->findGroupForSite($site);
+        $fleet = $this->fleetReplicas($site);
+
         if ($group === null || ! $this->shouldIncludePeersOnManual($site)) {
-            RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+            if ($fleet->isEmpty()) {
+                RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+
+                return;
+            }
+
+            Bus::chain(
+                collect([$site])->concat($fleet)->map(
+                    fn (Site $s) => new RunSiteDeploymentJob($s->fresh(), SiteDeployment::TRIGGER_MANUAL)
+                )->all()
+            )->dispatch();
 
             return;
         }
 
         $group->loadMissing('sites');
-        $this->rollOut($group, $group->sites, SiteDeployment::TRIGGER_MANUAL);
+        $members = $group->sites->concat($fleet)->unique('id')->values();
+        $this->rollOut($group, $members, SiteDeployment::TRIGGER_MANUAL);
     }
 
     public function dispatchManualSingle(Site $site): void
@@ -76,6 +99,16 @@ class SiteDeploySyncCoordinator
         $this->rollOut($group, $group->sites, $trigger);
 
         return $group->sites->count();
+    }
+
+    /**
+     * Hidden worker-fleet replicas of this site (empty when the site is itself a replica).
+     *
+     * @return Collection<int, Site>
+     */
+    public function fleetReplicas(Site $site): Collection
+    {
+        return $site->fleetReplicaSites();
     }
 
     /**

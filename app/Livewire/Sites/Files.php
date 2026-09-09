@@ -23,8 +23,8 @@ use Livewire\Component;
  * Site file browser (read + edit text files ≤1 MB + download ≤25 MB).
  *
  * Runs as the site's effectiveSystemUser. Edits use the atomic writer with an
- * optimistic mtime+sha256 precondition; saves into a path resolving under
- * `releases/<…>/` warn before committing (the next deploy will wipe them).
+ * optimistic mtime+sha256 precondition; paths the next deploy will replace
+ * (atomic `releases/`/`current/`, or the simple checkout) warn before save.
  */
 #[Layout('layouts.app')]
 class Files extends Component
@@ -73,15 +73,15 @@ class Files extends Component
 
     public ?string $editingSha256 = null;
 
-    public bool $editingInsideReleases = false;
+    public bool $editingWillBeOverwrittenOnDeploy = false;
 
     /** Set when a save is rejected for sha/mtime drift. */
     public bool $showConflictModal = false;
 
     public ?string $conflictMessage = null;
 
-    /** Set when a save lands inside `releases/` — operator must confirm. */
-    public bool $pendingReleaseWarning = false;
+    /** Set when a save lands on a path the next deploy will wipe — operator must confirm. */
+    public bool $pendingOverwriteWarning = false;
 
     public function mount(Server $server, Site $site): void
     {
@@ -277,11 +277,12 @@ class Files extends Component
         $this->editingSize = $read->size;
         $this->editingMtime = $read->mtime;
         $this->editingSha256 = $read->sha256;
-        $this->editingInsideReleases = FileBrowserPathPolicy::isInsideReleases(
+        $this->editingWillBeOverwrittenOnDeploy = FileBrowserPathPolicy::willBeOverwrittenOnDeploy(
             $target,
-            $this->site->effectiveRepositoryPath(),
+            $this->siteRoot(),
+            $this->site->isAtomicDeploys(),
         );
-        $this->pendingReleaseWarning = false;
+        $this->pendingOverwriteWarning = false;
         $this->showEditModal = true;
 
         $this->logSensitiveOpenIfNeeded($target);
@@ -302,22 +303,22 @@ class Files extends Component
         $this->editingContent = null;
         $this->editingSha256 = null;
         $this->editingMtime = null;
-        $this->pendingReleaseWarning = false;
+        $this->pendingOverwriteWarning = false;
     }
 
-    public function saveEdit(bool $confirmReleases = false): void
+    public function saveEdit(bool $confirmOverwrite = false): void
     {
         if ($this->editingPath === null || $this->editingSha256 === null || $this->editingMtime === null) {
             return;
         }
 
-        if ($this->editingInsideReleases && ! $confirmReleases) {
-            $this->pendingReleaseWarning = true;
+        if ($this->editingWillBeOverwrittenOnDeploy && ! $confirmOverwrite) {
+            $this->pendingOverwriteWarning = true;
 
             return;
         }
 
-        $this->pendingReleaseWarning = false;
+        $this->pendingOverwriteWarning = false;
         $writer = app(ServerFileBrowserAtomicWriter::class);
 
         $result = $writer->write(
@@ -361,7 +362,7 @@ class Files extends Component
             (int) $this->editingSize,
             $newBytes,
             $this->effectiveLoginUser(),
-            $this->editingInsideReleases,
+            FileBrowserPathPolicy::isInsideReleases($this->editingPath, $this->siteRoot()),
         );
 
         $this->editingSha256 = $result->newSha256;

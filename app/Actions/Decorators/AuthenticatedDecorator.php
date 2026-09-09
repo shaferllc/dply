@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Decorators;
 
 use App\Actions\Concerns\DecorateActions;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -56,8 +57,18 @@ class AuthenticatedDecorator
         $redirectRoute = $this->getAuthRedirectRoute();
 
         if ($redirectRoute) {
-            redirect()->route($redirectRoute)->send();
-            exit;
+            // Throw, never send()+exit. exit terminates the PHP process
+            // outright: under a queue worker or console command it kills the
+            // whole process mid-job, and under a test runner it takes the run
+            // down with no output at all -- which is exactly how this decorator
+            // silenced the entire App suite (ISS-018). It also skips terminable
+            // middleware and the rest of the response lifecycle.
+            //
+            // HttpResponseException is the framework's supported way to return
+            // a response from deep in the stack: in an HTTP request the handler
+            // unwraps it into this same redirect, and everywhere else it is an
+            // ordinary catchable exception.
+            throw new HttpResponseException(redirect()->route($redirectRoute));
         }
 
         abort(401, 'Unauthenticated');

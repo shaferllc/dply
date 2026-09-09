@@ -13,6 +13,13 @@ use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read list<array{sha: string, short_sha: string, message: string, author_name: string, author_email: string|null, committed_at: string|null, html_url: string|null}> $filteredCommits
+ */
 #[Layout('layouts.app')]
 class Commits extends Component
 {

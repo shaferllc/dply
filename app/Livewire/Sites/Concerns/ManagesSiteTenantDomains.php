@@ -89,7 +89,7 @@ trait ManagesSiteTenantDomains
         $this->new_tenant_label = '';
         $this->new_tenant_comment = '';
         $this->site->load('tenantDomains');
-        $this->finalizeRoutingMutation('Tenant domain added.');
+        $this->finalizeRoutingMutation('Tenant domain added.', closeModal: 'add-tenant-modal');
 
         // If a connected DNS credential controls this hostname's zone, point it at
         // the server automatically — so the tenant "just works" without the
@@ -278,7 +278,7 @@ trait ManagesSiteTenantDomains
                 continue;
             }
             $parts = array_map('trim', explode(',', $line, 3));
-            $hostname = strtolower($parts[0] ?? '');
+            $hostname = strtolower($parts[0]);
             $key = $parts[1] ?? null;
             $label = $parts[2] ?? null;
             if ($hostname === '' || ! HostnameValidator::isValid($hostname)) {
@@ -320,7 +320,7 @@ trait ManagesSiteTenantDomains
 
         $this->bulk_tenant_input = '';
         $this->site->load('tenantDomains');
-        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
+        $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]), closeModal: 'add-tenant-modal');
     }
 
     /**
@@ -361,25 +361,46 @@ trait ManagesSiteTenantDomains
         }
 
         $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
-        if (! ($reachability['ok'] ?? false) && empty($reachability['behind_cloudflare'])) {
+        if (! $reachability['ok'] && empty($reachability['behind_cloudflare'])) {
             $this->toastError($reachability['error']
                 ?? __('“:host” isn’t pointed at this server yet — point its DNS here, then request SSL.', ['host' => $hostname]));
 
             return;
         }
 
-        $certificate = app(CertificateRequestService::class)->create([
-            'site_id' => $this->site->id,
-            'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
-            'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
-            'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
-            'domains_json' => [$hostname],
-            'status' => SiteCertificate::STATUS_PENDING,
-            'requested_settings' => [
-                'source' => 'tenant_ssl',
-                'tenant_domain_id' => (string) $tenant->id,
-            ],
-        ]);
+        $requests = app(CertificateRequestService::class);
+
+        // The guard above already returned for anything in flight or active, so
+        // a match here is a previously failed attempt for this exact tenant.
+        // Re-running that row keeps one row per tenant hostname — inserting a
+        // fresh one leaves two rows racing for the same certbot lineage.
+        $certificate = $requests->findReusable(
+            $this->site,
+            [$hostname],
+            SiteCertificate::PROVIDER_LETSENCRYPT,
+            SiteCertificate::CHALLENGE_HTTP,
+            'tenant_ssl',
+        );
+
+        if ($certificate !== null) {
+            $certificate->forceFill([
+                'status' => SiteCertificate::STATUS_PENDING,
+                'last_output' => null,
+            ])->save();
+        } else {
+            $certificate = $requests->create([
+                'site_id' => $this->site->id,
+                'scope_type' => SiteCertificate::SCOPE_CUSTOMER,
+                'provider_type' => SiteCertificate::PROVIDER_LETSENCRYPT,
+                'challenge_type' => SiteCertificate::CHALLENGE_HTTP,
+                'domains_json' => [$hostname],
+                'status' => SiteCertificate::STATUS_PENDING,
+                'requested_settings' => [
+                    'source' => 'tenant_ssl',
+                    'tenant_domain_id' => (string) $tenant->id,
+                ],
+            ]);
+        }
 
         ExecuteSiteCertificateJob::dispatch((string) $certificate->id);
         $this->toastSuccess(__('SSL requested for :host.', ['host' => $hostname]));

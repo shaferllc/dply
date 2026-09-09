@@ -82,7 +82,7 @@
             <form wire:submit="saveFixedEnvVar" id="fix-env-var-form" class="space-y-3" wire:key="fix-field-{{ md5($fixKey) }}">
                 <div x-data="{ showValue: true }">
                     <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="fixing_env_value">
-                        <span>{{ __('Value') }}@if ($fixHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($fixHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
+                        <span>{{ __('Value') }}@if ($fixHint['type'] === 'bool')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($fixHint['type'] === 'enum')<span class="ml-1 font-normal text-xs text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                         @if ($fixHint['type'] === 'text')
                             <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                 <span x-show="!showValue">{{ __('Show') }}</span>
@@ -105,12 +105,12 @@
                 @php $fixSources = $fixKey ? $this->envKeySources($fixKey) : []; @endphp
                 @if (! empty($fixSources))
                     <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
-                        <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-sage">{{ __('Or import :key from another site', ['key' => $fixKey]) }}</p>
+                        <p class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('Or import :key from another site', ['key' => $fixKey]) }}</p>
                         <div class="space-y-1">
                             @foreach ($fixSources as $s)
                                 <div class="flex items-center justify-between gap-2">
-                                    <span class="min-w-0 truncate text-xs text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-[10px] text-brand-mist">{{ $s['masked'] }}</span></span>
-                                    <button type="button" wire:click="importEnvKeyFromSite(@js($fixKey), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Use') }}</button>
+                                    <span class="min-w-0 truncate text-xs text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-2xs text-brand-mist">{{ $s['masked'] }}</span></span>
+                                    <button type="button" wire:click="importEnvKeyFromSite(@js($fixKey), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Use') }}</button>
                                 </div>
                             @endforeach
                         </div>

@@ -121,24 +121,38 @@ trait ManagesServerSystemLogs
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
 
+            // Platform activity is dply-side, so it works on every host kind.
             $sources = [
                 'site_'.$id.'_platform' => [
                     'type' => 'dply_site',
                     'label' => __('Platform activity'),
                     'group' => 'site',
                 ],
-                'site_'.$id.'_access' => [
-                    'type' => 'file',
-                    'label' => __('Site access log'),
-                    'path' => $logDirectory.'/'.$basename.'-access.log',
-                    'group' => 'site',
-                ],
-                'site_'.$id.'_error' => [
-                    'type' => 'file',
-                    'label' => __('Site error log'),
-                    'path' => $logDirectory.'/'.$basename.'-error.log',
-                    'group' => 'site',
-                ],
+            ];
+
+            // Everything below is a file on a machine. A FaaS namespace or a
+            // managed-container host has no disk to read and no SSH to read it
+            // with, so listing these paths only ever renders "SSH blocked /
+            // Unavailable" rows for logs that cannot exist. Those runtimes have
+            // their own log workspaces (Serverless: activations/visits/runtime
+            // via `function_invocations`; Cloud/Edge: provider log streams).
+            if (! $server->hostCapabilities()->supportsSsh()) {
+                $this->cachedAvailableLogSources = $sources;
+
+                return $sources;
+            }
+
+            $sources['site_'.$id.'_access'] = [
+                'type' => 'file',
+                'label' => __('Site access log'),
+                'path' => $logDirectory.'/'.$basename.'-access.log',
+                'group' => 'site',
+            ];
+            $sources['site_'.$id.'_error'] = [
+                'type' => 'file',
+                'label' => __('Site error log'),
+                'path' => $logDirectory.'/'.$basename.'-error.log',
+                'group' => 'site',
             ];
 
             if ($site->isLaravelFrameworkDetected()) {
@@ -159,6 +173,14 @@ trait ManagesServerSystemLogs
                 ];
             }
 
+            $this->cachedAvailableLogSources = $sources;
+
+            return $sources;
+        }
+
+        // Same rule for the whole-server catalog: only a VM has per-site log
+        // files to offer.
+        if (! $server->hostCapabilities()->supportsSsh()) {
             $this->cachedAvailableLogSources = $sources;
 
             return $sources;
@@ -454,7 +476,7 @@ trait ManagesServerSystemLogs
                 $this->logTimeRangeMinutes,
             );
 
-            $raw = (string) ($result['output'] ?? '');
+            $raw = (string) $result['output'];
             $maxStored = (int) config('server_system_logs.max_stored_bytes', 524288);
             $truncated = false;
             if ($maxStored > 0 && strlen($raw) > $maxStored) {

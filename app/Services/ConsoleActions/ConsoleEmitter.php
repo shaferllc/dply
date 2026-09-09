@@ -50,6 +50,14 @@ class ConsoleEmitter
             return;
         }
 
+        if (str_contains($line, "\n") || str_contains($line, "\r")) {
+            foreach (preg_split('/\R/u', $line) ?: [] as $part) {
+                $this->__invoke($part, $level, $source);
+            }
+
+            return;
+        }
+
         $line = $this->trimLine($line);
         if ($line === '') {
             return;

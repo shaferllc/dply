@@ -20,7 +20,7 @@
     @php $sub = $shippingSubTab ?? 'logs'; @endphp
 
     {{-- Sub-tabs — Logs first so the stream is visible without scrolling past setup --}}
-    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
         <div class="flex flex-wrap items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1">
             @foreach ([
                 'logs' => [__('Logs'), 'heroicon-m-bars-3-bottom-left'],
@@ -29,11 +29,11 @@
             ] as $key => $meta)
                 <button type="button" wire:click="setShippingSubTab('{{ $key }}')"
                     @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition',
+                        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold leading-none transition',
                         'bg-brand-forest text-white shadow-sm' => $sub === $key,
                         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $sub !== $key,
                     ])>
-                    <x-dynamic-component :component="$meta[1]" class="h-4 w-4" aria-hidden="true" />
+                    <x-dynamic-component :component="$meta[1]" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ $meta[0] }}
                 </button>
             @endforeach
@@ -57,38 +57,32 @@
             <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
         @endif
         <section class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-center gap-3 px-6 py-4 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-inbox-arrow-down class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Log aggregator') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
-                        {{ __('This server is the dply Logs ingest tier') }}
-                    </h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Edges across the fleet ship here over mTLS; it writes to ClickHouse.') }}
-                        <span class="font-medium text-brand-ink">
-                            {{ __('Config') }} {{ $aggInstalled ? 'v'.$aggInstalled : __('unknown') }}
-                            @if (! $aggStale && $aggregator->isRunning())
-                                <span class="text-brand-sage">· {{ __('up to date') }}</span>
-                            @else
-                                <span class="opacity-70">→ v{{ $aggCurrent }}</span>
-                            @endif
-                        </span>
-                    </p>
-                </div>
+            {{-- The "LOG AGGREGATOR" eyebrow restated the title under it; the
+                 installed-config line folds into the head's single note row. --}}
+            @php
+                $aggNote = __('Edges across the fleet ship here over mTLS; it writes to ClickHouse.')
+                    .' '.__('Config').' '.($aggInstalled ? 'v'.$aggInstalled : __('unknown'))
+                    .(! $aggStale && $aggregator->isRunning() ? ' · '.__('up to date') : ' → v'.$aggCurrent);
+            @endphp
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-inbox-arrow-down"
+                :title="__('This server is the dply Logs ingest tier')"
+                :note="$aggNote"
+            >
                 @if ($aggStale)
-                    <button type="button" wire:click="resyncLogAggregator" wire:loading.attr="disabled"
-                        @disabled($aggBusy)
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
-                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
-                        {{ $aggBusy ? __('Updating…') : __('Update aggregator') }}
-                    </button>
+                    <x-slot:actions>
+                        <button type="button" wire:click="resyncLogAggregator" wire:loading.attr="disabled"
+                            @disabled($aggBusy)
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ $aggBusy ? __('Updating…') : __('Update aggregator') }}
+                        </button>
+                    </x-slot:actions>
                 @endif
-            </div>
+            </x-workspace-panel-head>
             @if ($aggStale)
-                <div class="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900 sm:px-7">
+                <div class="border-t border-amber-200 bg-amber-50 px-5 py-2 text-xs leading-relaxed text-amber-900 sm:px-6">
                     {{ __('A newer aggregator config is available (v:current). Re-sync to apply it — existing log rows are unaffected; new logs use the updated pipeline.', ['current' => $aggCurrent]) }}
                 </div>
             @endif
@@ -96,46 +90,63 @@
     @endif
 
     <section class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Add-on') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply Logs') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Run a lightweight agent (Vector) on this server to ship system + service logs to dply for persistent, searchable storage — beyond the live SSH tail. Hard-capped so it never competes with your app.') }}
-                </p>
-            </div>
+        {{-- "ADD-ON" over "dply Logs" said the same thing as the tab; the status
+             chip keeps its place in the head's actions slot. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-paper-airplane"
+            :title="__('dply Logs')"
+            :note="__('Run a lightweight agent (Vector) on this server to ship system + service logs to dply for persistent, searchable storage — beyond the live SSH tail. Hard-capped so it never competes with your app.')"
+            class="border-b border-brand-ink/10"
+        >
             @if ($agent !== null)
-                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $statusTone }}">
-                    {{ $statusMeta['label'] }}
-                    @if ($agent->version)
-                        <span class="font-normal opacity-70">· v{{ $agent->version }}</span>
-                    @endif
-                </span>
+                <x-slot:actions>
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $statusTone }}">
+                        {{ $statusMeta['label'] }}
+                        @if ($agent->version)
+                            <span class="font-normal opacity-70">· v{{ $agent->version }}</span>
+                        @endif
+                    </span>
+                </x-slot:actions>
             @endif
-        </div>
+        </x-workspace-panel-head>
 
-        <div class="space-y-5 px-6 py-5 sm:px-7">
+        <div class="space-y-3 px-5 py-3 sm:px-6">
             @unless ($this->logShippingEnabled)
-                <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
                     {{ __('The Logs add-on is not enabled in this environment yet. Set SERVER_LOGS_ENABLED=true to turn it on.') }}
                 </div>
             @endunless
 
             @if ($agent?->error_message)
-                <div class="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">
+                <div class="rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700 ring-1 ring-inset ring-rose-200">
                     <p class="font-semibold">{{ __('Last error') }}</p>
                     <p class="mt-0.5 break-words">{{ $agent->error_message }}</p>
                 </div>
             @endif
 
+            {{-- Stale SINK: the agent was configured before the current aggregator
+                 existed, so its rendered config points at the blackhole sink and it
+                 is discarding every line — while reporting running, no error, and a
+                 current config version. Strictly worse than a version-stale config,
+                 so it wins the slot and is coloured as a fault, not a nudge. --}}
+            @if ($agent?->needsAggregatorResync())
+                <div class="flex flex-wrap items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-800 ring-1 ring-inset ring-rose-200">
+                    <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <p class="min-w-0 flex-1">
+                        {{ __('This agent was configured before the current log aggregator, so it is shipping to nowhere and no logs are being stored. Re-sync to point it at the aggregator.') }}
+                    </p>
+                    <button type="button" wire:click="resyncLogShipping" wire:loading.attr="disabled"
+                        @disabled($busy)
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                        {{ $busy ? __('Re-syncing…') : __('Re-sync agent') }}
+                    </button>
+                </div>
             {{-- Stale edge config: this build of dply renders a newer agent config than
                  the box is running. Re-sync (same action as a source change) to apply it. --}}
-            @if ($agent?->isConfigStale())
-                <div class="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
-                    <x-heroicon-o-arrow-path class="h-5 w-5 shrink-0" aria-hidden="true" />
+            @elseif ($agent?->isConfigStale())
+                <div class="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 ring-1 ring-inset ring-amber-200">
+                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" aria-hidden="true" />
                     <p class="min-w-0 flex-1">
                         {{ __('A newer log agent config is available (v:installed → v:current). Re-sync to apply it on this server.', [
                             'installed' => $agent->installedConfigVersion() ?? '—',
@@ -144,7 +155,7 @@
                     </p>
                     <button type="button" wire:click="resyncLogShipping" wire:loading.attr="disabled"
                         @disabled($busy)
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-brand-ink/90 disabled:opacity-50">
                         {{ $busy ? __('Re-syncing…') : __('Re-sync agent') }}
                     </button>
                 </div>
@@ -164,28 +175,28 @@
                 <button
                     type="button"
                     x-on:click="open = ! open"
-                    class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
+                    class="flex w-full items-start justify-between gap-3 px-3 py-2 text-left"
                 >
                     <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Sources') }}</p>
+                        <p class="text-xs font-semibold text-brand-ink">{{ __('Sources') }}</p>
                         <p class="mt-0.5 text-xs text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
-                        <span class="rounded-full bg-brand-ink/5 px-2 py-0.5 text-[11px] font-semibold text-brand-moss">
+                        <span class="rounded-full bg-brand-ink/5 px-2 py-0.5 text-xs font-semibold text-brand-moss">
                             {{ __(':on / :total on', ['on' => $sourcesOnCount, 'total' => $sourcesTotal]) }}
                         </span>
                         <x-heroicon-o-chevron-down class="h-4 w-4 text-brand-moss transition" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
                     </div>
                 </button>
                 <div x-show="open" x-collapse>
-                    <div class="grid gap-2 border-t border-brand-ink/10 px-4 py-4 sm:grid-cols-2">
+                    <div class="grid gap-1.5 border-t border-brand-ink/10 px-3 py-2.5 sm:grid-cols-2">
                         @foreach ($this->logShippingSourceCatalog as $key => $label)
                             @php $on = (bool) ($this->logShippingSources[$key] ?? false); @endphp
                             <button
                                 type="button"
                                 wire:click="toggleLogShippingSource('{{ $key }}')"
                                 @disabled($busy)
-                                class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:opacity-50
+                                class="flex items-center justify-between gap-3 rounded-lg border px-2.5 py-1.5 text-left text-xs transition disabled:opacity-50
                                     {{ $on ? 'border-brand-sage/40 bg-brand-sage/10' : 'border-brand-ink/10 bg-white hover:bg-brand-sand/20' }}"
                             >
                                 <span class="min-w-0 truncate text-brand-ink">{{ $label }}</span>
@@ -199,16 +210,16 @@
             </div>
 
             {{-- Actions --}}
-            <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 pt-4">
+            <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-3">
                 @if ($agent === null || $status === 'failed')
                     <button
                         type="button"
                         wire:click="enableLogShipping"
                         wire:loading.attr="disabled"
                         @disabled(! $this->logShippingEnabled || $busy)
-                        class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50"
                     >
-                        <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
+                        <x-heroicon-o-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ $status === 'failed' ? __('Retry install') : __('Enable log shipping') }}
                     </button>
                 @else
@@ -217,9 +228,9 @@
                         wire:click="resyncLogShipping"
                         wire:loading.attr="disabled"
                         @disabled($busy)
-                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/20 disabled:opacity-50"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/20 disabled:opacity-50"
                     >
-                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Re-sync agent') }}
                     </button>
                     <button
@@ -227,18 +238,39 @@
                         wire:click="disableLogShipping"
                         wire:confirm="{{ __('Remove the log agent from this server? Shipping will stop.') }}"
                         @disabled($busy)
-                        class="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
                     >
-                        <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                        <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Disable') }}
                     </button>
                 @endif
 
                 @if ($busy)
-                    <span class="inline-flex items-center gap-2 text-xs text-brand-moss">
-                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                    <span class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
                         {{ __('Working on the server…') }}
                     </span>
+
+                    {{-- Without this the panel is fully disabled behind "Installing…"
+                         with nothing to click — a dead queue worker or an unreachable
+                         box would strand it there indefinitely. --}}
+                    <button
+                        type="button"
+                        wire:click="openConfirmActionModal(
+                            'cancelLogShipping',
+                            [],
+                            @js($status === 'uninstalling' ? __('Cancel removal') : __('Cancel install')),
+                            @js($status === 'uninstalling'
+                                ? __('Stop waiting on this removal? Anything already running on the server finishes, and the agent may be left partly removed.')
+                                : __('Stop waiting on this install? Anything already running on the server finishes — re-installing afterwards is safe.')),
+                            @js($status === 'uninstalling' ? __('Cancel removal') : __('Cancel install')),
+                            false
+                        )"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-moss transition hover:bg-brand-sand/20 hover:text-brand-ink"
+                    >
+                        <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        {{ $status === 'uninstalling' ? __('Cancel removal') : __('Cancel install') }}
+                    </button>
                 @endif
             </div>
 
@@ -249,18 +281,16 @@
     {{-- Activity sub-tab: streaming install output + agent metadata --}}
     @if ($sub === 'activity')
         <section class="border-b border-brand-ink/10">
-            <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Agent activity') }}</h3>
-                    <p class="text-xs text-brand-moss">{{ __('Install output and the current state of the shipping agent on this server.') }}</p>
-                </div>
-            </div>
-            <div class="space-y-5 px-6 py-5 sm:px-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-clipboard-document-list"
+                :title="__('Agent activity')"
+                :note="__('Install output and the current state of the shipping agent on this server.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="space-y-3 px-5 py-3 sm:px-6">
                 @if ($agent)
-                    <dl class="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <dl class="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
                         <div><dt class="text-xs text-brand-moss">{{ __('Status') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $statusMeta['label'] }}</dd></div>
                         <div><dt class="text-xs text-brand-moss">{{ __('Vector version') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->version ? 'v'.$agent->version : '—' }}</dd></div>
                         <div><dt class="text-xs text-brand-moss">{{ __('Last seen') }}</dt><dd class="mt-0.5 font-medium text-brand-ink">{{ $agent->last_seen_at?->diffForHumans() ?? __('never') }}</dd></div>
@@ -268,7 +298,7 @@
                     </dl>
 
                     @if ($agent->error_message)
-                        <div class="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">
+                        <div class="rounded-lg bg-rose-50 px-3 py-2 text-xs leading-relaxed text-rose-700 ring-1 ring-inset ring-rose-200">
                             <p class="font-semibold">{{ __('Last error') }}</p>
                             <p class="mt-0.5 break-words">{{ $agent->error_message }}</p>
                         </div>
@@ -277,13 +307,13 @@
                     @if (trim((string) $agent->install_output) !== '')
                         <div>
                             <p class="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Install output') }}</p>
-                            <pre class="max-h-96 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02] px-4 py-3 text-[11px] leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
+                            <pre class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02] px-3 py-2 text-xs leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
                         </div>
                     @else
-                        <p class="text-sm text-brand-moss">{{ __('No install output recorded yet.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('No install output recorded yet.') }}</p>
                     @endif
                 @else
-                    <p class="text-sm text-brand-moss">{{ __('The agent is not installed on this server yet — enable it under Settings.') }}</p>
+                    <p class="text-xs text-brand-moss">{{ __('The agent is not installed on this server yet — enable it under Settings.') }}</p>
                 @endif
             </div>
         </section>
@@ -292,25 +322,29 @@
     @if ($sub === 'logs')
     {{-- Shipping isn't running: nudge to Settings rather than show an empty stream --}}
     @unless ($agent?->isRunning())
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-4 sm:px-7">
-            <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
-                <x-heroicon-o-paper-airplane class="h-4 w-4" aria-hidden="true" />
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-2.5 sm:px-6">
+            <span class="inline-flex min-w-0 items-center gap-2 text-xs text-brand-moss">
+                <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Log shipping is not running on this server, so there are no persisted logs yet.') }}
             </span>
-            <button type="button" wire:click="setShippingSubTab('settings')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-forest/90">
-                <x-heroicon-o-cog-6-tooth class="h-4 w-4" aria-hidden="true" /> {{ __('Set up shipping') }}
+            <button type="button" wire:click="setShippingSubTab('settings')" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-forest/90">
+                <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {{ __('Set up shipping') }}
             </button>
         </div>
     @endunless
 
     {{-- Correlation histogram: log volume over time + deploy/error/incident overlay --}}
     @if ($agent?->isRunning())
-        @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null)
+        {{-- Skip the histogram entirely when the store is unreachable. It rendered
+             a whole card whose only content was a second copy of the "Log store
+             unavailable" line already shown by the explorer below — two panels,
+             two borders, one fact. --}}
+        @if (($logCorrelationEnabled ?? true) && ($logHistogram ?? null) !== null && ($logHistogram['available'] ?? false))
             <x-logs-correlation-chart :histogram="$logHistogram" />
         @elseif (! ($logCorrelationEnabled ?? true))
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-6 py-3 sm:px-7">
-                <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
-                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-5 py-2 sm:px-6">
+                <span class="inline-flex min-w-0 items-center gap-2 text-xs text-brand-moss">
+                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Events vs logs graph is hidden.') }}
                 </span>
                 <button type="button" wire:click="toggleLogCorrelation" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
@@ -324,19 +358,18 @@
     {{-- Shipped logs explorer (reads ClickHouse, org + server scoped) --}}
     @if ($logExplorer !== null)
         <section class="border-b border-brand-ink/10">
-            <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Shipped logs') }}</h3>
-                    <p class="text-xs text-brand-moss">{{ __('Searchable, persisted logs from this server (newest first).') }}</p>
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-magnifying-glass"
+                :title="__('Shipped logs')"
+                :note="__('Searchable, persisted logs from this server (newest first).')"
+                class="border-b border-brand-ink/10"
+            >
+                <x-slot:actions>
                     @unless ($logExplorer['windowed'] ?? false)
                         <button type="button" wire:click="toggleLogExplorerLive"
                             @class([
-                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
+                                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold transition',
                                 'border-emerald-300 bg-emerald-50 text-emerald-800' => $logExplorerLive,
                                 'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/20' => ! $logExplorerLive,
                             ])>
@@ -344,12 +377,12 @@
                             {{ $logExplorerLive ? __('Live') : __('Go live') }}
                         </button>
                     @endunless
-                    <button type="button" wire:click="$refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="$refresh" />
+                    <button type="button" wire:click="$refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" aria-hidden="true" wire:loading.class="animate-spin" wire:target="$refresh" />
                         {{ __('Refresh') }}
                     </button>
-                </div>
-            </div>
+                </x-slot:actions>
+            </x-workspace-panel-head>
 
             {{-- Auto-refresh while Live (and not pinned to a correlation window). --}}
             @if ($logExplorerLive && ! ($logExplorer['windowed'] ?? false))
@@ -357,15 +390,22 @@
             @endif
 
             @if (! ($logExplorer['available'] ?? false))
-                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-                    <x-heroicon-o-signal-slash class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
-                    <p class="mt-2 font-medium text-brand-ink">{{ __('Log store unavailable') }}</p>
-                    <p class="mt-0.5">{{ __('Could not reach the dply Logs store.') }}</p>
+                {{-- One row, not a centred hero. "Unavailable" on its own sent
+                     operators hunting the agent, which is usually fine — the
+                     reader is a separate connection (CLICKHOUSE_* on the control
+                     plane) from the shipping path, so name it here. --}}
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-5 py-2 text-xs text-brand-moss sm:px-6">
+                    <x-heroicon-o-signal-slash class="h-3.5 w-3.5 shrink-0 text-brand-ink/40" aria-hidden="true" />
+                    <span class="font-medium text-brand-ink">{{ __('Log store unavailable') }}</span>
+                    <span class="text-brand-mist">·</span>
+                    <span>{{ __('dply could not reach ClickHouse at :host — this is the read path, separate from shipping.', [
+                        'host' => \App\Modules\Logs\Services\LogStoreConnection::describe(),
+                    ]) }}</span>
                 </div>
             @else
                 {{-- Pinned-window banner (arrived via a correlation deep-link, e.g. error → logs) --}}
                 @if ($logExplorer['windowed'] ?? false)
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-sage/30 bg-brand-sage/10 px-6 py-2.5 text-sm sm:px-7">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-sage/30 bg-brand-sage/10 px-5 py-2 text-xs sm:px-6">
                         <span class="min-w-0 text-brand-ink">
                             <x-heroicon-o-viewfinder-circle class="mr-1 inline h-4 w-4 -translate-y-0.5 text-brand-forest" aria-hidden="true" />
                             {{ __('Pinned to a fixed window') }}
@@ -379,29 +419,29 @@
                 @endif
 
                 {{-- Filters --}}
-                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-6 py-3 sm:px-7">
+                <div class="flex flex-wrap items-center gap-1.5 border-b border-brand-ink/10 px-5 py-2 sm:px-6">
                     <div class="relative min-w-0 flex-1">
                         <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-ink/30" aria-hidden="true" />
                         <input
                             type="search"
                             wire:model.live.debounce.500ms="logExplorerSearch"
                             placeholder="{{ __('Search message…') }}"
-                            class="w-full rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-brand-ink/30 focus:border-brand-sage focus:ring-brand-sage"
+                            class="w-full rounded-lg border border-brand-ink/15 bg-white py-1 pl-8 pr-3 text-xs placeholder:text-brand-ink/30 focus:border-brand-sage focus:ring-brand-sage"
                         />
                     </div>
-                    <select wire:model.live="logExplorerLevel" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                    <select wire:model.live="logExplorerLevel" class="rounded-lg border border-brand-ink/15 bg-white py-1 pl-2.5 pr-7 text-xs focus:border-brand-sage focus:ring-brand-sage">
                         <option value="">{{ __('All levels') }}</option>
                         @foreach (['error', 'warn', 'warning', 'info', 'notice', 'debug', 'critical'] as $lvl)
                             <option value="{{ $lvl }}">{{ ucfirst($lvl) }}</option>
                         @endforeach
                     </select>
-                    <select wire:model.live="logExplorerSource" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                    <select wire:model.live="logExplorerSource" class="rounded-lg border border-brand-ink/15 bg-white py-1 pl-2.5 pr-7 text-xs focus:border-brand-sage focus:ring-brand-sage">
                         <option value="">{{ __('All sources') }}</option>
                         @foreach ($this->logShippingSourceCatalog as $key => $label)
                             <option value="{{ $key }}">{{ $label }}</option>
                         @endforeach
                     </select>
-                    <select wire:model.live="logExplorerRange" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                    <select wire:model.live="logExplorerRange" class="rounded-lg border border-brand-ink/15 bg-white py-1 pl-2.5 pr-7 text-xs focus:border-brand-sage focus:ring-brand-sage">
                         <option value="15">{{ __('Last 15m') }}</option>
                         <option value="60">{{ __('Last 1h') }}</option>
                         <option value="360">{{ __('Last 6h') }}</option>
@@ -422,15 +462,15 @@
                     $syslogLevels = [0 => 'emerg', 1 => 'alert', 2 => 'crit', 3 => 'error', 4 => 'warning', 5 => 'notice', 6 => 'info', 7 => 'debug'];
                 @endphp
                 @if (count($entries) === 0)
-                    <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-7">
-                        <x-heroicon-o-inbox class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
+                    <div class="px-5 py-6 text-center text-xs text-brand-moss sm:px-6">
+                        <x-heroicon-o-inbox class="mx-auto h-5 w-5 text-brand-ink/30" aria-hidden="true" />
                         <p class="mt-2">{{ __('No log lines match in this window.') }}</p>
                         <p class="mt-0.5 text-xs">{{ __('If you just enabled shipping, allow a minute for logs to arrive.') }}</p>
                     </div>
                 @else
                     <div class="max-h-[28rem] overflow-auto">
                         <table class="min-w-full text-left text-xs">
-                            <thead class="sticky top-0 z-10 bg-brand-sand text-[10px] uppercase tracking-wider text-brand-moss shadow-sm">
+                            <thead class="sticky top-0 z-10 bg-brand-sand text-2xs uppercase tracking-wider text-brand-moss shadow-sm">
                                 <tr class="border-b border-brand-ink/10">
                                     <th class="whitespace-nowrap px-4 py-2 font-semibold">{{ __('Time') }}</th>
                                     <th class="px-3 py-2 font-semibold">{{ __('Level') }}</th>
@@ -449,12 +489,12 @@
                                             };
                                         @endphp
                                         <tr class="bg-brand-sage/[0.07]" wire:key="dep-{{ $entry['deployment_id'] }}">
-                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-forest">{{ $entry['timestamp'] }}</td>
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-xs tabular-nums text-brand-forest">{{ $entry['timestamp'] }}</td>
                                             <td colspan="3" class="px-3 py-1.5">
-                                                <span class="inline-flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-brand-forest">
+                                                <span class="inline-flex flex-wrap items-center gap-1.5 text-xs font-semibold text-brand-forest">
                                                     <x-heroicon-m-rocket-launch class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ $entry['running'] ? __('Deploy in progress') : __('Deployed') }} · {{ $entry['site_name'] }}
-                                                    <span class="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ring-1 ring-inset ring-brand-sage/30 {{ $deployTone }}">{{ $entry['status'] }}</span>
+                                                    <span class="rounded px-1.5 py-0.5 text-2xs uppercase tracking-wide ring-1 ring-inset ring-brand-sage/30 {{ $deployTone }}">{{ $entry['status'] }}</span>
                                                     @if ($entry['site'])
                                                         <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $entry['site'], 'deployment' => $entry['deployment_id']]) }}"
                                                             wire:navigate
@@ -476,21 +516,21 @@
                                             };
                                         @endphp
                                         <tr class="align-top hover:bg-brand-sand/10">
-                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-moss">{{ $entry['timestamp'] ?? '' }}</td>
+                                            <td class="whitespace-nowrap px-4 py-1.5 font-mono text-xs tabular-nums text-brand-moss">{{ $entry['timestamp'] ?? '' }}</td>
                                             <td class="px-3 py-1.5">
                                                 @if ($lvl !== '')
-                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
+                                                    <span class="inline-flex rounded px-1.5 py-0.5 text-2xs font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
                                                 @endif
                                             </td>
                                             <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">{{ $entry['source'] ?? '' }}</td>
-                                            <td class="px-4 py-1.5 font-mono text-[11px] leading-relaxed text-brand-ink/80">{{ $entry['message'] ?? '' }}</td>
+                                            <td class="px-4 py-1.5 font-mono text-xs leading-relaxed text-brand-ink/80">{{ $entry['message'] ?? '' }}</td>
                                         </tr>
                                     @endif
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
+                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-brand-ink/10 px-5 py-1.5 text-xs text-brand-moss sm:px-6">
                         <span class="inline-flex flex-wrap items-center gap-x-2">
                             <span>{{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif</span>
                             @if ($deployCount > 0)

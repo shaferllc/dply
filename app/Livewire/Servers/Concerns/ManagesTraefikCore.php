@@ -352,10 +352,10 @@ trait ManagesTraefikCore
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
             app(TraefikDashboardExposure::class)->sync($this->server, [
-                'enabled' => ($this->traefik_dashboard_form['enabled'] ?? '0') === '1',
-                'path' => (string) ($this->traefik_dashboard_form['path'] ?? '/traefik-dashboard'),
-                'username' => (string) ($this->traefik_dashboard_form['username'] ?? ''),
-                'password' => (string) ($this->traefik_dashboard_form['password'] ?? ''),
+                'enabled' => ($this->traefik_dashboard_form['enabled']) === '1',
+                'path' => (string) $this->traefik_dashboard_form['path'],
+                'username' => (string) $this->traefik_dashboard_form['username'],
+                'password' => (string) $this->traefik_dashboard_form['password'],
             ], new ConsoleEmitter($consoleId));
             DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
             $this->traefik_dashboard_flash = __('Dashboard exposure updated.');

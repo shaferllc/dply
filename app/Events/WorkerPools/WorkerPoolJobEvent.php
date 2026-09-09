@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use App\Listeners\ForwardWorkerPoolJobEvent;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 
 /**
@@ -18,10 +18,12 @@ use Illuminate\Foundation\Events\Dispatchable;
  * endpoint {@see WorkerPoolJobEventController} after a
  * box-side {@see ForwardWorkerPoolJobEvent} POSTs the event.
  *
- * NOT ShouldQueue: queueing the broadcast would route it through the very queue
- * we're observing and add latency — these are fire-and-forget UI pushes.
+ * Must be {@see ShouldBroadcastNow} (not ShouldBroadcast): queueing the
+ * broadcast would put BroadcastEvent jobs on the same Redis queues Horizon
+ * observes, which the box agent then re-forwards — a feedback loop that
+ * floods `dply` / `dply:notify`.
  */
-final class WorkerPoolJobEvent implements ShouldBroadcast
+final class WorkerPoolJobEvent implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets;
 

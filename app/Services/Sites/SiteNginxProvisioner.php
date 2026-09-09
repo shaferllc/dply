@@ -205,10 +205,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     protected function shadowedServerNames(string $out, string $config, Server $server, SshConnection $ssh, string $ourBasename): array
     {
         if (! preg_match_all('/conflicting server name "([^"]+)"/i', $out, $m)) {
@@ -275,10 +271,8 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * @param  array<string, mixed> $shadowedNames
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
-     * @param  array<string, mixed> $shadowedNames
+     * @param  list<string> $shadowedNames
      */
     protected function healShadowingOrphans(Server $server, SshConnection $ssh, array $shadowedNames, string $ourBasename, ConsoleEmitter $emit): array
     {
@@ -327,7 +321,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      * treated as "nothing to protect" — `nginx -t` below remains the real syntax
      * gate, and this never blocks a deploy in the default warn mode.
      *
-     * @param  array<string, mixed> $shadowedNames
      * @param  Server  $server
      */
     protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit, ?string $current = null): void
@@ -501,10 +494,9 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * Stat a set of paths on the box in one round trip.
      *
-     * @param  array<string, mixed> $paths
+     * @param  array<int, string> $paths
      * @return array<string, bool>
      */
-    /** @return array<string, mixed> */
     protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array
     {
         $paths = array_values(array_unique(array_filter($paths)));
@@ -536,13 +528,40 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         return $present;
     }
 
+
+    /**
+     * Whether `*.<zone>` covers a hostname.
+     *
+     * A wildcard matches exactly one label: `*.on-dply.cc` covers
+     * `site.on-dply.cc` but neither `on-dply.cc` itself nor
+     * `a.b.on-dply.cc` — and certainly not an unrelated domain.
+     */
+    protected static function wildcardCoversHostname(string $zone, string $hostname): bool
+    {
+        $zone = strtolower(trim($zone, ". \t\n\r"));
+        $hostname = strtolower(trim($hostname, ". \t\n\r"));
+
+        if ($zone === '' || $hostname === '') {
+            return false;
+        }
+
+        $suffix = '.'.$zone;
+
+        if (! str_ends_with($hostname, $suffix)) {
+            return false;
+        }
+
+        $label = substr($hostname, 0, -strlen($suffix));
+
+        return $label !== '' && ! str_contains($label, '.');
+    }
+
     /**
      * The on-disk cert/key pair for the per-server wildcard that covers this
      * site's testing hostname, or null when the site isn't wildcard-covered.
      * Mirrors {@see OpenLiteSpeedTlsPaths::letsEncryptDirectoryName}'s wildcard
      * branch: certbot stores the shared cert under /etc/letsencrypt/live/<zone>/.
      *
-     * @param  array<string, mixed> $paths
      * @return array{cert: string, key: string}|null
      */
     protected function coveringWildcardCertPair(Site $site): ?array
@@ -557,6 +576,21 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             return null;
         }
 
+        // The wildcard is only a salvage if it actually covers every hostname
+        // this vhost answers on. coveringServerWildcard() looks up the site's
+        // TESTING zone and knows nothing about custom domains, so a site with a
+        // customer domain was handed *.on-dply.cc — nginx then served a cert
+        // that could not match the requested name, and every browser refused
+        // the connection outright. Serving no TLS is recoverable; serving a
+        // mismatched cert is a hard failure the operator cannot see from dply.
+        $zone = strtolower(trim((string) ($wildcard->zone ?: $site->testingZone())));
+
+        foreach ($site->webserverHostnames() as $hostname) {
+            if (! self::wildcardCoversHostname($zone, (string) $hostname)) {
+                return null;
+            }
+        }
+
         return [
             'cert' => '/etc/letsencrypt/live/'.$dir.'/fullchain.pem',
             'key' => '/etc/letsencrypt/live/'.$dir.'/privkey.pem',
@@ -566,7 +600,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * Temporarily writes pending main + layer files, runs nginx -t, then restores previous files.
      *
-     * @return array{ok: bool, message: string}
      */
     public function readCurrentMainConfig(Site $site): ?string
     {
@@ -591,7 +624,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @return array{main: ?string, before: ?string, after: ?string}
      */
-    /** @return array<string, mixed> */
     public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
@@ -718,7 +750,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingMainConfig, SiteWebserverConfigProfile $profile): array
     {
         $server = $this->ensureServerReady($site);

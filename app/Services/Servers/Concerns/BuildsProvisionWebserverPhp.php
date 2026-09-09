@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\Concerns;
 
-
-
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -13,8 +11,6 @@ namespace App\Services\Servers\Concerns;
  */
 trait BuildsProvisionWebserverPhp
 {
-
-
     /**
      * @return list<string>
      */
@@ -221,6 +217,7 @@ trait BuildsProvisionWebserverPhp
         // so php-fpm ends up enabled but inactive. Explicitly start it the same way nginx/mysql/redis
         // are started; the verification check `systemctl is-active php{ver}-fpm` then passes.
         $lines[] = 'systemctl enable --now '.$stem.'-fpm';
+        $lines = array_merge($lines, $this->setPhpCliDefault($php));
 
         $lines = array_merge($lines, $this->wireWebserverToPhp($web, $php));
 
@@ -263,6 +260,28 @@ trait BuildsProvisionWebserverPhp
         }
 
         return [];
+    }
+
+    /**
+     * Distro `php` is often older than the version we just installed (Ubuntu
+     * 24.04 ships 8.3.6). Composer and artisan must use the wizard/site pin.
+     *
+     * @return list<string>
+     */
+    private function setPhpCliDefault(string $php): array
+    {
+        $binary = '/usr/bin/php'.$php;
+        $priority = preg_replace('/\D/', '', $php) ?: '84';
+
+        return [
+            implode("\n", [
+                'if [ -x '.escapeshellarg($binary).' ]; then',
+                '  update-alternatives --install /usr/bin/php php '.escapeshellarg($binary).' '.escapeshellarg((string) $priority).' 2>/dev/null || true',
+                '  update-alternatives --set php '.escapeshellarg($binary).' || ln -sfn '.escapeshellarg($binary).' /usr/local/bin/php',
+                '  echo "[dply] CLI php now '.$binary.' ($('.$binary.' -r \'echo PHP_VERSION;\' 2>/dev/null || true))"',
+                'fi',
+            ]),
+        ];
     }
 
     private function phpStem(string $phpVersionId): string

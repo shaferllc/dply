@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Livewire\Sites\Show;
-use App\Models\EdgeDeployment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployment;
+use App\Services\Sites\SiteProvisioner;
 use App\Support\Deployment\DeploymentContract;
 use Illuminate\Support\Collection;
 
@@ -20,7 +20,7 @@ use Illuminate\Support\Collection;
 final class SiteShowViewData
 {
     /**
-     * @param  array<string, mixed> $deploymentPreflight
+     * @param  array<string, mixed>  $deploymentPreflight
      * @return array<string, mixed>
      */
     public static function for(
@@ -31,11 +31,10 @@ final class SiteShowViewData
         array $deploymentPreflight,
         string $activeTab,
     ): array {
-        $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
+        $functionsHost = false;
         $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
         $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
         $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
         $showVmCronDaemonsLinks = $showWebserverConfigEditor;
@@ -76,7 +75,9 @@ final class SiteShowViewData
         $hostChecks = (new Collection($hostChecksRaw))
             ->filter(fn ($check): bool => is_array($check) && is_string($check['hostname'] ?? null))
             ->values();
-        $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
+        // Site::serverlessConfig() is removed with the serverless surface
+        // (remove-cloud-edge-serverless).
+        $serverlessRuntime = [];
         $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
         $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
         $runtimeTarget = $site->runtimeTarget();
@@ -161,23 +162,10 @@ final class SiteShowViewData
         // SEPARATELY once a repo is connected, so showing a "Waiting for first
         // deploy" step in its provisioning journey would imply provisioning waits
         // for a deploy it never triggers. Drop it for VM hosts.
-        $entersFirstDeployState = $site->usesFunctionsRuntime()
-            || $site->usesDockerRuntime()
+        $entersFirstDeployState = $site->usesDockerRuntime()
             || $site->usesKubernetesRuntime();
 
-        $statusSteps = [
-            'queued' => __('Queued'),
-            'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
-            'configuring_publication' => __('Preparing publication target'),
-            'provisioning_testing_hostname' => __('Assigning testing hostname'),
-            'writing_site_config' => __('Writing site config'),
-            'waiting_for_http' => __('Checking reachability'),
-        ];
-        if ($entersFirstDeployState) {
-            $statusSteps['awaiting_first_deploy'] = __('Waiting for first deploy');
-        }
-        $statusSteps['ready'] = __('Site available');
-        $statusSteps['failed'] = __('Needs attention');
+        $statusSteps = self::byoStatusSteps($site, $provisioningState, $entersFirstDeployState);
         /** @var list<string> $stepKeys */
         $stepKeys = array_keys($statusSteps);
         $currentStepIndex = array_search($provisioningState, $stepKeys, true);
@@ -207,69 +195,30 @@ final class SiteShowViewData
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
         ];
 
-        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
-            && function_exists('production_data_mirror_connected')
-            && production_data_mirror_connected();
+        $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
+        // Project omitted — see SiteWorkspaceBreadcrumbs.
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $server->name,
+            'href' => route('servers.overview', $server),
+            'icon' => 'server-stack',
+            'avatar' => $server->name ?: (string) $server->id,
+            'avatar_image' => $server->logoUrl(),
+        ];
+        $siteHeaderBreadcrumbs[] = [
+            'label' => $site->name,
+            'icon' => 'globe-alt',
+            'avatar' => $site->name ?: (string) $site->id,
+            'avatar_image' => $site->logoUrl(),
+        ];
 
-        if ($isProductionMirror) {
-            $siteHeaderBreadcrumbs[] = [
-                'label' => __('Production'),
-                'href' => route('live.sites.index'),
-                'icon' => 'exclamation-triangle',
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => __('Sites'),
-                'href' => route('live.sites.index'),
-                'icon' => 'globe-alt',
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $server->name,
-                'href' => route('live.servers.index'),
-                'icon' => 'server-stack',
-                'avatar' => $server->name ?: (string) $server->id,
-                'avatar_image' => $server->logoUrl(),
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $site->name,
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-        } elseif ($site->usesEdgeRuntime()) {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
-            $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
-        } else {
-            $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
-            if ($server->workspace) {
-                $siteHeaderBreadcrumbs[] = [
-                    'label' => $server->workspace->name,
-                    'href' => route('projects.resources', $server->workspace),
-                    'icon' => 'rectangle-group',
-                ];
-            }
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $server->name,
-                'href' => route('servers.overview', $server),
-                'icon' => 'server-stack',
-                'avatar' => $server->name ?: (string) $server->id,
-                'avatar_image' => $server->logoUrl(),
-            ];
-            $siteHeaderBreadcrumbs[] = [
-                'label' => $site->name,
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-        }
-
-        $provisioningJourney = $site->usesEdgeRuntime() && ! $readyForWorkspace
-            ? self::edgeProvisioningJourney($site)
-            : self::provisioningJourney(
-                $provisioningState,
-                $statusSteps,
-                $stepKeys,
-                $currentStepIndex,
-            );
+        // Edge is removed; a legacy row with edge_backend still set falls
+        // through to the BYO journey rather than a deleted code path.
+        $provisioningJourney = self::provisioningJourney(
+            $provisioningState,
+            $statusSteps,
+            $stepKeys,
+            $currentStepIndex,
+        );
 
         $dashboard = $readyForWorkspace
             ? self::dashboard(
@@ -336,197 +285,76 @@ final class SiteShowViewData
             ),
             $provisioningJourney,
             $dashboard,
-            $site->usesEdgeRuntime() ? EdgeSiteViewData::context($site) : [],
             ['activeTab' => $activeTab],
         );
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
-     * Public so the ad-hoc previews tab can render its own inline progress
-     * card off a pending preview Site without going through the full
-     * site-show view-data pipeline.
+     * Ordered BYO provision-journey keys + labels (including failed).
+     * Wildcard TLS sits between the testing hostname and writing vhost — the
+     * same place {@see SiteProvisioner} pauses — so the
+     * progress bar does not fall through to 0 when state is
+     * `waiting_for_wildcard_tls`.
      *
-     * @return array<string, mixed>
+     * @return array<string, string>
      */
-    public static function edgeProvisioningJourney(Site $site): array
+    public static function byoStatusSteps(Site $site, string $provisioningState, bool $entersFirstDeployState): array
     {
-        $edgeMeta = $site->edgeMeta();
-        $sourceSpec = is_array($edgeMeta['source'] ?? null) ? $edgeMeta['source'] : [];
-        $buildSpec = is_array($edgeMeta['build'] ?? null) ? $edgeMeta['build'] : [];
-        $edgeBuildCommand = (string) ($buildSpec['command'] ?? 'npm ci && npm run build');
-        $edgeOutputDir = (string) ($buildSpec['output_dir'] ?? 'dist');
-        $edgeRepoLabel = (($sourceSpec['repo'] ?? '?').'@'.($sourceSpec['branch'] ?? 'main'));
-        $edgeLiveUrl = $site->edgeLiveUrl();
-
-        $edgeLatestDeployment = $site->relationLoaded('edgeDeployments')
-            ? $site->edgeDeployments->first()
-            : $site->edgeDeployments()->first();
-
-        $edgeProvisioningState = self::resolveEdgeProvisioningState($site, $edgeLatestDeployment);
-        $edgeProvisioningError = self::resolveEdgeProvisioningError($site, $edgeLatestDeployment);
-
-        $edgeStatusSteps = [
-            'queued' => __('Queued / cloning repository'),
-            'building' => __('Installing dependencies & building'),
-            'publishing' => __('Publishing to Edge CDN'),
-            'live' => __('Live'),
-            'failed' => __('Needs attention'),
-        ];
-        $edgeStepKeys = array_keys($edgeStatusSteps);
-        $edgeCurrentStepIndex = array_search($edgeProvisioningState, $edgeStepKeys, true);
-        $edgeCurrentStepIndex = $edgeCurrentStepIndex === false ? 0 : $edgeCurrentStepIndex;
-
-        $edgeJourneyHasFailed = $edgeProvisioningState === 'failed';
-        $edgeJourneyIsDone = $edgeProvisioningState === 'live';
-        $edgeVisibleSteps = collect($edgeStatusSteps)->except('failed');
-        $edgeTotalSteps = $edgeVisibleSteps->count();
-        // Count the IN-FLIGHT step as the current step number — operators
-        // read "(3/4)" as "we're on step 3", not "3 done and not started 4".
-        // Done = totalSteps; failed = the step that died (currentStepIndex
-        // stays at the live-time index since state flips to 'failed' only
-        // after the failing step is set).
-        $edgeCompletedSteps = $edgeJourneyHasFailed
-            ? max(1, min($edgeTotalSteps, $edgeCurrentStepIndex))
-            : ($edgeJourneyIsDone ? $edgeTotalSteps : max(1, min($edgeTotalSteps, $edgeCurrentStepIndex + 1)));
-        $edgeProgressPercent = $edgeTotalSteps > 0
-            ? (int) round(($edgeCompletedSteps / $edgeTotalSteps) * 100)
-            : 0;
-        $edgeCurrentLabel = $edgeStatusSteps[$edgeProvisioningState]
-            ?? str_replace('_', ' ', $edgeProvisioningState);
-
-        return compact(
-            'edgeMeta',
-            'sourceSpec',
-            'buildSpec',
-            'edgeBuildCommand',
-            'edgeOutputDir',
-            'edgeRepoLabel',
-            'edgeLiveUrl',
-            'edgeLatestDeployment',
-            'edgeProvisioningState',
-            'edgeProvisioningError',
-            'edgeStatusSteps',
-            'edgeStepKeys',
-            'edgeCurrentStepIndex',
-            'edgeJourneyHasFailed',
-            'edgeJourneyIsDone',
-            'edgeVisibleSteps',
-            'edgeTotalSteps',
-            'edgeCompletedSteps',
-            'edgeProgressPercent',
-            'edgeCurrentLabel',
-        );
-    }
-
-    /**
-     * Journey shape scoped to a single deployment (build → publish → live),
-     * without leaning on the parent Site's status. Used by the deployment
-     * detail page so the progress card reflects THIS build even when the
-     * site as a whole is already live on a different deployment.
-     *
-     * @return array<string, mixed>
-     */
-    public static function edgeDeploymentJourney(EdgeDeployment $deployment): array
-    {
-        $state = match ($deployment->status) {
-            EdgeDeployment::STATUS_BUILDING => 'building',
-            EdgeDeployment::STATUS_PUBLISHING => 'publishing',
-            EdgeDeployment::STATUS_LIVE, EdgeDeployment::STATUS_SUPERSEDED => 'live',
-            EdgeDeployment::STATUS_FAILED => 'failed',
-            default => 'queued',
-        };
-
         $statusSteps = [
-            'queued' => __('Queued / cloning repository'),
-            'building' => __('Installing dependencies & building'),
-            'publishing' => __('Publishing to Edge CDN'),
-            'live' => __('Live'),
-            'failed' => __('Needs attention'),
+            'queued' => __('Queued'),
+            'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
+            'configuring_publication' => __('Preparing publication target'),
+            'provisioning_testing_hostname' => __('Assigning testing hostname'),
         ];
-        $stepKeys = array_keys($statusSteps);
-        $currentStepIndex = array_search($state, $stepKeys, true);
-        $currentStepIndex = $currentStepIndex === false ? 0 : $currentStepIndex;
 
-        $hasFailed = $state === 'failed';
-        $isDone = $state === 'live';
-        $visibleSteps = collect($statusSteps)->except('failed');
-        $totalSteps = $visibleSteps->count();
-        // "(X/N)" reads as "currently on step X" — count the in-flight step
-        // as the current number, not the count of finished ones.
-        $completedSteps = $hasFailed
-            ? max(1, min($totalSteps, $currentStepIndex))
-            : ($isDone ? $totalSteps : max(1, min($totalSteps, $currentStepIndex + 1)));
-        $progressPercent = $totalSteps > 0
-            ? (int) round(($completedSteps / $totalSteps) * 100)
-            : 0;
-        $currentLabel = $statusSteps[$state];
-
-        return [
-            'state' => $state,
-            'statusSteps' => $statusSteps,
-            'stepKeys' => $stepKeys,
-            'visibleSteps' => $visibleSteps,
-            'currentStepIndex' => $currentStepIndex,
-            'totalSteps' => $totalSteps,
-            'completedSteps' => $completedSteps,
-            'progressPercent' => $progressPercent,
-            'currentLabel' => $currentLabel,
-            'hasFailed' => $hasFailed,
-            'isDone' => $isDone,
-            'error' => is_string($deployment->failure_reason) && $deployment->failure_reason !== ''
-                ? $deployment->failure_reason
-                : null,
-        ];
-    }
-
-    private static function resolveEdgeProvisioningState(Site $site, ?EdgeDeployment $deployment): string
-    {
-        if ($site->status === Site::STATUS_EDGE_FAILED
-            || ($deployment !== null && $deployment->status === EdgeDeployment::STATUS_FAILED)) {
-            return 'failed';
+        if (self::showsWildcardTlsStep($site, $provisioningState)) {
+            $statusSteps['waiting_for_wildcard_tls'] = __('Issuing wildcard TLS');
         }
 
-        if ($site->status === Site::STATUS_EDGE_ACTIVE
-            || ($deployment !== null && $deployment->status === EdgeDeployment::STATUS_LIVE)) {
-            return 'live';
+        $statusSteps['writing_site_config'] = __('Writing site config');
+        $statusSteps['waiting_for_http'] = __('Checking reachability');
+
+        if ($entersFirstDeployState) {
+            $statusSteps['awaiting_first_deploy'] = __('Waiting for first deploy');
         }
 
-        if ($deployment === null) {
-            return 'queued';
-        }
+        $statusSteps['ready'] = __('Site available');
+        $statusSteps['failed'] = __('Needs attention');
 
-        return match ($deployment->status) {
-            EdgeDeployment::STATUS_PUBLISHING => 'publishing',
-            EdgeDeployment::STATUS_BUILDING => 'building',
-            default => 'queued',
-        };
-    }
-
-    private static function resolveEdgeProvisioningError(Site $site, ?EdgeDeployment $deployment): ?string
-    {
-        $metaError = $site->edgeMeta()['last_error'] ?? null;
-        $deploymentError = $deployment?->failure_reason;
-
-        // This "Last error" box is rendered *alongside* the BuildJourney
-        // component, which already shows the deployment failure_reason in its
-        // own "Reason" box. So only surface the site-meta last_error here when
-        // it *differs* — i.e. an infra-level failure (R2/KV perms) that never
-        // reached the deployment row. When it matches, or when the only error
-        // is the deployment one, stay null and let BuildJourney be the single
-        // source of truth instead of double-printing the same string.
-        if (is_string($metaError) && $metaError !== '' && $metaError !== $deploymentError) {
-            return $metaError;
-        }
-
-        return null;
+        return $statusSteps;
     }
 
     /**
-     * @param  array<string, string> $statusSteps
-     * @param  list<string> $stepKeys
+     * Show the wildcard step whenever this site will (or already did) wait
+     * on a shared per-server cert — not only while the state key is live.
+     * That keeps the step count stable from queued through ready.
+     */
+    private static function showsWildcardTlsStep(Site $site, string $provisioningState): bool
+    {
+        if ($provisioningState === 'waiting_for_wildcard_tls') {
+            return true;
+        }
+
+        if (! (bool) config('sites.wildcard_testing_ssl', true)) {
+            return false;
+        }
+
+        if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime() || $site->usesEdgeRuntime()) {
+            return false;
+        }
+
+        $webserver = $site->webserver();
+
+        if ($webserver === 'caddy' && ! ($site->server?->hasEdgeProxy() ?? false)) {
+            return false;
+        }
+
+        return in_array($webserver, ['nginx', 'caddy', 'openlitespeed', 'apache'], true);
+    }
+
+    /**
+     * @param  array<string, string>  $statusSteps
+     * @param  list<string>  $stepKeys
      * @return array<string, mixed>
      */
     private static function provisioningJourney(
@@ -570,10 +398,10 @@ final class SiteShowViewData
     }
 
     /**
-     * @param  array<string, mixed> $foundationStatus
-     * @param  Collection<int, string> $preflightErrors
-     * @param  Collection<int, string> $preflightWarnings
-     * @param  Collection<int, array<string, mixed>> $hostChecks
+     * @param  array<string, mixed>  $foundationStatus
+     * @param  Collection<int, string>  $preflightErrors
+     * @param  Collection<int, string>  $preflightWarnings
+     * @param  Collection<int, array<string, mixed>>  $hostChecks
      * @return array<string, mixed>
      */
     private static function dashboard(
@@ -626,7 +454,7 @@ final class SiteShowViewData
         ][$statusTone];
 
         $showRuntimeTab = ! $site->usesEdgeRuntime()
-            && ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime());
+            && ($site->usesDockerRuntime() || $site->usesKubernetesRuntime());
         $showSslTab = ! $site->usesEdgeRuntime()
             && ! $site->usesDockerRuntime()
             && ($previewDomain || $site->certificates->isNotEmpty());

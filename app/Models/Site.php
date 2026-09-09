@@ -7,8 +7,7 @@ use App\Jobs\CleanupCustomSiteJob;
 use App\Models\Concerns\Site\DerivesWorkerEnvironment;
 use App\Models\Concerns\Site\GuardsSiteAccess;
 use App\Models\Concerns\Site\HasSiteRelationships;
-use App\Models\Concerns\Site\ManagesEdgeHosting;
-use App\Models\Concerns\Site\ManagesServerless;
+use App\Models\Concerns\Site\ManagesAtomicLayout;
 use App\Models\Concerns\Site\ResolvesSiteHostnames;
 use App\Models\Concerns\Site\ResolvesSiteRuntime;
 use App\Models\Concerns\Site\ResolvesSiteUrls;
@@ -17,6 +16,8 @@ use App\Models\Concerns\Site\TracksProvisioningStatus;
 use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Support\Sites\SiteRelationPurger;
 use Database\Factories\SiteFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,63 +37,63 @@ use Illuminate\Support\Str;
  * @property ?string $parent_site_id
  * @property string $name
  * @property string $slug
- * @property string $logo_path
+ * @property string|null $logo_path
  * @property SiteType $type
- * @property string $document_root
+ * @property ?string $document_root
  * @property ?string $repository_path
  * @property ?string $runtime
  * @property ?string $runtime_version
  * @property ?string $database_engine
- * @property ?string $app_port
- * @property string $internal_port
- * @property string $build_command
- * @property string $start_command
+ * @property ?int $app_port
+ * @property ?string $internal_port
+ * @property ?string $build_command
+ * @property ?string $start_command
  * @property string $status
  * @property string $ssl_status
  * @property ?Carbon $nginx_installed_at
  * @property ?Carbon $ssl_installed_at
  * @property ?Carbon $last_deploy_at
  * @property ?Carbon $suspended_at
- * @property string $suspended_reason
+ * @property ?string $suspended_reason
  * @property ?Carbon $scheduled_deletion_at
- * @property string $git_repository_url
- * @property string $git_branch
- * @property string $git_deploy_key_private
- * @property string $git_deploy_key_public
- * @property string $webhook_secret
- * @property array<string, mixed> $webhook_allowed_ips
- * @property string $post_deploy_command
+ * @property ?string $git_repository_url
+ * @property ?string $git_branch
+ * @property ?string $git_deploy_key_private
+ * @property ?string $git_deploy_key_public
+ * @property ?string $webhook_secret
+ * @property ?list<string> $webhook_allowed_ips
+ * @property ?string $post_deploy_command
  * @property ?string $deploy_script_id
  * @property string $deploy_strategy
- * @property string $deploy_method
- * @property string $releases_to_keep
- * @property string $nginx_extra_raw
+ * @property string|null $deploy_method
+ * @property int $releases_to_keep smallint in the schema
+ * @property ?string $nginx_extra_raw
  * @property bool $engine_http_cache_enabled
  * @property ?string $octane_port
  * @property bool $laravel_scheduler
  * @property bool $restart_supervisor_programs_after_deploy
  * @property string $deployment_environment
- * @property string $php_fpm_user
- * @property string $env_file_content
+ * @property ?string $php_fpm_user
+ * @property ?string $env_file_content
  * @property ?Carbon $env_synced_at
- * @property string $env_cache_origin
- * @property string $env_file_path
- * @property string $container_image
- * @property string $container_registry
- * @property string $container_port
+ * @property ?string $env_cache_origin
+ * @property ?string $env_file_path
+ * @property ?string $container_image
+ * @property ?string $container_registry
+ * @property ?string $container_port
  * @property ?string $container_backend
  * @property ?string $container_backend_id
- * @property string $container_region
- * @property string $serverless_backend
+ * @property ?string $container_region
+ * @property string|null $serverless_backend
  * @property ?string $serverless_provider_credential_id
  * @property ?string $edge_backend
  * @property ?string $edge_backend_id
  * @property ?string $edge_provider_credential_id
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?string $dns_provider_credential_id
- * @property string $dns_zone
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property ?string $dns_zone
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  * @property-read ?string $php_version
  * @property-read int $code_action_count
  */
@@ -101,12 +102,11 @@ class Site extends Model
     use DerivesWorkerEnvironment;
     use GuardsSiteAccess;
 
-    /** @use HasFactory<\Database\Factories\SiteFactory> */
+    /** @use HasFactory<SiteFactory> */
     use HasFactory, HasUlids;
 
     use HasSiteRelationships;
-    use ManagesEdgeHosting;
-    use ManagesServerless;
+    use ManagesAtomicLayout;
     use ResolvesSiteHostnames;
     use ResolvesSiteRuntime;
     use ResolvesSiteUrls;
@@ -137,6 +137,14 @@ class Site extends Model
 
     public const STATUS_FUNCTIONS_ACTIVE = 'functions_active';
 
+    /**
+     * First deploy (or pre-live retry) failed. Mirrors {@see STATUS_EDGE_FAILED}
+     * / {@see STATUS_CONTAINER_FAILED}: the Site row is kept for retry/delete,
+     * but must not present as a healthy live function. Redeploy failures on an
+     * already-active function leave {@see STATUS_FUNCTIONS_ACTIVE} alone.
+     */
+    public const STATUS_FUNCTIONS_FAILED = 'functions_failed';
+
     public const STATUS_CONTAINER_PROVISIONING = 'container_provisioning';
 
     public const STATUS_CONTAINER_ACTIVE = 'container_active';
@@ -148,27 +156,6 @@ class Site extends Model
     public const STATUS_EDGE_ACTIVE = 'edge_active';
 
     public const STATUS_EDGE_FAILED = 'edge_failed';
-
-    /**
-     * Serverless function resource limits. These map onto the OpenWhisk
-     * action `limits` block DigitalOcean Functions is built on, and are
-     * applied to the action on the next deploy.
-     *
-     * @var array<int, int>
-     */
-    public const SERVERLESS_MEMORY_OPTIONS_MB = [128, 256, 512, 1024];
-
-    public const SERVERLESS_DEFAULT_MEMORY_MB = 512;
-
-    public const SERVERLESS_DEFAULT_TIMEOUT_MS = 60000;
-
-    public const SERVERLESS_MIN_TIMEOUT_MS = 1000;
-
-    public const SERVERLESS_MAX_TIMEOUT_MS = 900000;
-
-    public const SERVERLESS_DEFAULT_CONCURRENCY = 1;
-
-    public const SERVERLESS_MAX_CONCURRENCY = 50;
 
     /**
      * Site row exists, scaffold pipeline (PR 5/6) is in flight.
@@ -276,6 +263,7 @@ class Site extends Model
             'env_file_content' => 'encrypted',
             'env_synced_at' => 'datetime',
             'meta' => 'array',
+            'app_port' => 'integer',
             'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
             'engine_http_cache_enabled' => 'boolean',
@@ -430,12 +418,6 @@ class Site extends Model
         });
     }
 
-    /** dply runs the function on its own managed FaaS account (dply pays the provider). */
-    public const SERVERLESS_BACKEND_DPLY = 'dply_serverless';
-
-    /** The customer's connected provider account runs (and is billed for) the function. */
-    public const SERVERLESS_BACKEND_BYO = 'org_digitalocean';
-
     /**
      * URL the container deployment is reachable at, set by the
      * provisioner once the backend reports an "ingress" hostname
@@ -472,6 +454,60 @@ class Site extends Model
             $this->slug = $base.'-'.$i;
             $i++;
         }
+    }
+
+    /**
+     * Container apps (Docker / Kubernetes hosts).
+     *
+     * The predicate is `type = Container` OR a non-null `container_backend`:
+     * some imported/legacy rows only ever got the backend column, so getting
+     * one half of the OR wrong silently hides apps.
+     *
+     * @param  Builder<Site>  $query
+     */
+    public function scopeCloudApps(Builder $query): void
+    {
+        $query->where(function ($q): void {
+            $q->where('type', SiteType::Container)
+                ->orWhereNotNull('container_backend');
+        });
+    }
+
+    /**
+     * Hide site-sourced worker-fleet replicas from the Sites inventory.
+     *
+     * @param  Builder<Site>  $query
+     */
+    public function scopeVisibleInSiteIndex(Builder $query): void
+    {
+        $query->whereRaw("coalesce(meta->>'fleet_replica_of_site_id', '') = ''");
+    }
+
+    public function isFleetReplica(): bool
+    {
+        return filled(data_get($this->meta, 'fleet_replica_of_site_id'));
+    }
+
+    /**
+     * Hidden worker-host copies of this site (same repo, drain the same queue).
+     *
+     * `static`, not `Site`: the query is built with `static::query()`, and
+     * Eloquent's Collection is invariant in TModel, so a Collection<int, static>
+     * is not a Collection<int, Site>. Site is subclassed (PhpStanTraitHarness),
+     * so this is a real distinction rather than a formality.
+     *
+     * @return Collection<int, static>
+     */
+    public function fleetReplicaSites()
+    {
+        if ($this->organization_id === null || $this->isFleetReplica()) {
+            return static::query()->whereRaw('1 = 0')->get();
+        }
+
+        return static::query()
+            ->where('organization_id', $this->organization_id)
+            ->where('meta->fleet_replica_of_site_id', $this->id)
+            ->get();
     }
 
     protected function slugTaken(): bool

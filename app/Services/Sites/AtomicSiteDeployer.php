@@ -9,9 +9,9 @@ use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
-use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 
@@ -27,7 +27,6 @@ class AtomicSiteDeployer
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // A resume re-attaches to an already-staged release and runs only the
@@ -222,6 +221,11 @@ class AtomicSiteDeployer
 
             // Post-clone snapshot: confirm exactly what landed in the release dir.
             $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
+            // Persist SHA as soon as clone resolves it so the deploy console
+            // can show the commit during build/release (not only at success).
+            if ($deployment !== null && $cloneSha !== '' && ctype_xdigit($cloneSha)) {
+                $deployment->forceFill(['git_sha' => $cloneSha])->save();
+            }
             $cloneLog .= $ssh->exec(sprintf(
                 'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
                 .'echo "[dply] whoami=$(whoami)"; '
@@ -259,7 +263,22 @@ class AtomicSiteDeployer
 
             $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
 
-            app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+            app(VmSiteStackDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+
+            // Same reconcile as the simple deployer: make the build steps match
+            // what detection just found in the checkout, so a Node repo stops
+            // running composer_install left over from the site's PHP seeding.
+            $reconcileNote = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+            if ($reconcileNote !== null) {
+                $log .= $reconcileNote."\n";
+            }
+
+            // Same reason as the step reconcile: a Node repo that deploys green
+            // and then serves a PHP-FPM vhost is a silent failure.
+            $runtimeNote = app(SiteRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+            if ($runtimeNote !== null) {
+                $log .= $runtimeNote."\n";
+            }
         }
 
         // ── ENV ── seed the fresh release's .env. A release is a clean git
@@ -279,7 +298,7 @@ class AtomicSiteDeployer
                 // <release>/.env, which resolves to the unservable external
                 // file. Never copy the secret into the docroot.
                 $log .= sprintf("\n[dply] ENV → external env_file_path; writing %s and symlinking %s → it\n", $envOverride, $releaseEnv);
-                app(SiteEnvPusher::class)->push($site, $envOverride);
+                app(SiteEnvPusher::class)->push($site, $envOverride, includeSharedSecrets: true);
                 $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($releaseEnv)), 30);
                 $resolved = trim($ssh->exec(sprintf('readlink -f %s 2>/dev/null || echo "(unresolved)"', escapeshellarg($releaseEnv)), 30));
                 $log .= sprintf("[dply] ENV → %s/.env → %s\n", basename($newRelease), $resolved);
@@ -288,7 +307,7 @@ class AtomicSiteDeployer
                 // into the release dir (which `current` flips to), so this
                 // release is self-contained.
                 $log .= sprintf("\n[dply] ENV → writing composed .env to %s\n", $releaseEnv);
-                app(SiteEnvPusher::class)->push($site, $releaseEnv);
+                app(SiteEnvPusher::class)->push($site, $releaseEnv, includeSharedSecrets: true);
                 $log .= "[dply] ENV → .env written\n";
             }
         } else {
@@ -342,10 +361,24 @@ class AtomicSiteDeployer
             // last live snapshot with the settled step results.
             $deployment?->recordPhaseResults('build', $build['steps']);
             if (! $build['ok']) {
+                $deployment?->recordPartialLog($log);
                 throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
             }
 
-            $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
+            $log .= sprintf("[dply] BUILD done → %d step(s), ok=true\n", count($build['steps']));
+
+            // Same check as the simple deployer: vendor/ exists now, so this is
+            // the first moment we can tell whether the mail transport package
+            // the site's binding needs was actually installed.
+            $mailNote = app(MailTransportPreflight::class)->check($site->fresh() ?? $site, $ssh, $newRelease);
+            if ($mailNote !== null) {
+                $log .= "\n".$mailNote."\n";
+            }
+
+            $agentNote = app(QueueInsightsInstaller::class)->ensure($site->fresh() ?? $site, $ssh, $newRelease);
+            if ($agentNote !== null) {
+                $log .= "\n".$agentNote."\n";
+            }
         } else {
             $log .= sprintf("\n[dply] BUILD → skipped (resume from %s); reusing the build already staged in %s\n", $resume->startFromPhase, $newRelease);
         }
@@ -398,6 +431,7 @@ class AtomicSiteDeployer
             $log .= $releaseLog;
             $deployment?->recordPhaseResults('release', $releaseSteps);
             if (! $release['ok']) {
+                $deployment?->recordPartialLog($log);
                 throw new \RuntimeException('Deploy failed during the release phase before cutover — the previous release is still live and nothing changed. See the deployment log for details.');
             }
         } else {
@@ -477,6 +511,7 @@ class AtomicSiteDeployer
 
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
         if (! $postOk) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the post-deploy command (after cutover). See the deployment log for details.');
         }
 
@@ -516,6 +551,10 @@ class AtomicSiteDeployer
                 ]]);
             }
         } catch (\Throwable $e) {
+            // Everything up to the health failure, on the row before any throw
+            // below unwinds the frame that holds it.
+            $deployment?->recordPartialLog($log);
+
             // Record a FAILED Health check phase whose output carries the on-box
             // cause (laravel.log + nginx tail from diagnose()), so the timeline
             // surfaces WHERE and WHY instead of reading all-green on a failure.
@@ -532,6 +571,7 @@ class AtomicSiteDeployer
                 try {
                     $log .= "\n--- auto rollback ---\n";
                     $log .= app(SiteReleaseRollback::class)->rollbackTo($site->fresh(), $previousActiveRelease);
+                    $deployment?->recordPartialLog($log);
                 } catch (\Throwable $rollbackEx) {
                     throw new \RuntimeException(
                         $e->getMessage().' '.__('Automatic rollback failed: :msg', ['msg' => $rollbackEx->getMessage()]),

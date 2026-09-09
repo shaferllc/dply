@@ -10,6 +10,7 @@ use App\Jobs\ToggleDatabaseEngineRemoteAccessJob;
 use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Models\ConsoleAction;
+use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseEngine;
@@ -19,7 +20,9 @@ use App\Support\Servers\DatabaseEngineAvailability;
 use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\RemoteCidr;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use App\Support\Servers\ServerNetworkPeers;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,9 +46,18 @@ trait ManagesDatabaseEngineLifecycle
 
     public string $remote_access_engine = '';
 
-    public string $remote_access_allowed_from = '0.0.0.0/0';
+    public string $remote_access_allowed_from = '';
+
+    /**
+     * Servers picked off this server's private network to admit, by id. Each
+     * becomes its own /32 firewall rule; see ToggleDatabaseEngineRemoteAccessJob.
+     *
+     * @var list<string>
+     */
+    public array $engine_remote_server_ids = [];
 
     /** Keyed by database ID — the CIDR input value for each row's networking form. */
+    /** @var array<string, string> */
     public array $db_networking_allowed_from = [];
 
     /** @var array<string, mixed>|null */
@@ -99,7 +111,16 @@ trait ManagesDatabaseEngineLifecycle
             ->where('engine', $engine)
             ->first();
 
-        if ($existing && $existing->status === ServerDatabaseEngine::STATUS_RUNNING) {
+        // Refuse only when the engine is ACTUALLY there. Trusting the stored
+        // status alone made a stale RUNNING row unrecoverable: dply insisted the
+        // engine was installed, the box disagreed, and the UI offered no way
+        // through. When the capability probe has run and says the engine is
+        // absent, let the install proceed and fix the record.
+        $probeSaysPresent = ! $this->capabilitiesLoaded
+            || ! array_key_exists($engine, $this->capabilities_state)
+            || (bool) $this->capabilities_state[$engine];
+
+        if ($existing && $existing->status === ServerDatabaseEngine::STATUS_RUNNING && $probeSaysPresent) {
             $this->toastError(__(':engine is already installed.', ['engine' => $engine]));
 
             return;
@@ -112,6 +133,12 @@ trait ManagesDatabaseEngineLifecycle
             'is_default' => ServerDatabaseEngine::query()->where('server_id', $this->server->id)->doesntExist(),
             'port' => ServerDatabaseEngine::defaultPortFor($engine),
         ]);
+
+        // A stale RUNNING row that the probe contradicts is a valid retry state —
+        // otherwise the check below would bounce the very case this exists for.
+        if ($row->status === ServerDatabaseEngine::STATUS_RUNNING && ! $probeSaysPresent) {
+            $row->forceFill(['status' => ServerDatabaseEngine::STATUS_PENDING])->save();
+        }
 
         // Re-run install only when the row is in a state that makes sense to retry from.
         if (! in_array($row->status, [
@@ -302,7 +329,7 @@ trait ManagesDatabaseEngineLifecycle
     /**
      * Make this engine the server's primary/default. Exactly one engine row per
      * server carries {@see ServerDatabaseEngine::$is_default}; new sites default
-     * their `database_engine` to it ({@see \App\Models\Server::defaultDatabaseEngine()}).
+     * their `database_engine` to it ({@see Server::defaultDatabaseEngine()}).
      * Pure metadata — no SSH — so it applies immediately.
      */
     public function setPrimaryEngine(string $engine, ServerDatabaseAuditLogger $auditLogger): void
@@ -370,24 +397,59 @@ trait ManagesDatabaseEngineLifecycle
             return;
         }
 
-        $allowedFrom = $enable ? trim($this->remote_access_allowed_from) : '';
+        // Two ways to say who may connect, and they ADD rather than replace.
+        // Treating them as either/or meant admitting a laptop's public IP
+        // silently revoked the app server that was already ticked — the two
+        // inputs describe different sources, so both belong in the rule set.
+        //
+        // Servers picked off the private network each become their own /32, so
+        // the operator never has to reason about mask arithmetic to admit two
+        // hosts. The CIDR field covers sources dply has no server record of (an
+        // office range, an off-VPC customer edge, a laptop).
+        $peerIds = $enable ? $this->selectedRemoteAccessPeerIds() : [];
+        $typedCidr = $enable ? trim($this->remote_access_allowed_from) : '';
+        $extraCidrs = [];
+        $allowedParts = [];
 
         if ($enable) {
-            // Require an explicit trusted source — never silently open the engine
-            // port to the whole internet on a blank field.
-            if ($allowedFrom === '') {
-                $this->addError('remote_access_allowed_from', __('Enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32). Leave remote access off to keep the port closed.'));
+            if ($peerIds !== []) {
+                $peerCidrs = ServerNetworkPeers::for($this->server)
+                    ->whereIn('id', $peerIds)
+                    ->map(fn ($peer) => ServerNetworkPeers::hostCidr($peer))
+                    ->filter()
+                    ->values();
 
-                return;
+                if ($peerCidrs->isEmpty()) {
+                    $this->addError('engine_remote_server_ids', __('Those servers have no private address on this network — pick different servers or enter a CIDR.'));
+
+                    return;
+                }
+
+                $allowedParts = $peerCidrs->all();
             }
 
-            // Basic CIDR sanity — must look like x.x.x.x/n or x::/n.
-            if (! $this->isValidRemoteCidr($allowedFrom)) {
-                $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 10.0.0.0/8, 203.0.113.5/32).'));
+            if ($typedCidr !== '') {
+                // Basic CIDR sanity — must look like x.x.x.x/n or x::/n.
+                if (! $this->isValidRemoteCidr($typedCidr)) {
+                    $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 10.0.0.0/8, 203.0.113.5/32).'));
+
+                    return;
+                }
+
+                $extraCidrs[] = $typedCidr;
+                $allowedParts[] = $typedCidr;
+            }
+
+            // Never silently open the engine port to the whole internet.
+            if ($allowedParts === []) {
+                $this->addError('remote_access_allowed_from', __('Pick at least one server, or enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32).'));
 
                 return;
             }
         }
+
+        // Recorded for display; the firewall rules are one per source.
+        $allowedFrom = implode(', ', array_values(array_unique($allowedParts)));
 
         $engineLabel = DatabaseEngineInfo::for($engine)['label'];
 
@@ -399,13 +461,12 @@ trait ManagesDatabaseEngineLifecycle
                 : __('Disabling remote access for :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name]),
         );
 
-        // Optimistically update the row so the UI flips immediately.
         $row->update([
             'remote_access' => $enable,
             'allowed_from' => $enable ? $allowedFrom : null,
         ]);
 
-        ToggleDatabaseEngineRemoteAccessJob::dispatch($row->id, $enable, $allowedFrom, auth()->id());
+        ToggleDatabaseEngineRemoteAccessJob::dispatch($row->id, $enable, $allowedFrom, auth()->id(), $peerIds, $extraCidrs);
 
         $this->toastSuccess(
             $enable
@@ -473,25 +534,7 @@ trait ManagesDatabaseEngineLifecycle
 
     private function isValidRemoteCidr(string $value): bool
     {
-        if ($value === '' || $value === 'any') {
-            return false;
-        }
-
-        $parts = array_filter(array_map('trim', explode(',', $value)));
-        foreach ($parts as $part) {
-            if (! str_contains($part, '/')) {
-                return false;
-            }
-            [$ip, $prefix] = explode('/', $part, 2);
-            if (! filter_var($ip, FILTER_VALIDATE_IP)) {
-                return false;
-            }
-            if (! is_numeric($prefix) || (int) $prefix < 0 || (int) $prefix > 128) {
-                return false;
-            }
-        }
-
-        return true;
+        return RemoteCidr::isValid($value);
     }
 
     /**
@@ -614,11 +657,64 @@ trait ManagesDatabaseEngineLifecycle
             }
         }
 
+        // The other direction, which was missing: a row claiming RUNNING for an
+        // engine the probe cannot find. Nothing ever verified stored status
+        // against the box, so a failed/skipped install left a permanent lie —
+        // and installDatabaseEngine() refuses with "already installed" on a
+        // RUNNING row, so the engine could never be installed from the UI again.
+        // (Seen in the wild: a server whose Postgres was silently swapped for
+        // SQLite by the low-memory provisioning fallback still had a RUNNING
+        // postgres row.)
+        $correctedEngines = [];
+        $rows = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('status', [
+                ServerDatabaseEngine::STATUS_RUNNING,
+                ServerDatabaseEngine::STATUS_STOPPED,
+            ])
+            ->get();
+
+        foreach ($rows as $row) {
+            $engine = (string) $row->engine;
+
+            // Only correct engines the probe actually reports on, and never
+            // sqlite (a file-based engine the probe treats differently). An
+            // engine missing from the probe map means "not checked", not
+            // "absent" — demoting on that would invent failures.
+            if ($engine === 'sqlite' || ! array_key_exists($engine, $detected)) {
+                continue;
+            }
+
+            if ($detected[$engine]) {
+                continue;
+            }
+
+            $row->forceFill([
+                'status' => ServerDatabaseEngine::STATUS_FAILED,
+                'error_message' => __('Not found on the server during a recheck — the stored status was stale. Install it again to reconcile.'),
+            ])->save();
+
+            $correctedEngines[] = $engine;
+        }
+
+        $notes = [];
         if ($seededEngines !== []) {
-            $labels = implode(', ', array_map(fn ($e) => ucfirst($e), $seededEngines));
-            $this->toastSuccess(__('Rechecked engines — adopted :engines as already installed.', ['engines' => $labels]));
-        } else {
+            $notes[] = __('adopted :engines as already installed', [
+                'engines' => implode(', ', array_map(fn ($e) => ucfirst($e), $seededEngines)),
+            ]);
+        }
+        if ($correctedEngines !== []) {
+            $notes[] = __(':engines is recorded as installed but is not on the server', [
+                'engines' => implode(', ', array_map(fn ($e) => ucfirst($e), $correctedEngines)),
+            ]);
+        }
+
+        if ($notes === []) {
             $this->toastSuccess(__('Rechecked the server for database engines.'));
+        } elseif ($correctedEngines !== []) {
+            $this->toastError(__('Rechecked engines — :notes.', ['notes' => implode('; ', $notes)]));
+        } else {
+            $this->toastSuccess(__('Rechecked engines — :notes.', ['notes' => implode('; ', $notes)]));
         }
     }
 
@@ -631,5 +727,30 @@ trait ManagesDatabaseEngineLifecycle
         $this->drift_loaded = true;
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DRIFT_CHECK, [], auth()->user());
         $this->toastSuccess(__('Drift analysis updated.'));
+    }
+
+    /**
+     * Selected peer ids, filtered to servers actually on this server's private
+     * network. A stale Livewire snapshot (peer detached, or moved networks since
+     * the page loaded) must not be able to open a port to an arbitrary host id.
+     *
+     * @return list<string>
+     */
+    protected function selectedRemoteAccessPeerIds(): array
+    {
+        $selected = array_values(array_filter(array_map(
+            static fn ($id): string => is_string($id) ? $id : '',
+            $this->engine_remote_server_ids,
+        )));
+
+        if ($selected === []) {
+            return [];
+        }
+
+        return ServerNetworkPeers::for($this->server)
+            ->whereIn('id', $selected)
+            ->pluck('id')
+            ->values()
+            ->all();
     }
 }

@@ -13,7 +13,7 @@
                 <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when your site is detected as a Ruby on Rails application from repository inspection.') }}</p>
             </div>
@@ -26,7 +26,7 @@
                 <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Framework') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rails') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Background workers, scheduled jobs, and real-time channels for this Rails site.') }}</p>
             </div>

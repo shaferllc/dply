@@ -25,7 +25,7 @@ class WorkspaceCostCard extends Component
         abort_unless($server->isVmHost() && ! $server->isManagedProductHost(), 404);
 
         $this->redirect(
-            route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate',
+            route('servers.settings', ['server' => $server, 'tab' => 'governance']).'#settings-cost-estimate',
             navigate: true,
         );
     }

@@ -11,16 +11,16 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property array<string, mixed> $category_breakdown
+ * @property array<string, mixed>|null $category_breakdown
  * @property int $edge_usage_cents
- * @property array<string, mixed> $fleet_counts
+ * @property array<string, mixed>|null $fleet_counts
  * @property int $monthly_total_cents
  * @property ?string $organization_id
  * @property Carbon $snapshot_date
- * @property string $subscription_interval
+ * @property string|null $subscription_interval
  * @property-read ?Organization $organization
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class OrganizationBillingSnapshot extends Model
 {

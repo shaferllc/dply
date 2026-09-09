@@ -29,9 +29,9 @@
         <div class="min-w-0 flex-1">
             <h3 class="truncate text-sm font-semibold text-brand-ink">{{ $t['label'] }}</h3>
             @if ($hasBuckets)
-                <p class="mt-0.5 text-[11px] leading-snug text-brand-moss">{{ trans_choice('{1} :count bucket attached|[2,*] :count buckets attached', $buckets->count(), ['count' => $buckets->count()]) }}</p>
+                <p class="mt-0.5 text-xs leading-snug text-brand-moss">{{ trans_choice('{1} :count bucket attached|[2,*] :count buckets attached', $buckets->count(), ['count' => $buckets->count()]) }}</p>
             @else
-                <p class="mt-0.5 line-clamp-2 text-[11px] leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
+                <p class="mt-0.5 line-clamp-2 text-xs leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
             @endif
         </div>
     </div>
@@ -56,12 +56,12 @@
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/10">
+                                <span class="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 font-mono text-2xs font-semibold text-brand-ink ring-1 ring-inset ring-brand-ink/10">
                                     {{ $disk }}@if ($isPrimary) <span class="text-brand-mist">{{ __('default') }}</span>@endif
                                 </span>
                                 <span title="{{ $statusHint }}" class="h-2 w-2 rounded-full {{ $statusDot[$bucket->status] ?? 'bg-brand-moss' }}"></span>
                             </div>
-                            <p class="mt-1 truncate font-mono text-[11px] text-brand-moss">{{ $bucketName }}</p>
+                            <p class="mt-1 truncate font-mono text-xs text-brand-moss">{{ $bucketName }}</p>
                         </div>
                         <div class="flex shrink-0 items-center gap-0.5">
                             @if ($bEnvKeys !== [])
@@ -82,20 +82,20 @@
 
                     <div x-show="open" x-cloak class="mt-2">
                         @if ($bEnvKeys !== [])
-                            <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($bEnvKeys) }})</p>
+                            <p class="mb-1 text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($bEnvKeys) }})</p>
                             <div class="flex flex-wrap gap-1">
                                 @foreach ($bucket->injected_env as $k => $v)
                                     <div x-data="{ pop: false, show: false, copied: false, async copyVal() { try { await navigator.clipboard.writeText(@js((string) $v)); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }" class="relative">
-                                        <button type="button" @click="pop = ! pop" class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
+                                        <button type="button" @click="pop = ! pop" class="rounded bg-white px-1.5 py-0.5 font-mono text-2xs text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
                                         <div x-show="pop" x-cloak x-transition.opacity class="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-brand-ink/10 bg-white p-2 text-left shadow-xl">
                                             <div class="flex items-center justify-between gap-2">
-                                                <span class="truncate font-mono text-[10px] font-semibold text-brand-ink">{{ $k }}</span>
-                                                <div class="flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                                                <span class="truncate font-mono text-2xs font-semibold text-brand-ink">{{ $k }}</span>
+                                                <div class="flex shrink-0 items-center gap-2 text-2xs font-semibold">
                                                     <button type="button" @click="show = ! show" class="text-brand-sage hover:underline"><span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span></button>
                                                     <button type="button" @click="copyVal()" class="text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                                 </div>
                                             </div>
-                                            <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-[10px] text-brand-ink">
+                                            <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-2xs text-brand-ink">
                                                 <span x-show="show" x-cloak>{{ ((string) $v) === '' ? '(empty)' : $v }}</span>
                                                 <span x-show="! show">••••••••••</span>
                                             </p>
@@ -110,10 +110,10 @@
                                  config/filesystems.php — hand the operator the exact array. --}}
                             <div x-data="{ copied: false, async copy() { try { await navigator.clipboard.writeText(@js($snippet)); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }" class="mt-2">
                                 <div class="flex items-center justify-between">
-                                    <p class="text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/filesystems.php → disks') }}</p>
-                                    <button type="button" @click="copy()" class="text-[10px] font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                    <p class="text-3xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add to config/filesystems.php → disks') }}</p>
+                                    <button type="button" @click="copy()" class="text-2xs font-semibold text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
                                 </div>
-                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-[10px] leading-relaxed text-brand-cream">{{ $snippet }}</pre>
+                                <pre class="mt-1 overflow-x-auto rounded bg-brand-ink/90 p-2 font-mono text-2xs leading-relaxed text-brand-cream">{{ $snippet }}</pre>
                             </div>
                         @endif
                     </div>
@@ -124,10 +124,10 @@
 
     {{-- Actions --}}
     <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
-        <button type="button" wire:click="openBindingModal('storage', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+        <button type="button" wire:click="openBindingModal('storage', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
             <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ $hasBuckets ? __('Add bucket') : __('Attach') }}
         </button>
-        <button type="button" wire:click="openBindingModal('storage', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+        <button type="button" wire:click="openBindingModal('storage', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
             <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Provision') }}
         </button>
     </div>

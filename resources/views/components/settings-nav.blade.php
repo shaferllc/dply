@@ -26,8 +26,8 @@
         'profile.ssh-keys',
         'profile.api-keys',
         'profile.cli',
-        'profile.backup-configurations',
         'profile.notification-channels',
+        'profile.notification-channels.bulk-assign',
     );
 
     // Organizations is its own top-level menu item (peer to Account / Guides),
@@ -87,17 +87,19 @@
                                 </x-slot>
                                 {{ __('API keys') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.backup-configurations')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-archive-box class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Backup configurations') }}
-                            </x-dropdown-link>
+                            {{-- CLI hidden for now — bringing it back later.
                             <x-dropdown-link :href="route('profile.cli')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-command-line class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('CLI') }}
+                            </x-dropdown-link>
+                            --}}
+                            <x-dropdown-link :href="route('settings.servers')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-server class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('Servers & sites') }}
                             </x-dropdown-link>
                             <x-dropdown-link :href="route('profile.notification-channels')" wire:navigate>
                                 <x-slot name="icon">
@@ -111,12 +113,14 @@
                                 </x-slot>
                                 {{ __('Profile') }}
                             </x-dropdown-link>
+                            {{-- Referrals hidden for now.
                             <x-dropdown-link :href="route('profile.referrals')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-gift class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('Referrals') }}
                             </x-dropdown-link>
+                            --}}
                             <x-dropdown-link :href="route('profile.security')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-shield-check class="h-[1.15rem] w-[1.15rem]" />
@@ -170,7 +174,7 @@
                                         <span class="flex items-center justify-between gap-2">
                                             <span class="truncate">{{ $org->name }}</span>
                                             @if ($currentOrgId == $org->id)
-                                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
                                             @endif
                                         </span>
                                     </x-dropdown-link>
@@ -255,15 +259,15 @@
                 <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
                 @if ($user)
                     <p class="mt-0.5 truncate text-sm font-semibold text-brand-ink" title="{{ $user->name }}">{{ $user->name }}</p>
-                    <p class="mt-0.5 truncate text-[11px] text-brand-mist" title="{{ $user->email }}">{{ $user->email }}</p>
+                    <p class="mt-0.5 truncate text-xs text-brand-mist" title="{{ $user->email }}">{{ $user->email }}</p>
                 @endif
             </div>
         </div>
 
-        <p class="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
+        <p class="mt-4 text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
         <nav class="{{ $accountNavClass }}" aria-label="{{ __('Account settings') }}">
             <a
                 href="{{ route('profile.api-keys') }}"
@@ -273,14 +277,7 @@
                 <x-heroicon-o-bolt class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('API keys') }}
             </a>
-            <a
-                href="{{ route('profile.backup-configurations') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.backup-configurations') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-archive-box class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Backup configurations') }}
-            </a>
+            {{-- CLI hidden for now — bringing it back later.
             <a
                 href="{{ route('profile.cli') }}"
                 wire:navigate
@@ -289,10 +286,14 @@
                 <x-heroicon-o-command-line class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('CLI') }}
             </a>
+            --}}
             <a
                 href="{{ route('profile.notification-channels') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('profile.notification-channels') ? $navOn : $navOff])
+                {{-- …'.*' too: /bulk-assign is a child of this page, and leaving
+                     the parent unlit made the sidebar look like you had navigated
+                     out of Settings entirely. --}}
+                @class([$navBase, request()->routeIs('profile.notification-channels', 'profile.notification-channels.*') ? $navOn : $navOff])
             >
                 <x-heroicon-o-bell-alert class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Notification channels') }}
@@ -303,11 +304,12 @@
             <a
                 href="{{ route('settings.profile') }}"
                 wire:navigate
-                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'settings.servers', 'profile.delete-account') ? $navOn : $navOff])
+                @class([$navBase, request()->routeIs('settings.index', 'settings.profile', 'profile.delete-account') ? $navOn : $navOff])
             >
                 <x-heroicon-o-user-circle class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Profile') }}
             </a>
+            {{-- Referrals hidden for now.
             <a
                 href="{{ route('profile.referrals') }}"
                 wire:navigate
@@ -316,6 +318,7 @@
                 <x-heroicon-o-gift class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Referrals') }}
             </a>
+            --}}
             <a
                 href="{{ route('profile.security') }}"
                 wire:navigate
@@ -323,6 +326,17 @@
             >
                 <x-heroicon-o-shield-check class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Security') }}
+            </a>
+            {{-- Servers & sites is its own page, not a tab inside Profile: it
+                 holds organization and team defaults, which are nobody's personal
+                 settings. --}}
+            <a
+                href="{{ route('settings.servers') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('settings.servers') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('Servers & sites') }}
             </a>
             <a
                 href="{{ route('profile.source-control') }}"
@@ -344,11 +358,11 @@
 
         <div class="mt-5 border-t border-brand-ink/10 pt-4">
             <div class="flex items-center justify-between gap-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Organizations') }}</p>
+                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Organizations') }}</p>
                 <a
                     href="{{ route('organizations.create') }}"
                     wire:navigate
-                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-sage hover:text-brand-ink"
+                    class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink"
                     title="{{ __('New organization') }}"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -374,57 +388,11 @@
                         <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
                             <span class="truncate">{{ $org->name }}</span>
                             @if ($currentOrgId == $org->id)
-                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
                             @endif
                         </span>
                     </a>
                 @endforeach
-            </nav>
-        </div>
-
-        <div class="mt-5 border-t border-brand-ink/10 pt-4">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
-            <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
-                <a
-                    href="{{ route('docs.index') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.index') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('All docs') }}
-                </a>
-                <a
-                    href="{{ route('docs.connect-provider') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.connect-provider') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-cloud class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Connect a provider') }}
-                </a>
-                <a
-                    href="{{ route('docs.create-first-server') }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.create-first-server') ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Create your first server') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'org-roles-and-limits' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-user-group class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Roles & plan limits') }}
-                </a>
-                <a
-                    href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
-                    wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'source-control' ? $navOn : $navOff])
-                >
-                    <x-heroicon-o-code-bracket-square class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Source control & deploys') }}
-                </a>
             </nav>
         </div>
     @endif

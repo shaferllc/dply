@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\CreateSiteDatabaseJob;
-use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -20,13 +19,17 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerDatabaseCredentialShare;
 use App\Models\ServerDatabaseExtraUser;
 use App\Models\Site;
-use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
+use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Services\DatabaseBackupDownloader;
 use App\Modules\Backups\Services\DatabaseBackupExporter;
+use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
+use App\Services\Servers\ServerDatabaseInventory;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use App\Support\Sites\SiteDatabaseWorkspace;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -65,6 +68,13 @@ class Database extends Component
 
     #[Url(as: 'tab', except: 'databases')]
     public string $dbTab = 'databases';
+
+    /**
+     * Engine capabilities are probed over SSH, which must never run on the
+     * render/HTTP path (30s max_execution_time). The page paints a skeleton,
+     * then wire:init calls loadDatabaseCapabilities() to fill this in.
+     */
+    public bool $capabilitiesLoaded = false;
 
     public Server $server;
 
@@ -122,7 +132,8 @@ class Database extends Component
         $this->site = $site;
 
         $this->new_db_name = $this->suggestedName();
-        $this->new_db_engine = $this->defaultEngine();
+        // NOT defaultEngine() here — it reads capabilities() and would SSH
+        // during mount. loadDatabaseCapabilities() seeds it after first paint.
     }
 
     /**
@@ -131,7 +142,32 @@ class Database extends Component
     #[Computed]
     public function capabilities(): array
     {
+        // Before the deferred load, report "nothing known yet" rather than
+        // blocking the response on an SSH round-trip.
+        if (! $this->capabilitiesLoaded) {
+            return DatabaseWorkspaceEngines::defaultCapabilities();
+        }
+
         return app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
+    }
+
+    /**
+     * Deferred capability probe (wire:init). Runs the SSH check once, off the
+     * initial render, then seeds the create-form engine default now that we
+     * actually know what's installed.
+     */
+    public function loadDatabaseCapabilities(): void
+    {
+        if ($this->capabilitiesLoaded) {
+            return;
+        }
+
+        $this->capabilitiesLoaded = true;
+        unset($this->capabilities, $this->installedEngines);
+
+        if ($this->new_db_engine === '') {
+            $this->new_db_engine = $this->defaultEngine();
+        }
     }
 
     /**
@@ -146,22 +182,110 @@ class Database extends Component
 
         return array_values(array_filter(
             DatabaseWorkspaceEngines::ENGINE_TABS,
-            fn (string $engine): bool => $caps[$engine] ?? false,
+            fn (string $engine): bool => $caps[$engine],
         ));
     }
 
     /**
-     * Databases owned by this site.
+     * Databases this site uses — by EITHER route.
+     *
+     * There are two independent ways a database ends up on a site, and this tab
+     * used to see only one of them:
+     *
+     *   1. OWNED — `server_databases.site_id` points at this site. Set when the
+     *      database is created from this tab, from site create, or via the MCP
+     *      tool, and by "Link" below.
+     *   2. ATTACHED — a `database` SiteBinding targets it (the Environment tab's
+     *      resource picker). This never touched `site_id`, so a database
+     *      attached there rendered "No databases are linked to this site yet"
+     *      here while the resource map showed it as configured.
+     *
+     * `site_id` cannot replace bindings: it is a single column, and two sites
+     * legitimately share one database (an app and its worker both bind the same
+     * row). So the two coexist and this reads the union.
      *
      * @return Collection<int, ServerDatabase>
      */
     #[Computed]
     public function linkedDatabases()
     {
-        return $this->site->serverDatabases()
+        return ServerDatabase::query()
+            ->where(function ($q): void {
+                $q->where('site_id', $this->site->id)
+                    ->orWhereIn('id', $this->boundDatabaseIds());
+            })
             ->with(['extraUsers', 'backups' => fn ($q) => $q->orderByDesc('created_at')])
+            ->orderBy('name')
             ->get();
     }
+
+    /**
+     * Server-database id => the id of the `database` binding that attaches it.
+     * A derived worker inherits its parent app's resources, so the lookup
+     * follows the same source site the deploy env does.
+     *
+     * @return array<string, string>
+     */
+    private function boundBindingIdByDatabaseId(): array
+    {
+        $source = $this->site->resourceSourceSite();
+        $source->loadMissing('bindings');
+
+        $map = [];
+        foreach ($source->bindings as $binding) {
+            if ($binding->type !== 'database' || $binding->target_type !== 'server_database') {
+                continue;
+            }
+            if (filled($binding->target_id)) {
+                $map[(string) $binding->target_id] = (string) $binding->id;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Ids of server databases attached to this site through a `database` binding.
+     *
+     * @return list<string>
+     */
+    private function boundDatabaseIds(): array
+    {
+        return array_keys($this->boundBindingIdByDatabaseId());
+    }
+
+    /**
+     * The binding that attaches a database, if any — the key the Connect panel
+     * ({@see DatabaseConnect}) and its credential-link,
+     * URI and terminal routes are all addressed by. Null for a database owned
+     * only through `site_id`, which predates databases adopting a binding; those
+     * rows get no Connect action rather than a broken one.
+     */
+    public function connectBindingIdFor(ServerDatabase $db): ?string
+    {
+        return $this->boundBindingIdByDatabaseId()[(string) $db->id] ?? null;
+    }
+
+    /**
+     * Whether a resource binding manages this database.
+     *
+     * Drives whether detaching is offered HERE. When a binding references the
+     * row, detaching has to remove its injected DB_* too — which only the
+     * Environment tab does. That is true whether or not `site_id` also points
+     * at this site: the two are independent, and a database can be both owned
+     * and bound (every one created since databases started adopting a binding).
+     */
+    public function bindingManagesDatabase(ServerDatabase $db): bool
+    {
+        return in_array((string) $db->id, $this->boundDatabaseIds(), true);
+    }
+
+    /**
+     * Prefix marking a picker option that is not a ServerDatabase row yet —
+     * an untracked database found by the server scan. Linking one adopts it
+     * first. Distinguishable from a ULID, which cannot contain a colon.
+     */
+    private const ADOPT_PREFIX = 'untracked:';
 
     /** Engines whose extra-user management this tab supports. */
     private const EXTRA_USER_ENGINES = ['mysql', 'mariadb', 'postgres'];
@@ -177,8 +301,35 @@ class Database extends Component
         return ServerDatabase::query()
             ->where('server_id', $this->server->id)
             ->whereNull('site_id')
+            // Already reachable through a binding — offering to "link" it would
+            // list a database the row above is already showing.
+            ->whereNotIn('id', $this->boundDatabaseIds())
             ->orderBy('name')
             ->get();
+    }
+
+    /**
+     * Databases sitting on this server that dply does not track yet.
+     *
+     * Read from the CACHED inventory (server.meta) written by the server
+     * workspace's deferred scan — this tab must never SSH on a render path.
+     * An empty list therefore means "not scanned yet or nothing found", and the
+     * picker says so rather than implying the server has none.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    #[Computed]
+    public function adoptableDatabases(): array
+    {
+        $out = [];
+        foreach (app(ServerDatabaseInventory::class)->untracked($this->server) as $row) {
+            $out[] = [
+                'value' => self::ADOPT_PREFIX.$row['engine'].':'.$row['name'],
+                'label' => $row['name'].' ('.DatabaseWorkspaceEngines::label($row['engine']).' — '.__('not tracked yet').')',
+            ];
+        }
+
+        return $out;
     }
 
     public function updatedNewDbName(string $value): void
@@ -275,13 +426,30 @@ class Database extends Component
             'name' => $db->name,
         ]));
 
+        // Give it a resource binding so the Environment tab and the resource
+        // map see it too — a database created here used to exist only as
+        // server_databases.site_id, invisible everywhere but this tab. Null
+        // when the site already has a primary database binding elsewhere; that
+        // case keeps the old loose-.env behaviour rather than repointing the
+        // running app at a database the operator just made.
+        $binding = $this->write_env
+            ? app(SiteBindingManager::class)->adoptServerDatabase($this->site, $db)
+            : null;
+
+        if ($binding !== null) {
+            app(SiteBindingManager::class)->stripAdoptedEnvKeys($this->site, $binding);
+        }
+
         CreateSiteDatabaseJob::dispatch(
             $db->id,
             $this->site->id,
-            $this->write_env,
+            // The binding owns DB_* once adopted — writing them to the cache as
+            // well would render them as overrides that never apply.
+            $this->write_env && $binding === null,
             $this->write_env && $this->push_env,
             (string) (auth()->id() ?? ''),
             (string) $run->id,
+            $binding?->id,
         );
 
         $this->watchConsoleAction(
@@ -305,8 +473,18 @@ class Database extends Component
     {
         $this->authorize('update', $this->site);
         $this->validate([
-            'link_database_id' => 'required|ulid',
+            'link_database_id' => 'required|string|max:200',
         ]);
+
+        // An untracked database has no row yet: adopt it onto this server first,
+        // linked straight to this site. No SiteBinding is created — dply holds
+        // no password for it, and a binding would inject DB_PASSWORD='' into a
+        // live app. See ServerDatabaseInventory::adopt().
+        if (str_starts_with($this->link_database_id, self::ADOPT_PREFIX)) {
+            $this->adoptAndLinkDatabase(substr($this->link_database_id, strlen(self::ADOPT_PREFIX)));
+
+            return;
+        }
 
         // Only adopt databases that aren't already owned by another site —
         // the dropdown only lists unlinked ones, but re-check on submit so a
@@ -328,6 +506,40 @@ class Database extends Component
         $this->toastSuccess(__('Linked :name to this site.', ['name' => $db->name]));
     }
 
+    /**
+     * Adopt an untracked database from the server scan and link it to this site
+     * in one step. $spec is "<engine>:<name>" from the picker.
+     */
+    private function adoptAndLinkDatabase(string $spec): void
+    {
+        [$engine, $name] = array_pad(explode(':', $spec, 2), 2, '');
+        $inventory = app(ServerDatabaseInventory::class);
+
+        // Re-check against the scan rather than trusting the posted value.
+        $seen = collect($inventory->untracked($this->server))
+            ->contains(fn (array $row): bool => $row['engine'] === $engine && $row['name'] === $name);
+
+        if (! $seen) {
+            $this->addError('link_database_id', __('That database is no longer listed on this server.'));
+
+            return;
+        }
+
+        try {
+            $db = $inventory->adopt($this->server, $engine, $name, $this->site);
+        } catch (\Throwable $e) {
+            $this->addError('link_database_id', Str::limit($e->getMessage(), 200));
+
+            return;
+        }
+
+        $this->link_database_id = '';
+        unset($this->linkedDatabases, $this->linkableDatabases, $this->adoptableDatabases);
+        $this->toastSuccess(__('Now tracking :name and linked it to this site. dply does not hold its password — rotate it to enable environment wiring.', [
+            'name' => $db->name,
+        ]));
+    }
+
     public function unlinkDatabase(string $id): void
     {
         $this->authorize('update', $this->site);
@@ -336,6 +548,15 @@ class Database extends Component
             ->where('server_id', $this->server->id)
             ->where('site_id', $this->site->id)
             ->find($id);
+
+        // A bound database is never detached from here — clearing site_id would
+        // leave the binding (and its injected DB_*) in place, so the app would
+        // still be pointed at a database this tab claims is gone.
+        if (in_array($id, $this->boundDatabaseIds(), true)) {
+            $this->toastError(__('This database is attached as a connected resource. Detach it from the Environment tab so its connection variables are removed too.'));
+
+            return;
+        }
 
         if (! $db instanceof ServerDatabase) {
             return;
@@ -348,12 +569,68 @@ class Database extends Component
         $this->toastSuccess(__('Detached :name. The database was not dropped on the server.', ['name' => $db->name]));
     }
 
-    /** Resolve one of this site's databases by id, or null. */
+    /**
+     * Issue a one-time credential link for a database, without changing
+     * anything about it.
+     *
+     * The rich Connect panel is addressed by binding id, so a database that
+     * predates bindings — or one attached with "Link", which deliberately does
+     * not touch the app's environment — cannot use it. Those rows still need a
+     * way to hand out the password, which is what this is: the same share
+     * channel create and rotate already use, on demand.
+     */
+    public function shareCredentials(string $id, ServerDatabaseAuditLogger $auditLogger): void
+    {
+        $this->authorize('update', $this->site);
+
+        $db = $this->ownedDatabase($id);
+        if (! $db instanceof ServerDatabase) {
+            return;
+        }
+
+        if (DatabaseWorkspaceEngines::family((string) $db->engine) === 'sqlite') {
+            // A file on disk has no username or password to share.
+            $this->toastError(__('SQLite databases have no credentials — the file path is the connection.'));
+
+            return;
+        }
+
+        if (! $db->hasUsableCredentials()) {
+            // Adopted from the server: dply never held this password, so there
+            // is nothing to hand over. Rotating it would give dply a known one,
+            // at the cost of breaking whatever currently uses the database.
+            $this->toastError(__('dply does not hold the password for :name — it was adopted from this server. Rotate the password to take ownership of it.', ['name' => $db->name]));
+
+            return;
+        }
+
+        $this->share_context = 'shared';
+        $this->issueCredentialShare($db, $auditLogger);
+
+        if ($this->share_link_url === null) {
+            $this->toastError(__('Credential sharing is turned off for this organization.'));
+
+            return;
+        }
+
+        $this->dispatch('open-modal', 'site-db-credentials-modal');
+    }
+
+    /**
+     * Resolve a database this site may act on, or null.
+     *
+     * Same union as {@see linkedDatabases()} — otherwise every row that got
+     * here through a binding would render with buttons that silently no-op,
+     * which is worse than not showing it at all.
+     */
     private function ownedDatabase(string $id): ?ServerDatabase
     {
         return ServerDatabase::query()
             ->where('server_id', $this->server->id)
-            ->where('site_id', $this->site->id)
+            ->where(function ($q): void {
+                $q->where('site_id', $this->site->id)
+                    ->orWhereIn('id', $this->boundDatabaseIds());
+            })
             ->with('extraUsers')
             ->find($id);
     }
@@ -511,7 +788,7 @@ class Database extends Component
         if (! $db instanceof ServerDatabase) {
             return;
         }
-        if (! in_array($db->engine, self::EXTRA_USER_ENGINES, true) || $db->username === null || $db->username === '') {
+        if (! in_array($db->engine, self::EXTRA_USER_ENGINES, true) || $db->username === '') {
             $this->toastError(__('Password rotation is supported for MySQL, MariaDB, and PostgreSQL databases.'));
 
             return;
@@ -588,7 +865,7 @@ class Database extends Component
         }
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
-        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
+        $filename = ($backup->serverDatabase->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
         try {
             return $downloader->response($backup, $filename);
@@ -655,6 +932,7 @@ class Database extends Component
 
         return view('livewire.sites.database', [
             'consoleRun' => $this->latestConsoleRun(),
+            'remoteDatabases' => SiteDatabaseWorkspace::remoteConfigurableSummaries($this->site),
             'notifChannels' => $onNotifications ? $this->assignableDatabaseNotificationChannels() : collect(),
             'notifSubscriptions' => $onNotifications ? $this->databaseNotificationSubscriptions() : collect(),
             'notifEventLabels' => $onNotifications ? $this->databaseEventLabels() : [],

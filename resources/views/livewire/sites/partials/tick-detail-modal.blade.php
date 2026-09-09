@@ -51,14 +51,14 @@
                 @if ($tickError !== '')
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Error') }}</p>
-                        <pre class="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rose-200 bg-rose-50 p-3 font-mono text-[11px] leading-relaxed text-rose-900">{{ $tickError }}</pre>
+                        <pre class="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-rose-200 bg-rose-50 p-3 font-mono text-xs leading-relaxed text-rose-900">{{ $tickError }}</pre>
                     </div>
                 @endif
 
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Response body') }}</p>
                     @if ($tickBody !== '')
-                        <pre class="mt-1.5 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $tickBody }}</pre>
+                        <pre class="mt-1.5 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-900 p-4 font-mono text-xs leading-relaxed text-slate-100">{{ $tickBody }}</pre>
                     @else
                         <p class="mt-1.5 text-xs text-brand-moss">{{ __('No response body captured.') }}</p>
                     @endif

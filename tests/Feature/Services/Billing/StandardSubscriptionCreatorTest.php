@@ -32,8 +32,6 @@ beforeEach(function () {
             'pro' => 'price_pro_y',
             'business' => 'price_business_y',
         ],
-        'serverless' => 'price_serverless',
-        'serverless_yearly' => 'price_serverless_y',
         'cloud' => 'price_cloud',
         'cloud_yearly' => 'price_cloud_y',
         'edge' => 'price_edge',
@@ -107,12 +105,12 @@ test('the plan line tracks the count ceiling', function () {
 test('a free plan with managed products emits only the managed lines', function () {
     $desired = DesiredBillingState::fromPlanAndUsage(
         plan: FREE,
-        serverlessCount: 3,
-        serverlessUnitCents: 200,
+        cloudCount: 2,
+        cloudUnitCents: 500,
     );
 
     expect($this->creator->buildPriceList($desired))->toBe([
-        ['price' => 'price_serverless', 'quantity' => 3],
+        ['price' => 'price_cloud', 'quantity' => 2],
     ]);
 });
 
@@ -135,20 +133,6 @@ test('yearly interval uses the yearly plan price', function () {
     foreach ($items as $item) {
         $this->assertNotSame('price_pro', $item['price']);
     }
-});
-
-test('serverless functions add an interval aware line item', function () {
-    $desired = DesiredBillingState::fromPlanAndUsage(
-        plan: FREE,
-        serverlessCount: 3,
-        serverlessUnitCents: 200,
-    );
-
-    $monthly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_MONTH);
-    $this->assertContainsEquals(['price' => 'price_serverless', 'quantity' => 3], $monthly);
-
-    $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
-    $this->assertContainsEquals(['price' => 'price_serverless_y', 'quantity' => 3], $yearly);
 });
 
 test('cloud and edge sites add interval aware line items', function () {
@@ -201,17 +185,6 @@ test('edge usage adds a metered line item on the monthly interval only', functio
     $yearly = $this->creator->buildPriceList($desired, StandardSubscriptionCreator::INTERVAL_YEAR);
     foreach ($yearly as $item) {
         $this->assertNotSame('price_edge_usage', $item['price']);
-    }
-});
-
-test('no serverless line item when count is zero', function () {
-    $org = Organization::factory()->create();
-    $items = $this->creator->buildPriceList(
-        app(OrganizationBillingStateComputer::class)->compute($org)
-    );
-
-    foreach ($items as $item) {
-        $this->assertStringNotContainsString('serverless', $item['price']);
     }
 });
 

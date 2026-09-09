@@ -131,6 +131,32 @@ test('run aggregate total duration sums all phases', function () {
     expect($result['ok'])->toBeTrue();
     expect($result['total_duration_ms'])->toBeGreaterThanOrEqual(0);
 });
+test('run still succeeds when a post-cutover restart step fails', function () {
+    [$site, $deployment] = makeDeploymentForSite([
+        'runtime' => 'php',
+        'runtime_version' => '8.4',
+        'deploy_strategy' => 'simple',
+    ]);
+    SiteDeployStep::create([
+        'site_id' => $site->id,
+        'sort_order' => 10,
+        'step_type' => SiteDeployStep::TYPE_ARTISAN_HORIZON_TERMINATE,
+        'phase' => SiteDeployStep::PHASE_RESTART,
+        'timeout_seconds' => 60,
+    ]);
+
+    $shell = new DeploymentRunnerRecordingShell;
+    $shell->failOn = 'horizon:terminate';
+
+    $runner = new DeploymentRunner(app(DeployPhaseRunner::class));
+    $result = $runner->run($deployment, '/var/www/app', fn () => $shell);
+
+    expect($result['ok'])->toBeTrue();
+    $deployment->refresh();
+    expect($deployment->status)->toBe(SiteDeployment::STATUS_SUCCESS)
+        ->and($deployment->phase_results)->toHaveKey('restart');
+});
+
 test('run throws when deployment has no site', function () {
     $deployment = new SiteDeployment;
     $deployment->status = SiteDeployment::STATUS_RUNNING;

@@ -6,6 +6,7 @@ namespace App\Models\Concerns\Site;
 
 use App\Livewire\Sites\Settings;
 use App\Models\Site;
+use App\Support\GitCloneUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -84,8 +85,35 @@ trait ResolvesSiteUrls
     {
         $meta = $this->meta ?? [];
         $value = $meta['git_ref_kind'] ?? null;
+        $kind = in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
 
-        return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
+        // A commit pin has to actually be a commit. A site left with
+        // git_ref_kind=commit while git_branch is a branch name made every
+        // deploy a silent no-op: the deployer fetches the URL (which populates
+        // FETCH_HEAD only, never origin/*), checks out the unchanged local
+        // branch, then returns early because "commits have no upstream to
+        // pull" — so the checkout never moved while deploys reported success.
+        if ($kind === 'commit' && preg_match('/^[0-9a-f]{7,40}$/i', trim((string) $this->git_branch)) !== 1) {
+            return 'branch';
+        }
+
+        return $kind;
+    }
+
+    /**
+     * Live URL for a container workspace (Docker, Kubernetes), read from the
+     * meta the deploy writes.
+     *
+     * Restored after the Cloud removal deleted it wholesale: the partial that
+     * calls it — livewire/sites/partials/container-dashboard — serves Docker and
+     * Kubernetes sites too, not just Cloud, so every container workspace 500'd.
+     * The old Cloud-branded `dply_subdomain` branch is gone with the product.
+     */
+    public function containerLiveUrl(): ?string
+    {
+        $url = $this->meta['container']['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
     }
 
     public function visitUrl(): ?string
@@ -162,29 +190,27 @@ trait ResolvesSiteUrls
 
     /**
      * Git remote URL for source-control API browsing (BYO git_repository_url or Edge source.repo).
+     *
+     * Always a URL, never the bare `owner/name` shorthand. Serverless Create
+     * persists the shorthand into git_repository_url (see {@see GitCloneUrl}),
+     * which the clone path expands but every reader here does not: the commits
+     * list, README, branches, file browser, and commitWebUrl() all run the
+     * value through a URL parser, so shorthand read as "no repository
+     * configured" on a site that plainly had one. Normalizing at the accessor
+     * fixes all of them at once, and matches what the Edge branch below was
+     * already doing inline.
      */
     public function sourceControlRepositoryUrl(): ?string
     {
         $direct = trim((string) $this->git_repository_url);
         if ($direct !== '') {
-            return $direct;
+            return GitCloneUrl::normalize($direct);
         }
 
-        if (! $this->usesEdgeRuntime()) {
-            return null;
-        }
-
-        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
-        $repo = trim((string) ($source['repo'] ?? ''));
-        if ($repo === '') {
-            return null;
-        }
-
-        if (str_contains($repo, '://')) {
-            return $repo;
-        }
-
-        return 'https://github.com/'.$repo.'.git';
+        // Edge sites carried their remote in meta.edge.source instead of the
+        // column; that fallback is gone with the surface
+        // (remove-cloud-edge-serverless).
+        return null;
     }
 
     /**

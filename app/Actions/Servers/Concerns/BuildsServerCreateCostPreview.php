@@ -14,8 +14,6 @@ use Illuminate\Support\Collection;
  */
 trait BuildsServerCreateCostPreview
 {
-
-
     /**
      * @param  array{
      *     credentials: Collection<int, mixed>,
@@ -64,25 +62,9 @@ trait BuildsServerCreateCostPreview
             return $this->buildEksCostPreview($form);
         }
 
-        $size = collect($catalog['sizes'] ?? [])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
+        $size = collect($catalog['sizes'])->first(fn (array $option): bool => (string) ($option['value'] ?? '') === $form->size);
 
         if (! is_array($size)) {
-            if ($form->type === 'digitalocean_functions') {
-                return [
-                    'state' => 'unavailable',
-                    'provider' => $form->type,
-                    'region' => null,
-                    'size' => null,
-                    'price_monthly' => null,
-                    'price_hourly' => null,
-                    'formatted_price' => null,
-                    'source' => null,
-                    'detail' => __('DigitalOcean Functions pricing depends on invocations, execution time, and memory. Review pricing in DigitalOcean before launch.'),
-                    'extras' => [],
-                    'notes' => [__('Functions hosts do not use VM region/size catalogs.')],
-                ];
-            }
-
             return [
                 'state' => 'incomplete',
                 'provider' => $form->type,

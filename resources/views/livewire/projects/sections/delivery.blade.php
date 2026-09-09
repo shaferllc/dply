@@ -26,7 +26,7 @@
     <x-section-card>
         <div class="mb-4">
             <h3 class="text-base font-semibold text-brand-ink">{{ __('Project variables and secrets') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Store values here when several sites in the project need the same configuration. Use secrets for credentials or tokens, and non-secret values for shared flags or endpoints.') }}</p>
+            <p class="mt-1 text-sm text-brand-moss">{{ __('Store shared non-secret flags here. Credentials belong in Organization → Secrets, then link them onto each site.') }}</p>
         </div>
         <div class="mb-5 space-y-3">
             @forelse ($workspace->variables as $variable)
@@ -55,10 +55,6 @@
                     <x-text-input id="variable-value" wire:model="variableValue" type="text" class="mt-1 block w-full" />
                 </div>
             </div>
-            <label class="mt-3 inline-flex items-center gap-2 text-sm text-brand-moss">
-                <input type="checkbox" wire:model="variableIsSecret" class="rounded border-brand-ink/20 text-brand-ink focus:ring-brand-sage/40">
-                <span>{{ __('Treat as secret') }}</span>
-            </label>
             <div class="mt-3">
                 <x-secondary-button type="button" wire:click="saveVariable">{{ __('Save variable') }}</x-secondary-button>
             </div>

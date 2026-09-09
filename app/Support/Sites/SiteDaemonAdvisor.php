@@ -26,6 +26,12 @@ use Illuminate\Support\Collection;
  */
 final class SiteDaemonAdvisor
 {
+    public const SURFACE_QUEUE = 'queue';
+
+    public const SURFACE_SCHEDULE = 'schedule';
+
+    public const SURFACE_WORKERS = 'workers';
+
     /**
      * @return list<array{key: string, label: string, reason: string, kind: string, preset: ?string, command: string, priority: string}>
      */
@@ -35,7 +41,7 @@ final class SiteDaemonAdvisor
         if ($server === null || ! $server->isVmHost()) {
             return [];
         }
-        if ($site->usesFunctionsRuntime() || $site->usesEdgeRuntime()) {
+        if ($site->usesEdgeRuntime()) {
             return [];
         }
         if (! $site->isLaravelFrameworkDetected()) {
@@ -95,6 +101,7 @@ final class SiteDaemonAdvisor
                 'laravel-horizon',
                 'php artisan horizon',
                 'high',
+                self::SURFACE_QUEUE,
             );
         }
 
@@ -109,6 +116,7 @@ final class SiteDaemonAdvisor
                 'laravel-queue',
                 'php artisan queue:work',
                 'high',
+                self::SURFACE_QUEUE,
             );
         }
 
@@ -137,10 +145,76 @@ final class SiteDaemonAdvisor
                 'laravel-schedule',
                 'php artisan schedule:work',
                 'medium',
+                self::SURFACE_SCHEDULE,
             );
         }
 
+        // Suggestions an operator has explicitly dismissed stay hidden until
+        // they restore them — see dismiss()/restoreAll().
+        $dismissed = self::dismissedKeys($site);
+        if ($dismissed !== []) {
+            $out = array_values(array_filter(
+                $out,
+                static fn (array $item): bool => ! in_array($item['key'], $dismissed, true),
+            ));
+        }
+
         return $out;
+    }
+
+    /**
+     * Keys the operator has dismissed for this site.
+     *
+     * @return list<string>
+     */
+    public static function dismissedKeys(Site $site): array
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $keys = $meta['dismissed_daemon_suggestions'] ?? [];
+
+        return is_array($keys)
+            ? array_values(array_filter($keys, 'is_string'))
+            : [];
+    }
+
+    /**
+     * How many suggestions are currently hidden — drives the "restore" affordance
+     * so a dismissal is never a one-way door.
+     */
+    public static function dismissedCount(Site $site): int
+    {
+        return count(self::dismissedKeys($site));
+    }
+
+    public static function dismiss(Site $site, string $key): void
+    {
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+
+        $keys = self::dismissedKeys($site);
+        if (in_array($key, $keys, true)) {
+            return;
+        }
+
+        $keys[] = $key;
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['dismissed_daemon_suggestions'] = $keys;
+        $site->meta = $meta;
+        $site->save();
+    }
+
+    public static function restoreAll(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        if (! isset($meta['dismissed_daemon_suggestions'])) {
+            return;
+        }
+
+        unset($meta['dismissed_daemon_suggestions']);
+        $site->meta = $meta;
+        $site->save();
     }
 
     /**
@@ -182,7 +256,14 @@ final class SiteDaemonAdvisor
     /**
      * @return array{key: string, label: string, reason: string, kind: string, preset: ?string, command: string, priority: string}
      */
-    private static function make(string $key, string $label, string $reason, string $kind, ?string $preset, string $command, string $priority): array
+    /**
+     * @param  string  $surface  Which page owns this suggestion — 'queue',
+     *                           'schedule' or 'workers'. A suggestion has to
+     *                           appear where the thing it creates will live, or
+     *                           you set up Horizon on Workers and then look for
+     *                           it on Queue.
+     */
+    private static function make(string $key, string $label, string $reason, string $kind, ?string $preset, string $command, string $priority, string $surface = self::SURFACE_WORKERS): array
     {
         return [
             'key' => $key,
@@ -192,6 +273,21 @@ final class SiteDaemonAdvisor
             'preset' => $preset,
             'command' => $command,
             'priority' => $priority,
+            'surface' => $surface,
         ];
+    }
+
+    /**
+     * The suggestions one page is responsible for.
+     *
+     * @param  list<array<string, mixed>>  $suggestions
+     * @return list<array<string, mixed>>
+     */
+    public static function onlyForSurface(array $suggestions, string $surface): array
+    {
+        return array_values(array_filter(
+            $suggestions,
+            static fn (array $s): bool => ($s['surface'] ?? self::SURFACE_WORKERS) === $surface,
+        ));
     }
 }

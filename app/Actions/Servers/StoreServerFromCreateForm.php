@@ -28,9 +28,11 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\RedisServerProvisioningStartedNotification;
-use App\Modules\Cloud\Services\AwsEksService;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\AwsEksService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogFailure;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -53,6 +55,12 @@ final class StoreServerFromCreateForm
         if (! ServerProviderGate::enabled($form->type)) {
             throw ValidationException::withMessages([
                 'form.type' => __('This server provider is not available yet.'),
+            ]);
+        }
+
+        if (ProviderApiStatus::isUnreachable($form->type)) {
+            throw ValidationException::withMessages([
+                'form.type' => ProviderCatalogFailure::message($form->type),
             ]);
         }
 
@@ -83,7 +91,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        if (! in_array($form->type, ['custom', 'digitalocean_functions', 'digitalocean_kubernetes', 'aws_kubernetes', 'aws_lambda'], true)) {
+        if (! in_array($form->type, ['custom', 'digitalocean_kubernetes', 'aws_kubernetes'], true)) {
             $hasLinkedCredential = GetProviderCredentialsForServerType::run($org, $form->type)->isNotEmpty();
             Validator::make(
                 [
@@ -99,10 +107,8 @@ final class StoreServerFromCreateForm
 
         $server = match ($form->type) {
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
-            'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
             'aws_kubernetes' => $this->storeAwsKubernetes($user, $org, $form),
-            'aws_lambda' => $this->storeAwsLambda($user, $org, $form),
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
             'vultr' => $this->storeVultr($user, $org, $form, $scriptKeys),

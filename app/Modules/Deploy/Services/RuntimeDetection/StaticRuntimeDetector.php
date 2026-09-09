@@ -43,7 +43,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
             return null;
         }
 
-        if ($framework === null && $hasIndexHtml) {
+        if ($hasIndexHtml) {
             $detectedFiles[] = 'index.html';
             $reasons[] = 'Found `index.html` at the repo root — treating as a plain static site.';
         }
@@ -69,8 +69,8 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectFramework(string $root, array &$detectedFiles, array &$reasons): ?string
     {
@@ -113,7 +113,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectBuildCommand(?string $framework, array &$reasons): ?string
     {
@@ -139,7 +139,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectOutputDirectory(string $root, ?string $framework, array &$reasons): ?string
     {
@@ -191,7 +191,7 @@ final class StaticRuntimeDetector implements RuntimeDetector
             }
 
             if (preg_match('/output\s*:\s*["\']([^"\']+)["\']/i', $contents, $matches) === 1) {
-                $dir = trim((string) ($matches[1] ?? ''));
+                $dir = trim((string) $matches[1]);
                 if ($dir !== '') {
                     return $dir;
                 }

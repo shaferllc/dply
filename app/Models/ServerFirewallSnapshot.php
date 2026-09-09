@@ -8,14 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $label
+ * @property ?string $label
  * @property array<string, mixed> $rules
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerFirewallSnapshot extends Model
 {

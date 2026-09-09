@@ -8,9 +8,9 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\Manifest\SiteManifestCodeShapeSync;
-use App\Services\Servers\SupervisorDeployRestarter;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SshConnection;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
@@ -27,7 +27,6 @@ class SiteGitDeployer
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function run(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
         // Cutover wrapper: maintenance/recreate methods bracket the whole deploy
@@ -112,7 +111,13 @@ class SiteGitDeployer
      */
     private function runInner(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
-        if (($site->deploy_strategy ?? 'simple') === 'atomic') {
+        if ($site->isConvertingAtomicLayout()) {
+            throw new \RuntimeException('This site is converting to a zero-downtime layout. Wait for that to finish before deploying.');
+        }
+
+        $forceFlat = $site->isDisablingAtomicLayout();
+
+        if (($site->deploy_strategy ?? 'simple') === 'atomic' && ! $forceFlat) {
             return app(AtomicSiteDeployer::class)->deploy($site, $deployment, $resume);
         }
 
@@ -203,6 +208,11 @@ class SiteGitDeployer
         // unborn (no commits yet) — `git rev-parse HEAD` prints the literal
         // string "HEAD" in that case, which would fool the $sha !== '' check.
         $sha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $pathEsc), 30));
+        // Persist SHA as soon as clone resolves it so the deploy console
+        // can show the commit during build/release (not only at success).
+        if ($deployment !== null && $sha !== '' && ctype_xdigit($sha)) {
+            $deployment->forceFill(['git_sha' => $sha])->save();
+        }
 
         // Post-clone snapshot: confirm exactly what landed on disk.
         $cloneLog .= $ssh->exec(sprintf(
@@ -256,7 +266,38 @@ class SiteGitDeployer
         // does this from its release dir; without it, simple deploys never
         // populate meta.vm_runtime.detected and the framework reads as unknown
         // even for obvious Laravel apps (esp. when the app-picker was skipped).
-        app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
+        app(VmSiteStackDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
+
+        // ── RECONCILE ── the pipeline is seeded once at site creation and never
+        // revisited, so a site created as PHP kept a composer_install step even
+        // after a Node repo was connected. Now that detection has run against
+        // the fresh checkout, make the build steps match what the repo is.
+        $reconcileNote = app(SiteDeployStepsRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+        if ($reconcileNote !== null) {
+            $log .= "\n".$reconcileNote."\n";
+        }
+
+        // The steps now match the repo; the SITE still may not. Without this a
+        // Node repo deploys green and then serves nothing, because the vhost is
+        // still PHP-FPM rooted at a public/ dir the repo has no reason to own.
+        $runtimeNote = app(SiteRuntimeReconciler::class)->reconcile($site->fresh() ?? $site);
+        if ($runtimeNote !== null) {
+            $log .= $runtimeNote."\n";
+        }
+
+        // ── PROCESS ── install/refresh the systemd unit that actually RUNS a
+        // reverse-proxied app. Nothing in either deployer did this, so a Node
+        // site deployed its code, wrote a vhost proxying to its port, and then
+        // failed its own health check with 502 because no process was ever
+        // started. PHP/static sites are skipped by the provisioner itself.
+        try {
+            $units = app(SiteSystemdProvisioner::class)->provision($site->fresh() ?? $site);
+            if ($units !== []) {
+                $log .= "\n[dply] PROCESS → ".implode(', ', $units)."\n";
+            }
+        } catch (\Throwable $e) {
+            $log .= "\n[dply] PROCESS → could not install the service unit: ".$e->getMessage()."\n";
+        }
 
         // ── ENV ── compose the .env (env cache + attached resource bindings'
         // connection vars + workspace variables) and write it BEFORE build, so
@@ -267,11 +308,11 @@ class SiteGitDeployer
         if ($server->hostCapabilities()->supportsEnvPushToHost()) {
             $envOverride = trim((string) ($site->env_file_path ?? ''));
             if ($envOverride !== '') {
-                app(SiteEnvPusher::class)->push($site, $envOverride);
+                app(SiteEnvPusher::class)->push($site, $envOverride, includeSharedSecrets: true);
                 $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($path.'/.env')), 30);
                 $log .= sprintf("\n[dply] ENV → external env_file_path %s; symlinked %s/.env → it\n", $envOverride, $path);
             } else {
-                app(SiteEnvPusher::class)->push($site, $path.'/.env');
+                app(SiteEnvPusher::class)->push($site, $path.'/.env', includeSharedSecrets: true);
                 $log .= "\n[dply] ENV → composed .env (cache + connected resources) written to ".$path."/.env\n";
             }
         }
@@ -289,7 +330,22 @@ class SiteGitDeployer
         $log .= $build['log'];
         $deployment?->recordPhaseResults('build', $build['steps']);
         if (! $build['ok']) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
+        }
+
+        // The binding injected MAIL_* above; the transport package lives in the
+        // customer's composer.json and we can only tell them it is missing.
+        $mailNote = app(MailTransportPreflight::class)->check($site->fresh() ?? $site, $ssh, $path);
+        if ($mailNote !== null) {
+            $log .= "\n".$mailNote."\n";
+        }
+
+        // Opt-in agent: adds job timing and throughput that reading a store
+        // cannot see. Never fatal — a registry outage must not stop a deploy.
+        $agentNote = app(QueueInsightsInstaller::class)->ensure($site->fresh() ?? $site, $ssh, $path);
+        if ($agentNote !== null) {
+            $log .= "\n".$agentNote."\n";
         }
 
         // ── LOGGING ── overlay dply's generated config/logging.php now that
@@ -356,6 +412,7 @@ class SiteGitDeployer
         $deployment?->recordPhaseResults('release', $releaseSteps);
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
         if (! $releaseOk) {
+            $deployment?->recordPartialLog($log);
             throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
         }
 
@@ -367,7 +424,10 @@ class SiteGitDeployer
         $log .= $restart['log'];
         $deployment?->recordPhaseResults('restart', $restart['steps']);
         if (! $restart['ok']) {
-            throw new \RuntimeException('Deploy failed during the restart phase. See the deployment log for details.');
+            // Cutover already happened. A worker bounce (horizon:terminate talking
+            // to a flaky TLS Redis, a missing daemon) must not mark a live
+            // release as a failed deploy — same contract as AtomicSiteDeployer.
+            $log .= "\n[dply] restart phase reported a failure — continuing because the release is already live.\n";
         }
 
         $syncResult = app(ByoRepoConfigSync::class)->syncAfterDeploy($site, $ssh, $path);
@@ -395,6 +455,17 @@ class SiteGitDeployer
             $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
         }
 
-        return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
+        if ($forceFlat) {
+            app(SiteAtomicLayoutRequester::class)->markFlattened($site);
+            $site->refresh();
+            $log .= "\n[dply] deploy_strategy → simple (disable transition complete)\n";
+            try {
+                $log .= app(SiteWebserverConfigApplier::class)->apply($site);
+            } catch (\Throwable $e) {
+                $log .= "\n[dply] webserver reapply after flatten skipped: ".$e->getMessage()."\n";
+            }
+        }
+
+        return ['output' => $log, 'sha' => $sha];
     }
 }

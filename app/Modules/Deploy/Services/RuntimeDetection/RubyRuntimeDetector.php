@@ -48,7 +48,7 @@ final class RubyRuntimeDetector implements RuntimeDetector
         $appPort = 3000;
         $processes = $this->detectProcesses($gems, $root, $detectedFiles, $reasons);
 
-        $confidence = $framework !== null && $framework !== 'ruby' ? 'high' : 'medium';
+        $confidence = $framework !== 'ruby' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'ruby',
@@ -80,8 +80,8 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectVersion(
         string $root,
@@ -122,11 +122,11 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $gems
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string> $gems
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
-    private function detectFramework(array $gems, string $root, array &$detectedFiles, array &$reasons): ?string
+    private function detectFramework(array $gems, string $root, array &$detectedFiles, array &$reasons): string
     {
         if (in_array('rails', $gems, true)) {
             $reasons[] = 'Detected rails from `Gemfile`.';
@@ -151,7 +151,7 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectBuildCommand(?string $framework, array &$reasons): string
     {
@@ -168,7 +168,7 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $reasons
      */
     private function detectStartCommand(?string $framework, string $root, array &$reasons): string
     {
@@ -207,9 +207,9 @@ final class RubyRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $gems
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string> $gems
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      * @return list<DetectedProcess>
      */
     private function detectProcesses(array $gems, string $root, array &$detectedFiles, array &$reasons): array

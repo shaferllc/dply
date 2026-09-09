@@ -54,7 +54,7 @@ class InsightsNotificationDispatcher
         $lines = [
             '['.$severityLabel.'] '.$finding->title,
         ];
-        if (($finding->body) && $finding->body !== '') {
+        if ($finding->body) {
             $lines[] = $finding->body;
         }
         if ($finding->site_id) {

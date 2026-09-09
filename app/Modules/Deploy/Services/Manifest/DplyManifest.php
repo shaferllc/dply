@@ -45,6 +45,11 @@ final readonly class DplyManifest
     public const KNOWN_TOP_LEVEL_KEYS = [
         // code-shape (stored on this DTO)
         'runtime', 'version', 'build', 'release', 'processes', 'healthcheck',
+        // which dply product this repo wants to be — read by `dply init` when
+        // creating the site. Purely declarative: it never changes an existing
+        // site's kind, because a site's kind is not something a deploy may
+        // silently migrate.
+        'kind',
         // control-plane supervisor templates (SelfSupervisorSync; not code-shape)
         'supervisor',
         // repeatable config (owned by ByoRepoConfigLoader / EdgeRepoConfig)
@@ -56,10 +61,10 @@ final readonly class DplyManifest
     ];
 
     /**
-     * @param  array<string, mixed>  $build
-     * @param  array<string, mixed>  $release
+     * @param  list<string>  $build
+     * @param  list<string>  $release
      * @param  array<string, mixed>  $processes
-     * @param  array<string, mixed>  $warnings
+     * @param  list<string>  $warnings
      */
     public function __construct(
         public ?string $runtime,
@@ -69,6 +74,7 @@ final readonly class DplyManifest
         public array $processes,
         public array $warnings,
         public ?string $healthcheck = null,
+        public ?string $kind = null,
     ) {}
 
     public static function empty(): self
@@ -81,6 +87,7 @@ final readonly class DplyManifest
             processes: [],
             warnings: [],
             healthcheck: null,
+            kind: null,
         );
     }
 

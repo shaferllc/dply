@@ -363,7 +363,6 @@ class BackgroundTaskTracker
      * Get task status summary.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskStatus(Task $task): array
     {
         return [

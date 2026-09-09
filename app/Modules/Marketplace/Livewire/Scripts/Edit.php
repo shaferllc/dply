@@ -141,9 +141,7 @@ class Edit extends Component
         $auditOrg = $this->script->organization;
         $this->script->delete();
 
-        if ($auditOrg) {
-            audit_log($auditOrg, Auth::user(), 'script.deleted', null, $snapshot, null);
-        }
+        audit_log($auditOrg, Auth::user(), 'script.deleted', null, $snapshot, null);
 
         return $this->redirect(route('scripts.index'), navigate: true);
     }

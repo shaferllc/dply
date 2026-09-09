@@ -32,9 +32,6 @@ class ServerAuthorizedKeysDiffPreview
         return $this;
     }
 
-    /**
-     * @return non-empty-array<string, array{remote: array<string, mixed>, desired: list<string>, added: list<string>, removed: list<mixed>, kept: list<mixed>}>
-     */
     public function diffPerUser(Server $server): array
     {
         if (! $server->isReady() || empty($server->ssh_private_key)) {
@@ -136,8 +133,8 @@ class ServerAuthorizedKeysDiffPreview
             $out[$targetUser] = [
                 'remote' => $remote,
                 'desired' => $desired,
-                'added' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($added)))))))))))))))))))))))))))))))),
-                'removed' => array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($removed)))))))))))))))))))))))))))))))),
+                'added' => $added,
+                'removed' => $removed,
                 // Stays on the server after the next sync: desired keys already present PLUS every
                 // foreign key dply preserves. The workspace shows these so operators see what's in
                 // place (incl. Dply's auto-injected operational/recovery keys and their own keys).
@@ -187,7 +184,7 @@ class ServerAuthorizedKeysDiffPreview
     /**
      * Map of SHA256 fingerprint => true for every parseable key line (comment-independent).
      *
-     * @param  array<string, mixed> $lines
+     * @param  list<string> $lines
      * @return array<string, true>
      */
     protected function fingerprintSet(array $lines): array

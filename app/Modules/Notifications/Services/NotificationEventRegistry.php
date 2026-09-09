@@ -9,7 +9,6 @@ class NotificationEventRegistry
     /**
      * @return array{key: string, label: string, category: string|null, severity: string, supports_in_app: bool, supports_email: bool, supports_webhook: bool}
      */
-    /** @return array<string, mixed> */
     public function definition(string $eventKey): array
     {
         $configured = config('notification_events.categories', []);
@@ -36,6 +35,10 @@ class NotificationEventRegistry
                     // A dead/expiring Git credential is action-required: every
                     // deploy using it fails at clone until it's replaced.
                     || str_starts_with($eventKey, 'account.git_token.')
+                    || str_starts_with($eventKey, 'account.provider_credential.')
+                    // A resize powers the machine down — every site on it is
+                    // offline for the duration, so the org needs telling.
+                    || str_starts_with($eventKey, 'server.resize.')
                     || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
@@ -72,6 +75,7 @@ class NotificationEventRegistry
     {
         if (str_contains($eventKey, 'monitor')
             || str_starts_with($eventKey, 'account.git_token.')
+            || str_starts_with($eventKey, 'account.provider_credential.')
             || str_contains($eventKey, 'uptime')
             || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')
@@ -91,6 +95,8 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'health.warning_finding')
             || str_ends_with($eventKey, 'errors.deploy_failed')
             || str_ends_with($eventKey, 'errors.operation_failed')
+            || str_ends_with($eventKey, 'resize.started')
+            || str_ends_with($eventKey, 'resize.failed')
         ) {
             return 'warning';
         }

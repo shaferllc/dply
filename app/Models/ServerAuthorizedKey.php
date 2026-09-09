@@ -11,16 +11,16 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?string $managed_key_id
- * @property string $managed_key_type
+ * @property ?string $managed_key_type
  * @property string $name
  * @property string $public_key
- * @property Carbon $review_after
+ * @property ?Carbon $review_after
  * @property ?string $server_id
  * @property ?Carbon $synced_at
  * @property string $target_linux_user
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerAuthorizedKey extends Model
 {
@@ -33,6 +33,7 @@ class ServerAuthorizedKey extends Model
         'managed_key_id',
         'name',
         'public_key',
+        'key_options',
         'synced_at',
         'review_after',
     ];

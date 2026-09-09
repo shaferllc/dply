@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Actions\Sites\SetSiteRuntime;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\MeasureSiteDiskUsageJob;
@@ -57,7 +58,7 @@ trait ManagesSiteRuntimeHealth
 
     /**
      * Whether the worker-mode toggle is offered for this site. It's a VM
-     * webserver concern only — container/serverless/edge sites don't serve from
+     * webserver concern only — container/function/edge sites don't serve from
      * a Caddy vhost, and headless (webserver=none) sites have no web front at
      * all. Worker hosts default the toggle ON; any VM site can opt in.
      */
@@ -65,7 +66,6 @@ trait ManagesSiteRuntimeHealth
     public function canConfigureWorkerMode(): bool
     {
         return $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime()
@@ -327,14 +327,13 @@ trait ManagesSiteRuntimeHealth
     }
 
     /**
-     * VM-hosted sites have a real filesystem to measure; container/edge/serverless
+     * VM-hosted sites have a real filesystem to measure; container/edge/function
      * apps run off-box and have no deploy path to `du`.
      */
     #[Computed]
     public function canMeasureDiskUsage(): bool
     {
         return $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime()
             && ! $this->site->usesDockerRuntime()
             && ! $this->site->usesKubernetesRuntime();
@@ -358,15 +357,121 @@ trait ManagesSiteRuntimeHealth
         return is_array($usage) && isset($usage['bytes']) ? $usage : null;
     }
 
-    public function saveRuntimePreferences(): void
+    /**
+     * Runtimes offered by the Runtime tab's picker, installed ones first.
+     *
+     * Installed comes from the server (real mise inventory, falling back to the
+     * wizard's pins); the rest of the mise catalog is returned too, flagged
+     * `installed => false`, so the tab can offer "install it on this server"
+     * rather than dead-ending someone whose preset didn't include what they
+     * need — which is exactly how a PHP site ended up on a Node-only box.
+     *
+     * @return list<array{key: string, label: string, version: ?string, installed: bool, current_but_missing: bool}>
+     */
+    public function siteRuntimeOptions(): array
+    {
+        $available = $this->server->availableSiteRuntimes();
+        $catalog = (array) config('server_manage.mise_runtimes', []);
+
+        $labelFor = function (string $key) use ($catalog): string {
+            $label = $catalog[$key]['label'] ?? null;
+            if (is_string($label) && $label !== '') {
+                return $label;
+            }
+
+            return match ($key) {
+                'php' => 'PHP',
+                'static' => 'Static',
+                default => ucfirst($key),
+            };
+        };
+
+        $options = [];
+        foreach ($available as $key => $version) {
+            $options[] = [
+                'key' => (string) $key,
+                'label' => $labelFor((string) $key),
+                'version' => $version !== null ? (string) $version : null,
+                'installed' => true,
+                'current_but_missing' => false,
+            ];
+        }
+
+        // The site's current runtime stays selectable even when the server does
+        // not have it — otherwise the <select> renders with no matching option
+        // and the first item silently looks like the current choice. It is
+        // reported honestly as NOT installed: this site is php on a box with no
+        // php, and listing it under "installed" is the lie that hid the problem.
+        $current = (string) ($this->site->runtime ?? '');
+        if ($current !== '' && ! array_key_exists($current, $available)) {
+            $options[] = [
+                'key' => $current,
+                'label' => $labelFor($current),
+                'version' => $this->site->runtime_version !== null ? (string) $this->site->runtime_version : null,
+                'installed' => false,
+                'current_but_missing' => true,
+            ];
+        }
+
+        foreach (array_keys($catalog) as $key) {
+            if (array_key_exists($key, $available)) {
+                continue;
+            }
+            $options[] = [
+                'key' => (string) $key,
+                'label' => $labelFor((string) $key),
+                'version' => null,
+                'installed' => false,
+                'current_but_missing' => false,
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Apply the Runtime tab's picker. All the real work — required-field checks
+     * for the target runtime, and re-applying the vhost so the box matches the
+     * record — lives in the SetSiteRuntime action, which the CLI command calls
+     * too. This method only marshals form state into it.
+     */
+    public function switchSiteRuntime(SetSiteRuntime $action): void
     {
         $this->authorize('update', $this->site);
 
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->toastError(__('Runtime preferences apply to VM and container sites. Use Deploy for function and serverless targets.'));
+        $this->validate([
+            'runtime_choice' => ['required', Rule::in(SetSiteRuntime::allowedRuntimes())],
+            'runtime_choice_version' => ['nullable', 'string', 'max:32'],
+            'runtime_start_command' => ['nullable', 'string', 'max:500'],
+            'runtime_internal_port' => ['nullable', 'integer', 'min:1', 'max:65535'],
+        ]);
+
+        $changes = [
+            'runtime' => $this->runtime_choice,
+            'runtime_version' => trim($this->runtime_choice_version) !== '' ? trim($this->runtime_choice_version) : null,
+        ];
+
+        if (in_array($this->runtime_choice, SetSiteRuntime::proxiedRuntimes(), true)) {
+            $changes['start_command'] = trim($this->runtime_start_command) !== '' ? trim($this->runtime_start_command) : null;
+            $changes['internal_port'] = $this->runtime_internal_port !== '' ? (int) $this->runtime_internal_port : null;
+        }
+
+        try {
+            $action->handle($this->site, $changes, (string) auth()->id());
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('runtime_choice', $e->getMessage());
 
             return;
         }
+
+        $this->site->refresh();
+
+        $this->toastSuccess(__('Runtime updated. Re-applying the web server config…'));
+    }
+
+    public function saveRuntimePreferences(): void
+    {
+        $this->authorize('update', $this->site);
 
         $rules = [];
 
@@ -453,10 +558,6 @@ trait ManagesSiteRuntimeHealth
 
     private function shouldShowRuntimeAppPortField(): bool
     {
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return false;
-        }
-
         $resolved = $this->site->resolvedRuntimeAppDetection();
         $fw = strtolower((string) ($resolved['framework'] ?? ''));
 

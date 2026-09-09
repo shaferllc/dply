@@ -10,14 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property ?string $api_token_id
  * @property string $event
- * @property array<string, mixed> $meta
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
  * @property-read ?ApiToken $apiToken
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerFirewallAuditEvent extends Model
 {

@@ -69,35 +69,36 @@
     @endif
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-800 ring-1 ring-amber-200">
-                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ $cachesTitle }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Install and manage cache engines on this server — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines can run side-by-side.') }}
-                        </p>
-                    </div>
-                </div>
-                @if ($opsReady)
-                    <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        {{-- Dense head, matching the rest of the workspace. --}}
+        @php
+            $cachesInstalledCount = collect($cacheServicesByEngine ?? [])->filter()->count();
+        @endphp
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-bolt"
+            :title="$cachesTitle"
+            :count="$cachesInstalledCount > 0
+                ? trans_choice('{1} :count engine|[2,*] :count engines', $cachesInstalledCount, ['count' => $cachesInstalledCount])
+                : null"
+            :note="__('Install and manage cache engines on this server — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines can run side-by-side.')"
+            class="border-b border-brand-ink/10"
+        >
+            @if ($opsReady)
+                <x-slot:actions>
                         <x-dropdown align="right" width="w-80" contentClasses="py-1.5">
                             <x-slot name="trigger">
                                 <button
                                     type="button"
                                     aria-label="{{ __('Workspace actions') }}"
                                     aria-haspopup="true"
-                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                    class="inline-flex h-6 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
                                     <span wire:loading.remove wire:target="refreshCacheCapabilities">{{ __('Actions') }}</span>
-                                    <span wire:loading wire:target="refreshCacheCapabilities" class="inline-flex items-center gap-2">
+                                    <span wire:loading wire:target="refreshCacheCapabilities" class="inline-flex items-center gap-1">
                                         <x-spinner variant="forest" />
                                         {{ __('Working…') }}
                                     </span>
-                                    <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
+                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-ink/70" aria-hidden="true" />
                                 </button>
                             </x-slot>
                             <x-slot name="content">
@@ -116,13 +117,12 @@
                                 </button>
                             </x-slot>
                         </x-dropdown>
-                    </div>
-                @endif
-            </div>
-        </div>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Cache workspace sections')" scroll class="!mb-0 border-0 bg-transparent p-0 shadow-none">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Cache workspace sections')" scroll bare class="!mb-0">
                 <x-server-workspace-tab
                     id="cache-tab-overview"
                     :active="$workspace_tab === 'overview'"
@@ -145,6 +145,10 @@
                         :active="$workspace_tab === $engine"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
+                        {{-- Icon only — no spinner here. x-server-workspace-tab
+                             already renders one for any tab with a wire:target,
+                             so a hand-rolled one made every engine tab show two
+                             spinners side by side while it loaded. --}}
                         <span class="inline-flex items-center gap-2">
                             <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
                                 @switch($engine)
@@ -164,24 +168,21 @@
                                         <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
                                 @endswitch
                             </span>
-                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading wire:target="setWorkspaceTab('{{ $engine }}')">
-                                <x-spinner class="h-4 w-4" />
-                            </span>
                             {{ $engineLabels[$engine] }}
                             @if (($comingSoonEngines[$engine] ?? false) && ! $row)
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                             @elseif ($row)
                                 @if ($isInFlight)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700">
                                         <x-spinner variant="forest" />
                                         {{ __('Working') }}
                                     </span>
                                 @elseif ($row->status === \App\Models\ServerCacheService::STATUS_FAILED)
-                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{{ __('Failed') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-2xs font-semibold text-rose-700">{{ __('Failed') }}</span>
                                 @elseif ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
-                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">{{ __('Running') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-700">{{ __('Running') }}</span>
                                 @else
-                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">{{ ucfirst($row->status) }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-1.5 py-0.5 text-2xs font-semibold text-amber-700">{{ ucfirst($row->status) }}</span>
                                 @endif
                             @endif
                         </span>
@@ -198,31 +199,23 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div wire:loading.block wire:target="setWorkspaceTab" class="px-5 py-6 sm:px-6" aria-busy="true">
-            <span class="sr-only">{{ __('Loading…') }}</span>
-            <div class="space-y-3" aria-hidden="true">
-                <div class="flex items-start gap-3">
-                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    </div>
-                </div>
-                @foreach (range(1, 3) as $row)
-                    <div class="flex items-start gap-3 border-t border-brand-ink/10 pt-3">
-                        <span class="mt-1 h-5 w-14 shrink-0 animate-pulse rounded-full bg-brand-ink/10"></span>
-                        <div class="min-w-0 flex-1 space-y-2">
-                            <div class="h-3.5 w-48 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                            <div class="h-2.5 w-3/4 max-w-md animate-pulse rounded bg-brand-ink/10"></div>
-                        </div>
-                    </div>
-                @endforeach
+        {{-- One skeleton per tab, each targeting the call WITH its argument.
+             The shared stub matched none of the three shapes (engine cards vs
+             a status strip + connection panels vs a settings list), so the
+             panel resized on every switch. Engine tabs share one shape. --}}
+        @foreach (array_merge(['overview'], $engines, ['advanced']) as $skeletonTab)
+            <div class="hidden" wire:loading.class.remove="hidden" wire:target="setWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                @include('livewire.servers.partials.cache._tab-skeleton', [
+                    'tab' => in_array($skeletonTab, ['overview', 'advanced'], true) ? $skeletonTab : 'engine',
+                    'rows' => count($engines),
+                ])
             </div>
-        </div>
+        @endforeach
 
-        <div wire:loading.remove wire:target="setWorkspaceTab">
+        <div wire:loading.class="hidden" wire:target="setWorkspaceTab">
             @if (! $opsReady)
-                <div class="px-5 py-5 sm:px-6">
+                <div class="px-4 py-3.5 sm:px-5">
                     @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
                 </div>
             @else

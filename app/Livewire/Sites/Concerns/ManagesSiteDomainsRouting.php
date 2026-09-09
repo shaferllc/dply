@@ -6,20 +6,21 @@ namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\ApplySiteDnsRecordsJob;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Modules\Cloud\Jobs\AttachCloudDomainJob;
-use App\Modules\Cloud\Jobs\DetachCloudDomainJob;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
-use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
 use App\Models\SiteDomain;
+use App\Models\SiteDomainAlias;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Services\Sites\Dns\DnsZoneCredentialResolver;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\SiteReachabilityChecker;
+use App\Services\Sites\TenantDnsProvisioner;
 use App\Services\Sites\TestingHostnameProvisioner;
 use App\Support\HostnameValidator;
 use Illuminate\Validation\Rule;
@@ -35,6 +36,14 @@ trait ManagesSiteDomainsRouting
 
     /** Optional intent comment captured at add-time and rendered on the row. */
     public string $new_domain_comment = '';
+
+    /**
+     * Add `www.<hostname>` alongside the domain. On by default: every layer
+     * downstream already handles an alias (vhost server_name, certificate SAN,
+     * A record), and a domain added without it silently serves the apex only —
+     * which reads as "dply broke www" the first time a visitor types it.
+     */
+    public bool $new_domain_with_www = true;
 
     /** Multi-line bulk paste — one hostname per line. */
     public string $bulk_domain_input = '';
@@ -57,8 +66,6 @@ trait ManagesSiteDomainsRouting
     public bool $rename_reissue_cert = false;
 
     /** Opt-in: detach old + attach new on the site's container backend during rename confirmation. */
-    public bool $rename_cycle_backend = false;
-
     public string $editing_domain_hostname = '';
 
     public string $editing_domain_comment = '';
@@ -73,8 +80,17 @@ trait ManagesSiteDomainsRouting
      * config to :host …"). Setting it lets a single shared apply job carry
      * different banner titles depending on which UI path triggered it.
      */
-    protected function finalizeRoutingMutation(string $successMessage, ?string $bannerLabel = null): void
+    protected function finalizeRoutingMutation(string $successMessage, ?string $bannerLabel = null, ?string $closeModal = null): void
     {
+        // Dismiss the modal the mutation was submitted from, before the
+        // auto-reapply branch below returns early. Every add/bulk-import form
+        // in the routing tab lives in a modal that has no other way to close:
+        // the success toast fired over a dialog that stayed open, which reads
+        // as "nothing happened" and invites a duplicate submit.
+        if ($closeModal !== null) {
+            $this->dispatch('close-modal', $closeModal);
+        }
+
         if (! $this->shouldAutoReapplyManagedWebserverConfig()) {
             $this->toastSuccess($successMessage);
 
@@ -130,7 +146,7 @@ trait ManagesSiteDomainsRouting
             'comment' => trim($this->new_domain_comment) ?: null,
         ]);
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.domain.added', $this->site, null, [
                 'domain_id' => (string) $newDomain->id,
@@ -138,9 +154,175 @@ trait ManagesSiteDomainsRouting
             ]);
         }
 
+        $wwwHostname = $this->addWwwAliasFor($newDomain->hostname);
+
         $this->new_domain_hostname = '';
         $this->new_domain_comment = '';
-        $this->finalizeRoutingMutation('Domain added.');
+        $this->new_domain_with_www = true;
+
+        $attached = $this->autoAttachDomainDns($newDomain->hostname);
+
+        if ($wwwHostname !== null) {
+            $this->autoAttachDomainDns($wwwHostname);
+        }
+
+        $this->finalizeRoutingMutation(
+            $attached ?? 'Domain added.',
+            closeModal: 'add-domain-modal',
+        );
+    }
+
+    /**
+     * Add `www.<hostname>` as a domain alias, when asked and not already there.
+     *
+     * An alias rather than a new domain: aliases already flow into
+     * {@see Site::webserverHostnames()} (nginx server_name),
+     * {@see Site::sslIssuanceHostnames()} (certificate SANs) and
+     * {@see Site::customerFacingHostnames()} (the A records "Apply records"
+     * writes), so www is served, certificated and pointed with no new plumbing.
+     *
+     * Skipped for a hostname that is already a www, and for one whose www form
+     * some other site already claims — a duplicate would fail the alias
+     * uniqueness rule and take the whole add down with it.
+     *
+     * @return string|null The alias hostname created, or null when none was.
+     */
+    private function addWwwAliasFor(string $hostname): ?string
+    {
+        if (! $this->new_domain_with_www) {
+            return null;
+        }
+
+        $hostname = strtolower(trim($hostname));
+
+        if ($hostname === '' || str_starts_with($hostname, 'www.')) {
+            return null;
+        }
+
+        $www = 'www.'.$hostname;
+
+        $taken = SiteDomainAlias::query()->where('hostname', $www)->exists()
+            || SiteDomain::query()->where('hostname', $www)->exists();
+
+        if ($taken) {
+            return null;
+        }
+
+        SiteDomainAlias::query()->create([
+            'site_id' => $this->site->id,
+            'hostname' => $www,
+            'label' => null,
+            'comment' => __('Added automatically with :hostname.', ['hostname' => $hostname]),
+            'sort_order' => (int) ($this->site->domainAliases()->max('sort_order') ?? 0) + 1,
+        ]);
+
+        $this->site->load('domainAliases');
+
+        return $www;
+    }
+
+    /**
+     * Point a freshly added hostname at this server without the operator
+     * leaving the tab — if one of the org's connected DNS credentials actually
+     * hosts its zone.
+     *
+     * Zone ownership is *probed* ({@see DnsZoneCredentialResolver}), not
+     * assumed: `Site::dnsAutomationCredential()` returns the most recently
+     * updated DNS credential in the org, which is a fine default for a
+     * single-provider org and the wrong token the moment there are two. A
+     * successful attach backfills the site's saved zone and credential, so
+     * "Apply records" and DNS-01 issuance afterwards use the token that owns
+     * the zone rather than that guess.
+     *
+     * Provider HTTP only, no SSH, and every failure path is soft: when nothing
+     * connected controls the zone the domain is still added and the row shows
+     * the record to enter by hand. Deliberately not wired into bulk import —
+     * 50 hostnames is 50 serial probes, and a DNS export is what someone
+     * pastes when their records already exist.
+     *
+     * @return string|null Success message to toast, or null for the default.
+     */
+    private function autoAttachDomainDns(string $hostname): ?string
+    {
+        if ($this->site->server?->ip_address === null) {
+            return null;
+        }
+
+        try {
+            $result = app(TenantDnsProvisioner::class)->ensureHostname($this->site, $hostname);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return null;
+        }
+
+        if ($result['status'] !== 'created') {
+            return null;
+        }
+
+        // Only fill blanks. An operator who picked a zone or credential by hand
+        // keeps it; this is for the common case where neither was ever set.
+        $updates = [];
+        if (trim((string) ($this->site->dns_zone ?? '')) === '' && $result['zone'] !== null) {
+            $updates['dns_zone'] = $result['zone'];
+        }
+        if ($this->site->dns_provider_credential_id === null && $result['credential_id'] !== null) {
+            $updates['dns_provider_credential_id'] = $result['credential_id'];
+        }
+        if ($updates !== []) {
+            $this->site->forceFill($updates)->save();
+        }
+
+        // The status rows carry the old answer for this hostname (or none).
+        $this->dnsRecordStatuses = [];
+        $this->dnsRecordsLoaded = false;
+
+        return (string) __('Domain added — A record pointed at :ip via :provider. Allow a few minutes for DNS to propagate.', [
+            'ip' => (string) $this->site->server->ip_address,
+            'provider' => $result['provider'] ?? __('your DNS provider'),
+        ]);
+    }
+
+    /**
+     * The record an operator has to create at their DNS host for one hostname.
+     *
+     * Static — no resolver probe — so it can render on every row of the Domains
+     * tab at first paint. The live "is it actually pointing here" answer is the
+     * DNS tab's job ({@see computeDnsRecordRows()}), which is why that one sits
+     * behind wire:init.
+     *
+     * `name` is zone-relative when the zone is known, because that is what
+     * registrar forms ask for; the full hostname is shown alongside it for the
+     * hosts that want an FQDN instead.
+     *
+     * @return array{type: string, name: string, value: string, zone: string, apex: bool}|null
+     */
+    public function dnsRecordHintFor(string $hostname): ?array
+    {
+        $hostname = strtolower(trim($hostname));
+        $serverIp = trim((string) ($this->site->server->ip_address ?? ''));
+
+        if ($hostname === '' || $serverIp === '') {
+            return null;
+        }
+
+        $zone = strtolower(trim((string) ($this->site->dns_zone ?: ($this->site->guessDnsZoneFromPrimaryHostname() ?? ''))));
+        $inZone = $zone !== '' && ($hostname === $zone || str_ends_with($hostname, '.'.$zone));
+
+        $name = match (true) {
+            ! $inZone => $hostname,
+            $hostname === $zone => '@',
+            default => rtrim(substr($hostname, 0, -(strlen($zone) + 1)), '.'),
+        };
+
+        return [
+            'type' => 'A',
+            'name' => $name === '' ? '@' : $name,
+            'value' => $serverIp,
+            'zone' => $inZone ? $zone : '',
+            // An apex cannot take a CNAME, so the row must not offer one there.
+            'apex' => $inZone && $hostname === $zone,
+        ];
     }
 
     public function editDomain(int|string $domainId): void
@@ -195,7 +377,7 @@ trait ManagesSiteDomainsRouting
                 'comment' => trim($this->editing_domain_comment) ?: null,
             ])->save();
 
-            $org = $this->site->server?->organization;
+            $org = $this->site->server->organization;
             if ($org) {
                 audit_log($org, auth()->user(), 'site.domain.updated', $this->site, [
                     'hostname' => $oldHostname,
@@ -231,7 +413,6 @@ trait ManagesSiteDomainsRouting
 
         $this->rename_plan = $plan;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('open-modal', 'primary-hostname-rename-modal');
     }
 
@@ -266,7 +447,6 @@ trait ManagesSiteDomainsRouting
         $optInKeys = array_map(fn (array $row) => $row['key'], $freshPlan['optIn']);
 
         $reissueCert = $this->rename_reissue_cert && in_array('reissue_cert', $optInKeys, true);
-        $cycleBackend = $this->rename_cycle_backend && in_array('cycle_backend', $optInKeys, true);
         $rewriteDnsZone = collect($freshPlan['auto'])->contains(fn (array $row) => $row['key'] === 'dns_zone');
 
         $primaryDomain->forceFill(['hostname' => $new])->save();
@@ -282,17 +462,11 @@ trait ManagesSiteDomainsRouting
             $cascadeKeys[] = 'reissue_cert';
             $this->dispatchCertReissue($freshPlan);
         }
-        if ($cycleBackend) {
-            $cascadeKeys[] = 'cycle_backend';
-            DetachCloudDomainJob::dispatch($this->site->id, $old);
-            AttachCloudDomainJob::dispatch($this->site->id, $new);
-        }
 
         $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);
 
         $this->rename_plan = null;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('close-modal', 'primary-hostname-rename-modal');
         $this->cancelEditDomain();
         $this->finalizeRoutingMutation('Primary hostname renamed.');
@@ -306,7 +480,6 @@ trait ManagesSiteDomainsRouting
     {
         $this->rename_plan = null;
         $this->rename_reissue_cert = false;
-        $this->rename_cycle_backend = false;
         $this->dispatch('close-modal', 'primary-hostname-rename-modal');
     }
 
@@ -319,7 +492,7 @@ trait ManagesSiteDomainsRouting
      */
     private function dispatchCertReissue(array $plan): void
     {
-        $row = collect($plan['optIn'] ?? [])->firstWhere('key', 'reissue_cert');
+        $row = collect($plan['optIn'])->firstWhere('key', 'reissue_cert');
         $certIds = is_array($row) ? ($row['detail']['cert_ids'] ?? []) : [];
         if (! is_array($certIds) || $certIds === []) {
             return;
@@ -413,7 +586,7 @@ trait ManagesSiteDomainsRouting
         }
 
         $this->bulk_domain_input = '';
-        $this->finalizeRoutingMutation(__(':count domain(s) imported.', ['count' => $imported]));
+        $this->finalizeRoutingMutation(__(':count domain(s) imported.', ['count' => $imported]), closeModal: 'add-domain-modal');
     }
 
     public function confirmRemoveDomain(int|string $domainId): void
@@ -421,7 +594,7 @@ trait ManagesSiteDomainsRouting
         $this->authorize('update', $this->site);
 
         $domain = SiteDomain::query()->where('site_id', $this->site->id)->find($domainId);
-        $hostname = $domain?->hostname ?? __('this domain');
+        $hostname = $domain->hostname ?? __('this domain');
 
         $this->openConfirmActionModal(
             'removeDomain',
@@ -462,7 +635,7 @@ trait ManagesSiteDomainsRouting
         ];
         $domain->delete();
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.domain.removed', $this->site, $snapshot, null);
         }
@@ -527,21 +700,17 @@ trait ManagesSiteDomainsRouting
         );
 
         // Stream certbot progress into the page-top banner instead of making the
-        // operator refresh to read last_output. Guarded so any host component
-        // reusing this trait without the console-action machinery still works.
-        $useConsole = method_exists($this, 'seedQueuedConsoleAction') && method_exists($this, 'watchConsoleAction');
-        $run = $useConsole
-            ? $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]))
-            : null;
+        // operator refresh to read last_output.
+        $run = $this->seedQueuedConsoleAction('ssl', __('Issuing *.:zone wildcard certificate', ['zone' => $zone]));
 
         IssueServerWildcardCertificateJob::dispatch(
             $serverId,
             $zone,
-            $run !== null ? (string) $run->id : null,
-            $run !== null ? (string) $this->site->id : null,
+            (string) $run->id,
+            (string) $this->site->id,
         );
 
-        $org = $this->site->server?->organization;
+        $org = $this->site->server->organization;
         if ($org) {
             audit_log($org, auth()->user(), 'site.wildcard.reissue_requested', $this->site, null, [
                 'zone' => $zone,
@@ -549,16 +718,12 @@ trait ManagesSiteDomainsRouting
             ]);
         }
 
-        if ($run !== null) {
-            $this->dispatch('dply-console-action-focus');
-            $this->watchConsoleAction(
-                $run,
-                __('Wildcard *.:zone issued.', ['zone' => $zone]),
-                __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
-            );
-        } else {
-            $this->toastSuccess(__('Reissuing the *.:zone wildcard certificate — refresh in a minute to see the result.', ['zone' => $zone]));
-        }
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Wildcard *.:zone issued.', ['zone' => $zone]),
+            __('Wildcard *.:zone issuance did not finish — check the output below.', ['zone' => $zone]),
+        );
     }
 
     /**
@@ -637,7 +802,9 @@ trait ManagesSiteDomainsRouting
         $checker = app(SiteReachabilityChecker::class);
 
         $rows = [];
-        foreach ($this->site->customerDomainHostnames() as $host) {
+        // Same set the apply job writes, so the table can never report a clean
+        // bill of health for names it never looked at.
+        foreach ($this->site->customerFacingHostnames() as $host) {
             $host = strtolower(trim((string) $host));
             if ($host === '') {
                 continue;
@@ -649,9 +816,16 @@ trait ManagesSiteDomainsRouting
                 ? $host
                 : ($host === $zone ? '@' : rtrim(substr($host, 0, -(strlen($zone) + 1)), '.'));
 
-            $status = ! empty($reach['behind_cloudflare']) ? 'cloudflare'
-                : (($reach['points_here'] ?? false) ? 'pointing'
-                : (($reach['resolves'] ?? false) ? 'wrong' : 'missing'));
+            // 'propagating' outranks 'wrong': the record is already correct at
+            // the nameservers and only a cache still disagrees, so there is
+            // nothing for the operator to fix.
+            $status = match (true) {
+                ! empty($reach['behind_cloudflare']) => 'cloudflare',
+                (bool) $reach['points_here'] => 'pointing',
+                ! empty($reach['propagating']) => 'propagating',
+                (bool) $reach['resolves'] => 'wrong',
+                default => 'missing',
+            };
 
             $rows[] = [
                 'hostname' => $host,
@@ -661,7 +835,7 @@ trait ManagesSiteDomainsRouting
                 'zone' => $zone,
                 'in_zone' => $inZone,
                 'status' => $status,
-                'resolved_ips' => array_values($reach['resolved_ips'] ?? []),
+                'resolved_ips' => $reach['resolved_ips'],
             ];
         }
 

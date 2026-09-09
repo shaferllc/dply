@@ -237,7 +237,7 @@ class WorkspaceMonitor extends Component
                 return 'healthy';
             };
 
-            $latestPayload = is_array($rangeData['latest_payload']) ? $rangeData['latest_payload'] : [];
+            $latestPayload = $rangeData['latest_payload'];
             $metricStatuses = [
                 'cpu' => $statusFor($this->floatOrNull($latestPayload['cpu_pct'] ?? null), $thresholdCpu, 95.0),
                 'mem' => $statusFor($this->floatOrNull($latestPayload['mem_pct'] ?? null), $thresholdMem, 95.0),
@@ -263,6 +263,10 @@ class WorkspaceMonitor extends Component
             ? app(ServerMetricsGuestPushVerifier::class)->summary($this->server)
             : null;
 
+        // Both self-heal branches below SSH into the host. On a mirror the flags
+        // they read describe a machine this control plane has no key for, so
+        // acting on them would fire a doomed job at a live production box on
+        // every render. The owning control plane runs its own heal.
         if (
             $guestPushVerification !== null
             && ! $guestPushVerification['script_current']

@@ -32,8 +32,8 @@ use Illuminate\Support\Carbon;
  * @property ?int $last_count
  * @property-read ?Server $server
  * @property-read ?Organization $organization
- * @property Carbon $created_at
- * @property Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class ServerLogAlertRule extends Model
 {

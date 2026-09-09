@@ -7,15 +7,20 @@ import {
 import { registerDplyThemeListeners } from './theme.js';
 import { registerDeployPipelineWorkspace } from './deploy-pipeline-dnd.js';
 import { registerConsoleDrawer } from './console-drawer.js';
+import { registerRealtimeConsole } from './realtime-console.js';
 import {
     installFeedbackConsoleBuffer,
     registerFeedbackSidebar,
 } from './feedback.js';
+import { registerDplyTooltips } from './tooltip.js';
+import { registerMarkdownEditor } from './markdown-editor.js';
 
 window.dplyEnsureDocsProseStyles = dplyEnsureDocsProseStyles;
 
 registerDplyLazyAssetListeners();
 registerDplyThemeListeners();
+// Styled hover tooltips for [data-tooltip] and for truncated [title] text.
+registerDplyTooltips();
 
 // Install the console-error ring buffer immediately so the global feedback
 // sidebar can attach the errors that preceded a bug report.
@@ -39,6 +44,33 @@ const toastRegionClasses = {
 };
 
 document.addEventListener('alpine:init', () => {
+    // Site header Deploy/Console/Sync drawers — store survives Livewire morph
+    // (local x-data on DeployControl is lost during poll/lazy clone).
+    if (! Alpine.store('deployControl')) {
+        Alpine.store('deployControl', {
+            deployDrawerOpen: false,
+            syncDrawerOpen: false,
+            openDeployDrawer() {
+                this.deployDrawerOpen = true;
+            },
+            closeDeployDrawer() {
+                this.deployDrawerOpen = false;
+            },
+            toggleDeployDrawer() {
+                this.deployDrawerOpen = ! this.deployDrawerOpen;
+            },
+            openSyncDrawer() {
+                this.syncDrawerOpen = true;
+            },
+            closeSyncDrawer() {
+                this.syncDrawerOpen = false;
+            },
+            toggleSyncDrawer() {
+                this.syncDrawerOpen = ! this.syncDrawerOpen;
+            },
+        });
+    }
+
     window.Alpine.data('toastStore', (config = {}) => {
         const positionKey = config.position ?? 'bottom_right';
         const savedClass =
@@ -75,6 +107,10 @@ document.addEventListener('alpine:init', () => {
     registerDeployPipelineWorkspace(window.Alpine);
     registerConsoleDrawer(window.Alpine);
     registerFeedbackSidebar(window.Alpine);
+    registerRealtimeConsole(window.Alpine);
+    // Toolbar/shortcuts for Markdown textareas (server notes today). Pure DOM
+    // work — no parser, so it stays in the main bundle rather than a lazy entry.
+    registerMarkdownEditor(window.Alpine);
 });
 
 const plotlyCdnUrl = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.4.0/plotly.min.js';

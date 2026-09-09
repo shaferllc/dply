@@ -34,7 +34,7 @@ class SlowBuildRule implements IntelligenceRule
 
     /** @return array<string, mixed> */
     /**
-     * @return list<App\Services\DeployIntelligence\AlertFinding>
+     * @return list<\App\Services\DeployIntelligence\AlertFinding>
      */
     public function evaluate(Organization $organization): array
     {
@@ -128,7 +128,7 @@ class SlowBuildRule implements IntelligenceRule
     }
 
     /**
-     * @param  array<string, mixed> $sortedAsc
+     * @param  list<float|int>  $sortedAsc
      */
     private function median(array $sortedAsc): float
     {

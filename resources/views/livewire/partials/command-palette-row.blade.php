@@ -62,7 +62,7 @@
     <span
         x-show="confirming === {{ $i }}"
         x-cloak
-        class="shrink-0 rounded bg-brand-forest/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest"
+        class="shrink-0 rounded bg-brand-forest/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest"
     >{{ __('↵ again') }}</span>
     <x-heroicon-o-bolt
         x-show="confirming !== {{ $i }}"

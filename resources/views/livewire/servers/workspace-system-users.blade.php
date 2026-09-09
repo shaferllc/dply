@@ -22,21 +22,14 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('System users') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user; create the account here, then assign it to a site from the site\'s System user section.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-user-group"
+            :title="__('System users')"
+            :note="__('Linux accounts on this server. Sites pick from these for their file owner / PHP-FPM pool user; create the account here, then assign it to a site from the site\'s System user section.')"
+            class="border-b border-brand-ink/10"
+        />
 
     @if (! $opsReady)
         <div class="flex items-start gap-3 border-b border-amber-200/80 bg-amber-50/60 px-5 py-5 sm:px-6">
@@ -44,7 +37,7 @@
                 <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
             </div>
@@ -64,71 +57,75 @@
         {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
              for this server's system_user.* events. Keeps "set up alerts" one click
              away instead of bouncing the operator out to global settings. --}}
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('System users sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
-                <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="$set('activeTab', 'accounts')">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('System users sections')" scroll bare class="!mb-0 w-full">
+                <x-server-workspace-tab icon="heroicon-o-users" :active="$activeTab === 'accounts'" wire:click="setActiveTab('accounts')">
                     {{ __('Accounts') }}
                 </x-server-workspace-tab>
-                <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="$set('activeTab', 'notifications')">
+                <x-server-workspace-tab icon="heroicon-o-bell" :active="$activeTab === 'notifications'" wire:click="setActiveTab('notifications')">
                     {{ __('Notifications') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
         </div>
 
-        <div @class(['min-w-0', 'hidden' => $activeTab !== 'accounts'])>
+        {{-- Tab-switch skeleton, same treatment as the SSH keys page: setActiveTab()
+             round-trips, and without this the panel below just blanks.
+
+             $activeTab is still the OUTGOING tab while the request is in flight, and
+             with exactly two tabs a switch can only be heading to the other one — so
+             the skeleton is shaped from the inverse. Add a third tab and this needs
+             the real target instead (Alpine state here does not survive the morph).
+
+             wire:loading.block, not bare wire:loading, or the skeleton shrink-wraps
+             to inline-block. --}}
+        <div wire:loading.block wire:target="setActiveTab" aria-busy="true" aria-live="polite">
+            <span class="sr-only">{{ __('Loading section…') }}</span>
+            @include('livewire.servers.partials.system-users._tab-skeleton', [
+                'tab' => $activeTab === 'accounts' ? 'notifications' : 'accounts',
+                'rows' => count($remote_rows),
+            ])
+        </div>
+
+        <div wire:loading.remove wire:target="setActiveTab" @class(['min-w-0', 'hidden' => $activeTab !== 'accounts'])>
             <section class="{{ $card }}">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Accounts') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                {{ __('Loaded from /etc/passwd over SSH. Click a row to expand UID, home, shell, groups, and assigned sites.') }}
-                            </p>
-                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                    {{ trans_choice('{0} no accounts|{1} :count account|[2,*] :count accounts', count($remote_rows), ['count' => count($remote_rows)]) }}
-                                </span>
-                                @if ($orphanRows->count() > 0)
-                                    <span class="text-brand-mist/60">·</span>
-                                    <span class="inline-flex items-center gap-1 text-amber-800">
-                                        <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
-                                        {{ trans_choice('{1} :count orphan|[2,*] :count orphans', $orphanRows->count(), ['count' => $orphanRows->count()]) }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                {{-- Dense head, matching the Notifications tab and the SSH keys page:
+                     count as a pill, the /etc/passwd explainer as the one-line note,
+                     Add + Sync in the actions slot. Orphans get the amber strip
+                     below rather than a second copy of the count up here. --}}
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-users"
+                    :title="__('Accounts on this server')"
+                    :count="trans_choice('{0} none|{1} :count account|[2,*] :count accounts', count($remote_rows), ['count' => count($remote_rows)])"
+                    :note="__('Loaded from /etc/passwd over SSH. Expand a row for UID, home, shell, groups, and assigned sites.')"
+                    :tone="$orphanRows->count() > 0 ? 'amber' : null"
+                    class="border-b border-brand-ink/10"
+                >
+                    <x-slot:actions>
                         <button
                             type="button"
                             wire:click="openCreateModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-plus class="h-4 w-4" />
+                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Add a user') }}
                         </button>
-                        <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
                         <button
                             type="button"
                             wire:click="loadUsers"
                             wire:loading.attr="disabled"
                             wire:target="loadUsers"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="loadUsers" />
-                            <span wire:loading wire:target="loadUsers" class="inline-flex h-4 w-4 items-center justify-center">
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="loadUsers" aria-hidden="true" />
+                            <span wire:loading wire:target="loadUsers" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             <span wire:loading.remove wire:target="loadUsers">{{ __('Sync now') }}</span>
                             <span wire:loading wire:target="loadUsers">{{ __('Syncing…') }}</span>
                         </button>
-                    </div>
-                </div>
+                    </x-slot:actions>
+                </x-workspace-panel-head>
 
                 @if ($remote_rows !== [] && $orphanRows->count() > 0)
                     <div class="flex flex-col gap-3 border-b border-amber-200 bg-amber-50/70 px-6 py-3 text-sm text-amber-900 sm:flex-row sm:items-start sm:justify-between sm:px-8">
@@ -192,30 +189,30 @@
                                         <div class="flex flex-wrap items-center gap-2">
                                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $row['username'] }}</p>
                                             @if ($isLogin)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                     <x-heroicon-m-user class="h-3 w-3" />
                                                     {{ __('login') }}
                                                 </span>
                                             @endif
                                             @if (! empty($row['is_orphan']))
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
                                                     <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                                                     {{ __('Orphan') }}
                                                 </span>
                                             @elseif (! empty($row['is_protected']))
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                                     <x-heroicon-m-shield-check class="h-3 w-3" />
                                                     {{ __('Protected') }}
                                                 </span>
                                             @endif
                                             @if ($uid !== null)
-                                                <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                                <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                                     UID {{ $uid }}
                                                 </span>
                                             @endif
                                         </div>
 
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">
+                                        <p class="mt-0.5 text-xs text-brand-mist">
                                             {{ trans_choice('{0} no sites|{1} :count site|[2,*] :count sites', $row['site_count'], ['count' => $row['site_count']]) }}
                                             @if ($workerCount > 0)
                                                 <span class="text-brand-mist/60">·</span>
@@ -237,7 +234,7 @@
                                             <button
                                                 type="button"
                                                 x-on:click="open = ! open"
-                                                class="inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink"
+                                                class="inline-flex cursor-pointer items-center gap-1 text-xs font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink"
                                             >
                                                 <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
                                                 <span x-show="! open">{{ __('Show details') }}</span>
@@ -246,29 +243,29 @@
                                             <div x-show="open" x-collapse x-cloak class="mt-2 space-y-3 rounded-lg bg-brand-sand/15 px-4 py-3">
                                                 <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                                                     <div>
-                                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('UID') }}</dt>
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('UID') }}</dt>
                                                         <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $uid ?? '—' }}</dd>
                                                     </div>
                                                     <div>
-                                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Login shell') }}</dt>
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Login shell') }}</dt>
                                                         <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $shell !== '' ? $shell : '—' }}</dd>
                                                     </div>
                                                     <div class="sm:col-span-2">
-                                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Home directory') }}</dt>
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Home directory') }}</dt>
                                                         <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $home !== '' ? $home : '—' }}</dd>
                                                     </div>
                                                     <div class="sm:col-span-2">
-                                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ trans_choice('{0} Groups|{1} Group|[2,*] Groups', count($groups)) }}</dt>
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ trans_choice('{0} Groups|{1} Group|[2,*] Groups', count($groups)) }}</dt>
                                                         <dd class="mt-1 flex flex-wrap gap-1">
                                                             @forelse ($groups as $g)
-                                                                <span class="inline-flex items-center rounded-md bg-white px-1.5 py-0.5 font-mono text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">{{ $g }}</span>
+                                                                <span class="inline-flex items-center rounded-md bg-white px-1.5 py-0.5 font-mono text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">{{ $g }}</span>
                                                             @empty
                                                                 <span class="text-xs italic text-brand-mist">{{ __('No group memberships detected.') }}</span>
                                                             @endforelse
                                                         </dd>
                                                     </div>
                                                     <div class="sm:col-span-2">
-                                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ trans_choice('{0} Assigned sites|{1} Assigned site|[2,*] Assigned sites', count($sites)) }}</dt>
+                                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ trans_choice('{0} Assigned sites|{1} Assigned site|[2,*] Assigned sites', count($sites)) }}</dt>
                                                         <dd class="mt-1">
                                                             @if ($sites === [])
                                                                 <p class="text-xs italic text-brand-mist">{{ __('No Dply-managed sites use this account.') }}</p>
@@ -288,22 +285,22 @@
                                                     </div>
                                                     @if ($workerCount > 0 || $cronCount > 0)
                                                         <div class="sm:col-span-2">
-                                                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Also used by') }}</dt>
+                                                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Also used by') }}</dt>
                                                             <dd class="mt-1 flex flex-wrap gap-1.5">
                                                                 @if ($workerCount > 0)
-                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                                                         <x-heroicon-m-cog-6-tooth class="h-3 w-3" />
                                                                         {{ trans_choice('{1} :count worker process|[2,*] :count worker processes', $workerCount, ['count' => $workerCount]) }}
                                                                     </span>
                                                                 @endif
                                                                 @if ($cronCount > 0)
-                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                                                    <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-2xs font-medium text-brand-moss ring-1 ring-brand-ink/10">
                                                                         <x-heroicon-m-clock class="h-3 w-3" />
                                                                         {{ trans_choice('{1} :count cron job|[2,*] :count cron jobs', $cronCount, ['count' => $cronCount]) }}
                                                                     </span>
                                                                 @endif
                                                             </dd>
-                                                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Removing this account would orphan these — reassign or remove them first.') }}</p>
+                                                            <p class="mt-1 text-xs text-brand-mist">{{ __('Removing this account would orphan these — reassign or remove them first.') }}</p>
                                                         </div>
                                                     @endif
                                                 </dl>
@@ -336,7 +333,7 @@
             </section>
         </div>
 
-        <div @class(['min-w-0', 'hidden' => $activeTab !== 'notifications'])>
+        <div wire:loading.remove wire:target="setActiveTab" @class(['min-w-0', 'hidden' => $activeTab !== 'notifications'])>
             @include('livewire.servers.partials.system-users.notifications-tab', [
                 'notifChannels' => $notifChannels,
                 'notifSubscriptions' => $notifSubscriptions,
@@ -399,7 +396,7 @@
                             <div class="rounded-xl border-2 px-4 py-3 transition peer-checked:border-brand-sage peer-checked:bg-brand-sage/10 peer-focus:ring-2 peer-focus:ring-brand-sage/30 {{ $new_shell === '/bin/bash' ? 'border-brand-sage bg-brand-sage/10' : 'border-brand-ink/12 bg-white hover:border-brand-ink/20' }}">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('Bash') }}</p>
                                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Interactive shell. Use when this account should be able to SSH in.') }}</p>
-                                <p class="mt-1 font-mono text-[10px] uppercase tracking-wide text-brand-mist">/bin/bash</p>
+                                <p class="mt-1 font-mono text-2xs uppercase tracking-wide text-brand-mist">/bin/bash</p>
                             </div>
                         </label>
                         <label class="cursor-pointer">
@@ -407,7 +404,7 @@
                             <div class="rounded-xl border-2 px-4 py-3 transition peer-checked:border-brand-sage peer-checked:bg-brand-sage/10 peer-focus:ring-2 peer-focus:ring-brand-sage/30 {{ $new_shell === '/usr/sbin/nologin' ? 'border-brand-sage bg-brand-sage/10' : 'border-brand-ink/12 bg-white hover:border-brand-ink/20' }}">
                                 <p class="text-sm font-semibold text-brand-ink">{{ __('nologin') }}</p>
                                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Service accounts only — runs FPM / queues but cannot SSH in.') }}</p>
-                                <p class="mt-1 font-mono text-[10px] uppercase tracking-wide text-brand-mist">/usr/sbin/nologin</p>
+                                <p class="mt-1 font-mono text-2xs uppercase tracking-wide text-brand-mist">/usr/sbin/nologin</p>
                             </div>
                         </label>
                     </div>
@@ -467,7 +464,7 @@
 
             <div class="space-y-4 px-6 py-6">
                 <div>
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Removing') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Removing') }}</p>
                     <p class="mt-1 break-all rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 font-mono text-sm text-brand-ink">{{ $remove_username }}</p>
                 </div>
                 <div>

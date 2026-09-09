@@ -14,19 +14,19 @@ use Illuminate\Support\Carbon;
 /**
  * @property string $id
  * @property ?Carbon $completed_at
- * @property string $failure_summary
- * @property array<string, mixed> $manual_review_items
+ * @property ?string $failure_summary
+ * @property ?list<array<string, mixed>> $manual_review_items
  * @property ?string $organization_id
  * @property ?Carbon $paused_nudge_sent_at
  * @property ?string $provider_credential_id
  * @property string $source
  * @property int $source_server_id
- * @property string $ssh_key_fingerprint
- * @property string $ssh_key_private_encrypted
- * @property string $ssh_key_public
+ * @property ?string $ssh_key_fingerprint
+ * @property ?string $ssh_key_private_encrypted
+ * @property ?string $ssh_key_public
  * @property ?Carbon $ssh_key_pushed_at
  * @property ?Carbon $ssh_key_revoked_at
- * @property int $ssh_key_source_id
+ * @property ?int $ssh_key_source_id
  * @property ?Carbon $started_at
  * @property string $status
  * @property ?string $target_server_id
@@ -37,8 +37,8 @@ use Illuminate\Support\Carbon;
  * @property-read ?Server $targetServer
  * @property-read Collection<int, ImportSiteMigration> $siteMigrations
  * @property-read Collection<int, ImportMigrationStep> $steps
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ImportServerMigration extends Model
 {

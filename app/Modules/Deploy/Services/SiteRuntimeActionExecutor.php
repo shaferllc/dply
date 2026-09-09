@@ -14,7 +14,6 @@ class SiteRuntimeActionExecutor
     /**
      * @return array{status: string, output: string, publication?: array<string, mixed>, runtime_details?: array<string, mixed>}
      */
-    /** @return array<string, mixed> */
     public function run(Site $site, string $action): array
     {
         return match ($site->runtimeTargetFamily()) {

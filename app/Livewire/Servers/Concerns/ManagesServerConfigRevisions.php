@@ -135,7 +135,7 @@ trait ManagesServerConfigRevisions
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $this->config_contents = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
         $this->stashConfigDraft((string) $this->config_selected_path, $this->config_contents);
         $this->configDiffRevisionId = null;
@@ -160,7 +160,7 @@ trait ManagesServerConfigRevisions
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $content = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
         $engine = $this->resolvedConfigEngine();
 
@@ -313,8 +313,8 @@ trait ManagesServerConfigRevisions
             if ($a !== null && $b !== null) {
                 return [
                     $registry->rendererFor(ServerConfigFileEditor::KIND)->render(
-                        is_array($a->snapshot) ? $a->snapshot : [],
-                        is_array($b->snapshot) ? $b->snapshot : [],
+                        $a->snapshot,
+                        $b->snapshot,
                     ),
                     (string) __('Comparing revisions :a → :b', [
                         'a' => optional($a->created_at)->format('Y-m-d H:i') ?? $a->id,
@@ -331,7 +331,7 @@ trait ManagesServerConfigRevisions
             if ($rev !== null) {
                 return [
                     $registry->rendererFor(ServerConfigFileEditor::KIND)->render(
-                        is_array($rev->snapshot) ? $rev->snapshot : [],
+                        $rev->snapshot,
                         $editor->snapshotFor($path, $this->config_contents, $engine),
                     ),
                     (string) __('Revision :time vs editor buffer', [

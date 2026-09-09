@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Servers;
 
-use App\Enums\ServerTier;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
@@ -15,11 +14,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('cost card totals provider note and dply tier fee', function (): void {
+test('cost card totals the provider note and charges no dply fee for a BYO server', function (): void {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
-    // BYO VMs pay the provider directly — flat org plans replaced per-server
-    // tier fees, so dply cents stay 0 unless usesManagedHosting().
+    // BYO VMs pay the provider directly — the flat org plan replaced per-server
+    // fees, so dply cents stay 0 unless usesManagedHosting().
     $server = Server::factory()->create([
         'organization_id' => $org->id,
         'user_id' => $user->id,
@@ -45,7 +44,6 @@ test('cost card totals provider note and dply tier fee', function (): void {
 
     expect($report['provider']['source'])->toBe('note')
         ->and($report['provider']['monthly_usd_cents'])->toBe(1200)
-        ->and($report['dply']['tier'])->toBe(ServerTier::M->value)
         ->and($report['dply']['monthly_cents'])->toBe(0)
         ->and($report['sites']['count'])->toBe(1)
         ->and($report['totals']['monthly_usd_cents'])->toBe(1200)

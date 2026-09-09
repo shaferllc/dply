@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployStep;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Services\Sites\SiteAtomicLayoutRequester;
 use App\Support\Sites\DeployPipelinePalette;
 use App\Support\Sites\DeployScriptComposer;
 use Illuminate\Contracts\View\View;
@@ -26,7 +27,8 @@ use Livewire\Component;
  * It edits ONLY the freeform TYPE_CUSTOM portion of each phase — typed steps and
  * hooks authored in the visual builder are preserved and shown read-only (see
  * {@see DeployScriptComposer}). The simple editor is the live default while the
- * visual step builder is gated behind FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL;
+ * visual step builder is available via the Steps Script/Visual toggle
+ * (FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL);
  * in production it is the only deploy editor, so it carries hooks + atomic on its
  * own rather than deferring to the builder.
  */
@@ -122,7 +124,10 @@ class DeployScript extends Component
         $this->build = $rendered['build'] ?? '';
         $this->release = $rendered['release'] ?? '';
         $this->restart = $rendered['restart'] ?? '';
-        $this->atomic_release = (string) ($this->site->deploy_strategy ?? 'simple') === 'atomic';
+        $this->atomic_release = $this->site->isAtomicDeploys() || $this->site->isConvertingAtomicLayout();
+        if ($this->site->isDisablingAtomicLayout()) {
+            $this->atomic_release = false;
+        }
         $this->managed_restart_enabled = ! (bool) data_get($this->site->meta, 'deploy.skip_managed_restart', false);
         $this->php_fpm_strategy = $this->site->phpFpmDeployStrategy();
     }
@@ -303,21 +308,21 @@ class DeployScript extends Component
 
         foreach (DeployPipelinePalette::stepCatalogFor($this->site) as $group) {
             foreach ($group['entries'] as $entry) {
-                if (! ($entry['visible'] ?? true)) {
+                if (! $entry['visible']) {
                     continue;
                 }
                 $cmd = $entry['command_preview'] ?? null;
                 if (! is_string($cmd) || trim($cmd) === '') {
                     continue;
                 }
-                $phase = (string) ($entry['phase'] ?? 'build');
+                $phase = (string) $entry['phase'];
                 if (! array_key_exists($phase, $byPhase)) {
                     continue;
                 }
                 $byPhase[$phase][] = [
                     'label' => (string) $entry['label'],
                     'command' => $cmd,
-                    'group' => (string) ($group['label'] ?? ''),
+                    'group' => (string) $group['label'],
                 ];
             }
         }
@@ -351,9 +356,33 @@ class DeployScript extends Component
         data_set($meta, 'deploy.php_fpm_strategy', $this->php_fpm_strategy);
 
         $this->site->update([
-            'deploy_strategy' => $this->atomic_release ? 'atomic' : 'simple',
             'meta' => $meta,
         ]);
+
+        $requester = app(SiteAtomicLayoutRequester::class);
+        if ($this->atomic_release && ! $this->site->isAtomicDeploys()) {
+            $result = $requester->requestAtomic($this->site, auth()->id(), confirmed: true);
+            $this->loadFromSite();
+            if ($result->ok) {
+                $this->toastSuccess(__('Deploy script saved.').' '.$result->message);
+            } else {
+                $this->toastError($result->message);
+            }
+
+            return;
+        }
+
+        if (! $this->atomic_release && $this->site->isAtomicDeploys()) {
+            $result = $requester->requestFlat($this->site);
+            $this->loadFromSite();
+            if ($result->ok) {
+                $this->toastSuccess(__('Deploy script saved.').' '.$result->message);
+            } else {
+                $this->toastError($result->message);
+            }
+
+            return;
+        }
 
         $this->loadFromSite();
         $this->toastSuccess(__('Deploy script saved.'));

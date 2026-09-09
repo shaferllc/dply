@@ -18,7 +18,6 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get comprehensive monitoring dashboard.
      */
-    /** @return array<string, mixed> */
     public function getComprehensiveDashboard(): array
     {
         return [
@@ -159,7 +158,6 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get all alerts from all monitoring systems.
      */
-    /** @return array<string, mixed> */
     public function getAllAlerts(): array
     {
         return [
@@ -218,7 +216,6 @@ trait HandlesComprehensiveMonitoring
     /**
      * Get comprehensive monitoring status.
      */
-    /** @return array<string, mixed> */
     public function getComprehensiveStatus(): array
     {
         return [
@@ -252,7 +249,6 @@ trait HandlesComprehensiveMonitoring
     /**
      * Run comprehensive health check.
      */
-    /** @return array<string, mixed> */
     public function runComprehensiveHealthCheck(): array
     {
         $results = [

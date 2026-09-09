@@ -12,7 +12,10 @@
     $extSnap = isset($meta['inventory_extended_snapshot']) && is_string($meta['inventory_extended_snapshot'])
         ? $meta['inventory_extended_snapshot']
         : null;
-    $serverPub = $server->openSshPublicKeyFromPrivate();
+    // Deriving the OpenSSH public key runs the private key through phpseclib —
+    // expensive enough to dominate a settings render, and only the Keys panel
+    // reads it. Computing it unconditionally taxed every category switch.
+    $serverPub = $section === 'keys' ? $server->openSshPublicKeyFromPrivate() : null;
     $credentialLabel = $server->providerCredential?->label ?? $server->providerCredential?->name;
     $providerLine = $server->provider?->label() ?? '—';
     if ($credentialLabel) {

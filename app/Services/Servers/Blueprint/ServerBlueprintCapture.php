@@ -25,7 +25,6 @@ final class ServerBlueprintCapture
      *     supervisor_programs: list<array<string, mixed>>,
      * }
      */
-    /** @return array<string, mixed> */
     public function fromServer(Server $server): array
     {
         $server->loadMissing(['firewallRules', 'supervisorPrograms']);

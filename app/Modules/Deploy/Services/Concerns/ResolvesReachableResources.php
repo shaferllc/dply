@@ -7,6 +7,7 @@ namespace App\Modules\Deploy\Services\Concerns;
 use App\Models\PrivateNetwork;
 use App\Models\Server;
 use App\Models\SiteBinding;
+use Illuminate\Support\Collection;
 
 /**
  * Private-network reachability helpers shared by the resource bindings that
@@ -20,14 +21,20 @@ trait ResolvesReachableResources
      * peers in one request doesn't re-run the same `private_networks` /
      * peer-server queries (sharePrivateNetwork is called once per peer).
      *
-     * @var array<string, \Illuminate\Support\Collection<int, PrivateNetwork>>
+     * @var array<string, Collection<int, PrivateNetwork>>
      */
     private array $privateNetworksByOrg = [];
 
     /** @var array<string, list<string>> */
     private array $reachableServerIdsByServer = [];
 
-    /** @return \Illuminate\Support\Collection<int, PrivateNetwork> */
+    /** @var array<string, list<string>> */
+    private array $attachableCacheServerIdsByServer = [];
+
+    /** @var array<string, list<string>> */
+    private array $attachableDatabaseServerIdsByServer = [];
+
+    /** @return Collection<int, PrivateNetwork> */
     private function orgPrivateNetworks(string $organizationId)
     {
         return $this->privateNetworksByOrg[$organizationId] ??= PrivateNetwork::query()
@@ -40,7 +47,7 @@ trait ResolvesReachableResources
      * target_id. Lets the attach pickers warn that a Redis/database/realtime app
      * is shared so the operator sets a prefix / separate DB to avoid collisions.
      *
-     * @param  array<string, mixed> $targetIds
+     * @param  list<string>  $targetIds
      * @return array<string, int> target_id => distinct other-site count
      */
     private function bindingConsumerCounts(string $targetType, array $targetIds, ?string $exceptSiteId): array
@@ -99,6 +106,78 @@ trait ResolvesReachableResources
             ->all();
 
         return $this->reachableServerIdsByServer[(string) $server->id] = array_values(array_unique([...$ids, ...$peers]));
+    }
+
+    /**
+     * Servers whose databases this site may attach: every server in the org.
+     *
+     * Reachability and *offerability* are different questions, and conflating
+     * them is what made "attach a database from another server" impossible
+     * unless a PrivateNetwork row happened to exist. {@see reachableServerIds()}
+     * answers "can these two talk over private IPs", which is the right input
+     * to {@see effectiveDatabaseHost()} — it is not the right input to a
+     * picker, because a database on an unlinked org server is perfectly
+     * attachable over its public endpoint once remote access is open.
+     *
+     * Same posture as {@see attachableCacheServerIds()}, which has always
+     * offered dedicated cache hosts org-wide and fallen back to a public IP.
+     * The label on each option says which case it is, and host resolution
+     * still prefers loopback, then a shared private IP, then the stored host —
+     * widening the picker changes nothing about how a binding actually dials.
+     *
+     * @return list<string>
+     */
+    private function attachableDatabaseServerIds(Server $server): array
+    {
+        $key = (string) $server->id;
+        if (isset($this->attachableDatabaseServerIdsByServer[$key])) {
+            return $this->attachableDatabaseServerIdsByServer[$key];
+        }
+
+        $orgServerIds = Server::query()
+            ->where('organization_id', $server->organization_id)
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return $this->attachableDatabaseServerIdsByServer[$key] = array_values(array_unique([
+            ...$this->reachableServerIds($server),
+            ...$orgServerIds,
+        ]));
+    }
+
+    /**
+     * Servers whose Redis-family cache services this site can attach: the
+     * private-network set, plus same-org dedicated cache hosts (redis/valkey
+     * role or redis_server profile). Dedicated boxes exist to be shared even
+     * when they aren't on a recorded VPC — the attach path uses their public
+     * IP in that case.
+     *
+     * @return list<string>
+     */
+    private function attachableCacheServerIds(Server $server): array
+    {
+        $key = (string) $server->id;
+        if (isset($this->attachableCacheServerIdsByServer[$key])) {
+            return $this->attachableCacheServerIdsByServer[$key];
+        }
+
+        $dedicated = Server::query()
+            ->where('organization_id', $server->organization_id)
+            ->whereKeyNot($server->id)
+            ->where(function ($q): void {
+                $q->where('meta->server_role', 'redis')
+                    ->orWhere('meta->server_role', 'valkey')
+                    ->orWhere('meta->install_profile', 'redis_server');
+            })
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all();
+
+        return $this->attachableCacheServerIdsByServer[$key] = array_values(array_unique([
+            ...$this->reachableServerIds($server),
+            ...$dedicated,
+        ]));
     }
 
     /**

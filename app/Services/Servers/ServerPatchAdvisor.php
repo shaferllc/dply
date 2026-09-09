@@ -14,7 +14,6 @@ use Illuminate\Support\Carbon;
 final class ServerPatchAdvisor
 {
     /**
-     * @return array{
      *     overall: string,
      *     alert_count: int,
      *     alerts: list<array{severity: string, title: string, message: string, href: string|null, link_label: string|null}>,
@@ -27,7 +26,6 @@ final class ServerPatchAdvisor
      *     supports_apt: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -227,10 +225,6 @@ final class ServerPatchAdvisor
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, bool|string|null>>
-     */
     public function parseUpgradableRows(string $preview): array
     {
         $rows = [];
@@ -257,9 +251,6 @@ final class ServerPatchAdvisor
         return $rows;
     }
 
-    /**
-     * @return list<array<string, bool|string|null>>
-     */
     private function parseUptime(?string $extendedSnapshot): array
     {
         if ($extendedSnapshot === null || trim($extendedSnapshot) === '') {

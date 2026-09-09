@@ -152,17 +152,17 @@
                             : null;
                     @endphp
                     @if (! $loop->first)
-                        <li class="select-none text-brand-mist" aria-hidden="true">/</li>
+                        <li class="flex h-5 select-none items-center text-brand-mist" aria-hidden="true">/</li>
                     @endif
                     <li class="min-w-0">
                         @if ($hasHref)
                             <a
                                 href="{{ $href }}"
-                                class="group inline-flex max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
+                                class="group inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
                                 wire:navigate
                             >
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
@@ -176,9 +176,9 @@
                                 <span class="truncate">{{ $item['label'] }}</span>
                             </a>
                         @elseif ($isLast)
-                            <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
+                            <span class="inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
@@ -189,9 +189,9 @@
                                 <span class="truncate">{{ $item['label'] }}</span>
                             </span>
                         @else
-                            <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
+                            <span class="inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
                                 @if ($crumbAvatar)
-                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-3xs" />
                                 @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
@@ -213,8 +213,8 @@
                 {{-- Deploy from anywhere: a persistent Deploy button + live
                      console for the site in scope, next to Documentation. --}}
                 @if ($breadcrumbSite instanceof \App\Models\Site)
-                    <livewire:sites.deploy-control :key="'deploy-control-'.$breadcrumbSite->id" />
-                    <livewire:sites.env-quick-edit :key="'env-quick-edit-'.$breadcrumbSite->id" />
+                    <livewire:sites.deploy-control :site="$breadcrumbSite" :server="$breadcrumbSite->server" :key="'deploy-control-'.$breadcrumbSite->id" />
+                    <livewire:sites.env-quick-edit :site="$breadcrumbSite" :server="$breadcrumbSite->server" :key="'env-quick-edit-'.$breadcrumbSite->id" />
                 @endif
                 @if ($docContextual)
                     <x-docs-link :slug="$resolvedContextualDocSlug">

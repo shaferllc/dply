@@ -5,6 +5,10 @@ namespace App\Jobs;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkspaceDeployRun;
+// Unqualified, this would resolve to App\Jobs\RunSiteDeploymentJob, which does
+// not exist — and the catch (\Throwable) below turns that fatal into a silent
+// per-site "failed" line. Keep the import.
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Projects\Services\WorkspaceHealthSummaryService;
 use App\Modules\Projects\Services\WorkspaceNotificationDispatcher;
 use Illuminate\Bus\Queueable;

@@ -2,15 +2,12 @@
 
 namespace App\Livewire\Forms;
 
+use App\Livewire\Sites\Concerns\ManagesSiteCreateDatabase;
 use Livewire\Form;
 
 class SiteCreateForm extends Form
 {
     public const DEFAULT_DEPLOY_PATH = '/home/dply/app';
-
-    public const DEFAULT_FUNCTIONS_BUILD_COMMAND = 'npm install && npm run build';
-
-    public const DEFAULT_FUNCTIONS_ARTIFACT_OUTPUT_PATH = 'dist';
 
     public string $name = '';
 
@@ -56,28 +53,6 @@ class SiteCreateForm extends Form
 
     public bool $customize_paths = false;
 
-    public string $functions_runtime = 'nodejs:18';
-
-    public string $functions_artifact_path = '';
-
-    public string $functions_entrypoint = 'index';
-
-    public string $functions_repo_source = 'manual';
-
-    public string $functions_source_control_account_id = '';
-
-    public string $functions_repository_selection = '';
-
-    public string $functions_repository_url = '';
-
-    public string $functions_repository_branch = 'main';
-
-    public string $functions_repository_subdirectory = '';
-
-    public string $functions_build_command = self::DEFAULT_FUNCTIONS_BUILD_COMMAND;
-
-    public string $functions_artifact_output_path = self::DEFAULT_FUNCTIONS_ARTIFACT_OUTPUT_PATH;
-
     /**
      * Canonical runtime key (php / node / python / ruby / go / static).
      * When empty, the legacy {@see $type}-based logic continues to drive
@@ -106,9 +81,7 @@ class SiteCreateForm extends Form
     public string $start_command = '';
 
     /**
-     * Repository URL used by URL-first auto-detection. Distinct from the
-     * functions-flow URL ({@see $functions_repository_url}); this one
-     * drives detection for VM-style sites.
+     * Repository URL used by URL-first auto-detection.
      */
     public string $git_repository_url = '';
 
@@ -126,6 +99,20 @@ class SiteCreateForm extends Form
      * server when the user picks a non-default engine.
      */
     public string $database_engine = '';
+
+    /**
+     * Provision a database for this site as part of creating it, and wire the
+     * DB_* vars into its .env. Defaults on, and is forced off by
+     * {@see ManagesSiteCreateDatabase} when the
+     * target server exposes no database engines.
+     */
+    public bool $create_database = true;
+
+    /**
+     * Name for the database created alongside the site. Pre-filled from the
+     * site name and kept in step with it until the user edits it directly.
+     */
+    public string $database_name = '';
 
     /**
      * Framework hint chosen by the user in the workspace "Add site" modal.
@@ -223,17 +210,6 @@ class SiteCreateForm extends Form
         return $hostname !== ''
             ? '/home/dply/'.$hostname
             : self::DEFAULT_DEPLOY_PATH;
-    }
-
-    public function applyFunctionsDefaults(): void
-    {
-        $this->functions_repository_branch = $this->functions_repository_branch !== '' ? $this->functions_repository_branch : 'main';
-        $this->functions_build_command = $this->functions_build_command !== ''
-            ? $this->functions_build_command
-            : self::DEFAULT_FUNCTIONS_BUILD_COMMAND;
-        $this->functions_artifact_output_path = $this->functions_artifact_output_path !== ''
-            ? $this->functions_artifact_output_path
-            : self::DEFAULT_FUNCTIONS_ARTIFACT_OUTPUT_PATH;
     }
 
     public function defaultArtifactBasename(): string

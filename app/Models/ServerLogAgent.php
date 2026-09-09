@@ -21,18 +21,18 @@ use Illuminate\Support\Carbon;
  *                      Enabling the add-on dispatches {@see InstallLogAgentJob}; the workspace renders
  *                      `install_output` live while status === installing. See docs/SERVER_LOGS_ADDON.md.
  * @property ?Carbon $cancel_requested_at
- * @property string $client_cert_fingerprint
- * @property array<string, mixed> $enabled_sources
+ * @property string|null $client_cert_fingerprint
+ * @property array<string, mixed>|null $enabled_sources
  * @property ?string $error_message
- * @property string $install_output
+ * @property string|null $install_output
  * @property ?Carbon $last_seen_at
  * @property ?string $server_id
  * @property string $status
- * @property string $version
+ * @property string|null $version
  * @property ?int $config_version
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerLogAgent extends Model
 {
@@ -169,5 +169,43 @@ class ServerLogAgent extends Model
         }
 
         return ($this->config_version ?? 0) < self::currentConfigVersion();
+    }
+
+    /**
+     * True when this agent was configured before the current aggregator existed
+     * (or before it was last re-installed), so the sink baked into its config is
+     * stale — most damagingly the blackhole sink an edge renders when no
+     * aggregator was available:
+     *
+     *   `# no aggregator endpoint configured — edge ships to blackhole`
+     *
+     * Such an agent reports status=running, no error, and a current
+     * config_version — isConfigStale() cannot see it, because the config VERSION
+     * tracks the template's shape, not whether the endpoint it points at is real.
+     * That combination silently discarded every log line for whoever enabled
+     * shipping before standing the aggregator up.
+     *
+     * InstallLogAggregatorJob now re-syncs running edges automatically, so this
+     * is the backstop for the cases it cannot cover: an agent that was failed or
+     * installing at the time, or one whose re-sync did not land.
+     */
+    public function needsAggregatorResync(): bool
+    {
+        if (! $this->isRunning()) {
+            return false;
+        }
+
+        $aggregator = ServerLogAggregator::query()
+            ->where('status', ServerLogAggregator::STATUS_RUNNING)
+            ->whereNotNull('endpoint')
+            ->where('server_id', '!=', $this->server_id)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        if ($aggregator === null || $this->updated_at === null || $aggregator->updated_at === null) {
+            return false;
+        }
+
+        return $this->updated_at->lt($aggregator->updated_at);
     }
 }

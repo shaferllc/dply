@@ -6,7 +6,7 @@ namespace App\Services\Servers;
 
 use App\Enums\ServerProvider;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\TcpPortProbe;
 use Illuminate\Support\Facades\Cache;
@@ -27,7 +27,6 @@ final class ServerJourneyInfrastructureAlerts
      *     ssh_unreachable?: array{headline: string, detail: string}
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $server = $server->fresh();

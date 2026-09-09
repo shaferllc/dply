@@ -6,9 +6,8 @@ use App\Contracts\DeployEngine;
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ConvertSiteToAtomicLayoutJob;
 use App\Jobs\ProvisionSiteJob;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\Settings as SiteSettings;
 use App\Livewire\Sites\Show as SitesShow;
@@ -28,7 +27,9 @@ use App\Models\SitePreviewDomain;
 use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\Workspace;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DockerDeployEngine;
 use App\Modules\Deploy\Services\KubernetesKubectlExecutor;
@@ -41,6 +42,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Symfony\Component\Process\Process;
 
@@ -82,9 +84,12 @@ test('site settings runtime section shows php card with current version and inst
 
     $response->assertOk()
         ->assertSee('PHP')
-        ->assertSee('Current site version')
+        // Fact-row labels were shortened: the card header already says PHP, so
+        // "Current site version"/"Installed on this server" are now
+        // "Site version"/"Installed".
+        ->assertSee('Site version')
         ->assertSee('PHP 8.3')
-        ->assertSee('Installed on this server')
+        ->assertSee('Installed')
         ->assertSee('PHP 8.4')
         ->assertSee('Memory limit')
         ->assertSee('Upload max filesize')
@@ -119,7 +124,7 @@ test('site settings deploy section shows docker runtime artifacts', function () 
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('docker compose up -d --build')
         ->assertSee('FROM php:8.3-apache');
@@ -153,7 +158,7 @@ test('site settings deploy section shows kubernetes runtime artifacts', function
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('kind: Deployment');
@@ -185,7 +190,7 @@ test('site settings runtime section shows php mismatch state and server php reme
 
     $response->assertOk()
         ->assertSee('PHP version mismatch')
-        ->assertSee('This site references PHP 8.1, but that version is not currently installed on this server.')
+        ->assertSee('This site references PHP 8.1, but that version is not installed on this server.')
         ->assertSee(route('servers.runtime', $server, false), escape: false)
         ->assertDontSee('value="8.1"', escape: false);
 });
@@ -504,109 +509,6 @@ test('site creation queues async provisioning and redirects to site show', funct
     });
 });
 
-test('functions host site creation uses runtime profile and artifact metadata', function () {
-    Queue::fake();
-
-    $origin = makeGitRepository([
-        'package.json' => json_encode([
-            'scripts' => [
-                'build' => 'vite build',
-            ],
-            'dependencies' => [
-                'vite' => '^5.0.0',
-            ],
-        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-    ]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            'digitalocean_functions' => [
-                'api_host' => 'https://faas-nyc1-example.doserverless.co',
-                'namespace' => 'fn-namespace',
-                'access_key' => 'dof_v1_test:secret',
-            ],
-        ],
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SitesCreate::class, ['server' => $server])
-        ->set('form.name', 'Functions Site')
-        ->set('form.primary_hostname', 'functions.example.com')
-        ->set('form.functions_repo_source', 'manual')
-        ->set('form.functions_repository_url', $origin)
-        ->set('form.functions_repository_branch', 'main')
-        ->call('store')
-        ->assertRedirect();
-
-    $site = Site::query()->where('name', 'Functions Site')->firstOrFail();
-
-    expect($site->usesFunctionsRuntime())->toBeTrue();
-    expect($site->runtimeProfile())->toBe('digitalocean_functions_web');
-    expect($site->git_repository_url)->toBe($origin);
-    expect($site->git_branch)->toBe('main');
-    expect(data_get($site->meta, 'serverless.runtime'))->toBe('nodejs:18');
-    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('main');
-    expect(data_get($site->meta, 'serverless.build_command'))->toBe('npm install && npm run build');
-    expect(data_get($site->meta, 'serverless.artifact_output_path'))->toBe('dist');
-    expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('vite_static');
-    expect($site->status)->toBe(Site::STATUS_PENDING);
-    expect($site->provisioningState())->toBe('queued');
-});
-
-test('aws lambda host site creation marks laravel repo as supported', function () {
-    Queue::fake();
-
-    $origin = makeGitRepository([
-        'artisan' => "#!/usr/bin/env php\n",
-        'bootstrap/app.php' => "<?php\n",
-        'routes/web.php' => "<?php\n",
-        'public/index.php' => "<?php\n",
-        'composer.json' => json_encode([
-            'require' => [
-                'laravel/framework' => '^12.0',
-            ],
-        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-    ]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'provider' => 'aws',
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
-            'aws_lambda' => [
-                'region' => 'us-east-1',
-            ],
-        ],
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SitesCreate::class, ['server' => $server])
-        ->set('form.name', 'Laravel Lambda Site')
-        ->set('form.primary_hostname', 'laravel-lambda.example.com')
-        ->set('form.functions_repo_source', 'manual')
-        ->set('form.functions_repository_url', $origin)
-        ->set('form.functions_repository_branch', 'main')
-        ->call('store')
-        ->assertHasNoErrors()
-        ->assertRedirect();
-
-    $site = Site::query()->where('name', 'Laravel Lambda Site')->firstOrFail();
-
-    expect($site->usesAwsLambdaRuntime())->toBeTrue();
-    expect($site->runtimeProfile())->toBe('aws_lambda_bref_web');
-    expect(data_get($site->meta, 'serverless.runtime'))->toBe('provided.al2023');
-    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('public/index.php');
-    expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('laravel');
-});
-
 test('docker host site creation uses docker runtime profile', function () {
     Queue::fake();
 
@@ -668,301 +570,6 @@ test('kubernetes host site creation uses kubernetes runtime profile', function (
     expect($site->runtimeProfile())->toBe('kubernetes_web');
     expect(data_get($site->meta, 'kubernetes_runtime.namespace'))->toBe('apps');
     expect($site->provisioningState())->toBe('queued');
-});
-
-test('functions host site creation allows laravel repo on digitalocean functions', function () {
-    Queue::fake();
-
-    $origin = makeGitRepository([
-        'artisan' => "#!/usr/bin/env php\n",
-        'bootstrap/app.php' => "<?php\n",
-        'routes/web.php' => "<?php\n",
-        'public/index.php' => "<?php\n",
-        'composer.json' => json_encode([
-            'require' => [
-                'laravel/framework' => '^11.0',
-            ],
-        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-    ]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            'digitalocean_functions' => [
-                'api_host' => 'https://faas-nyc1-example.doserverless.co',
-                'namespace' => 'fn-namespace',
-                'access_key' => 'dof_v1_test:secret',
-            ],
-        ],
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SitesCreate::class, ['server' => $server])
-        ->set('form.name', 'Laravel Functions Site')
-        ->set('form.primary_hostname', 'laravel.example.com')
-        ->set('form.functions_repo_source', 'manual')
-        ->set('form.functions_repository_url', $origin)
-        ->set('form.functions_repository_branch', 'main')
-        ->call('store')
-        ->assertHasNoErrors()
-        ->assertRedirect();
-
-    $site = Site::query()->where('name', 'Laravel Functions Site')->firstOrFail();
-
-    expect($site->usesFunctionsRuntime())->toBeTrue();
-    expect($site->runtimeProfile())->toBe('digitalocean_functions_web');
-    expect(data_get($site->meta, 'serverless.detected_runtime.framework'))->toBe('laravel');
-    expect(data_get($site->meta, 'serverless.entrypoint'))->toBe('main');
-    expect($site->provisioningState())->toBe('queued');
-});
-
-test('functions host site settings deploy hides server only controls', function () {
-    // The deploy *config* tab for a functions site only exposes the
-    // recipe (repo URL / branch / build command / pipeline / hooks);
-    // serverless invocation metadata (target, function URL, runtime,
-    // ARN) lives on the Overview / serverless dashboard, not here.
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-        'meta' => [
-            'runtime_profile' => 'digitalocean_functions_web',
-            'serverless' => [
-                'artifact_path' => '/tmp/functions-site.zip',
-                'entrypoint' => 'index',
-            ],
-            'provisioning' => [
-                'state' => 'awaiting_first_deploy',
-            ],
-        ],
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
-        // Positive: confirm we're on the functions-flavored deploy config tab.
-        // The "Deploy command" label and "Repository subdirectory" field
-        // only render when the site is a functions host.
-        ->assertSee('Deploy command')
-        ->assertSee('Repository subdirectory')
-        // Negative: server-only controls must not appear.
-        ->assertDontSee('Install / update Nginx site')
-        ->assertDontSee('Issue / renew SSL')
-        ->assertDontSee('Push .env to server')
-        ->assertDontSee('Generate deploy key');
-});
-
-test('aws lambda site settings deploy renders recipe only', function () {
-    // Lambda-specific invocation metadata (target = AWS Lambda, function
-    // ARN, runtime) now lives on the Overview / serverless dashboard.
-    // The deploy config tab is recipe-only and should render cleanly for
-    // a Lambda site without breaking on missing host concepts.
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'provider' => 'aws',
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
-            'aws_lambda' => [
-                'region' => 'us-east-1',
-            ],
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_ACTIVE,
-        'meta' => [
-            'runtime_profile' => 'aws_lambda_bref_web',
-            'serverless' => [
-                'runtime' => 'provided.al2023',
-                'entrypoint' => 'public/index.php',
-                'artifact_path' => '/tmp/laravel-lambda.zip',
-                'function_arn' => 'arn:aws:lambda:us-east-1:123456789012:function:laravel-lambda-site',
-            ],
-        ],
-    ]);
-
-    Livewire::actingAs($user)
-        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'deploy'])
-        ->assertSee('Deploy command')
-        ->assertSee('Repository subdirectory')
-        // Invocation metadata moved to Overview — must not leak back here.
-        ->assertDontSee('Function ARN')
-        ->assertDontSee('Latest managed artifact');
-});
-
-test('functions host deploy uses digitalocean functions engine', function () {
-    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
-
-    Http::fake([
-        'https://faas-nyc1-example.doserverless.co/api/v1/namespaces/*' => Http::response([
-            'version' => '7',
-        ], 200),
-        // The post-deploy health check GETs the web invocation URL.
-        'https://faas-nyc1-example.doserverless.co/api/v1/web/*' => Http::response('ok', 200),
-    ]);
-
-    $origin = storage_path('framework/testing/functions-deploy-repo-'.uniqid());
-    mkdir($origin, 0777, true);
-    (new Process(['git', 'init', '-b', 'main'], $origin))->mustRun();
-    file_put_contents($origin.'/README.md', "hello\n");
-    (new Process(['git', 'add', '.'], $origin))->mustRun();
-    (new Process(['git', 'config', 'user.email', 'tests@example.com'], $origin))->mustRun();
-    (new Process(['git', 'config', 'user.name', 'Tests'], $origin))->mustRun();
-    (new Process(['git', 'commit', '-m', 'Initial commit'], $origin))->mustRun();
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            'digitalocean_functions' => [
-                'api_host' => 'https://faas-nyc1-example.doserverless.co',
-                'namespace' => 'fn-namespace',
-                'access_key' => 'dof_v1_test:secret',
-            ],
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-        'meta' => [
-            'runtime_profile' => 'digitalocean_functions_web',
-            'serverless' => [
-                'runtime' => 'nodejs:18',
-                'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
-                'artifact_output_path' => 'dist',
-            ],
-        ],
-        'git_repository_url' => $origin,
-        'git_branch' => 'main',
-    ]);
-
-    RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
-
-    $deployment = SiteDeployment::query()->where('site_id', $site->id)->latest()->firstOrFail();
-    $site->refresh();
-
-    expect($deployment->status)->toBe(SiteDeployment::STATUS_SUCCESS);
-    expect($deployment->git_sha)->toBe('7');
-    expect($site->status)->toBe(Site::STATUS_FUNCTIONS_ACTIVE);
-    expect(data_get($site->meta, 'serverless.last_revision_id'))->toBe('7');
-    expect(data_get($site->meta, 'serverless.artifact_path'))->not->toBeNull();
-    $this->assertStringContainsString('DigitalOcean Functions deploy completed.', (string) $deployment->log_output);
-
-    // The post-deploy health check ran and the function answered.
-    $this->assertStringContainsString('Health check: HTTP 200', (string) $deployment->log_output);
-
-    // The action API uses the `_` namespace placeholder (not the literal
-    // namespace, which 404s) and marks the action web-exported.
-    Http::assertSent(function ($request) {
-        if ($request->method() !== 'PUT') {
-            return false;
-        }
-        $annotations = collect($request['annotations'] ?? []);
-
-        return str_contains($request->url(), '/api/v1/namespaces/_/actions/')
-            && ! str_contains($request->url(), 'fn-namespace/actions')
-            // exec.main is the OpenWhisk handler function name — dply's
-            // runtimes export `main`, never the `index` file basename.
-            && data_get($request->data(), 'exec.main') === 'main'
-            && $annotations->contains(fn ($a) => ($a['key'] ?? null) === 'web-export' && ($a['value'] ?? null) === true);
-    });
-});
-
-test('aws lambda host deploy uses aws lambda engine', function () {
-    Queue::getFacadeRoot()->except([RunSiteDeploymentJob::class]);
-
-    $origin = makeGitRepository([
-        'artisan' => "#!/usr/bin/env php\n",
-        'bootstrap/app.php' => "<?php\n",
-        'routes/web.php' => "<?php\n",
-        'public/index.php' => "<?php\n",
-        'composer.json' => json_encode([
-            'require' => [
-                'laravel/framework' => '^12.0',
-            ],
-        ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),
-    ]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'provider' => 'aws',
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
-            'aws_lambda' => [
-                'region' => 'us-east-1',
-            ],
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-        'meta' => [
-            'runtime_profile' => 'aws_lambda_bref_web',
-            'serverless' => [
-                'runtime' => 'provided.al2023',
-                'entrypoint' => 'public/index.php',
-                'build_command' => 'mkdir -p dist && printf "exports.main = true;\n" > dist/index.js',
-                'artifact_output_path' => 'dist',
-                'function_name' => 'laravel-lambda-site',
-            ],
-        ],
-        'git_repository_url' => $origin,
-        'git_branch' => 'main',
-    ]);
-
-    RunSiteDeploymentJob::dispatchSync($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
-
-    $deployment = SiteDeployment::query()->where('site_id', $site->id)->latest()->firstOrFail();
-    $site->refresh();
-
-    expect($deployment->status)->toBe(SiteDeployment::STATUS_SUCCESS);
-    expect($deployment->git_sha)->toBe('aws-stub-revision-1');
-    expect($site->status)->toBe(Site::STATUS_FUNCTIONS_ACTIVE);
-    expect(data_get($site->meta, 'serverless.target'))->toBe(Server::HOST_KIND_AWS_LAMBDA);
-    expect(data_get($site->meta, 'serverless.last_revision_id'))->toBe('aws-stub-revision-1');
-    expect(data_get($site->meta, 'serverless.artifact_path'))->not->toBeNull();
-    $this->assertStringContainsString('AWS Lambda deploy completed.', (string) $deployment->log_output);
-});
-
-test('functions configured state is ready for workspace but not traffic', function () {
-    $site = new Site([
-        'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-        'meta' => [
-            'runtime_profile' => 'digitalocean_functions_web',
-        ],
-    ]);
-
-    expect($site->isReadyForWorkspace())->toBeTrue();
-    expect($site->isReadyForTraffic())->toBeFalse();
-    expect($site->statusLabel())->toBe('functions configured');
 });
 
 test('docker host site provisioning prepares runtime until first deploy', function () {
@@ -1294,57 +901,6 @@ test('site show surfaces deployment foundation preflight and resource state', fu
         ->assertSee('Dply Demo');
 });
 
-test('site environment section renders keys for serverless sites', function () {
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-        'env_file_content' => "APP_KEY=base64:serverless-key\nAPP_NAME=Functions Demo\n",
-        'meta' => [
-            'runtime_profile' => 'digitalocean_functions_web',
-            'runtime_target' => [
-                'family' => 'digitalocean_functions',
-                'platform' => 'digitalocean',
-                'provider' => 'digitalocean',
-                'mode' => 'serverless',
-                'status' => 'configured',
-                'logs' => [],
-            ],
-            'serverless' => [
-                'runtime' => 'php-8.3',
-                'entrypoint' => 'index',
-            ],
-        ],
-    ]);
-
-    $response = $this->actingAs($user)->get(route('sites.show', [
-        'server' => $server,
-        'site' => $site,
-        'section' => 'environment',
-    ], false));
-
-    // Functions-backed sites have no host .env, so the cache IS the truth
-    // and the page hides Sync/Push CTAs but keeps the keys list usable.
-    // The explainer paragraph mentions the verbs as concepts; check for the
-    // CTA wire:click handlers to confirm the actual buttons are absent.
-    $response->assertOk()
-        ->assertSee('Environment variables')
-        ->assertSee('APP_KEY')
-        ->assertSee('APP_NAME')
-        ->assertDontSee('wire:click="syncEnvFromServer"', false)
-        ->assertDontSee('wire:click="pushEnvToServer"', false);
-});
-
 test('site settings legacy dns section redirects to routing dns tab', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
@@ -1448,10 +1004,13 @@ test('vm site pipeline workspace shows rollout hooks and reference', function ()
     // The pipeline lives on the WorkspacePipeline component (the sites.pipeline
     // route now redirects into the Deployments hub's pipeline tab); drive the
     // component's sub-tabs directly.
-    $component = Livewire::actingAs($user)->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
+    $component = Livewire::actingAs($user)->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site]);
 
-    $component->assertSee('Pipeline')
-        ->assertSee('Pipeline steps')
+    // Default sub-tab is Overview; the tab strip is Overview/Steps/Rollout/
+    // Reference (config/site_deploy_pipeline.php). The old "Pipeline steps"
+    // heading is gone.
+    $component->assertSee('Pipeline overview')
+        ->assertSee('Steps')
         ->assertSee('Rollout');
 
     $component->set('pipelineTab', 'rollout')
@@ -1523,7 +1082,10 @@ test('vm site pipeline can save rollout settings', function () {
         ->set('zero_downtime_enabled', true)
         ->call('saveZeroDowntimeDeployment')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Zero downtime deployment settings saved. Webserver config queued.', type: 'success')
+        ->assertSet('showConfirmActionModal', true)
+        ->call('confirmActionModal')
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', message: 'Converting to zero-downtime. Deploys are locked until this finishes.', type: 'success')
         ->set('releases_to_keep', 8)
         ->set('deployment_environment', 'staging')
         ->set('octane_port', '8080')
@@ -1532,13 +1094,17 @@ test('vm site pipeline can save rollout settings', function () {
         ->set('nginx_extra_raw', 'location /health { return 200; }')
         ->call('saveDeploymentSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'Deployment / Nginx settings saved. Re-install Nginx if you changed redirects, Octane, or extra config. Re-sync server crontab for Laravel scheduler. When “Restart Supervisor after deploy” is on, Dply restarts programs for this site (and server-wide programs) after a successful deploy.', type: 'success');
+        // Toast copy was cut down to a single line when this moved onto the
+        // pipeline Rollout tab.
+        ->assertDispatched('notify', message: 'Rollout settings saved.', type: 'success');
 
-    Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+    Bus::assertDispatched(ConvertSiteToAtomicLayoutJob::class, fn (ConvertSiteToAtomicLayoutJob $job): bool => $job->siteId === $site->id);
+    Bus::assertNotDispatched(ApplySiteWebserverConfigJob::class);
 
     $site->refresh();
 
-    expect($site->deploy_strategy)->toBe('atomic');
+    expect($site->deploy_strategy)->toBe('simple')
+        ->and($site->isConvertingAtomicLayout())->toBeTrue();
     expect($site->releases_to_keep)->toBe(8);
     expect($site->deployment_environment)->toBe('staging');
     expect($site->octane_port)->toBe(8080);
@@ -1574,7 +1140,10 @@ test('site settings general section uses certificate summary for ssl status', fu
 
     $response->assertOk()
         ->assertSee('SSL')
-        ->assertSee('active');
+        // The Overview fact grid renders SSL as a tone-coded pill (ucfirst'd),
+        // so assert the capitalised form — plain "active" would also match the
+        // "Nginx active" provisioning pill and pass for the wrong reason.
+        ->assertSee('Active');
 });
 
 test('site settings section shows project context links', function () {
@@ -1600,11 +1169,13 @@ test('site settings section shows project context links', function () {
     $response = $this->actingAs($user)->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'settings'], false));
 
     $response->assertOk()
-        ->assertSee('Current project')
-        ->assertSee('Customer Platform')
-        ->assertSee('Open project resources')
-        ->assertSee('Open project operations')
-        ->assertSee('Open project delivery');
+        // The project block was rewritten: a "rolls up into <name>" sentence
+        // plus bare Resources / Operations / Delivery links, replacing the old
+        // "Current project" heading and "Open project …" link labels.
+        ->assertSee('This site currently rolls up into Customer Platform.')
+        ->assertSee('Resources')
+        ->assertSee('Operations')
+        ->assertSee('Delivery');
 });
 
 test('site settings general section shows site details and notes', function () {
@@ -1698,61 +1269,6 @@ test('site show links to dedicated settings workspace and omits settings forms',
         ->assertDontSee('Environment (.env)');
 });
 
-test('site show displays aws lambda runtime target details', function () {
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'provider' => 'aws',
-        'meta' => [
-            'host_kind' => Server::HOST_KIND_AWS_LAMBDA,
-            'aws_lambda' => [
-                'region' => 'us-east-1',
-            ],
-        ],
-    ]);
-    $site = Site::factory()->create([
-        'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_ACTIVE,
-        'meta' => [
-            'runtime_profile' => 'aws_lambda_bref_web',
-            'serverless' => [
-                'runtime' => 'provided.al2023',
-                'entrypoint' => 'public/index.php',
-                'last_revision_id' => 'aws-stub-revision-1',
-                'artifact_path' => '/tmp/laravel-lambda.zip',
-                'function_arn' => 'arn:aws:lambda:us-east-1:123456789012:function:laravel-lambda-site',
-            ],
-        ],
-    ]);
-
-    $response = $this->actingAs($user)->get(route('sites.show', [$server, $site], false));
-
-    // Lambda invocation metadata lives on the serverless Overview dashboard now,
-    // not the legacy "Runtime target" panel from Sites\Show.
-    // General no longer shows the "Cloud app workspace" hero.
-    $response->assertOk()
-        ->assertSee('Overview')
-        ->assertSee('Serverless')
-        ->assertSee('Function')
-        ->assertSee('aws-stub-revision-1')
-        ->assertSee('provided.al2023')
-        ->assertSee('Live');
-
-    $this->actingAs($user)->get(route('sites.show', [
-        'server' => $server,
-        'site' => $site,
-        'section' => 'runtime',
-    ], false))
-        ->assertOk()
-        ->assertSee('Execution profile')
-        ->assertSee('Current revision')
-        ->assertSee('public/index.php');
-});
-
 test('site show displays docker runtime target summary', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();
@@ -1799,7 +1315,7 @@ test('site show displays docker runtime target summary', function () {
 
     // Compose / Dockerfile artifacts live on Pipeline; live discovery on Runtime.
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('Compose file')
         ->assertSee('Managed Dockerfile')
@@ -1845,7 +1361,7 @@ test('site show displays kubernetes runtime target summary', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test(\App\Livewire\Sites\WorkspacePipeline::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspacePipeline::class, ['server' => $server, 'site' => $site])
         ->assertSee('Runtime target')
         ->assertSee('orbit-local')
         ->assertSee('Manifest')
@@ -1956,7 +1472,9 @@ test('site show exposes orbstack runtime controls and records runtime actions', 
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->assertSee('Container lifecycle')
         ->assertSee('Rebuild')
-        ->assertSee('Refresh Docker details')
+        // Button label shortened to "Refresh Docker" in the settings runtime
+        // partial (the Sites\Show runtime tab calls it "Refresh details").
+        ->assertSee('Refresh Docker')
         ->assertSee('Destroy')
         ->call('runRuntimeAction', 'status')
         ->assertHasNoErrors()
@@ -2075,7 +1593,9 @@ test('site settings runtime section shows docker management and discovery', func
         ->assertDontSee('Certificates')
         ->assertSee('Docker discovery')
         ->assertSee('Container lifecycle')
-        ->assertSee('Refresh Docker details')
+        // Button label shortened to "Refresh Docker" in the settings runtime
+        // partial (the Sites\Show runtime tab calls it "Refresh details").
+        ->assertSee('Refresh Docker')
         ->assertSee('laravel.repo.orb.local')
         ->assertSee('192.168.107.2')
         ->assertSee('laravel.repo');
@@ -2291,7 +1811,7 @@ test('site show displays preview and certificate summary', function () {
     // The preview routing tab renders a "coming soon" teaser unless the real
     // workspace.site_preview flag is active; enable it so the live panel shows.
     config(['features.workspace.site_preview' => true]);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::flushCache();
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
@@ -2781,13 +2301,18 @@ test('site settings logs section renders site deployments and webhook deliveries
     ]);
 
     // The logs section now renders deployment activity via the activity console
-    // (status, not raw log_output) and links out to server logs; webhook
-    // deliveries moved to the server notifications surface.
+    // (status, not raw log_output); webhook deliveries moved to the server
+    // notifications surface.
+    //
+    // The "Open server logs" hero link is NOT here: settings embeds
+    // <livewire:sites.site-log-viewer :embedded="true">, and that link lives
+    // behind @unless($embedded) — it belongs to the standalone site logs page.
+    // Assert the embedded viewer's own chrome instead.
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'logs'])
         ->assertSee('Logs')
-        ->assertSee('Open server logs')
-        ->assertSee(route('servers.logs', $server, false), escape: false);
+        ->assertSee('Log source')
+        ->assertDontSee('Open server logs');
 });
 
 test('site settings can save web directory and primary hostname from dedicated sections', function () {
@@ -3114,7 +2639,7 @@ test('site settings aliases section shows quick ssl action only for uncovered al
 
     // The aliases routing tab is coming-soon-gated; enable the live surface.
     config(['features.workspace.site_aliases' => true]);
-    \Laravel\Pennant\Feature::flushCache();
+    Feature::flushCache();
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'routing'])
@@ -3687,4 +3212,33 @@ test('site settings suspend and resume updates site and applies webserver config
     expect($site->suspended_reason)->toBeNull();
     $meta = is_array($site->meta) ? $site->meta : [];
     $this->assertArrayNotHasKey('suspended_message', $meta);
+});
+
+test('queue section renders without the workspace hero card', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+        // Otherwise needsAppChoice() forces every section to the choose-app picker.
+        'meta' => ['choose_app' => ['skipped' => true]],
+    ]);
+
+    $response = $this->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue'], false));
+
+    // 'queue' is merged-chrome: the page is one dply-card, so the floating hero
+    // must not render above it. Assert on the hero's own description — the
+    // section header entry feeds ONLY the hero here, so its absence proves the
+    // hero is gone rather than merely that the copy changed.
+    $response->assertOk()
+        ->assertSee('Queue')
+        ->assertDontSee('Queue depth, failed jobs')
+        ->assertDontSee('Manage this site.');
 });

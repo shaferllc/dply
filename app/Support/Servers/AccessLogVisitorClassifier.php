@@ -25,7 +25,7 @@ final class AccessLogVisitorClassifier
 
     /**
      * @return array{human: int, crawler: int, bot: int, ai: int, unknown: int}
-     * @param  array<string, mixed> $lines
+     * @param  list<string> $lines
      */
     public static function breakdown(array $lines): array
     {
@@ -38,7 +38,7 @@ final class AccessLogVisitorClassifier
         ];
 
         foreach ($lines as $line) {
-            if (! is_string($line) || trim($line) === '') {
+            if (trim($line) === '') {
                 continue;
             }
 

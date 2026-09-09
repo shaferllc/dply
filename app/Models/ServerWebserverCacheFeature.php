@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  *                      a cache method that needs it.
  * @property bool $apache_mod_cache_enabled
  * @property bool $caddy_souin_built
- * @property string $caddy_souin_version
+ * @property ?string $caddy_souin_version
  * @property ?Carbon $last_probed_at
  * @property int $nginx_fcgi_zone_size_mb
  * @property int $nginx_proxy_zone_size_mb
@@ -29,8 +29,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $server_id
  * @property string $webserver
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerWebserverCacheFeature extends Model
 {

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Sites\SiteDatabaseWorkspace;
 use Laravel\Pennant\Feature;
 
 /**
@@ -20,10 +21,6 @@ final class SiteSettingsSidebar
      */
     public static function items(Site $site, Server $server): array
     {
-        if ($site->usesEdgeRuntime()) {
-            return self::edgeItems($site);
-        }
-
         $supportsSsh = $server->hostCapabilities()->supportsSsh();
 
         if ($site->isCustom()) {
@@ -31,7 +28,6 @@ final class SiteSettingsSidebar
         }
 
         $showWebserverConfigEditor = $supportsSsh
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
 
@@ -50,26 +46,27 @@ final class SiteSettingsSidebar
         // BACKGROUND (Schedule / Workers) sits between RUNTIME and OBSERVABILITY
         // so the page reads: configure → run → observe → destroy.
         //
-        // The `routing` item below is DIFFERENT from the VM `routing` (which
-        // edits nginx server blocks). Here it manages dply's edge proxy:
-        // hostname & DNS, custom domains pointed at the function, path
-        // redirects, response headers + CORS, the invocation URL. Same group
-        // key ("networking"), different surface.
         $base = $isContainerWorkspace
             ? [
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
-                ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
+                // Access is Routing's sibling: Routing is where the function
+                // lives, Access is who may call it (exposure, shared secret,
+                // CORS, bound parameters). Split out of Runtime.
+                ['id' => 'access', 'label' => __('Access'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'networking'],
                 // Deployments owns the deploy tab strip (Overview / Deploy /
                 // Releases / History / Settings). Pipeline + Repository live
                 // under Settings; the old standalone routes redirect there.
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.repository'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
-                ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+                ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.environment'],
+                // Data and Assets used to be two of the five panels stacked on
+                // Overview. Each is a page's worth of controls on its own.
+                ['id' => 'data', 'label' => __('Data'), 'icon' => 'heroicon-o-circle-stack', 'group' => 'runtime'],
+                ['id' => 'assets', 'label' => __('Assets'), 'icon' => 'heroicon-o-photo', 'group' => 'runtime'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
-                ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
@@ -114,17 +111,8 @@ final class SiteSettingsSidebar
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
 
-        // The Platform tab is the OpenWhisk inspector — it only applies to
-        // DigitalOcean Functions hosts, not docker / kubernetes containers.
-        if (! $site->usesFunctionsRuntime()) {
-            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
-        }
-
-        // Serverless keeps a dedicated Workers page; the Resources Livewire
-        // surface only admits container + VM runtimes and 404s for functions.
-        if ($site->usesFunctionsRuntime()) {
-            $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'resources'));
-        }
+        $functionsOnly = ['platform', 'access', 'data', 'assets'];
+        $base = array_values(array_filter($base, fn (array $item): bool => ! in_array($item['id'], $functionsOnly, true)));
 
         // Worker hosts run Caddy purely to attach testing URLs to background/
         // queue workloads — page caching and CDN/edge delivery don't apply, so
@@ -190,6 +178,7 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'files' || $supportsSsh)
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'database' || SiteDatabaseWorkspace::shouldShowTab($site, $server))
                 // Hide gated items when neither the full feature nor its coming-soon
                 // preview is active (e.g. Schedule, Backups).
                 ->filter(fn (array $item): bool => self::sidebarItemVisible($item))
@@ -213,11 +202,14 @@ final class SiteSettingsSidebar
         // provided here as a convenience entry point. Cron / daemons use site-scoped routes.
         $background = [
             ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule', 'feature' => 'workspace.schedule'],
+            // Queue sits before Workers: it owns anything that consumes jobs,
+            // which leaves Workers as "everything else under Supervisor".
+            ['id' => 'queue', 'label' => __('Queue'), 'icon' => 'heroicon-o-queue-list', 'group' => 'background'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             // Worker SERVERS (the app's worker pool) — detect + scale up/down. A
             // Settings section (no route); the panel shows attached pools or an
             // empty state. Distinct from 'daemons' (Supervisor processes on THIS box).
-            ['id' => 'worker-fleet', 'label' => __('Worker servers'), 'icon' => 'heroicon-o-square-3-stack-3d', 'group' => 'background'],
+            ['id' => 'worker-fleet', 'label' => __('Worker Servers'), 'icon' => 'heroicon-o-square-3-stack-3d', 'group' => 'background'],
             ['id' => 'services', 'label' => __('Services'), 'icon' => 'heroicon-o-cpu-chip', 'group' => 'background', 'route' => 'sites.services'],
             ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'sites.backups', 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ];
@@ -242,62 +234,6 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * Edge-native workspace — git builds, CDN delivery, custom domains.
-     * No VM runtime, SSH, nginx, or certificate automation tabs.
-     *
-     * @return list<array{id: string, label: string, icon: string, group: string}>
-     */
-    private static function edgeItems(Site $site): array
-    {
-        $edgeMeta = $site->edgeMeta();
-        $isPreviewChild = ! empty($edgeMeta['preview_parent_site_id']);
-
-        // Group order follows first appearance: Deploy → Networking (CDN /
-        // redirects) → Site (app features) → Background → Access → Observe.
-        $items = [
-            ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
-            ['id' => 'edge-deploys', 'label' => __('Deploys'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
-            ['id' => 'edge-build', 'label' => __('Build'), 'icon' => 'heroicon-o-wrench-screwdriver', 'group' => 'deploy'],
-            ['id' => 'edge-environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'deploy'],
-            ['id' => 'edge-deploy-triggers', 'label' => __('Deploy triggers'), 'icon' => 'heroicon-o-bolt', 'group' => 'deploy'],
-            ['id' => 'edge-bindings', 'label' => __('Bindings'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'deploy'],
-            ['id' => 'edge-routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-arrows-right-left', 'group' => 'networking'],
-        ];
-
-        if (! $isPreviewChild) {
-            $items[] = ['id' => 'edge-delivery', 'label' => __('Delivery'), 'icon' => 'heroicon-o-cloud', 'group' => 'networking'];
-            $items[] = ['id' => 'edge-previews', 'label' => __('Previews'), 'icon' => 'heroicon-o-sparkles', 'group' => 'deploy'];
-        }
-
-        $items = [
-            ...$items,
-            ['id' => 'edge-error-pages', 'label' => __('Error pages'), 'icon' => 'heroicon-o-exclamation-circle', 'group' => 'site'],
-            ['id' => 'edge-forms', 'label' => __('Forms'), 'icon' => 'heroicon-o-inbox', 'group' => 'site'],
-            ['id' => 'edge-snippets', 'label' => __('Snippets'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'site'],
-            ['id' => 'edge-tags', 'label' => __('Tags'), 'icon' => 'heroicon-o-tag', 'group' => 'site'],
-            ['id' => 'edge-crons', 'label' => __('Crons'), 'icon' => 'heroicon-o-clock', 'group' => 'background'],
-            ['id' => 'edge-jobs', 'label' => __('Jobs'), 'icon' => 'heroicon-o-rectangle-stack', 'group' => 'background'],
-            ['id' => 'edge-firewall', 'label' => __('Firewall'), 'icon' => 'heroicon-o-shield-check', 'group' => 'access'],
-            ['id' => 'edge-bot-protection', 'label' => __('Bot protection'), 'icon' => 'heroicon-o-finger-print', 'group' => 'access'],
-            ['id' => 'edge-rate-limits', 'label' => __('Rate limits'), 'icon' => 'heroicon-o-no-symbol', 'group' => 'access'],
-            ['id' => 'edge-waiting-room', 'label' => __('Waiting room'), 'icon' => 'heroicon-o-queue-list', 'group' => 'access'],
-            ['id' => 'edge-members', 'label' => __('Members'), 'icon' => 'heroicon-o-user-group', 'group' => 'access'],
-            ['id' => 'edge-alerts', 'label' => __('Alerts'), 'icon' => 'heroicon-o-bell-alert', 'group' => 'observability'],
-            ['id' => 'edge-audit', 'label' => __('Audit log'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
-        ];
-
-        if (! $isPreviewChild) {
-            $items[] = ['id' => 'edge-traffic', 'label' => __('Traffic & analytics'), 'icon' => 'heroicon-o-signal', 'group' => 'observability'];
-            $items[] = ['id' => 'edge-billing', 'label' => __('Billing & usage'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability'];
-        }
-
-        $items[] = ['id' => 'edge-logs', 'label' => __('Build & deploy logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'];
-        $items[] = ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'danger'];
-
-        return $items;
-    }
-
-    /**
      * Tight sidebar for Custom (headless) sites — no webserver, SSL, caching,
      * insights, or web-shaped runtime tabs. Daemons / Cron / Queue Workers
      * are first-class since they're the typical workload.
@@ -319,6 +255,7 @@ final class SiteSettingsSidebar
             ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
+            ['id' => 'queue', 'label' => __('Queue'), 'icon' => 'heroicon-o-queue-list', 'group' => 'background'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
@@ -328,7 +265,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed> $item
+     * @param  array<string, mixed>  $item
      */
     private static function sidebarItemVisible(array $item): bool
     {
@@ -347,7 +284,7 @@ final class SiteSettingsSidebar
     }
 
     /**
-     * @param  array<string, mixed> $item
+     * @param  array<string, mixed>  $item
      * @return array<string, mixed>
      */
     private static function markPreviewOnly(array $item): array
@@ -398,11 +335,23 @@ final class SiteSettingsSidebar
     {
         $tabs = ['overview' => __('Overview')];
 
-        $languageTab = match ((string) ($site->runtime ?? '')) {
-            'php' => 'php',
+        $runtime = (string) ($site->runtime ?? '');
+
+        // php / ruby / static keep bespoke partials — FPM pools and Rails knobs
+        // have nowhere else to live. Every other mise runtime (node, python,
+        // go, bun, deno, java) used to fall through to null, so a Node site got
+        // an Overview tab and nothing else. They now share one generic partial
+        // labelled from the catalog in config/servers/manage.php.
+        $languageTab = match ($runtime) {
+            // A php site on a box with no php has nothing to tune — the tab
+            // offered FPM pools and OPcache for an interpreter that isn't
+            // there. The runtime picker on Overview is how you get out of it.
+            'php' => $site->runsPhpOnItsServer() ? 'php' : null,
             'ruby' => 'ruby',
             'static' => 'static',
-            default => null,
+            default => $runtime !== '' && array_key_exists($runtime, self::miseCatalog())
+                ? 'generic'
+                : null,
         };
 
         if ($languageTab !== null) {
@@ -410,9 +359,24 @@ final class SiteSettingsSidebar
                 'php' => __('PHP'),
                 'ruby' => __('Ruby'),
                 'static' => __('Static'),
+                default => self::runtimeLabel($runtime),
             };
         }
 
         return $tabs;
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function miseCatalog(): array
+    {
+        return (array) config('server_manage.mise_runtimes', []);
+    }
+
+    /** Display label for a mise-managed runtime, from the shared catalog. */
+    private static function runtimeLabel(string $runtime): string
+    {
+        $label = self::miseCatalog()[$runtime]['label'] ?? '';
+
+        return is_string($label) && $label !== '' ? $label : ucfirst($runtime);
     }
 }

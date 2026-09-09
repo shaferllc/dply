@@ -22,7 +22,6 @@ class TraefikEntrypointsConfig
     /**
      * @return array{entrypoints: list<array{name: string, address: string, locked: bool}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {

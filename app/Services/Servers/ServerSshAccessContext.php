@@ -10,6 +10,7 @@ use App\Models\ServerRemoteAccessEvent;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\ServerSshSession;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 
 /**
@@ -35,10 +36,12 @@ final class ServerSshAccessContext
         return new self(
             authorizedKeys: $server->authorizedKeys()
                 ->with([
-                    'managedKey' => function (MorphTo $morphTo): void {
-                        $morphTo->morphWith([
-                            ServerSshSession::class => ['createdBy'],
-                        ]);
+                    'managedKey' => function (Relation $relation): void {
+                        if ($relation instanceof MorphTo) {
+                            $relation->morphWith([
+                                ServerSshSession::class => ['createdBy'],
+                            ]);
+                        }
                     },
                 ])
                 ->get(),

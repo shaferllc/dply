@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 
@@ -61,15 +62,43 @@ final class SiteSettingsHeader
             ],
             'runtime' => [
                 'title' => __('Runtime'),
-                'description' => $site->usesFunctionsRuntime()
-                    ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
-                    : __('What this :resource runs and how — language, processes, detection, and per-language tuning (PHP, Ruby, or Static) on the tabs below.', ['resource' => $resourceNoun]),
+                'description' => match (true) {
+                    $site->type === SiteType::Php || (string) ($site->runtime ?? '') === 'php' => __('How this site runs on the box — PHP version, FPM workers, OPcache, and request limits. Tune them on the PHP tab.'),
+                    (string) ($site->runtime ?? '') === 'ruby' => __('How this site runs on the box — Ruby version, processes, and detection. Tune them on the Ruby tab.'),
+                    (string) ($site->runtime ?? '') === 'static' => __('How this static site is served — detection, document root, and static-file settings.'),
+                    default => __('How this :resource runs on the box — language, live processes, and what we detected from the repo.', ['resource' => $resourceNoun]),
+                },
                 'icon' => 'heroicon-o-cube-transparent',
+            ],
+            'access' => [
+                'title' => __('Access'),
+                'description' => __('Whether this function answers HTTP, who may call it, and what parameters are bound to it. Applied to the live function on save.'),
+                'icon' => 'heroicon-o-globe-alt',
+            ],
+            'data' => [
+                'title' => __('Data'),
+                'description' => __('The stores this function talks to: its managed database, and the private network around it.'),
+                'icon' => 'heroicon-o-circle-stack',
+            ],
+            'assets' => [
+                'title' => __('Assets'),
+                'description' => __('Published front-end files, the allowance they draw on, and the domain they are served from.'),
+                'icon' => 'heroicon-o-photo',
             ],
             'system-user' => [
                 'title' => __('System user'),
                 'description' => __('The Linux user that owns this :resource on the server, plus permissions and sudo controls.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-user',
+            ],
+            'queue' => [
+                'title' => __('Queue'),
+                'description' => __('Queue depth, failed jobs, and the workers draining them for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-queue-list',
+            ],
+            'worker-fleet' => [
+                'title' => __('Worker Servers'),
+                'description' => __('Add worker VMs of this :resource — same code and queue, no webserver. Scale them here and watch the queues they drain.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-square-3-stack-3d',
             ],
             'laravel-stack' => [
                 'title' => __('Laravel'),
@@ -102,8 +131,8 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-bell',
             ],
             'basic-auth' => [
-                'title' => __('HTTP basic authentication'),
-                'description' => __('Username and password gate that the webserver checks before letting a request reach this :resource.', ['resource' => $resourceNoun]),
+                'title' => __('Authentication'),
+                'description' => __('Lock this :resource behind one visitor gate at the webserver — HTTP basic auth or a branded password page — before the app (or its own login) ever runs.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-lock-closed',
             ],
             'cli' => [
@@ -155,11 +184,6 @@ final class SiteSettingsHeader
                 'description' => __('Domains, redirects, rewrites, and headers.'),
                 'icon' => 'heroicon-o-arrows-right-left',
             ],
-            'edge-error-pages' => [
-                'title' => __('Error pages'),
-                'description' => __('Custom 404 / 500 HTML and maintenance mode.'),
-                'icon' => 'heroicon-o-exclamation-circle',
-            ],
             'edge-environment' => [
                 'title' => __('Environment'),
                 'description' => __('Set production env vars for builds and runtime.'),
@@ -192,47 +216,52 @@ final class SiteSettingsHeader
             ],
             'edge-firewall' => [
                 'title' => __('Firewall'),
-                'description' => __('Allow or block traffic by country.'),
+                'description' => __('Allow or block by country at the Edge. Blocked visitors get HTTP 403 before your site runs.'),
                 'icon' => 'heroicon-o-shield-check',
             ],
             'edge-bot-protection' => [
                 'title' => __('Bot protection'),
-                'description' => __('Challenge bots on forms or every page.'),
+                'description' => __('Cloudflare Turnstile on forms or every HTML page. Create a widget in Turnstile, paste site + secret keys, then Save.'),
                 'icon' => 'heroicon-o-finger-print',
             ],
             'edge-rate-limits' => [
                 'title' => __('Rate limits'),
-                'description' => __('Cap requests per IP; block or challenge.'),
+                'description' => __('Cap requests per IP on a path. Excess traffic gets HTTP 429 or a bot challenge — not a waiting-room queue.'),
                 'icon' => 'heroicon-o-no-symbol',
             ],
             'edge-waiting-room' => [
                 'title' => __('Waiting room'),
-                'description' => __('Queue visitors during high-traffic launches.'),
+                'description' => __('Hold excess visitors on a “You’re in line” page on your Edge URL until capacity opens.'),
                 'icon' => 'heroicon-o-queue-list',
             ],
             'edge-forms' => [
                 'title' => __('Forms'),
-                'description' => __('Accept form POSTs and email the results.'),
+                'description' => __('POST to an Edge path; Dply emails the fields — no backend app required.'),
                 'icon' => 'heroicon-o-inbox',
             ],
             'edge-jobs' => [
                 'title' => __('Jobs'),
-                'description' => __('Background queues for Edge workers.'),
+                'description' => __('Point middleware/SSR at a queue binding so workers can enqueue background work.'),
                 'icon' => 'heroicon-o-rectangle-stack',
             ],
             'edge-snippets' => [
                 'title' => __('Snippets'),
-                'description' => __('Inject HTML into matching pages at the Edge.'),
+                'description' => __('Inject HTML into matching pages without rebuilding — banners, meta, small widgets.'),
                 'icon' => 'heroicon-o-code-bracket',
             ],
             'edge-tags' => [
                 'title' => __('Tags'),
-                'description' => __('Third-party scripts loaded from the Edge.'),
+                'description' => __('Load analytics and pixel scripts from the Edge; optional consent gate via your CMP.'),
                 'icon' => 'heroicon-o-tag',
+            ],
+            'edge-error-pages' => [
+                'title' => __('Error pages'),
+                'description' => __('Brand 404/500 HTML and flip maintenance (503) without a redeploy.'),
+                'icon' => 'heroicon-o-exclamation-circle',
             ],
             'edge-alerts' => [
                 'title' => __('Alerts'),
-                'description' => __('RUM and error thresholds for this Edge site.'),
+                'description' => __('Route Edge events to notification channels, and set RUM / error thresholds.'),
                 'icon' => 'heroicon-o-bell-alert',
             ],
             'edge-audit' => [
@@ -252,12 +281,12 @@ final class SiteSettingsHeader
             ],
             'edge-traffic' => [
                 'title' => __('Traffic & analytics'),
-                'description' => __('CDN requests, bandwidth, and performance for this Edge site.'),
+                'description' => __('CDN requests, bandwidth, performance, and a live request tail.'),
                 'icon' => 'heroicon-o-signal',
             ],
             'edge-logs' => [
                 'title' => __('Build & deploy logs'),
-                'description' => __('Recent deploys, build output, and a live request tail.'),
+                'description' => __('Recent deploys and build output for this Edge site.'),
                 'icon' => 'heroicon-o-clipboard-document-list',
             ],
             'danger' => [

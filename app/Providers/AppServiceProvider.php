@@ -3,12 +3,10 @@
 namespace App\Providers;
 
 use App\Actions\Sites\ScheduleSiteDeploy;
-use App\Contracts\AwsLambdaGateway;
 use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ForwardWorkerPoolJobEvent;
-use App\Modules\Referrals\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
 use App\Listeners\RecordServerRemoteAccessContext;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
@@ -18,52 +16,33 @@ use App\Livewire\Pulse\DatabaseServersCard;
 use App\Livewire\Pulse\RedisServersCard;
 use App\Livewire\Pulse\WorkerServersCard;
 use App\Models\BackupConfiguration;
+use App\Models\CloudDatabase;
+use App\Models\GitProviderToken;
 use App\Models\ImportServerMigration;
 use App\Models\Incident;
+use App\Models\LookoutProject;
 use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Script;
-use App\Models\LookoutProject;
 use App\Models\Server;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SiteProcess;
-use App\Models\SiteUptimeMonitor;
 use App\Models\StatusPage;
-use App\Modules\Billing\Models\Subscription;
-use App\Modules\Billing\Models\SubscriptionItem;
 use App\Models\SupervisorProgram;
 use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSshKey;
 use App\Models\Workspace;
-use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
-use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Modules\Backups\Observers\BackupAutoResumeObserver;
 use App\Modules\Backups\Observers\BackupFailureNotifyObserver;
-use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
-use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
-use App\Observers\LookoutProjectBillingObserver;
-use App\Observers\ServerObserver;
-use App\Modules\Billing\Observers\SiteBillingObserver;
-use App\Observers\SupervisorProgramObserver;
-use App\Observers\TaskRunnerTaskObserver;
 use App\Modules\Backups\Policies\BackupConfigurationPolicy;
-use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
-use App\Policies\IncidentPolicy;
-use App\Policies\NotificationChannelPolicy;
-use App\Policies\OrganizationPolicy;
-use App\Policies\ProviderCredentialPolicy;
-use App\Policies\ScriptPolicy;
-use App\Policies\ServerPolicy;
-use App\Policies\SitePolicy;
-use App\Policies\StatusPagePolicy;
-use App\Policies\TeamPolicy;
-use App\Policies\UserSshKeyPolicy;
-use App\Policies\WorkspacePolicy;
+use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Models\SubscriptionItem;
+use App\Modules\Billing\Observers\SiteBillingObserver;
+use App\Modules\Cache\Support\CacheRequestContext;
 use App\Modules\Certificates\Services\CaddyAutomaticHttpsCertificateEngine;
 use App\Modules\Certificates\Services\CertificateEngineResolver;
 use App\Modules\Certificates\Services\CertificateRequestService;
@@ -72,11 +51,8 @@ use App\Modules\Certificates\Services\ImportedCertificateInstaller;
 use App\Modules\Certificates\Services\LetsEncryptDnsCertificateEngine;
 use App\Modules\Certificates\Services\LetsEncryptHttpCertificateEngine;
 use App\Modules\Certificates\Services\ZeroSslHttpCertificateEngine;
-use App\Modules\Deploy\Services\AwsLambdaDeployEngine;
 use App\Modules\Deploy\Services\ByoServerDeployEngine;
 use App\Modules\Deploy\Services\DeployEngineResolver;
-use App\Modules\Deploy\Services\DigitalOceanFunctionsActionDeployer;
-use App\Modules\Deploy\Services\DigitalOceanFunctionsDeployEngine;
 use App\Modules\Deploy\Services\DockerDeployEngine;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialContext;
 use App\Modules\Deploy\Services\KubernetesDeployEngine;
@@ -89,15 +65,38 @@ use App\Modules\Deploy\Services\RuntimeDetection\PythonRuntimeDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\RubyRuntimeDetector;
 use App\Modules\Deploy\Services\RuntimeDetection\RuntimeDetectionEngine;
 use App\Modules\Deploy\Services\RuntimeDetection\StaticRuntimeDetector;
-use App\Modules\Deploy\Services\ServerlessProvisionerFactory;
 use App\Modules\Deploy\Services\SiteResourceBindingResolver;
 use App\Modules\Docs\Services\DocsManifest;
-use App\Modules\Edge\Services\CloudflareEdgeDelivery;
-use App\Modules\Edge\Services\EdgeArtifactPublisher;
-use App\Modules\Edge\Services\EdgeDeliveryContextResolver;
-use App\Modules\Edge\Services\EdgeHostMapPublisher;
+use App\Modules\Imports\Observers\ImportSiteWakeupObserver;
+use App\Modules\Imports\Policies\ImportServerMigrationPolicy;
 use App\Modules\Imports\Services\Handlers\HandlerManifest;
 use App\Modules\Imports\Services\StepRegistry;
+use App\Modules\Queue\Support\QueueAction;
+use App\Modules\Queue\Support\QueueRequestContext;
+use App\Modules\Realtime\Models\RealtimeApp;
+use App\Modules\Realtime\Observers\RealtimeAppBillingObserver;
+use App\Modules\Referrals\Listeners\ProcessReferralInvoicePayment;
+use App\Modules\SourceControl\Services\GitIdentityResolver;
+use App\Modules\TaskRunner\Contracts\StreamingLoggerInterface;
+use App\Modules\TaskRunner\Models\Task as TaskRunnerTask;
+use App\Observers\LookoutProjectBillingObserver;
+use App\Observers\ServerObserver;
+use App\Observers\SiteWorkerFleetObserver;
+use App\Observers\SupervisorProgramObserver;
+use App\Observers\TaskRunnerTaskObserver;
+use App\Policies\CloudDatabasePolicy;
+use App\Policies\GitProviderTokenPolicy;
+use App\Policies\IncidentPolicy;
+use App\Policies\NotificationChannelPolicy;
+use App\Policies\OrganizationPolicy;
+use App\Policies\ProviderCredentialPolicy;
+use App\Policies\ScriptPolicy;
+use App\Policies\ServerPolicy;
+use App\Policies\SitePolicy;
+use App\Policies\StatusPagePolicy;
+use App\Policies\TeamPolicy;
+use App\Policies\UserSshKeyPolicy;
+use App\Policies\WorkspacePolicy;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
@@ -107,6 +106,7 @@ use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerWebserverSitesProvider;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
+use App\Services\Sites\EnsuresDefaultUptimeMonitors;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteApacheProvisioner;
@@ -119,28 +119,28 @@ use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use App\Services\Sites\TestingHostnameProvisioner;
-use App\Services\Sites\UptimeProbeRegionResolver;
-use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\CaddyWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
-use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
+use App\Support\Config\ConfigDirectoryAliases;
 use App\Support\Debug\SshCallRecorder;
 use App\Support\Debug\SshCallsCollector;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
-use App\Modules\Edge\Support\EdgeFilesystemRegistrar;
-use App\Modules\Edge\Support\EdgePlatformCredentials;
 use App\Support\Servers\EnvoyAdminScript;
 use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Servers\ServerRegistry;
+use App\Support\Sites\SiteRegistry;
 use App\Support\Sites\SiteSyncPeersResolver;
 use App\Support\Workspaces\WorkspaceRegistry;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -150,8 +150,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 use Livewire\Blaze\Blaze;
 use Livewire\Livewire;
 
@@ -162,6 +164,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        ConfigDirectoryAliases::apply();
+
         // WordPress advisory feed (Q20 — Wordfence Intelligence default).
         // Singleton because it caches per-request lookups in process.
         $this->app->singleton(AdvisoryProvider::class, WordfenceIntelligenceProvider::class);
@@ -210,6 +214,16 @@ class AppServiceProvider extends ServiceProvider
         // instance per id collapses both PK lookups to a single query.
         $this->app->scoped(WorkspaceRegistry::class);
 
+        // Scoped, same reasoning for `servers`: the platform panel, sync peers
+        // and the command palette each eager-load ->with('server') for the same
+        // site, so one render issued the identical servers SELECT three times.
+        $this->app->scoped(ServerRegistry::class);
+
+        // Scoped: the serverless workspace stacks sibling panels (platform,
+        // database, cache, background, rollback) that each resolved the same
+        // Site by id. Panels needing post-write state still call ->fresh().
+        $this->app->scoped(SiteRegistry::class);
+
         // Scoped: the Deploy sidebar and the Deploy-tab panel both read
         // pendingFor() on one render, each firing the scheduled_deploys SELECT.
         // The action memoizes the lookup per site; write paths forget() it.
@@ -246,8 +260,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(GitIdentityResolver::class);
 
         $this->app->singleton(ByoServerDeployEngine::class);
-        $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());
-        $this->app->singleton(ServerlessProvisionerFactory::class);
         $this->app->singleton(CertificateEngineResolver::class, function ($app) {
             return new CertificateEngineResolver($app->tagged('site.certificate.engines'));
         });
@@ -255,8 +267,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DeployEngineResolver::class, function ($app) {
             return new DeployEngineResolver(
                 $app->make(ByoServerDeployEngine::class),
-                $app->make(DigitalOceanFunctionsDeployEngine::class),
-                $app->make(AwsLambdaDeployEngine::class),
                 $app->make(DockerDeployEngine::class),
                 $app->make(KubernetesDeployEngine::class),
             );
@@ -331,11 +341,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->bind(GitCloner::class, ProcessGitCloner::class);
 
-        $this->app->singleton(EdgeArtifactPublisher::class);
-        $this->app->singleton(EdgeHostMapPublisher::class);
-        $this->app->singleton(EdgeDeliveryContextResolver::class);
-        $this->app->singleton(CloudflareEdgeDelivery::class);
-        $this->app->singleton(EdgeFilesystemRegistrar::class);
     }
 
     /**
@@ -343,6 +348,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A parked surface is not a malformed request. Pennant's middleware
+        // aborts 400 by default, which tells a visitor they sent something
+        // wrong; config/features.php has always documented these routes as
+        // 404ing, and a product that is not shipping yet should simply not be
+        // there. One responder covers every `feature:` route.
+        EnsureFeaturesAreActive::whenInactive(fn () => abort(404));
+
         Blaze::optimize()
             ->in(resource_path('views/components/spinner.blade.php'), memo: true)
             ->in(resource_path('views/components/application-logo.blade.php'), memo: true)
@@ -350,9 +362,9 @@ class AppServiceProvider extends ServiceProvider
             ->in(resource_path('views/components/oauth-provider-icon.blade.php'), memo: true)
             ->in(resource_path('views/components/credentials-provider-icon.blade.php'), memo: true);
 
-        $this->registerCustomPulseCards();
+        DevCommands::artisan('schedule:work');
 
-        $this->registerEdgeR2FilesystemDisk();
+        $this->registerCustomPulseCards();
 
         $this->discardCorruptedViteHotFile();
 
@@ -364,12 +376,12 @@ class AppServiceProvider extends ServiceProvider
         // in database/factories/ (namespace Database\Factories). Laravel's default
         // resolver would look for Database\Factories\Modules\<Domain>\Models\<X>Factory;
         // map module models back to the flat Database\Factories\<X>Factory.
-        \Illuminate\Database\Eloquent\Factories\Factory::guessFactoryNamesUsing(function (string $modelName): string {
-            $relative = \Illuminate\Support\Str::startsWith($modelName, 'App\\Models\\')
-                ? \Illuminate\Support\Str::after($modelName, 'App\\Models\\')
+        Factory::guessFactoryNamesUsing(function (string $modelName): string {
+            $relative = Str::startsWith($modelName, 'App\\Models\\')
+                ? Str::after($modelName, 'App\\Models\\')
                 : (str_starts_with($modelName, 'App\\Modules\\')
                     ? class_basename($modelName)
-                    : \Illuminate\Support\Str::after($modelName, 'App\\'));
+                    : Str::after($modelName, 'App\\'));
 
             return 'Database\\Factories\\'.$relative.'Factory';
         });
@@ -399,6 +411,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(JobFailed::class, [ForwardWorkerPoolJobEvent::class, 'handleFailed']);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
+        Gate::policy(CloudDatabase::class, CloudDatabasePolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);
         Gate::policy(Site::class, SitePolicy::class);
         Gate::policy(ProviderCredential::class, ProviderCredentialPolicy::class);
@@ -406,6 +419,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(UserSshKey::class, UserSshKeyPolicy::class);
         Gate::policy(NotificationChannel::class, NotificationChannelPolicy::class);
         Gate::policy(BackupConfiguration::class, BackupConfigurationPolicy::class);
+        Gate::policy(GitProviderToken::class, GitProviderTokenPolicy::class);
         Gate::policy(Script::class, ScriptPolicy::class);
         Gate::policy(Workspace::class, WorkspacePolicy::class);
         Gate::policy(StatusPage::class, StatusPagePolicy::class);
@@ -481,6 +495,7 @@ class AppServiceProvider extends ServiceProvider
         Server::observe(ServerObserver::class);
         Site::observe(ImportSiteWakeupObserver::class);
         Site::observe(SiteBillingObserver::class);
+        Site::observe(SiteWorkerFleetObserver::class);
         RealtimeApp::observe(RealtimeAppBillingObserver::class);
         LookoutProject::observe(LookoutProjectBillingObserver::class);
         SupervisorProgram::observe(SupervisorProgramObserver::class);
@@ -498,29 +513,7 @@ class AppServiceProvider extends ServiceProvider
 
         Site::created(function (Site $site): void {
             rescue(
-                function () use ($site): void {
-                    $regions = array_keys((array) config('site_uptime.probe_regions', []));
-                    if ($regions === []) {
-                        return;
-                    }
-
-                    // Probe from the worker nearest the host; the cosmetic
-                    // region label is derived from that worker (falling back to
-                    // the host's nearest region when no worker is configured).
-                    $worker = app(UptimeProbeWorkerResolver::class)->forSite($site);
-                    $region = app(UptimeProbeWorkerResolver::class)->regionFor($worker)
-                        ?? app(UptimeProbeRegionResolver::class)->forSite($site);
-
-                    SiteUptimeMonitor::query()->firstOrCreate(
-                        ['site_id' => $site->id, 'sort_order' => 0],
-                        [
-                            'label' => __('Homepage check'),
-                            'path' => null,
-                            'probe_region' => $region,
-                            'probe_worker' => $worker,
-                        ],
-                    );
-                },
+                fn () => app(EnsuresDefaultUptimeMonitors::class)->ensure($site),
                 report: false,
             );
 
@@ -598,13 +591,8 @@ class AppServiceProvider extends ServiceProvider
                 report: false,
             );
             $site->previewDomains()->delete();
-            if ($site->server?->isDigitalOceanFunctionsHost()) {
-                rescue(
-                    fn () => app(DigitalOceanFunctionsActionDeployer::class)->delete($site),
-                    report: false,
-                );
-            } elseif ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
-                // Non-DO serverless targets do not have remote SSH artifacts to clean up here.
+            if ($site->server?->hostCapabilities()->supportsFunctionDeploy()) {
+                // Function targets have no remote SSH artifacts to clean up here.
             } else {
                 // Compute systemd unit names from the live site so the
                 // cleanup job (which runs after the row is gone) can
@@ -648,16 +636,16 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($token ? 'api:'.$token->id : $request->ip());
         });
 
-        // Edge surface gets a higher ceiling — log tailing + ad-hoc
-        // deploys are chatty by design, and a typical CI run can fire
-        // 20–30 calls in quick succession (lint + deploy + poll). Keyed
-        // by token id so one chatty token can't starve another's
-        // budget. Falls back to IP when called pre-auth (shouldn't
-        // happen post-`auth.api` but defensive).
-        RateLimiter::for('edge-api', function (Request $request) {
-            $token = $request->attributes->get('api_token');
+        // Creating and tearing down sites that provision infrastructure.
+        // Keyed by ORGANIZATION rather than token so a create/delete loop
+        // cannot churn provider APIs under a per-token ceiling.
+        RateLimiter::for('site-create', function (Request $request) {
+            $organization = $request->attributes->get('api_organization');
+            $key = $organization !== null
+                ? 'site-create:'.$organization->id
+                : 'site-create-ip:'.$request->ip();
 
-            return Limit::perMinute(600)->by($token ? 'edge-api:'.$token->id : 'edge-api-ip:'.$request->ip());
+            return Limit::perMinute(10)->by($key);
         });
 
         RateLimiter::for('site-webhook', function (Request $request) {
@@ -671,21 +659,63 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(300)->by($request->ip());
         });
 
-        // Per-request log POSTs from deployed serverless functions. Keyed by
-        // site so one busy function can't starve another; generous because a
-        // function fires this once per request it serves. Over the limit the
-        // handler's fire-and-forget POST just 429s and the row is dropped.
-        RateLimiter::for('function-log-ingest', function (Request $request) {
-            $site = $request->route('site');
-            $key = $site instanceof Site ? 'fli:'.$site->id : 'fli-ip:'.$request->ip();
-
-            return Limit::perMinute((int) config('sites.function_log_ingest_per_minute', 1000))->by($key);
-        });
-
         RateLimiter::for('metrics-guest-push', function (Request $request) {
             $sid = $request->input('server_id');
 
             return Limit::perMinute(120)->by(is_string($sid) && $sid !== '' ? 'gmp:'.$sid : 'gmp-ip:'.$request->ip());
+        });
+
+        // dply Queue data plane. Keyed by namespace so one tenant's drain loop
+        // cannot starve another's. The
+        // ceiling is an entitlement, not a constant, so a plan that pays for
+        // throughput gets it; AuthenticateQueueCredential sets the context
+        // before this runs.
+        //
+        // Emphatically NOT `throttle:api` (60/min): one polling worker would
+        // exhaust that in seconds.
+        //
+        // Two buckets, not one. A ReceiveMessage that comes back empty changed
+        // nothing and cost one indexed query, but under a single bucket an idle
+        // fleet's polling spends the very allowance a burst needs to drain —
+        // eight workers polling every 3s is 160 req/min of a 600 budget gone
+        // finding nothing. Polls therefore draw on their own, larger allowance;
+        // the tier rate still bounds the work that actually mutates the queue.
+        RateLimiter::for('dply-queue', function (Request $request) {
+            $context = $request->attributes->get('queue_context');
+
+            if ($context instanceof QueueRequestContext) {
+                return QueueAction::isPoll($request)
+                    ? Limit::perMinute($context->pollsPerMinute())->by('dqp:'.$context->namespaceId())
+                    : Limit::perMinute($context->requestsPerMinute)->by('dq:'.$context->namespaceId());
+            }
+
+            // Unauthenticated: a tight IP limit, so credential stuffing cannot
+            // ride the generous per-namespace allowance.
+            return Limit::perMinute(60)->by('dq-ip:'.$request->ip());
+        });
+
+        // dply Cache data plane. Keyed by ACCESS KEY rather than by cache,
+        // because a cache request names its table in the body and this runs
+        // before the body is decoded — the credential is the only tenant
+        // identity available this early.
+        //
+        // The ceiling is a constant, not an entitlement: the shared tier is
+        // free and bounded by BYTES, not throughput (docs/adr/dply-cache.md,
+        // decisions 7 and 16), so there is no tier to read a rate off. What
+        // this exists to stop is a runaway loop, not a paying customer.
+        //
+        // Generous on purpose. A page doing twenty cache reads is twenty
+        // requests here, where the same page on Redis would be twenty pipelined
+        // commands — so a limit tuned to "requests" would punish exactly the
+        // usage the product is for.
+        RateLimiter::for('dply-cache', function (Request $request) {
+            $credential = $request->attributes->get('cache_context');
+
+            if ($credential instanceof CacheRequestContext) {
+                return Limit::perMinute(6_000)->by('dc:'.$credential->credential->id);
+            }
+
+            return Limit::perMinute(60)->by('dc-ip:'.$request->ip());
         });
     }
 
@@ -799,28 +829,5 @@ class AppServiceProvider extends ServiceProvider
         Livewire::component('pulse.redis-servers', RedisServersCard::class);
         Livewire::component('pulse.database-servers', DatabaseServersCard::class);
         Livewire::component('pulse.worker-servers', WorkerServersCard::class);
-    }
-
-    private function registerEdgeR2FilesystemDisk(): void
-    {
-        $cfg = config('edge.r2');
-        $bucket = is_string($cfg['bucket'] ?? null) ? trim($cfg['bucket']) : '';
-        if ($bucket === '') {
-            return;
-        }
-
-        config([
-            'filesystems.disks.edge_r2' => [
-                'driver' => 's3',
-                'key' => $cfg['key'],
-                'secret' => $cfg['secret'],
-                'region' => $cfg['region'],
-                'bucket' => $bucket,
-                'endpoint' => EdgePlatformCredentials::r2Endpoint(),
-                'use_path_style_endpoint' => $cfg['use_path_style_endpoint'],
-                'throw' => false,
-                'report' => false,
-            ],
-        ]);
     }
 }

@@ -4,8 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\DigitalOceanServiceDatabaseTest;
 
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+
+test('mutating digitalocean calls wait longer than catalog reads', function () {
+    expect(DigitalOceanService::transferTimeoutSeconds('get'))->toBe(8)
+        ->and(DigitalOceanService::transferTimeoutSeconds('GET'))->toBe(8)
+        ->and(DigitalOceanService::transferTimeoutSeconds('post'))->toBeGreaterThan(30)
+        ->and(DigitalOceanService::transferTimeoutSeconds('put'))->toBeGreaterThan(30)
+        ->and(DigitalOceanService::transferTimeoutSeconds('delete'))->toBeGreaterThan(30);
+});
 
 test('create database cluster posts and normalizes the response', function () {
     Http::fake([
@@ -28,6 +37,118 @@ test('create database cluster posts and normalizes the response', function () {
     Http::assertSent(fn ($request) => $request->method() === 'POST'
         && $request['engine'] === 'pg'
         && $request['region'] === 'nyc1'
+        && $request['num_nodes'] === 1
+        && ! isset($request['tags']));
+});
+
+test('create database cluster sends provider tags', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases' => Http::response([
+            'database' => [
+                'id' => 'db-abc',
+                'status' => 'creating',
+                'engine' => 'pg',
+                'tags' => ['dply', 'dply-database'],
+                'connection' => [],
+            ],
+        ], 201),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('pg', 'nyc1', 'db-s-1vcpu-1gb', 'dply-fn-abc', null, ['dply', 'dply-database', 'dply-site-abc']);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request['tags'] === ['dply', 'dply-database', 'dply-site-abc']);
+});
+
+test('tag database cluster creates missing tags and attaches them', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/tags' => Http::response([], 201),
+        'https://api.digitalocean.com/v2/tags/*/resources' => Http::response([], 204),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->tagDatabaseCluster('db-abc', ['dply', 'dply-database']);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with(parse_url($request->url(), PHP_URL_PATH) ?: '', '/tags')
+        && $request['name'] === 'dply');
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_contains($request->url(), '/tags/dply/resources')
+        && $request['resources'][0]['resource_type'] === 'database'
+        && $request['resources'][0]['resource_id'] === 'db-abc');
+});
+
+test('create remaps portable size and rejected region from the live catalog', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases/options*' => Http::response([
+            'options' => [
+                'valkey' => [
+                    'regions' => ['nyc1', 'sfo2'],
+                    'versions' => ['8'],
+                    'default_version' => '8',
+                    'layouts' => [
+                        ['num_nodes' => 1, 'sizes' => ['db-s-1vcpu-1gb', 'm-2vcpu-16gb']],
+                    ],
+                ],
+            ],
+        ], 200),
+        'https://api.digitalocean.com/v2/databases' => Http::response([
+            'database' => [
+                'id' => 'db-valkey',
+                'status' => 'creating',
+                'engine' => 'valkey',
+                'connection' => [],
+            ],
+        ], 201),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('redis', 'sfo3', 'small', 'dply-redis-abc', '7');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && str_ends_with(parse_url($request->url(), PHP_URL_PATH) ?: '', '/databases')
+        && $request['engine'] === 'valkey'
+        && $request['version'] === '8'
+        && $request['region'] === 'sfo2'
+        && $request['size'] === 'db-s-1vcpu-1gb'
+        && $request['num_nodes'] === 1);
+});
+
+test('create maps a transport timeout to a retryable operator message', function () {
+    Http::fake(function ($request) {
+        if (str_contains($request->url(), '/databases/options')) {
+            return Http::response(['options' => []], 200);
+        }
+
+        throw new ConnectionException('cURL error 28: Operation timed out after 8002 milliseconds with 0 bytes received');
+    });
+
+    expect(fn () => (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('mysql', 'sfo2', 'db-s-1vcpu-2gb', 'dply-db'))
+        ->toThrow(\RuntimeException::class, 'did not accept the database create in time');
+});
+
+test('create remaps discontinued redis clusters to valkey 8', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases' => Http::response([
+            'database' => [
+                'id' => 'db-valkey',
+                'status' => 'creating',
+                'engine' => 'valkey',
+                'connection' => [],
+            ],
+        ], 201),
+    ]);
+
+    (new DigitalOceanService('tok'))
+        ->createDatabaseCluster('redis', 'nyc3', 'db-s-1vcpu-1gb', 'dply-redis-abc', '7');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request['engine'] === 'valkey'
+        && $request['version'] === '8'
+        && $request['region'] === 'nyc3'
+        && $request['size'] === 'db-s-1vcpu-1gb'
         && $request['num_nodes'] === 1);
 });
 test('create connection pool posts transaction mode', function () {
@@ -82,4 +203,28 @@ test('get database cluster returns the connection when online', function () {
     expect($cluster['connection']['host'])->toBe('db-abc.db.ondigitalocean.com');
     expect($cluster['connection']['port'])->toBe(25060);
     expect($cluster['connection']['password'])->toBe('sup3r-s3cret');
+});
+
+test('resize database cluster puts the new size', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/databases/db-abc' => Http::response([
+            'database' => [
+                'id' => 'db-abc',
+                'status' => 'resizing',
+                'engine' => 'valkey',
+                'connection' => [],
+            ],
+        ], 200),
+    ]);
+
+    $cluster = (new DigitalOceanService('tok'))
+        ->resizeDatabaseCluster('db-abc', 'db-s-2vcpu-4gb');
+
+    expect($cluster['id'])->toBe('db-abc')
+        ->and($cluster['status'])->toBe('resizing');
+
+    Http::assertSent(fn ($request) => $request->method() === 'PUT'
+        && str_ends_with($request->url(), '/databases/db-abc')
+        && $request['size'] === 'db-s-2vcpu-4gb'
+        && $request['num_nodes'] === 1);
 });

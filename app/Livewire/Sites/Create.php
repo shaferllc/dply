@@ -2,23 +2,23 @@
 
 namespace App\Livewire\Sites;
 
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
 use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateContainer;
+use App\Livewire\Sites\Concerns\ManagesSiteCreateDatabase;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateDetection;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateFormFields;
-use App\Livewire\Sites\Concerns\ManagesSiteCreateFunctions;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateScaffold;
 use App\Livewire\Sites\Concerns\ManagesSiteCreateStore;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Modules\Deploy\Services\LocalRepositoryInspector;
-use App\Services\Servers\ServerPhpManager;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
@@ -31,9 +31,9 @@ class Create extends Component
     use DetectsRepositoryRuntime;
     use EnforcesSiteQuota;
     use ManagesSiteCreateContainer;
+    use ManagesSiteCreateDatabase;
     use ManagesSiteCreateDetection;
     use ManagesSiteCreateFormFields;
-    use ManagesSiteCreateFunctions;
     use ManagesSiteCreateScaffold;
     use ManagesSiteCreateStore;
     use RefreshesLinkedSourceControlAccounts;
@@ -51,18 +51,6 @@ class Create extends Component
      * @var list<array{id: string, provider: string, label: string}>
      */
     public array $linkedSourceControlAccounts = [];
-
-    /**
-     * @var list<array{label: string, url: string, branch: string}>
-     */
-    public array $availableFunctionsRepositories = [];
-
-    /**
-     * @var array<string, mixed>
-     */
-    public array $functionsDetection = [];
-
-    public bool $functionsOverridesTouched = false;
 
     /**
      * Suggested non-web processes carried forward from the last detection
@@ -93,9 +81,18 @@ class Create extends Component
      * Picker is surfaced in the view only when this list has more than
      * one entry — single-engine servers don't need to ask.
      *
+     * Populated by {@see ManagesSiteCreateDatabase::initializeDatabaseDefaults()},
+     * which also drives the "create a database with this site" section.
+     *
      * @var list<array{id: string, label: string}>
      */
     public array $availableDatabaseEngines = [];
+
+    /**
+     * Latches once the user edits the database name themselves, so typing in
+     * the site name stops overwriting their choice.
+     */
+    public bool $databaseNameTouched = false;
 
     /**
      * Container-mode state — populated only when the target server's host_kind
@@ -161,7 +158,13 @@ class Create extends Component
         if ($this->siteCreateBlockedReason !== '') {
             return;
         }
-        $this->form->applyDefaultsForType($this->form->type);
+        // Default to what the server can actually run, not always PHP —
+        // see Server::defaultSiteRuntime().
+        [$defaultType, $defaultRuntimeVersion] = $server->defaultSiteRuntime();
+        $this->form->applyDefaultsForType($defaultType);
+        if ($defaultRuntimeVersion !== null) {
+            $this->form->runtime_version = $defaultRuntimeVersion;
+        }
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
             $phpData = $phpManager->siteCreationPhpData($server);
             $this->phpVersions = $phpData['available_versions'];
@@ -169,8 +172,6 @@ class Create extends Component
         } else {
             $this->phpVersions = [];
             $this->form->php_version = '';
-            $this->form->applyFunctionsDefaults();
-            $this->loadFunctionsSourceControlState($repositoryBrowser);
         }
 
         $hostname = request()->query('hostname');
@@ -198,18 +199,14 @@ class Create extends Component
             $this->form->deploy_stack = 'docker';
         }
 
-        // Build the list of database engines the user can pick from. The
-        // default ServerDatabaseEngine row pre-selects in the picker; the
-        // form->database_engine column override only applies when the
-        // user explicitly chooses a different engine.
-        $engines = $server->databaseEngines()->orderBy('engine')->get();
-        $this->availableDatabaseEngines = $engines->map(fn ($e) => [
-            'id' => (string) $e->engine,
-            'label' => trim((string) $e->engine.' '.($e->version ?? '')),
-        ])->values()->all();
-        $defaultEngine = $engines->firstWhere('is_default', true);
-        if ($defaultEngine !== null && $this->form->database_engine === '') {
-            $this->form->database_engine = (string) $defaultEngine->engine;
+        // Build the list of database engines the user can pick from, pre-select
+        // the server's default, and arm the "create a database with this site"
+        // section. The default ServerDatabaseEngine row pre-selects in the
+        // picker; the form->database_engine column override only applies when
+        // the user explicitly chooses a different engine.
+        $this->initializeDatabaseDefaults();
+        if ($this->form->database_name === '' && $this->form->name !== '') {
+            $this->updatedFormName($this->form->name);
         }
 
         // Container hosts (docker / kubernetes) take a wholly different form;
@@ -266,14 +263,13 @@ class Create extends Component
             'isContainerMode' => $this->isContainerMode(),
             'containerOssPresets' => $this->isContainerMode() ? $this->containerOssPresets() : [],
             'usesChooseAppBareCreate' => $this->usesChooseAppBareCreate(),
+            'databaseCreationAvailable' => $this->databaseCreationAvailable(),
             'dockerDeployRequestedButMissing' => $this->dockerDeployRequestedButMissing(),
         ]);
     }
 
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
-        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
-
         if ($this->isContainerMode()) {
             $this->refreshContainerRepositories(app(SourceControlRepositoryBrowser::class));
         }

@@ -16,7 +16,7 @@ All product lines ship from this one app and one Postgres database. New surfaces
 | **Cloud apps** | Shipped, gated | `surface.cloud` | App-first managed PaaS (Laravel-Cloud-style). Cloud apps run as containers on DigitalOcean App Platform or AWS App Runner via the `EdgeBackend` interface. |
 | **Edge** | Shipped, gated | `surface.edge` | First-party Netlify-style static + hybrid SSR on Cloudflare Workers + R2. Git previews, custom domains, deploy hooks, build logs, traffic analytics. |
 | **Serverless** | Shipped, gated | `surface.serverless` | FaaS via DigitalOcean Functions / OpenWhisk + AWS Lambda. Per-function flat fee, web functions, invocation logs. |
-| **WordPress** | Planned | — | Managed WordPress on dply-controlled infra. Not yet implemented. |
+| **WordPress** | Managed on BYO servers | — | WP-CLI over the remote-task engine, plugin/theme/user/cron management, hardening, Wordfence advisories and scaffolding — all on servers you own. A **dply-hosted** WordPress surface is not built; its scope is open in [docs/adr/managed-wordpress-surface.md](docs/adr/managed-wordpress-surface.md). |
 
 Long-term product roadmap: [docs/MULTI_PRODUCT_PLATFORM_PLAN.md](docs/MULTI_PRODUCT_PLATFORM_PLAN.md). Edge phase plan: [docs/edge-roadmap-next.md](docs/edge-roadmap-next.md).
 

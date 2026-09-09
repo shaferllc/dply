@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\SiteEdgeBackendProvisioner;
 use App\Services\SshConnection;
+use App\Support\Servers\AptSourceRepairScript;
 
 /**
  * Operator-tunable nginx/OpenResty globals merged into
@@ -17,8 +18,6 @@ use App\Services\SshConnection;
 class OpenRestyStaticConfigOptions
 {
     use PrivilegedRemoteFileWrites;
-
-    private const REMOTE_PATH = '/etc/openresty/nginx.conf';
 
     /**
      * @var array<string, array{type: string, default: string, label: string, help: string, group: string}>
@@ -76,7 +75,7 @@ class OpenRestyStaticConfigOptions
      */
     public static function installShellHelpers(): string
     {
-        return <<<'BASH'
+        return AptSourceRepairScript::withTolerantApt(<<<'BASH'
 
 openresty_pkg_configured() {
   dpkg-query -W -f='${Status}' openresty 2>/dev/null | grep -q '^install ok installed$'
@@ -123,7 +122,7 @@ ensure_openresty_stopped() {
   systemctl stop openresty 2>/dev/null || true
   systemctl disable openresty 2>/dev/null || true
 }
-BASH;
+BASH);
     }
 
     /**
@@ -177,7 +176,7 @@ else
       ;;
   esac
   echo "[dply] policy-rc.d shim active — openresty will not auto-start on :80 during package install."
-  apt-get update -y
+  dply_apt_update
   write_openresty_placeholder_config
   if ! openresty_pkg_configured; then
     apt-get install -y --no-install-recommends openresty
@@ -206,7 +205,7 @@ BASH;
     {
         $out = [];
         foreach (self::PARAMS as $key => $meta) {
-            $out[$key] = (string) ($meta['default'] ?? '');
+            $out[$key] = (string) $meta['default'];
         }
 
         return $out;
@@ -244,7 +243,6 @@ BASH;
     /**
      * @return array{values: array<string, string>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         return [
@@ -254,13 +252,13 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      */
     public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
     {
         $normalized = self::defaultOperatorSettings();
         foreach (self::PARAMS as $key => $meta) {
-            $normalized[$key] = trim((string) ($values[$key] ?? $meta['default'] ?? ''));
+            $normalized[$key] = trim((string) ($values[$key] ?? $meta['default']));
         }
 
         $meta = is_array($server->meta) ? $server->meta : [];

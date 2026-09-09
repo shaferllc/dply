@@ -12,18 +12,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $id
  * @property string $domain
  * @property ?string $forge_server_id
- * @property string $php_version
+ * @property ?string $php_version
  * @property bool $removed_from_source
- * @property string $repository_branch
- * @property string $repository_url
+ * @property ?string $repository_branch
+ * @property ?string $repository_url
  * @property string $site_type
  * @property int $source_id
- * @property array<string, mixed> $source_snapshot
- * @property string $status
- * @property string $web_directory
+ * @property ?array<string, mixed> $source_snapshot
+ * @property ?string $status
+ * @property ?string $web_directory
  * @property-read ?ForgeServer $forgeServer
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ForgeSite extends Model
 {

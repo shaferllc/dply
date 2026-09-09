@@ -33,7 +33,6 @@ class InsightsBannerStream
     public function __construct(
         private Server|Site $entity,
         private string $runId,
-        private int $findingId,
         private string $statusKeyConfig,
         private string $finishedKeyConfig,
         private string $errorKeyConfig,

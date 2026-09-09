@@ -11,19 +11,15 @@
     <section class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading load balancers…') }}</span>
 
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6" aria-hidden="true">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Load balancers') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Load balancers that target this server. Manage all load balancers from the Networking section.') }}
-                    </p>
-                </div>
-            </div>
-        </div>
+        {{-- The same dense head the real page renders — keep the two in step or
+             the card resizes when the render swaps in. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-arrows-right-left"
+            :title="__('Load balancers')"
+            :note="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
+            class="border-b border-brand-ink/10"
+        />
 
         <div class="flex flex-wrap gap-1.5 border-b border-brand-ink/10 px-4 py-2.5" aria-hidden="true">
             @foreach ([__('Load balancers'), __('Notifications')] as $i => $label)

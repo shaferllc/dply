@@ -27,7 +27,7 @@ class LogViewerLineAnalyzer
                     $http5++;
                 } elseif ($c >= 400) {
                     $http4++;
-                } elseif ($c >= 200 && $c < 400) {
+                } elseif ($c >= 200) {
                     $http23++;
                 }
             }

@@ -78,7 +78,7 @@ CONF;
 
         $cacheModule = app(OpenLiteSpeedCacheModuleConfig::class)
             ->renderBlock(OpenLiteSpeedCacheModuleConfig::defaultValues());
-        $perfModules = trim(OpenLiteSpeedModulesConfig::DEFAULT_BLOCKS['modgzip'] ?? '');
+        $perfModules = trim(OpenLiteSpeedModulesConfig::DEFAULT_BLOCKS['modgzip']);
 
         return <<<CONF
 # Managed by Dply — do NOT hand-edit. Regenerated on every webserver switch.

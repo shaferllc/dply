@@ -6,12 +6,14 @@ namespace App\Console\Scheduling;
 
 use App\Console\Commands\CdnSyncMetricsCommand;
 use App\Console\Commands\CheckGitProviderTokensCommand;
+use App\Console\Commands\CheckProviderCredentialsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
 use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
+use App\Console\Commands\DispatchSiteQueueSnapshotsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
@@ -29,6 +31,7 @@ use App\Console\Commands\PruneOrphanedSiteDataCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
+use App\Console\Commands\PruneSiteQueueSnapshotsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\ReapStuckConsoleActionsCommand;
@@ -41,22 +44,20 @@ use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
+use App\Modules\Backups\Console\DispatchDueBackupSchedulesCommand;
 use App\Modules\Backups\Console\PruneBackupDownloadStagingsCommand;
+use App\Modules\Backups\Console\PruneBackupsCommand;
 use App\Modules\Billing\Console\PurgeSuspendedBundleEntitlementsCommand;
 use App\Modules\Billing\Console\ReconcileBundleEntitlementsCommand;
 use App\Modules\Billing\Console\SnapshotOrganizationBillingCommand;
 use App\Modules\Billing\Console\SyncAllOrganizationBillingCommand;
+use App\Modules\Cache\Console\SweepExpiredCacheItemsCommand;
 use App\Modules\Certificates\Console\RenewServerWildcardCertificatesCommand;
-use App\Modules\Cloud\Console\CloudPollStatusCommand;
+use App\Modules\Database\Console\ReapExpiredTrustedSourcesCommand;
 use App\Modules\Deploy\Console\FlushDeployDigestCommand;
+use App\Modules\Deploy\Console\PollQuickDeployCommitsCommand;
 use App\Modules\Deploy\Console\RunDueDeploymentSchedulesCommand;
 use App\Modules\Deploy\Console\RunDueScheduledDeploysCommand;
-use App\Modules\Edge\Console\CheckEdgeRumAlertsCommand;
-use App\Modules\Edge\Console\CollectEdgeUsageCommand;
-use App\Modules\Edge\Console\EvaluateEdgeGuardrailsCommand;
-use App\Modules\Edge\Console\RollupEdgeAnalyticsEngineCommand;
-use App\Modules\Edge\Console\WarmEdgeBuildImagesCommand;
-use App\Modules\Edge\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Modules\Feedback\Console\PruneFeedbackAttachmentsCommand;
 use App\Modules\Imports\Console\ExpirePausedImportMigrationsCommand;
 use App\Modules\Insights\Console\DispatchServerInsightsCommand;
@@ -66,13 +67,14 @@ use App\Modules\Logs\Console\EvaluateLogAlertsCommand;
 use App\Modules\Logs\Console\MeterServerLogUsageCommand;
 use App\Modules\Logs\Console\PruneAppLogsCommand;
 use App\Modules\Logs\Console\SyncLogAggregatorPolicyCommand;
+use App\Modules\Queue\Console\FlushQueueUsageCommand;
+use App\Modules\Queue\Console\MeterFleetUsageCommand;
+use App\Modules\Queue\Console\MeterQueueUsageCommand;
+use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Realtime\Console\CollectRealtimeUsageCommand;
 use App\Modules\Secrets\Console\SecretsCheckDriftCommand;
 use App\Modules\Secrets\Console\SecretsEscrowCommand;
 use App\Modules\Secrets\Console\SecretsRestoreDrillCommand;
-use App\Modules\Serverless\Console\CollectServerlessUsageCommand;
-use App\Modules\Serverless\Console\PruneFunctionInvocationsCommand;
-use App\Modules\Serverless\Console\ServerlessTickCommand;
 use App\Modules\TaskRunner\Commands\PruneRemoteTaskRunnerCommand;
 use App\Modules\TaskRunner\Commands\SweepStalledTasksCommand;
 use App\Support\DplyRuntime;
@@ -93,6 +95,12 @@ final class DplySchedule
         $schedule->command(DispatchSiteUptimeChecksCommand::class)
             ->everyFiveMinutes()
             ->name('dispatch-site-uptime-checks');
+
+        // Queue depth history. Five minutes is enough to watch a backlog build;
+        // the job fans out per server, so this is one SSH per box, not per site.
+        $schedule->command(DispatchSiteQueueSnapshotsCommand::class)
+            ->everyFiveMinutes()
+            ->name('dispatch-site-queue-snapshots');
 
         // Tier-2 of the server-error-reference feature: sweep PHP-FPM access logs
         // for 5xx responses into the Errors stream. Cadence sits under the
@@ -122,6 +130,13 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('check-git-provider-tokens');
 
+        // Provider API tokens rot independently of Git. Catch a revoked
+        // DigitalOcean/Hetzner key here instead of during droplet create.
+        $schedule->command(CheckProviderCredentialsCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('check-provider-credentials');
+
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()
             ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
@@ -149,8 +164,6 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('reconcile-tenant-dns');
 
-        $schedule->command(CloudPollStatusCommand::class)->everyMinute();
-
         $schedule->command(RunDueDeploymentSchedulesCommand::class)
             ->everyMinute()
             ->withoutOverlapping()
@@ -161,6 +174,12 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('run-due-scheduled-deploys');
+
+        // Quick deploy poll mode: control-plane tip check (Git API, no SSH).
+        $schedule->command(PollQuickDeployCommitsCommand::class)
+            ->everyTwoMinutes()
+            ->withoutOverlapping()
+            ->name('poll-quick-deploy-commits');
 
         // Worker pools: autoscale by queue backlog, and alert when a pool's
         // primary is unhealthy (manual promote — see WorkerPoolPrimaryHealthCommand).
@@ -180,32 +199,34 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('worker-pools-member-health');
 
-        $schedule->command(ServerlessTickCommand::class)
+        // Steady-state sizing for managed queue fleets. Not the latency path:
+        // an idle fleet is woken by the push itself, so no job waits on this.
+        $schedule->command(QueueFleetTickCommand::class)
             ->everyMinute()
-            ->withoutOverlapping();
+            ->withoutOverlapping()
+            ->name('queue-fleet-tick');
+
+        // Hourly, not nightly: this advances the watermark that makes a
+        // still-running worker billable at all.
+        $schedule->command(MeterFleetUsageCommand::class)
+            ->hourly()
+            ->withoutOverlapping()
+            ->name('queue-fleet-usage');
 
         $schedule->command(SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
-
-        $schedule->command(CollectEdgeUsageCommand::class, ['--today' => true])
-            ->hourly()
-            ->name('edge-usage-today');
-
-        // Keep Node build images warm on workers so Edge deploys skip cold pulls.
-        if ((bool) config('edge.build.warm_images_on_schedule', true)) {
-            $schedule->command(WarmEdgeBuildImagesCommand::class)
-                ->everySixHours()
-                ->name('edge-warm-build-images')
-                ->withoutOverlapping()
-                ->onOneServer();
-        }
-
-        $schedule->command(CollectServerlessUsageCommand::class)
-            ->hourly()
-            ->name('serverless-usage-today');
 
         $schedule->command(CollectRealtimeUsageCommand::class)
             ->hourly()
             ->name('realtime-usage-today')
+            ->withoutOverlapping();
+
+        // dply Queue throughput rollup. Observational — a namespace is priced by
+        // its capacity tier, so a missed run costs a gap in a sparkline and
+        // nothing else. The flush upserts the day's running total, so the next
+        // pass heals a skipped one (docs/adr/managed-services-tier.md, dec. 6).
+        $schedule->command(FlushQueueUsageCommand::class)
+            ->hourly()
+            ->name('queue-usage-flush')
             ->withoutOverlapping();
 
         // dply Logs ingest metering (read-only; no billing yet). Hourly keeps the
@@ -216,9 +237,23 @@ final class DplySchedule
             ->name('server-log-usage-today')
             ->withoutOverlapping();
 
-        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday' => true])
+        $schedule->command(MeterServerLogUsageCommand::class, ['--yesterday'])
             ->dailyAt('02:05')
             ->name('server-log-usage-finalize')
+            ->withoutOverlapping();
+
+        // dply Queue push metering (read-only; no billing yet). One flush covers
+        // every live day at once — the counters hold running totals and the rows
+        // are written absolute, so there is no separate finalize pass to run and
+        // nothing to lose if a flush is missed. Ten past the hour keeps it clear
+        // of the log meter above.
+        //
+        // The name must stay distinct from the queue-usage-flush event above:
+        // withoutOverlapping() derives its mutex from the event name, so sharing
+        // one would let a slow or crashed :00 flush suppress this :10 run.
+        $schedule->command(MeterQueueUsageCommand::class)
+            ->hourlyAt(10)
+            ->name('queue-usage-meter')
             ->withoutOverlapping();
 
         // dply Logs alerting (paid tier): evaluate enabled alert rules against the
@@ -237,11 +272,8 @@ final class DplySchedule
             ->name('server-log-policy-sync')
             ->withoutOverlapping();
 
-        $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
-
-        $schedule->command(EvaluateEdgeGuardrailsCommand::class)
-            ->dailyAt('02:45')
-            ->withoutOverlapping();
+        // After the sweep (01:50) and the usage roll-up, so the state it
+        // reports reflects today's measurements rather than yesterday's.
 
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
 
@@ -256,8 +288,6 @@ final class DplySchedule
             ->dailyAt('03:05')
             ->name('bundle-entitlements-purge')
             ->withoutOverlapping();
-
-        $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
 
         // Capture failed operations into the dedicated error stream, then cap
         // its growth nightly. The sweeper polls the source tables (failures are
@@ -284,6 +314,24 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('sweep-expired-maintenance-windows');
 
+        /*
+         * Reclaim expired dply Cache items.
+         *
+         * Space only — expired rows are already filtered on READ, so however
+         * far behind this falls a stale value can never be served. That
+         * separation is why this can be a plain scheduled sweep rather than
+         * something correctness depends on.
+         *
+         * Every five minutes rather than every minute: it is bounded by
+         * batch_size x max_batches, and running it more often just means more
+         * empty passes against the item store.
+         */
+        $schedule->command(SweepExpiredCacheItemsCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->when(fn (): bool => (bool) config('cache_service.enabled', false))
+            ->name('sweep-expired-cache-items');
+
         // Keep warm-pool buckets topped up to their min + retire idle surplus.
         // No-op unless warm_pool.enabled and buckets are configured.
         $schedule->command(WarmPoolAutoscaleCommand::class)
@@ -293,8 +341,8 @@ final class DplySchedule
             ->name('warm-pool-autoscale');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
+        $schedule->command(PruneSiteQueueSnapshotsCommand::class)->dailyAt('03:18');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');
-        $schedule->command(CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
         $schedule->command(RenewServerWildcardCertificatesCommand::class)
@@ -302,6 +350,21 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // The backup engine. Every schedule in the app is derived-due from its own
+        // cron expression here — there is no crontab entry on any customer box, by
+        // design: a provider image has to be capturable when that box is down.
+        // See docs/adr/backups-as-a-product.md, decision 14.
+        $schedule->command(DispatchDueBackupSchedulesCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('dispatch-due-backups');
+        // Retention. Nothing enforced the configured window until this was
+        // scheduled, so the first runs delete a long backlog — verify with
+        // `dply:prune-backups --dry-run` before trusting it unattended.
+        $schedule->command(PruneBackupsCommand::class)
+            ->dailyAt('03:40')
+            ->withoutOverlapping()
+            ->name('prune-backups');
         // 4h-TTL download stagings need finer-than-daily pruning (S3 lifecycle min
         // is 1 day), so sweep every 15 minutes. onOneServer is auto-applied below.
         $schedule->command(PruneBackupDownloadStagingsCommand::class)
@@ -312,7 +375,6 @@ final class DplySchedule
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->name('prune-quick-downloads');
-        $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneFeedbackAttachmentsCommand::class)->dailyAt('04:25');
 
         // Safety net for orphaned site relations (errors/logs/polymorphic links)
@@ -322,8 +384,8 @@ final class DplySchedule
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();
 
-        // Local control-plane build scratch (serverless artifacts / repo caches /
-        // task-runner temp). Local filesystem work, so it runs in the background
+        // Local control-plane build scratch (task-runner temp). Local
+        // filesystem work, so it runs in the background
         // rather than blocking the scheduler tick. Per-box files — see the
         // onOneServer caveat in the class docblock for split deployments.
         $schedule->command(PruneLocalWorkspaceArtifactsCommand::class)
@@ -354,8 +416,14 @@ final class DplySchedule
 
         $schedule->command(RevokeExpiredServerSshSessionsCommand::class)->everyFiveMinutes();
 
+        // Same idea, one layer out: an operator IP left on a managed cluster's
+        // allowlist is a standing hole pointing at a dynamic address.
+        $schedule->command(ReapExpiredTrustedSourcesCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping();
+
         $schedule->command(ProcessInsightDigestQueueCommand::class)->dailyAt('08:00');
-        $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly' => true])->weeklyOn(1, '08:15');
+        $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly'])->weeklyOn(1, '08:15');
 
         $schedule->command(DispatchServerInsightsCommand::class)
             ->hourly()
@@ -379,7 +447,7 @@ final class DplySchedule
 
         // Secret-vault (app-native, W1 off-box break-glass): daily age-encrypted
         // escrow of the platform .env (→ APP_KEY), an independent DB dump, and the
-        // fast-recovery critical-keys bundle. dply's own ServerBackupSchedule is
+        // fast-recovery critical-keys bundle. dply's own BackupSchedule is
         // the PRIMARY DB backup; this dump is the provider-independent copy.
         $schedule->command(SecretsEscrowCommand::class, ['--source' => 'platform-env'])
             ->dailyAt('04:20')

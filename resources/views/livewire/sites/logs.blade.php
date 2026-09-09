@@ -32,31 +32,28 @@
                 data-subscribe="{{ $logBroadcastEchoSubscribable ? '1' : '0' }}"
             ></div>
 
-            <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Logs') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+            <section @class([
+                'dply-card min-w-0 p-0',
+                'overflow-visible' => $logSourceMenuOpen || $logOptionsMenuOpen,
+                'overflow-hidden' => ! $logSourceMenuOpen && ! $logOptionsMenuOpen,
+            ])>
+                <x-workspace-panel-head
+                    icon="heroicon-o-document-text"
+                    :title="__('Logs')"
+                    :note="__('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.')"
+                    class="border-b border-brand-ink/10"
+                />
 
                 {{-- dply Logs app-log stream — only when a logging binding routes to it. --}}
                 @if ($hasDplyRealtime)
                     <livewire:sites.site-app-logs :site="$site" :embedded="true" wire:key="site-app-logs-{{ $site->id }}" />
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist
                         :aria-label="__('Logs workspace sections')"
                         scroll
-                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                        bare class="!mb-0 w-full"
                     >
                         <x-server-workspace-tab
                             id="logs-tab-viewer"
@@ -82,13 +79,39 @@
                         >
                             {{ __('Sources') }}
                             @if (($summary['source_count'] ?? 0) > 0)
-                                <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
+                                <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-moss">{{ number_format((int) $summary['source_count']) }}</span>
                             @endif
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-alerts"
+                            icon="heroicon-o-bell-alert"
+                            :active="$logsTab === 'alerts'"
+                            wire:click="setLogsWorkspaceTab('alerts')"
+                        >
+                            {{ __('Alerts') }}
+                        </x-server-workspace-tab>
+                        <x-server-workspace-tab
+                            id="logs-tab-notifications"
+                            icon="heroicon-o-bell"
+                            :active="$logsTab === 'notifications'"
+                            wire:click="setLogsWorkspaceTab('notifications')"
+                        >
+                            {{ __('Notifications') }}
                         </x-server-workspace-tab>
                     </x-server-workspace-tablist>
                 </div>
 
-                <div class="relative min-w-0" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setLogsWorkspaceTab">
+                {{-- Skeleton swap, not a dim-and-lock. Fading the outgoing tab to
+                     opacity-60 left the previous tab's content legible on screen
+                     while a different tab was loading, which reads as "this is
+                     your data" — the shared panel skeleton the Repository /
+                     Deployments / Laravel / Monitor / Notifications tabs use says
+                     "new content incoming" instead. --}}
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setLogsWorkspaceTab">
+                    @include('livewire.sites.partials._panel-skeleton')
+                </div>
+
+                <div class="relative min-w-0" wire:loading.class="hidden" wire:target="setLogsWorkspaceTab">
                     @if ($logsTab === 'viewer')
                         @include('livewire.servers.partials.log-viewer-panel', ['logSources' => $logSources])
                     @endif
@@ -106,6 +129,22 @@
                             'report' => $report,
                             'tonePalette' => $tonePalette,
                             'server' => $server,
+                        ])
+                    @endif
+
+                    @if ($logsTab === 'alerts')
+                        @include('livewire.servers.partials.logs._tab-alerts', [
+                            'server' => $server,
+                            'rules' => $logAlertRules,
+                            'alertingAvailable' => $logAlertingAvailable,
+                        ])
+                    @endif
+
+                    @if ($logsTab === 'notifications')
+                        @include('livewire.servers.partials.logs._tab-notifications', [
+                            'server' => $server,
+                            'notifSubscriptions' => $notifSubscriptions,
+                            'notifEventLabels' => $notifEventLabels,
                         ])
                     @endif
                 </div>
@@ -133,6 +172,8 @@
                     ]" />
                 </div>
             </section>
+
+            @include('livewire.partials.create-notification-channel-modal')
         </div>
     </div>
 </div>

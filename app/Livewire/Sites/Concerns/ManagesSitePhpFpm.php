@@ -53,8 +53,8 @@ trait ManagesSitePhpFpm
         }
 
         $phpData = $phpManager->sitePhpData($this->server->fresh(), $this->site->fresh());
-        $installedVersions = collect($phpData['installed_versions'] ?? [])
-            ->filter(fn (mixed $version): bool => is_array($version) && (bool) ($version['is_supported'] ?? false))
+        $installedVersions = collect($phpData['installed_versions'])
+            ->filter(fn (mixed $version): bool => (bool) $version['is_supported'])
             ->pluck('id')
             ->filter(fn (mixed $id): bool => is_string($id) && $id !== '')
             ->values()

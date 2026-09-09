@@ -106,7 +106,7 @@ final class OnePasswordVaultStore implements VaultStore
     }
 
     /**
-     * @param  array<string, mixed> $args
+     * @param  array<int, string> $args
      */
     private function op(array $args): ProcessResult
     {

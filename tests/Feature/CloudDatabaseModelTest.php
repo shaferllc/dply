@@ -7,6 +7,7 @@ namespace Tests\Feature\CloudDatabaseModelTest;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
 use App\Models\Site;
+use App\Support\Sites\ManagedDatabaseProvisionConsole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -32,12 +33,26 @@ test('size tier maps to do size slug', function () {
     expect(CloudDatabase::factory()->make(['size' => 'small'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb');
     expect(CloudDatabase::factory()->make(['size' => 'medium'])->backendSizeSlug())->toBe('db-s-1vcpu-2gb');
     expect(CloudDatabase::factory()->make(['size' => 'large'])->backendSizeSlug())->toBe('db-s-2vcpu-4gb');
-    expect(CloudDatabase::factory()->make(['size' => 'bogus'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb');
+    expect(CloudDatabase::factory()->make(['size' => 'bogus'])->backendSizeSlug())->toBe('db-s-1vcpu-1gb')
+        ->and(CloudDatabase::resolveSizeSlug('db-s-4vcpu-8gb'))->toBe('db-s-4vcpu-8gb')
+        ->and(CloudDatabase::resolveSizeSlug('medium'))->toBe('db-s-1vcpu-2gb');
 });
 test('engine maps to do engine slug', function () {
     expect(CloudDatabase::factory()->make(['engine' => 'postgres'])->backendEngineSlug())->toBe('pg');
     expect(CloudDatabase::factory()->make(['engine' => 'mysql'])->backendEngineSlug())->toBe('mysql');
-    expect(CloudDatabase::factory()->make(['engine' => 'redis'])->backendEngineSlug())->toBe('redis');
+    expect(CloudDatabase::factory()->make(['engine' => 'redis'])->backendEngineSlug())->toBe('valkey')
+        ->and(CloudDatabase::factory()->redis()->make()->backendEngineVersion())->toBe('8');
+});
+test('provision console label uses the engine name not the provider slug', function () {
+    expect(ManagedDatabaseProvisionConsole::label(
+        CloudDatabase::factory()->make(['engine' => 'postgres']),
+    ))->toBe(__('Provisioning managed :engine …', ['engine' => 'PostgreSQL']))
+        ->and(ManagedDatabaseProvisionConsole::label(
+            CloudDatabase::factory()->make(['engine' => 'mysql']),
+        ))->toBe(__('Provisioning managed :engine …', ['engine' => 'MySQL']))
+        ->and(ManagedDatabaseProvisionConsole::label(
+            CloudDatabase::factory()->make(['engine' => 'redis']),
+        ))->toBe(__('Provisioning managed Valkey …'));
 });
 test('postgres connection env vars', function () {
     $db = CloudDatabase::factory()->active()->create();
@@ -63,6 +78,27 @@ test('redis connection env vars', function () {
         'REDIS_HOST' => 'db.example.ondigitalocean.com',
         'REDIS_PORT' => '25060',
         'REDIS_PASSWORD' => 'secret-pass',
+        'REDIS_USERNAME' => 'doadmin',
+        'REDIS_SCHEME' => 'tls',
+        'REDIS_URL' => 'rediss://doadmin:secret-pass@db.example.ondigitalocean.com:25060',
+    ]);
+});
+
+test('on-box redis without tls does not invent a rediss url', function () {
+    $db = CloudDatabase::factory()->redis()->active()->create([
+        'backend' => CloudDatabase::BACKEND_EXTERNAL,
+        'connection' => [
+            'host' => '127.0.0.1',
+            'port' => 6379,
+            'password' => 'local-pass',
+            'ssl' => false,
+        ],
+    ]);
+
+    expect($db->connectionEnvVars())->toBe([
+        'REDIS_HOST' => '127.0.0.1',
+        'REDIS_PORT' => '6379',
+        'REDIS_PASSWORD' => 'local-pass',
     ]);
 });
 test('connection env vars empty when not provisioned', function () {
@@ -72,7 +108,9 @@ test('connection env vars empty when not provisioned', function () {
 });
 test('connection env keys per engine', function () {
     expect(CloudDatabase::factory()->make()->connectionEnvKeys())->toContain('DB_HOST');
-    expect(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_HOST');
+    expect(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_HOST')
+        ->and(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_URL')
+        ->and(CloudDatabase::factory()->redis()->make()->connectionEnvKeys())->toContain('REDIS_SCHEME');
 });
 test('sites relation via pivot', function () {
     $db = CloudDatabase::factory()->create();

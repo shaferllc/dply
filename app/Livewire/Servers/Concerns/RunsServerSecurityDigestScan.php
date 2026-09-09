@@ -34,7 +34,11 @@ trait RunsServerSecurityDigestScan
             app(ServerSecurityDigestScanner::class)->scanAndNotify(
                 $this->server,
                 auth()->user(),
-                fn (string $chunk): mixed => $this->remoteSshStreamAppendStdout($chunk),
+                function (string $chunk): mixed {
+                    $this->remoteSshStreamAppendStdout($chunk);
+
+                    return null;
+                },
             );
             $this->server->refresh();
             $this->toastSuccess(__('Security digest scan completed.'));

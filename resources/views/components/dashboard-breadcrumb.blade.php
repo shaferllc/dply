@@ -43,7 +43,7 @@
             <li class="min-w-0">
                 <a
                     href="{{ route('dashboard') }}"
-                    class="group inline-flex max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
+                    class="group inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
                     wire:navigate
                 >
                     <x-dynamic-component
@@ -57,9 +57,9 @@
                     <span class="truncate">{{ __('Dashboard') }}</span>
                 </a>
             </li>
-            <li class="select-none text-brand-mist" aria-hidden="true">/</li>
+            <li class="flex h-5 select-none items-center text-brand-mist" aria-hidden="true">/</li>
             <li class="min-w-0">
-                <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
+                <span class="inline-flex h-5 max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
                     <x-dynamic-component
                         :component="$resolvedCurrentIcon"
                         class="h-4 w-4 shrink-0 text-brand-ink opacity-90"

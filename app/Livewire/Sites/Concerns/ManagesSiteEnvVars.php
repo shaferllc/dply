@@ -451,7 +451,7 @@ trait ManagesSiteEnvVars
         $this->authorize('update', $this->site);
         $all = array_keys($parser->parse((string) ($this->site->env_file_content ?? ''))['variables']);
         $allSelected = $all !== [] && array_diff($all, $this->selected_env_keys) === [];
-        $this->selected_env_keys = $allSelected ? [] : array_values($all);
+        $this->selected_env_keys = $allSelected ? [] : $all;
     }
 
     public function clearEnvSelection(): void
@@ -527,7 +527,7 @@ trait ManagesSiteEnvVars
     {
         return array_values(array_filter(
             array_unique($this->selected_env_keys),
-            static fn ($k): bool => is_string($k) && $k !== ''
+            static fn ($k): bool => $k !== ''
         ));
     }
 

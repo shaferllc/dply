@@ -3,6 +3,10 @@
 namespace App\Livewire\Organizations;
 
 use App\Actions\Organizations\DeleteOrganizationAction;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ApiToken;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Organization;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
@@ -14,9 +18,20 @@ use Livewire\Attributes\Layout;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\WithFileUploads;
 
+/**
+ * Every organization-level setting an admin can change.
+ *
+ * The old "Automation & API" tab (email defaults, API tokens) folded in here
+ * in 2026-08: none of it was
+ * automation the org *ran*, it was all settings that happened to be about
+ * automated things, and splitting them across two admin pages meant no single
+ * place answered "what is configured for this org".
+ */
 #[Layout('layouts.app')]
 class Settings extends Component
 {
+    use ConfirmsActionWithModal;
+    use DispatchesToastNotifications;
     use WithFileUploads;
 
     public Organization $organization;
@@ -31,10 +46,32 @@ class Settings extends Component
 
     public string $timezone = '';
 
-    public $org_icon_upload = null;
+    public mixed $org_icon_upload = null;
 
     public string $delete_confirm = '';
 
+    public bool $deploy_email_notifications_enabled = true;
+
+    public bool $email_server_credentials_enabled = false;
+
+    public bool $email_database_credentials_enabled = false;
+
+    /**
+     * Recipient mode per email key — see
+     * {@see ManagesOrganizationEmailRecipients}.
+     *
+     * @var array<string, string>
+     */
+    public array $email_recipient_modes = [];
+
+    /**
+     * Hand-picked member ids per email key, used in `custom` mode.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $email_recipient_user_ids = [];
+
+    /** Comma- or newline-separated emails for the destinations textarea. */
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
@@ -47,6 +84,35 @@ class Settings extends Component
         $this->email = (string) ($organization->email ?? '');
         $this->description = (string) ($organization->description ?? '');
         $this->timezone = (string) ($organization->timezone ?? '');
+        $this->loadOrganizationRelations();
+    }
+
+    /**
+     * Post-mutation reload: re-fetch from the DB to pick up the change.
+     *
+     * NB: do not rename loadOrganizationRelations() to hydrateOrganization().
+     * Livewire treats `hydrate{Property}` as a lifecycle hook for the public
+     * $organization property and invokes it from outside the class — which
+     * lands in __call for a protected method and throws BadMethodCallException.
+     */
+    protected function refreshOrganization(): void
+    {
+        $this->organization = $this->organization->fresh();
+        $this->loadOrganizationRelations();
+    }
+
+    protected function loadOrganizationRelations(): void
+    {
+        $this->organization->load(['apiTokens']);
+
+        $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
+        $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
+        $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
+
+        foreach (Organization::emailRecipientKeys() as $key) {
+            $this->email_recipient_modes[$key] = $this->organization->emailRecipientMode($key);
+            $this->email_recipient_user_ids[$key] = $this->organization->emailRecipientUserIds($key);
+        }
     }
 
     public function saveGeneral(): void
@@ -82,7 +148,7 @@ class Settings extends Component
             $this->organization->only(['name', 'slug', 'email', 'description', 'timezone']),
         );
 
-        session()->flash('settings_status', __('Organization settings saved.'));
+        $this->toastSuccess(__('Organization settings saved.'));
     }
 
     /** Fires when an icon file is chosen — validate, store, set it immediately. */
@@ -112,7 +178,7 @@ class Settings extends Component
 
         $this->reset('org_icon_upload');
         $this->recordIconChange($old, $path);
-        session()->flash('settings_status', __('Icon updated.'));
+        $this->toastSuccess(__('Icon updated.'));
     }
 
     public function removeOrgIcon(): void
@@ -126,7 +192,145 @@ class Settings extends Component
             $this->recordIconChange($old, null);
         }
 
-        session()->flash('settings_status', __('Icon removed.'));
+        $this->toastSuccess(__('Icon removed.'));
+    }
+
+    /**
+     * Persist who receives one of the org's email defaults.
+     *
+     * Hand-picked ids are intersected with current membership before saving:
+     * two of these emails carry secrets, so a non-member id must never be
+     * storable, not merely ignored at send time.
+     */
+    public function saveEmailRecipients(string $key): void
+    {
+        $this->authorize('update', $this->organization);
+
+        if (! in_array($key, Organization::emailRecipientKeys(), true)) {
+            return;
+        }
+
+        $mode = $this->email_recipient_modes[$key] ?? null;
+        if (! in_array($mode, Organization::emailRecipientModes(), true)) {
+            $mode = Organization::EMAIL_RECIPIENT_DEFAULTS[$key];
+            $this->email_recipient_modes[$key] = $mode;
+        }
+
+        $memberIds = $this->organization->users()->pluck('users.id')->map(fn ($id): string => (string) $id);
+        $picked = collect($this->email_recipient_user_ids[$key] ?? [])
+            ->map(fn ($id): string => (string) $id)
+            ->intersect($memberIds)
+            ->unique()
+            ->values();
+
+        $this->email_recipient_user_ids[$key] = $picked->all();
+
+        $prefs = $this->organization->email_recipient_prefs ?? [];
+        $prefs[$key] = [
+            'mode' => $mode,
+            'user_ids' => $mode === Organization::RECIPIENTS_CUSTOM ? $picked->all() : [],
+        ];
+
+        $this->organization->update(['email_recipient_prefs' => $prefs]);
+        audit_log($this->organization, auth()->user(), 'organization.email_recipients_updated', null, null, [
+            'email' => $key,
+            'mode' => $mode,
+            'recipient_count' => $picked->count(),
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Email recipients updated.'));
+    }
+
+    public function updatedDeployEmailNotificationsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'deploy_email_notifications_enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.deploy_email_notifications_updated', null, null, [
+            'enabled' => $this->deploy_email_notifications_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Deploy email preferences updated.'));
+    }
+
+    public function updatedEmailServerCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_server_credentials_enabled' => $this->email_server_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_server_credentials_updated', null, null, [
+            'enabled' => $this->email_server_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Server credentials email preference updated.'));
+    }
+
+    public function updatedEmailDatabaseCredentialsEnabled(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->organization->update([
+            'email_database_credentials_enabled' => $this->email_database_credentials_enabled,
+        ]);
+        audit_log($this->organization, auth()->user(), 'organization.email_database_credentials_updated', null, null, [
+            'enabled' => $this->email_database_credentials_enabled,
+        ]);
+        $this->refreshOrganization();
+        $this->toastSuccess(__('Database credentials email preference updated.'));
+    }
+
+    /**
+     * Opens the confirm modal without embedding JSON in wire:click (which breaks HTML attributes).
+     */
+    public function promptRevokeApiToken(string $apiTokenId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $apiToken = ApiToken::query()
+            ->where('organization_id', $this->organization->id)
+            ->whereKey($apiTokenId)
+            ->first();
+
+        if ($apiToken === null) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'revokeApiToken',
+            [$apiToken->id],
+            __('Revoke API token'),
+            __('Revoke :name? Integrations using this token will stop working immediately. This cannot be undone.', ['name' => $apiToken->name]),
+            __('Revoke token'),
+            true
+        );
+    }
+
+    public function revokeApiToken(int|string $apiTokenId): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $apiToken = ApiToken::where('organization_id', $this->organization->id)->findOrFail($apiTokenId);
+
+        // Same audit shape the API keys settings page writes — an admin
+        // revoking another member's token is exactly the event you want a
+        // trail for, and this path had none.
+        $snapshot = [
+            'token_id' => (string) $apiToken->id,
+            'token_name' => $apiToken->name,
+            'token_prefix' => $apiToken->token_prefix,
+            'abilities' => $apiToken->abilities,
+            'expires_at' => $apiToken->expires_at?->toIso8601String(),
+        ];
+        $apiToken->delete();
+
+        audit_log($this->organization, auth()->user(), 'api_token.revoked', null, $snapshot, null);
+
+        $this->refreshOrganization();
+        $this->toastSuccess(__('API token revoked.'));
     }
 
     public function deleteOrganization(DeleteOrganizationAction $action): mixed
@@ -159,6 +363,9 @@ class Settings extends Component
     {
         return view('livewire.organizations.settings', [
             'timezones' => DateTimeZone::listIdentifiers(DateTimeZone::ALL),
+            'orgMembers' => $this->organization->users()
+                ->orderBy('name')
+                ->get(['users.id', 'users.name', 'users.email']),
         ]);
     }
 

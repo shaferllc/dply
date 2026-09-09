@@ -1,44 +1,37 @@
-@props(['active' => 'databases'])
+@props(['active' => 'overview'])
 
-@php
-    $link = 'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors';
-@endphp
-
-<nav class="flex flex-wrap gap-2 border-b border-brand-ink/10 pb-4 mb-8" aria-label="{{ __('Backups sections') }}">
-    <a
-        href="{{ route('backups.databases') }}"
-        wire:navigate
-        @class([
-            $link,
-            'bg-brand-sand/60 text-brand-ink' => $active === 'databases',
-            'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== 'databases',
-        ])
-    >
-        <x-heroicon-o-circle-stack class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
-        {{ __('Databases') }}
-    </a>
-    <a
-        href="{{ route('backups.files') }}"
-        wire:navigate
-        @class([
-            $link,
-            'bg-brand-sand/60 text-brand-ink' => $active === 'files',
-            'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== 'files',
-        ])
-    >
-        <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
-        {{ __('Files') }}
-    </a>
-    <a
-        href="{{ route('profile.backup-configurations') }}"
-        wire:navigate
-        @class([
-            $link,
-            'bg-brand-sand/60 text-brand-ink' => $active === 'storage',
-            'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== 'storage',
-        ])
-    >
-        <x-heroicon-o-archive-box class="h-5 w-5 shrink-0 opacity-90" aria-hidden="true" />
-        {{ __('Storage destinations') }}
-    </a>
+<nav class="flex min-w-0 flex-1 gap-0.5 overflow-x-auto sm:gap-1" style="-webkit-overflow-scrolling: touch;" aria-label="{{ __('Backups sections') }}">
+    {{-- /backups is the overview hub — posture, gaps and cross-type activity.
+         Each type tab then owns its own targets, schedules and history.
+         No Storage tab: destinations are org-owned shared credentials and are
+         listed with the rest of them on the org Credentials page.
+         See docs/adr/backups-as-a-product.md, decision 1. --}}
+    @foreach ([
+        ['key' => 'overview', 'route' => 'backups.overview', 'label' => __('Overview'), 'icon' => 'squares-2x2'],
+        ['key' => 'databases', 'route' => 'backups.databases', 'label' => __('Databases'), 'icon' => 'circle-stack'],
+        ['key' => 'files', 'route' => 'backups.files', 'label' => __('Files'), 'icon' => 'folder'],
+        ['key' => 'snapshots', 'route' => 'backups.snapshots', 'label' => __('Snapshots'), 'icon' => 'camera'],
+    ] as $item)
+        @php $isActive = $active === $item['key']; @endphp
+        <a
+            href="{{ route($item['route']) }}"
+            wire:navigate
+            @class([
+                'group inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-semibold transition',
+                'bg-brand-ink text-brand-cream' => $isActive,
+                'text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink' => ! $isActive,
+            ])
+        >
+            <x-dynamic-component
+                :component="'heroicon-o-'.$item['icon']"
+                @class([
+                    'h-3.5 w-3.5 shrink-0',
+                    'text-brand-cream' => $isActive,
+                    'text-brand-mist group-hover:text-brand-ink' => ! $isActive,
+                ])
+                aria-hidden="true"
+            />
+            {{ $item['label'] }}
+        </a>
+    @endforeach
 </nav>

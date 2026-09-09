@@ -2,9 +2,9 @@
 
 namespace App\Modules\Notifications\Services;
 
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\User;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
 use App\Support\ServerCertInventoryNotificationKeys;
 
 /**
@@ -21,8 +21,8 @@ final class ServerCertInventoryNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $detailLines
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string>  $detailLines
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

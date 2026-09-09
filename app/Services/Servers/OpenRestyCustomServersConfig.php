@@ -17,10 +17,6 @@ class OpenRestyCustomServersConfig
     /**
      * @return list<array{name: string, server_names: list<string>, upstream: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -58,7 +54,7 @@ class OpenRestyCustomServersConfig
     }
 
     /**
-     * @param  array<string, mixed> $serverNames
+     * @param  list<string> $serverNames
      */
     public function add(
         Server $server,
@@ -76,7 +72,7 @@ class OpenRestyCustomServersConfig
 
         $rows = $this->read($server);
         foreach ($rows as $row) {
-            if (($row['name'] ?? '') === $name) {
+            if ($row['name'] === $name) {
                 throw new \RuntimeException("A server block named `{$name}` already exists.");
             }
         }
@@ -90,7 +86,7 @@ class OpenRestyCustomServersConfig
         $name = $this->normalizeName($name);
         $rows = array_values(array_filter(
             $this->read($server),
-            fn (array $row): bool => ($row['name'] ?? '') !== $name,
+            fn (array $row): bool => $row['name'] !== $name,
         ));
 
         if (count($rows) === count($this->read($server))) {
@@ -100,9 +96,6 @@ class OpenRestyCustomServersConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public static function serversFromServer(Server $server): array
     {
         return app(self::class)->read($server);
@@ -173,7 +166,7 @@ class OpenRestyCustomServersConfig
     {
         $known = OpenRestyCustomUpstreamsConfig::knownUpstreamNames($server);
         foreach ($servers as $row) {
-            $upstream = (string) ($row['upstream'] ?? '');
+            $upstream = (string) $row['upstream'];
             if ($upstream === '') {
                 continue;
             }

@@ -7,14 +7,16 @@ use App\Models\Project;
 use App\Models\Site;
 
 /**
- * Resolves which deploy engine handles a project. Phase B: always {@see ByoServerDeployEngine}.
+ * Resolves which deploy engine handles a project: Docker, Kubernetes, or an
+ * SSH-managed server. The DigitalOcean Functions and AWS Lambda engines were
+ * deleted with the Serverless product; the container binding already passed
+ * only three engines, so every deploy through here was fataling on an
+ * ArgumentCountError until this matched it.
  */
 final class DeployEngineResolver
 {
     public function __construct(
         private DeployEngine $byoServerDeployEngine,
-        private DeployEngine $digitalOceanFunctionsDeployEngine,
-        private DeployEngine $awsLambdaDeployEngine,
         private DeployEngine $dockerDeployEngine,
         private DeployEngine $kubernetesDeployEngine,
     ) {}
@@ -29,14 +31,6 @@ final class DeployEngineResolver
 
         if ($project->site?->usesKubernetesRuntime()) {
             return $this->kubernetesDeployEngine;
-        }
-
-        if ($project->site?->server?->isDigitalOceanFunctionsHost()) {
-            return $this->digitalOceanFunctionsDeployEngine;
-        }
-
-        if ($project->site?->server?->isAwsLambdaHost()) {
-            return $this->awsLambdaDeployEngine;
         }
 
         return $this->byoServerDeployEngine;

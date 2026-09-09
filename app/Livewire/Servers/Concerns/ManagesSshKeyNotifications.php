@@ -22,6 +22,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSshKeyNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same key set the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return ServerSshKeyNotificationKeys::eventKeys();
+    }
+
     /** Channel selected in the add-subscription form on the Notifications tab. */
     public string $notif_channel_id = '';
 
@@ -35,6 +49,8 @@ trait ManagesSshKeyNotifications
 
     public function mountManagesSshKeyNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = ServerSshKeyNotificationKeys::eventKeys();
     }
 
@@ -122,13 +138,11 @@ trait ManagesSshKeyNotifications
         }
 
         $channel = $sub->channel;
-        if ($channel !== null) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $snapshot = [
             'channel_id' => (string) $sub->notification_channel_id,
-            'channel_label' => $channel?->label,
+            'channel_label' => $channel->label,
             'event_key' => $sub->event_key,
             'scope' => 'ssh_key',
         ];

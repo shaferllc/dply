@@ -9,8 +9,10 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Sites\SiteCachingStatsReader;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
@@ -23,6 +25,13 @@ use Livewire\Component;
  *
  * Saving here writes the meta and dispatches `ApplySiteWebserverConfigJob`
  * so the on-disk vhost picks up the new directives.
+ *
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read list<string> $availableMethods
+ * @property-read list<string> $activeStatMethods
  */
 #[Layout('layouts.app')]
 class Caching extends Component
@@ -65,11 +74,22 @@ class Caching extends Component
 
     public int $lscache_ttl = 120;
 
-    // Varnish per-site default TTL (the daemon is server-level; this drives
-    // the X-Dply-Varnish-Default-TTL hint header).
+    // Varnish is a server-level daemon with a single shared VCL — there is no
+    // per-site TTL knob to expose (the UI says so). The stored value is still
+    // round-tripped so older rows keep their data until per-site VCL lands.
     public bool $varnish_enabled = false;
 
     public string $varnish_ttl_default = '120s';
+
+    /**
+     * Live layer stats (OPcache / nginx disk / Varnish). Loaded via wire:init
+     * — never on first paint.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $cacheStats = null;
+
+    public bool $cacheStatsLoaded = false;
 
     public function mount(Server $server, Site $site): void
     {
@@ -107,7 +127,7 @@ class Caching extends Component
         }
 
         $organization = auth()->user()->currentOrganization();
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::for($organization)->active($flag)) {
             abort(404);
         }
@@ -151,6 +171,63 @@ class Caching extends Component
     public function getAvailableMethodsProperty(): array
     {
         return $this->site->availableCachingMethods();
+    }
+
+    /**
+     * Enabled methods that expose live stats (master toggle must be on).
+     *
+     * @return list<string>
+     */
+    public function getActiveStatMethodsProperty(): array
+    {
+        if (! $this->enabled) {
+            return [];
+        }
+
+        return array_values(array_intersect(
+            $this->methods,
+            $this->availableMethods,
+            ['opcache', 'nginx_http', 'varnish'],
+        ));
+    }
+
+    public function loadCacheStats(SiteCachingStatsReader $reader): void
+    {
+        $this->cacheStatsLoaded = true;
+        $this->cacheStats = null;
+
+        $methods = $this->activeStatMethods;
+        if ($methods === []) {
+            return;
+        }
+
+        try {
+            $this->cacheStats = Cache::remember(
+                $this->cacheStatsCacheKey($methods),
+                15,
+                fn () => $reader->collect($this->site, $methods),
+            );
+        } catch (\Throwable) {
+            $this->cacheStats = null;
+        }
+    }
+
+    public function refreshCacheStats(SiteCachingStatsReader $reader): void
+    {
+        Cache::forget($this->cacheStatsCacheKey($this->activeStatMethods));
+        $this->cacheStatsLoaded = false;
+        $this->loadCacheStats($reader);
+    }
+
+    /**
+     * @param  list<string>  $methods
+     */
+    private function cacheStatsCacheKey(array $methods): string
+    {
+        $sorted = $methods;
+        sort($sorted);
+
+        return 'dply.site-caching-stats:'.$this->site->id.':'.implode(',', $sorted);
     }
 
     public function toggleMethod(string $method): void

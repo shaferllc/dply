@@ -25,10 +25,6 @@ class SiteEnvResourceImporter
      *
      * @return list<array{id: string, type: string, label: string, server: string, same_server: bool}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, bool|string>>
-     */
     public function candidates(Site $site): array
     {
         $serverIds = $this->accessibleServerIds($site);
@@ -74,9 +70,7 @@ class SiteEnvResourceImporter
      * The candidate env key => value map for a chosen resource, or [] when the
      * id is unknown or out of the operator's reach.
      *
-     * @return list<array<string, bool|string>>
      */
-    /** @return array<string, mixed> */
     public function envFor(Site $site, string $resourceId): array
     {
         $serverIds = $this->accessibleServerIds($site);

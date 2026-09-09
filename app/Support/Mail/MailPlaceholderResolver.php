@@ -42,7 +42,7 @@ class MailPlaceholderResolver
                 // its primary hostname, before giving up.
                 if (($resolved === null || $resolved === '') && $key === 'APP_NAME') {
                     $resolved = trim((string) ($site->name ?? ''))
-                        ?: (string) ($site->primaryDomain()?->hostname ?? '');
+                        ?: (string) ($site->primaryDomain()->hostname ?? '');
                 }
 
                 return ($resolved !== null && $resolved !== '') ? (string) $resolved : $m[0];
@@ -56,9 +56,9 @@ class MailPlaceholderResolver
     {
         try {
             $parsed = app(DotEnvFileParser::class)->parse((string) $site->env_file_content);
-            $vars = $parsed['variables'] ?? [];
+            $vars = $parsed['variables'];
 
-            return is_array($vars) ? $vars : [];
+            return $vars;
         } catch (\Throwable) {
             return [];
         }

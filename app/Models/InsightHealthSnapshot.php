@@ -8,12 +8,12 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property ?Carbon $captured_at
- * @property array<string, mixed> $counts
+ * @property ?array<string, mixed> $counts
  * @property string $score
  * @property ?string $server_id
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class InsightHealthSnapshot extends Model
 {

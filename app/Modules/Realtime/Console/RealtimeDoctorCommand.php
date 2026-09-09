@@ -56,7 +56,7 @@ class RealtimeDoctorCommand extends Command
             'fake_mode' => RealtimeBackendFactory::fakeEnabled() ? 'yes' : 'no',
             'host' => $host !== '' ? $host : '(unset)',
             'cf_account_id' => $this->present(config('realtime.cloudflare.account_id')),
-            'cf_api_token' => $this->present(config('realtime.cloudflare.api_token')),
+            'cf_api_token' => $this->present(config('CLOUDFLARE_KEY')),
             'cf_kv_namespace_id' => $this->present(config('realtime.cloudflare.kv_namespace_id')),
             'stripe_tier_prices' => $tierPricesMissing === []
                 ? 'set ('.implode(', ', array_keys($tiers)).')'

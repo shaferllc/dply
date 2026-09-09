@@ -33,6 +33,9 @@ abstract class ServiceServersCard extends Card
     abstract protected function icon(): string;
 
     /** Server ids belonging to this service role. @return Collection<int, string> */
+    /**
+     * @return Collection<int, int|string>
+     */
     abstract protected function serverIds(): Collection;
 
     /** Short service-specific badge for a server (engine/version/role). */

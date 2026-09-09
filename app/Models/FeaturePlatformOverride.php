@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $name  The fully-qualified flag key ("{namespace}.{leaf}").
  * @property bool $enabled
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class FeaturePlatformOverride extends Model
 {

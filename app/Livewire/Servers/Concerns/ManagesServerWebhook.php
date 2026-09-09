@@ -5,7 +5,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Livewire\Servers\WorkspaceNotifications;
 use App\Models\OutboundWebhookDelivery;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
-use Illuminate\Support\Collection;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 
@@ -24,6 +24,9 @@ use Illuminate\Support\Facades\Crypt;
  */
 trait ManagesServerWebhook
 {
+    /** Rows per page in the deliveries log. */
+    public const DELIVERIES_PER_PAGE = 15;
+
     public string $settingsWebhookUrl = '';
 
     /** Plaintext only when the user changes it; empty means leave stored secret. */
@@ -127,19 +130,25 @@ trait ManagesServerWebhook
     }
 
     /**
-     * Last 30 outbound webhook attempts for this server (newest first). Drives
-     * the deliveries log; "would send" rows are included so an operator can
-     * audit what would fire before wiring up a URL.
+     * Outbound webhook attempts for this server, newest first. "Would send" rows
+     * are included so an operator can audit what would fire before wiring up a
+     * URL.
      *
-     * @return Collection<int, OutboundWebhookDelivery>
+     * Paginated rather than a flat "last 30": a chatty server fills thirty rows
+     * with one repeated event key, which pushed the rest of the tab off-screen
+     * and still hid everything older.
+     *
+     * The page name is explicit so this can't collide with another paginator on
+     * the page, and `deliveriesPage` reads better in a URL than `page`.
+     *
+     * @return LengthAwarePaginator<int, OutboundWebhookDelivery>
      */
-    protected function recentWebhookDeliveries(): Collection
+    protected function recentWebhookDeliveries(): LengthAwarePaginator
     {
         return OutboundWebhookDelivery::query()
             ->where('server_id', $this->server->id)
             ->orderByDesc('created_at')
-            ->limit(30)
-            ->get();
+            ->paginate(self::DELIVERIES_PER_PAGE, ['*'], 'deliveriesPage');
     }
 
     protected function syncServerWebhookFromServer(): void

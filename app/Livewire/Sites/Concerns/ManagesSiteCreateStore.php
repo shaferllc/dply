@@ -27,6 +27,7 @@ trait ManagesSiteCreateStore
     public function store(SiteProvisioner $siteProvisioner): mixed
     {
         $this->authorize('update', $this->server);
+        abort_if($this->server->isServerlessHost(), 403);
 
         $org = auth()->user()->currentOrganization();
         abort_if($org === null, 403);
@@ -43,14 +44,13 @@ trait ManagesSiteCreateStore
         $this->authorize('create', Site::class);
 
         $phpVersionIds = array_column($this->phpVersions, 'id');
-        $functionsHost = $this->server->hostCapabilities()->supportsFunctionDeploy();
         $dockerHost = $this->server->isDockerHost();
         $kubernetesHost = $this->server->isKubernetesCluster();
         $containerHost = $dockerHost || $kubernetesHost;
         // Headless host (webserver=none): no domain, no web root — the site
         // just runs deployed code via the standard pipeline + processes.
         $headlessHost = (($this->server->meta['webserver'] ?? 'nginx') === 'none')
-            && ! $functionsHost && ! $containerHost;
+            && ! $containerHost;
 
         $rules = [
             'name' => 'required|string|max:120',
@@ -59,16 +59,6 @@ trait ManagesSiteCreateStore
             'repository_path' => 'nullable|string|max:500',
             'php_version' => 'nullable|string|max:10',
             'app_port' => 'nullable|integer|min:1|max:65535',
-            'functions_runtime' => 'nullable|string|max:50',
-            'functions_entrypoint' => 'nullable|string|max:255',
-            'functions_repo_source' => 'nullable|string|in:manual,provider',
-            'functions_source_control_account_id' => 'nullable|string|max:26',
-            'functions_repository_selection' => 'nullable|string|max:500',
-            'functions_repository_url' => 'nullable|string|max:500',
-            'functions_repository_branch' => 'nullable|string|max:120',
-            'functions_repository_subdirectory' => 'nullable|string|max:255',
-            'functions_build_command' => 'nullable|string|max:4000',
-            'functions_artifact_output_path' => 'nullable|string|max:255',
             'primary_hostname' => [
                 'nullable',
                 'string',
@@ -85,7 +75,7 @@ trait ManagesSiteCreateStore
             ],
         ];
 
-        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && ! $this->usesVmDockerDeployStack()) {
+        if ($this->form->type === 'php' && ! $containerHost && ! $this->usesVmDockerDeployStack()) {
             $rules['php_version'] = ['required', 'string', 'max:10'];
 
             if ($phpVersionIds !== []) {
@@ -93,25 +83,7 @@ trait ManagesSiteCreateStore
             }
         }
 
-        if ($functionsHost) {
-            if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
-                $this->addError('form.functions_repository_url', (string) (($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.'))));
-
-                return null;
-            }
-
-            $rules['functions_runtime'] = ['required', 'string', 'max:50'];
-            $rules['functions_entrypoint'] = ['required', 'string', 'max:255'];
-            $rules['functions_repo_source'] = ['required', 'string', 'in:manual,provider'];
-            $rules['functions_repository_url'] = ['required', 'string', 'max:500'];
-            $rules['functions_repository_branch'] = ['required', 'string', 'max:120'];
-            $rules['functions_build_command'] = ['required', 'string', 'max:4000'];
-            $rules['functions_artifact_output_path'] = ['required', 'string', 'max:255'];
-
-            if ($this->form->functions_repo_source === 'provider') {
-                $rules['functions_source_control_account_id'] = ['required', 'string', 'max:26'];
-            }
-        }
+        $rules += $this->databaseCreationRules();
 
         $this->form->validate($rules, [
             'php_version.required' => __('Choose a PHP version for this site.'),
@@ -121,25 +93,7 @@ trait ManagesSiteCreateStore
         $org = $this->server->organization;
 
         $meta = [];
-        if ($functionsHost) {
-            $detectedRuntime = is_array($this->functionsDetection) ? $this->functionsDetection : [];
-            $meta['runtime_profile'] = $this->server->isAwsLambdaHost() ? 'aws_lambda_bref_web' : 'digitalocean_functions_web';
-            $meta['serverless'] = [
-                'target' => $this->server->hostKind(),
-                'runtime' => $this->form->functions_runtime,
-                'entrypoint' => trim($this->form->functions_entrypoint),
-                'package' => trim((string) ($detectedRuntime['package'] ?? '')),
-                'function_name' => Str::slug($this->form->name) ?: 'site',
-                'repo_source' => trim($this->form->functions_repo_source),
-                'source_control_account_id' => $this->form->functions_repo_source === 'provider'
-                    ? trim($this->form->functions_source_control_account_id)
-                    : null,
-                'repository_subdirectory' => trim($this->form->functions_repository_subdirectory),
-                'build_command' => trim($this->form->functions_build_command),
-                'artifact_output_path' => trim($this->form->functions_artifact_output_path),
-                'detected_runtime' => $detectedRuntime !== [] ? $detectedRuntime : null,
-            ];
-        } elseif ($dockerHost) {
+        if ($dockerHost) {
             $meta['runtime_profile'] = 'docker_web';
             $meta['runtime_target'] = [
                 'family' => match ($this->server->provider) {
@@ -158,7 +112,7 @@ trait ManagesSiteCreateStore
                     },
                 'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
                     ? 'orbstack'
-                    : ($this->server->provider?->value ?? 'byo'),
+                    : ($this->server->provider->value),
                 'mode' => 'docker',
                 'status' => 'pending',
                 'logs' => [],
@@ -171,7 +125,7 @@ trait ManagesSiteCreateStore
             $meta['runtime_target'] = [
                 'family' => 'byo_vm_docker',
                 'platform' => 'byo',
-                'provider' => $this->server->provider?->value ?? 'byo',
+                'provider' => $this->server->provider->value,
                 'mode' => 'docker',
                 'status' => 'pending',
                 'logs' => [],
@@ -199,7 +153,7 @@ trait ManagesSiteCreateStore
                     },
                 'provider' => data_get($this->server->meta, 'local_runtime.provider') === 'orbstack'
                     ? 'orbstack'
-                    : ($this->server->provider?->value ?? 'byo'),
+                    : ($this->server->provider->value),
                 'mode' => 'kubernetes',
                 'status' => 'pending',
                 'logs' => [],
@@ -216,8 +170,7 @@ trait ManagesSiteCreateStore
         $effectiveRuntime = $this->form->runtime !== ''
             ? $this->form->runtime
             : $this->form->type;
-        $allocatesInternalPort = ! $functionsHost
-            && ! $containerHost
+        $allocatesInternalPort = ! $containerHost
             && ! $this->usesVmDockerDeployStack()
             && ! in_array($effectiveRuntime, ['php', 'static'], true);
         $internalPort = null;
@@ -252,7 +205,7 @@ trait ManagesSiteCreateStore
             // (no detection), copy form->php_version into runtime_version.
             'runtime_version' => $this->form->runtime_version !== ''
                 ? $this->form->runtime_version
-                : ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && $this->form->php_version !== ''
+                : ($this->form->type === 'php' && ! $containerHost && $this->form->php_version !== ''
                     ? $this->form->php_version
                     : null),
             'build_command' => $this->form->build_command !== '' ? $this->form->build_command : null,
@@ -265,19 +218,13 @@ trait ManagesSiteCreateStore
             // default" implicit and lets re-default-ing the server
             // automatically apply to sites that haven't pinned.
             'database_engine' => $this->resolveDatabaseEngineOverride(),
-            'document_root' => $functionsHost
-                ? ($this->server->isAwsLambdaHost()
-                    ? '/lambda/'.trim($this->form->functions_entrypoint, '/')
-                    : '/functions/'.$this->form->functions_entrypoint)
-                : $this->form->document_root,
-            'repository_path' => $functionsHost ? null : ($this->form->repository_path ?: null),
+            'document_root' => $this->form->document_root,
+            'repository_path' => $this->form->repository_path ?: null,
             'app_port' => $this->form->type === 'node' ? $this->form->app_port : null,
             'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
-            'git_repository_url' => $functionsHost
-                ? trim($this->form->functions_repository_url)
-                : ($vmGitUrl !== '' ? $vmGitUrl : null),
-            'git_branch' => $functionsHost ? trim($this->form->functions_repository_branch) : $vmGitBranch,
+            'git_repository_url' => $vmGitUrl !== '' ? $vmGitUrl : null,
+            'git_branch' => $vmGitBranch,
             'webhook_secret' => Str::random(48),
             'deploy_strategy' => 'simple',
             'releases_to_keep' => 5,
@@ -339,6 +286,10 @@ trait ManagesSiteCreateStore
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
         ProvisionSiteJob::dispatch($site->id);
+
+        // Give the site its database (and the .env wiring to reach it) unless
+        // the user opted out or the server has no engine to put one on.
+        $this->provisionInitialDatabase($site);
 
         if ($this->server->organization) {
             audit_log(

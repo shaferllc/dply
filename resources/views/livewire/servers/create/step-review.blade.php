@@ -9,7 +9,7 @@
     ];
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="4" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     @if (! $canCreateServer && $billingUrl)
@@ -20,7 +20,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan limit') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Plan limit') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server limit reached for your plan.') }}</h3>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Upgrade to add more servers to this organization.') }}</p>
                     </div>
@@ -61,10 +61,14 @@
     @endphp
 
     <form wire:submit.prevent="store" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-      <div class="space-y-6 min-w-0">
+      <div class="space-y-4 min-w-0">
 
         {{-- Hero --}}
+        {{-- Compact, and the facts ride as inline chips rather than three
+             bordered tiles — same shape Step 1 uses for its draft summary. The
+             tile version cost ~90px of header for three short values. --}}
         <x-hero-card
+            compact
             :eyebrow="__('Step :n of :total', ['n' => 4, 'total' => $totalSteps])"
             :title="__('Review and launch')"
             :description="__('Confirm what dply is about to spin up. The preflight panel on the right surfaces anything blocking before you can create.')"
@@ -73,16 +77,11 @@
         >
             @if (! empty($heroStats))
                 <x-slot:stats>
-                    <dl @class([
-                        'grid gap-2',
-                        'grid-cols-1' => count($heroStats) === 1,
-                        'grid-cols-2' => count($heroStats) === 2,
-                        'grid-cols-2 sm:grid-cols-3' => count($heroStats) === 3,
-                    ])>
+                    <dl class="flex flex-wrap items-center gap-1.5">
                         @foreach ($heroStats as $stat)
-                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
-                                <dd class="mt-1 truncate text-sm font-semibold text-brand-ink {{ $stat['mono'] ? 'font-mono tabular-nums' : '' }}">{{ $stat['value'] }}</dd>
+                            <div class="inline-flex min-w-0 items-baseline gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-2 py-1">
+                                <dt class="shrink-0 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $stat['label'] }}</dt>
+                                <dd class="truncate text-xs font-semibold text-brand-ink {{ $stat['mono'] ? 'font-mono tabular-nums' : '' }}">{{ $stat['value'] }}</dd>
                             </div>
                         @endforeach
                     </dl>
@@ -112,7 +111,7 @@
                         <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Migrate from :source', ['source' => $sourceLabel]) }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Sites to migrate from :label', ['label' => $migrationSourceLabel]) }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ trans_choice('{1} 1 site selected|[2,*] :count selected', $checkedCount, ['count' => $checkedCount]) }}
@@ -120,7 +119,7 @@
                         </p>
                     </div>
                 </div>
-                <div class="p-6 sm:p-7">
+                <div class="px-4 py-3.5 sm:px-5">
                     <ul class="divide-y divide-amber-200/70 rounded-xl bg-white/60 ring-1 ring-amber-200">
                         @foreach ($sourceSites as $site)
                             @php
@@ -150,7 +149,7 @@
                                         </span>
                                     </span>
                                 </label>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $pillClass }}">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $pillClass }}">
                                     {{ $pillLabel }}
                                 </span>
                             </li>
@@ -163,25 +162,22 @@
 
         {{-- 1. SUMMARY — chip-strip pattern matching step-what's "Template filled in" panel --}}
         <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <x-icon-badge>
-                    <x-heroicon-o-clipboard-document-check class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What you are creating') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Final shape of the server. Anything missing here came from a step you can still go back to.') }}</p>
-                </div>
-            </div>
-            <div class="p-6 sm:p-7">
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-clipboard-document-check"
+                :title="__('What you are creating')"
+                :note="__('Final shape of the server. Anything missing here came from a step you can still go back to.')"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-4 py-3.5 sm:px-5">
                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/40 p-5">
                     <div class="flex flex-wrap gap-1.5 text-xs">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</span>
+                            <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Type') }}</span>
                             <span class="font-medium text-brand-ink">{{ $modeLabel }}</span>
                         </span>
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                            <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</span>
+                            <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Name') }}</span>
                             <span class="font-mono font-medium text-brand-ink">{{ $form->name ?: '—' }}</span>
                         </span>
 
@@ -189,40 +185,40 @@
                             @if ($isKubernetes)
                                 @if ($form->do_kubernetes_cluster_name !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cluster') }}</span>
                                         <span class="font-mono font-medium text-brand-ink">{{ $form->do_kubernetes_cluster_name }}</span>
                                     </span>
                                 @endif
                                 @if ($form->do_kubernetes_namespace !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Namespace') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Namespace') }}</span>
                                         <span class="font-mono font-medium text-brand-ink">{{ $form->do_kubernetes_namespace }}</span>
                                     </span>
                                 @endif
                             @else
                                 @if ($form->region !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</span>
                                         <span class="font-medium text-brand-ink">{{ $form->region }}</span>
                                     </span>
                                 @endif
                                 @if ($form->size !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</span>
                                         <span class="font-medium text-brand-ink">{{ $form->size }}</span>
                                     </span>
                                 @endif
                                 @php $osImageLabel = \App\Support\Servers\ServerImageCatalog::labelFor($form->os_image); @endphp
                                 @if ($osImageLabel !== null)
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('OS') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('OS') }}</span>
                                         <span class="font-medium text-brand-ink">{{ $osImageLabel }}</span>
                                     </span>
                                 @endif
                             @endif
                         @else
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</span>
+                                <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host') }}</span>
                                 <span class="font-mono font-medium text-brand-ink">{{ $form->ssh_user }}@{{ $form->ip_address }}:{{ $form->ssh_port ?: 22 }}</span>
                             </span>
                         @endif
@@ -232,61 +228,61 @@
                         <div class="mt-3 flex flex-wrap gap-1.5 text-xs">
                             @if ($form->install_profile !== '')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Bundle') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->install_profile }}</span>
                                 </span>
                             @endif
                             @if ($form->server_role !== '')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Job') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->server_role }}</span>
                                 </span>
                             @endif
                             @if ($form->webserver !== '' && $form->webserver !== 'none')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Web') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->webserver }}</span>
                                 </span>
                             @endif
                             @if ($form->php_version !== '' && $form->php_version !== 'none')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('PHP') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->php_version }}</span>
                                 </span>
                             @endif
                             @if ($form->database !== '' && $form->database !== 'none')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->database }}</span>
                                 </span>
                             @endif
                             @if ($form->cache_service !== '' && $form->cache_service !== 'none')
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache') }}</span>
                                     <span class="font-medium text-brand-ink">{{ $form->cache_service }}</span>
                                 </span>
                             @endif
                             @if ($form->server_role === 'database' && ($form->database_remote_access || $form->database_initial_name !== ''))
                                 @if ($form->database_initial_name !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB name') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB name') }}</span>
                                         <span class="font-medium font-mono text-brand-ink">{{ $form->database_initial_name }}</span>
                                     </span>
                                 @endif
                                 @if ($form->database_username !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB user') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB user') }}</span>
                                         <span class="font-medium font-mono text-brand-ink">{{ $form->database_username }}</span>
                                     </span>
                                 @endif
                                 @if ($form->database_remote_access && $form->database_allowed_from !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
                                         <span class="font-medium font-mono text-brand-ink">{{ $form->database_allowed_from }}</span>
                                     </span>
                                 @elseif ($form->database_remote_access)
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('DB access') }}</span>
                                         <span class="font-medium text-brand-ink">{{ __('Remote (CIDR pending)') }}</span>
                                     </span>
                                 @endif
@@ -294,25 +290,25 @@
                             @if (in_array($form->server_role, ['redis', 'valkey'], true) && ($form->cache_remote_access || $form->cache_require_password))
                                 @if ($form->cache_remote_access && $form->cache_allowed_from !== '')
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
                                         <span class="font-medium font-mono text-brand-ink">{{ $form->cache_allowed_from }}</span>
                                     </span>
                                 @elseif ($form->cache_remote_access)
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache access') }}</span>
                                         <span class="font-medium text-brand-ink">{{ __('Remote (CIDR pending)') }}</span>
                                     </span>
                                 @endif
                                 @if ($form->cache_require_password)
                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                        <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache auth') }}</span>
+                                        <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Cache auth') }}</span>
                                         <span class="font-medium text-brand-ink">{{ __('Password required') }}</span>
                                     </span>
                                 @endif
                             @endif
                             @foreach ($languageRuntimes as $name => $version)
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 ring-1 ring-brand-ink/10">
-                                    <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $name }}</span>
+                                    <span class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $name }}</span>
                                     <span class="font-medium text-brand-ink">{{ $version }}</span>
                                 </span>
                             @endforeach
@@ -326,20 +322,16 @@
         @if ($form->mode === 'provider' && $form->type === 'digitalocean')
             <section class="dply-card overflow-hidden">
                 <details class="group">
-                    <summary class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Advanced') }}</p>
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Advanced DigitalOcean options') }}</h3>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                            </div>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('IPv6, automated backups, monitoring agent, tags, cloud-init user-data.') }}</p>
-                        </div>
+                    <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Advanced DigitalOcean options') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('IPv6, automated backups, monitoring agent, tags, cloud-init user-data.') }}</p>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <label class="inline-flex items-center gap-3 text-sm text-brand-moss">
                                 <input type="checkbox" wire:model.live="form.do_ipv6" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage">
@@ -370,20 +362,16 @@
         @if ($isVmShaped)
             <section class="dply-card overflow-hidden">
                 <details class="group">
-                    <summary class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recipe') }}</p>
-                            <div class="flex items-baseline justify-between gap-3">
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Optional setup-script recipe') }}</h3>
-                                <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform group-open:rotate-180" />
-                            </div>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Run a recipe defined in config/setup_scripts.php after the base provision.') }}</p>
-                        </div>
+                    <summary class="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4">
+                        <h3 class="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                            {{ __('Optional setup-script recipe') }}
+                        </h3>
+                        <span class="h-4 w-px shrink-0 bg-brand-ink/10" aria-hidden="true"></span>
+                        <p class="min-w-0 flex-1 truncate text-xs text-brand-mist">{{ __('Run a recipe defined in config/setup_scripts.php after the base provision.') }}</p>
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-transform group-open:rotate-180" aria-hidden="true" />
                     </summary>
-                    <div class="p-6 sm:p-7">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <x-input-label for="setup_script_key" :value="__('Recipe key')" />
                         <x-text-input id="setup_script_key" wire:model.live="form.setup_script_key" type="text" class="mt-1 block w-full font-mono" placeholder="none" />
                         <p class="mt-2 text-xs text-brand-mist">{{ __('Leave blank or "none" to skip.') }}</p>
@@ -487,10 +475,10 @@
            The preflight checks panel stays in the main column where
            it has room; the cost preview lifts up here so the operator
            sees pricing at a glance while scanning the summary. --}}
-      <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+      <aside class="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
         @if ($isKubernetes)
             <div data-testid="k8s-billing-disclosure" class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+                <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                     <x-heroicon-m-banknotes class="h-4 w-4" />
                     {{ __('Billing') }}
                 </p>
@@ -506,7 +494,7 @@
         @endif
 
         <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+            <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                 <x-heroicon-m-information-circle class="h-4 w-4" />
                 {{ __('After you click create') }}
             </p>
@@ -518,7 +506,7 @@
         </div>
 
         <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/30 p-5">
-            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
+            <p class="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-brand-sage">
                 <x-heroicon-m-arrow-path class="h-4 w-4" />
                 {{ __('Need to change something?') }}
             </p>

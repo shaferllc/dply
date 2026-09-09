@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Support\Dns\AuthoritativeResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 
@@ -44,15 +45,10 @@ class SiteReachabilityChecker
      *   checks: list<array{hostname: string, url: string, ok: bool, error: ?string}>
      * }
      */
-    /** @return array<string, mixed> */
     public function check(Site $site): array
     {
-        $previewDomains = $site->previewDomains instanceof Collection
-            ? $site->previewDomains
-            : $site->previewDomains()->get();
-        $domains = $site->domains instanceof Collection
-            ? $site->domains
-            : $site->domains()->get();
+        $previewDomains = $site->previewDomains;
+        $domains = $site->domains;
         $primaryHostname = $domains->firstWhere('is_primary', true)->hostname
             ?? $domains->first()?->hostname;
         $primaryPreviewHostname = $previewDomains->firstWhere('is_primary', true)->hostname
@@ -163,6 +159,7 @@ class SiteReachabilityChecker
      *   ok: bool,
      *   resolves: bool,
      *   points_here: bool,
+     *   propagating: bool,
      *   behind_cloudflare: bool,
      *   http_ok: bool,
      *   resolved_ips: list<string>,
@@ -171,7 +168,6 @@ class SiteReachabilityChecker
      *   checked_at: string
      * }
      */
-    /** @return array<string, mixed> */
     public function checkHostname(Site $site, string $hostname): array
     {
         $hostname = strtolower(trim($hostname));
@@ -186,19 +182,40 @@ class SiteReachabilityChecker
         // instead of telling the operator to "fix" a correct A record.
         $behindCloudflare = ! $pointsHere && $this->ipsBehindCloudflare($resolved);
 
+        // gethostbynamel() goes through the system resolver, so for as long as
+        // the PREVIOUS record's TTL has left to run it keeps handing back the
+        // old address after a change. Reporting that as "points elsewhere"
+        // sends the operator to fix a record that is already correct. Ask the
+        // zone's own nameservers before saying anything is wrong: if the
+        // record is right at the source, this is propagation, not
+        // misconfiguration. Same reasoning as the Cloudflare carve-out above.
+        //
+        // Only on the mismatch path — a hostname that already points here
+        // costs nothing extra.
+        $propagating = ! $pointsHere
+            && ! $behindCloudflare
+            && $serverIp !== ''
+            && app(AuthoritativeResolver::class)->pointsAt($hostname, $serverIp);
+
         // Probe HTTP when DNS points straight here, OR when it's proxied through
         // Cloudflare (the GET then traverses the proxy to this origin — exactly
         // the path an HTTP-01 challenge takes). Otherwise the GET would hit
         // whatever third party the domain resolves to (and could hang), which
         // tells us nothing about this server.
+        //
+        // A propagating hostname is probed too, but by IP: dialling the name
+        // would follow the same stale cache and land on the OLD server, which
+        // says nothing about this one. Let's Encrypt resolves authoritatively,
+        // so "this box answers for this Host header" is exactly the question
+        // an HTTP-01 challenge will ask.
         $httpOk = false;
         $httpError = null;
-        if ($pointsHere || $behindCloudflare) {
+        if ($pointsHere || $behindCloudflare || $propagating) {
             try {
                 $response = Http::timeout(5)
                     ->withoutRedirecting()
                     ->withHeaders(['Host' => $hostname])
-                    ->get('http://'.$hostname);
+                    ->get('http://'.($propagating ? $serverIp : $hostname));
                 $httpOk = $this->statusMeansReachable($response->status());
                 if (! $httpOk) {
                     $httpError = 'HTTP '.$response->status();
@@ -224,6 +241,16 @@ class SiteReachabilityChecker
                     'err' => $httpError ?? __('no response'),
                 ]);
             }
+        } elseif ($propagating) {
+            // Not an error: the zone is right and there is nothing to do but
+            // wait. Worth saying out loud, because the cached answer below is
+            // what an operator checking with dig from their laptop may also
+            // still see.
+            $error = __('“:host” is already pointed at :ip at its nameservers — the old record (:got) is still cached and will expire on its own. Nothing to change.', [
+                'host' => $hostname,
+                'ip' => $serverIp,
+                'got' => implode(', ', $resolved),
+            ]);
         } elseif (! $pointsHere) {
             $error = __('“:host” resolves to :got, not this server (:ip). Update its A record before requesting SSL.', [
                 'host' => $hostname,
@@ -238,12 +265,17 @@ class SiteReachabilityChecker
         }
 
         return [
-            'ok' => $pointsHere && $httpOk,
+            // Propagating counts as ok: the record is correct at the source, so
+            // anything downstream that gates on reachability (SSL issuance
+            // above all) would only be waiting out a cache it does not share
+            // with the CA.
+            'ok' => ($pointsHere || $propagating) && $httpOk,
             'resolves' => $resolves,
             'points_here' => $pointsHere,
+            'propagating' => $propagating,
             'behind_cloudflare' => $behindCloudflare,
             'http_ok' => $httpOk,
-            'resolved_ips' => array_values($resolved),
+            'resolved_ips' => $resolved,
             'server_ip' => $serverIp,
             'error' => $error,
             'checked_at' => now()->toIso8601String(),
@@ -314,12 +346,6 @@ class SiteReachabilityChecker
     private function statusMeansReachable(int $status): bool
     {
         if ($status >= 200 && $status < 400) {
-            return true;
-        }
-
-        // A redirect to HTTPS still proves something is listening on :80 — do
-        // not follow the redirect (port 443 may not be configured yet).
-        if (in_array($status, [301, 302, 307, 308], true)) {
             return true;
         }
 

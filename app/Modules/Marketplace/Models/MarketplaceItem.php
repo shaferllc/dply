@@ -11,17 +11,17 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property string $id
  * @property string $category
- * @property array<string, mixed> $frameworks
+ * @property ?array<string, mixed> $frameworks
  * @property bool $is_active
  * @property string $name
  * @property array<string, mixed> $payload
  * @property string $recipe_type
- * @property array<string, mixed> $runtimes
+ * @property ?array<string, mixed> $runtimes
  * @property string $slug
  * @property string $sort_order
- * @property string $summary
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property ?string $summary
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class MarketplaceItem extends Model
 {
@@ -40,6 +40,8 @@ class MarketplaceItem extends Model
 
     public const CATEGORY_RUNBOOKS = 'runbooks';
 
+    public const CATEGORY_SCRIPTS = 'scripts';
+
     public const RECIPE_WEBSERVER_TEMPLATE = 'webserver_template';
 
     public const RECIPE_DEPLOY_COMMAND = 'deploy_command';
@@ -49,6 +51,9 @@ class MarketplaceItem extends Model
     public const RECIPE_WORKSPACE_RUNBOOK = 'workspace_runbook';
 
     public const RECIPE_EXTERNAL_LINK = 'external_link';
+
+    /** Preset shell script; payload carries the config/marketplace/scripts.php key. */
+    public const RECIPE_SCRIPT = 'script';
 
     protected $fillable = [
         'slug',
@@ -154,6 +159,7 @@ class MarketplaceItem extends Model
             self::CATEGORY_INTEGRATIONS => __('Integrations'),
             self::CATEGORY_GUIDES => __('Guides'),
             self::CATEGORY_RUNBOOKS => __('Runbooks'),
+            self::CATEGORY_SCRIPTS => __('Scripts'),
         ];
     }
 }

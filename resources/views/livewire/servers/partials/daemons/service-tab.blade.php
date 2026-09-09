@@ -1,24 +1,23 @@
             <div class="{{ $card }}">
-                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <x-icon-badge>
-                        <x-heroicon-o-server class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Service') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Supervisor service (systemd)') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Start, stop, or restart the Supervisor daemon on the guest. This is separate from individual program start/stop on the Programs tab. Unit: :unit (override with DPLY_SUPERVISOR_SYSTEMD_UNIT).', ['unit' => config('sites.supervisor_systemd_unit', 'supervisor')]) }}
-                        </p>
-                        <p class="mt-1.5 text-xs font-medium text-amber-900/90">
-                            {{ __('Stopping the service halts all Supervisor-managed workers until you start it again.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="space-y-5 p-6 sm:p-8">
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-server"
+                    :title="__('Supervisor service (systemd)')"
+                    :note="__('Start, stop, or restart the Supervisor daemon on the guest. This is separate from individual program start/stop on the Programs tab. Unit: :unit (override with DPLY_SUPERVISOR_SYSTEMD_UNIT).', ['unit' => config('sites.supervisor_systemd_unit', 'supervisor')])"
+                    class="border-b border-brand-ink/10"
+                />
+                {{-- The stop-halts-everything warning stays out of the head's note:
+                     a dense note truncates, and this one must not be the part that
+                     gets cut off. --}}
+                <p class="flex items-center gap-1.5 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs font-medium text-amber-900 sm:px-5">
+                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('Stopping the service halts all Supervisor-managed workers until you start it again.') }}
+                </p>
+                <div class="space-y-5 px-4 py-3.5 sm:px-5">
 
                     {{-- Diagnostics --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Diagnostics') }}</p>
                         <div class="flex flex-wrap gap-2">
                             <button
                                 type="button"
@@ -58,7 +57,7 @@
 
                     {{-- Lifecycle --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Lifecycle') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Lifecycle') }}</p>
                         <div class="flex flex-wrap gap-2">
                             {{-- Show Start when inactive or unknown; show Stop when active only --}}
                             @if ($supervisor_service_state !== 'active')
@@ -109,7 +108,7 @@
                                 {{ __('Reload') }}
                             </button>
                         </div>
-                        <p class="mt-2 inline-flex items-center gap-1 text-[11px] {{ $supervisor_service_state === 'active' ? 'text-emerald-700' : 'text-brand-mist' }}">
+                        <p class="mt-2 inline-flex items-center gap-1 text-xs {{ $supervisor_service_state === 'active' ? 'text-emerald-700' : 'text-brand-mist' }}">
                             <span class="inline-block h-1.5 w-1.5 rounded-full {{ $supervisor_service_state === 'active' ? 'bg-emerald-500' : 'bg-brand-mist' }}"></span>
                             @if ($supervisor_service_state === 'active')
                                 {{ __('Active') }}
@@ -123,7 +122,7 @@
 
                     {{-- Boot --}}
                     <div>
-                        <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Boot') }}</p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Boot') }}</p>
                         <div class="flex flex-wrap gap-2">
                             {{-- Show Enable when disabled or unknown; show Disable when enabled only --}}
                             @if ($supervisor_boot_state !== 'enabled')
@@ -153,7 +152,7 @@
                             @endif
                         </div>
                         @if ($supervisor_boot_state !== null)
-                            <p class="mt-2 text-[11px] text-brand-mist">
+                            <p class="mt-2 text-xs text-brand-mist">
                                 {{ $supervisor_boot_state === 'enabled' ? __('Starts automatically on boot') : __('Does not start on boot') }}
                             </p>
                         @endif

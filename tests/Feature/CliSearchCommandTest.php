@@ -18,7 +18,7 @@ test('finds commands by name keyword', function () {
     expect($names)->toContain('dply:site:env-list');
 });
 test('finds by description match', function () {
-    // dply:fleet:running-deploys has "in-progress" in its description but
+    // dply:ops:running-deploys has "in-progress" in its description but
     // not in its name.
     Artisan::call('dply:cli-search', [
         'keyword' => 'in-progress',
@@ -27,7 +27,7 @@ test('finds by description match', function () {
     $decoded = json_decode(Artisan::output(), true);
 
     $names = array_column($decoded['matches'], 'name');
-    expect($names)->toContain('dply:fleet:running-deploys');
+    expect($names)->toContain('dply:ops:running-deploys');
 });
 test('names only skips description matches', function () {
     // First: search for "in-progress" — matches a description.

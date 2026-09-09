@@ -129,9 +129,7 @@ trait PicksRepositoryRef
         $this->repo_ref_selected_kind = $kind;
         $this->closeRepoRefPicker();
 
-        if (method_exists($this, 'onRepoRefSelected')) {
-            $this->onRepoRefSelected();
-        }
+        $this->onRepoRefSelected();
     }
 
     /**
@@ -151,9 +149,7 @@ trait PicksRepositoryRef
         $this->repo_ref_selected_label = $sha;
         $this->repo_ref_selected_kind = 'commit';
 
-        if (method_exists($this, 'onRepoRefSelected')) {
-            $this->onRepoRefSelected();
-        }
+        $this->onRepoRefSelected();
     }
 
     public function clearRepoRefSelection(): void
@@ -242,9 +238,9 @@ trait PicksRepositoryRef
 
         $branch = trim($this->repo_ref_commits_branch) !== '' ? trim($this->repo_ref_commits_branch) : null;
         $result = app(SiteGitCommitsFetcher::class)->fetch($this->site, $user, 40, $branch);
-        if (! ($result['ok'] ?? false)) {
+        if (! $result['ok']) {
             $this->repo_ref_results = [];
-            $this->repo_ref_error = (string) ($result['error'] ?? __('Could not load commits.'));
+            $this->repo_ref_error = (string) $result['error'];
             $this->repo_ref_needs_provider = $this->detectRepoRefProviderGap($user, $result);
 
             return;
@@ -253,12 +249,12 @@ trait PicksRepositoryRef
         $this->repo_ref_error = null;
         $this->repo_ref_needs_provider = null;
         $this->repo_ref_results = $this->filterRepoRefs(
-            collect($result['commits'] ?? [])
+            collect($result['commits'])
                 ->map(fn (array $commit): array => [
                     'kind' => 'commit',
-                    'label' => (string) ($commit['short_sha'] ?? substr((string) ($commit['sha'] ?? ''), 0, 7)),
-                    'sha' => (string) ($commit['sha'] ?? ''),
-                    'meta' => Str::limit((string) ($commit['message'] ?? ''), 72),
+                    'label' => (string) $commit['short_sha'],
+                    'sha' => (string) $commit['sha'],
+                    'meta' => Str::limit((string) $commit['message'], 72),
                 ])
                 ->all(),
             $search,

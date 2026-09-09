@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\RemoveSiteRepositoryJob;
-use App\Modules\Deploy\Services\ServerlessRepositoryCheckout;
-use App\Modules\Deploy\Services\ServerlessRuntimeDetector;
-use App\Modules\Deploy\Services\ServerlessTargetCapabilityResolver;
-use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Modules\Deploy\Services\DeployRepoPreflight;
+use App\Modules\Deploy\Services\RepositoryCheckout;
+use App\Modules\Deploy\Services\RepositoryRuntimeDetector;
+use App\Modules\Deploy\Services\SiteQuickDeployCommitPoller;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Support\SiteDeployKeyGenerator;
+use Illuminate\Support\Str;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -47,6 +49,9 @@ trait ManagesSiteRepositoryConfig
 
     public bool $quick_deploy_enabled_ui = false;
 
+    /** @var 'webhook'|'poll'|null */
+    public ?string $quick_deploy_mode_ui = null;
+
     /**
      * @var list<array{id: string, provider: string, label: string}>
      */
@@ -73,31 +78,6 @@ trait ManagesSiteRepositoryConfig
             'post_deploy_command' => 'nullable|string|max:4000',
         ];
 
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            if (($this->functionsDetection['unsupported_for_target'] ?? false) === true) {
-                $this->toastError((string) ($this->functionsDetection['warnings'][0] ?? __('This repository runtime is not supported by the selected target.')));
-
-                return;
-            }
-
-            $rules = array_merge($rules, [
-                'functions_repo_source' => 'required|string|in:manual,provider',
-                'functions_source_control_account_id' => 'nullable|string|max:26',
-                'functions_repository_selection' => 'nullable|string|max:500',
-                'functions_repository_subdirectory' => 'nullable|string|max:255',
-                'functions_runtime' => 'required|string|max:50',
-                'functions_entrypoint' => 'required|string|max:255',
-                'functions_build_command' => 'required|string|max:4000',
-                'functions_artifact_output_path' => 'required|string|max:255',
-                'git_repository_url' => 'required|string|max:500',
-                'git_branch' => 'required|string|max:120',
-            ]);
-
-            if ($this->functions_repo_source === 'provider') {
-                $rules['functions_source_control_account_id'] = 'required|string|max:26';
-            }
-        }
-
         $this->validate($rules);
 
         $updates = [
@@ -105,24 +85,6 @@ trait ManagesSiteRepositoryConfig
             'git_branch' => trim($this->git_branch) ?: 'main',
             'post_deploy_command' => trim($this->post_deploy_command) ?: null,
         ];
-
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $meta = is_array($this->site->meta) ? $this->site->meta : [];
-            $functionsConfig = is_array($meta['serverless'] ?? null) ? $meta['serverless'] : [];
-            $meta['serverless'] = array_merge($functionsConfig, [
-                'repo_source' => trim($this->functions_repo_source),
-                'source_control_account_id' => $this->functions_repo_source === 'provider'
-                    ? trim($this->functions_source_control_account_id)
-                    : null,
-                'repository_subdirectory' => trim($this->functions_repository_subdirectory),
-                'runtime' => trim($this->functions_runtime),
-                'entrypoint' => trim($this->functions_entrypoint),
-                'build_command' => trim($this->functions_build_command),
-                'artifact_output_path' => trim($this->functions_artifact_output_path),
-                'detected_runtime' => $this->functionsDetection !== [] ? $this->functionsDetection : null,
-            ]);
-            $updates['meta'] = $meta;
-        }
 
         $oldRepoSnapshot = [
             'git_repository_url' => $this->site->git_repository_url,
@@ -147,10 +109,10 @@ trait ManagesSiteRepositoryConfig
      */
     private function warnIfRepositoryUnreachable(): void
     {
-        $error = app(\App\Modules\Deploy\Services\DeployRepoPreflight::class)->check($this->site->fresh());
+        $error = app(DeployRepoPreflight::class)->check($this->site->fresh());
         if ($error !== null) {
             $firstLine = trim((string) strtok($error, "\n"));
-            $this->toastError(__('Saved, but the repository check failed: :reason', ['reason' => \Illuminate\Support\Str::limit($firstLine, 180)]));
+            $this->toastError(__('Saved, but the repository check failed: :reason', ['reason' => Str::limit($firstLine, 180)]));
         }
     }
 
@@ -170,10 +132,6 @@ trait ManagesSiteRepositoryConfig
             'git_source_control_account_id' => 'nullable|string|max:26',
             'deploy_sync_include_peers_on_manual' => 'boolean',
         ];
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $rules['git_repository_url'] = 'required|string|max:500';
-            $rules['git_branch'] = 'required|string|max:120';
-        }
         if ($this->git_provider_kind !== 'custom' && $this->git_source_control_account_id === '') {
             $this->addError('git_source_control_account_id', __('Select a linked source control account or choose Custom.'));
 
@@ -218,11 +176,44 @@ trait ManagesSiteRepositoryConfig
             return;
         }
 
-        $result = $provisioner->enable($this->site->fresh(), $account);
+        $result = $provisioner->enable($this->site, $account);
         if (! $result['ok']) {
             $this->toastError($result['message']);
         } else {
             $this->toastSuccess($result['message']);
+        }
+        $this->syncFormFromSite();
+    }
+
+    public function enableQuickDeployPoll(RepositoryWebhookProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot enable Quick deploy.'));
+
+            return;
+        }
+
+        $user = request()->user();
+        $account = $this->git_source_control_account_id !== '' && $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->git_source_control_account_id)
+            : null;
+        if ($account === null) {
+            $this->toastError(__('Select a connected source control account first.'));
+
+            return;
+        }
+
+        $this->site->mergeRepositoryMeta([
+            'git_source_control_account_id' => $account->id(),
+        ]);
+        $this->site->save();
+
+        $result = $provisioner->enablePoll($this->site);
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
+        } else {
+            $this->toastSuccess((string) $result['message']);
         }
         $this->site->refresh();
         $this->syncFormFromSite();
@@ -243,6 +234,57 @@ trait ManagesSiteRepositoryConfig
         $this->syncFormFromSite();
     }
 
+    /**
+     * Run one Quick deploy poll tick for this site (operators shouldn't wait
+     * for the scheduled ~2 minute command).
+     */
+    public function checkQuickDeployPollNow(SiteQuickDeployCommitPoller $poller): void
+    {
+        $this->authorize('update', $this->site);
+        if (request()->user()?->currentOrganization()?->userIsDeployer(request()->user())) {
+            $this->dispatch('notify', message: __('Deployers cannot run Quick deploy checks.'));
+
+            return;
+        }
+
+        $mode = (string) ($this->site->repositoryMeta()['quick_deploy_mode'] ?? '');
+        if (! ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? false) || $mode !== 'poll') {
+            $this->toastError(__('Enable poll delivery before checking for new commits.'));
+
+            return;
+        }
+
+        $result = $poller->poll($this->site->fresh() ?? $this->site);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+
+        if (! $result['checked']) {
+            $this->toastError(__('Poll check skipped (:reason).', [
+                'reason' => (string) $result['reason'],
+            ]));
+
+            return;
+        }
+
+        $message = is_string($result['message'] ?? null) && $result['message'] !== ''
+            ? (string) $result['message']
+            : __('Checked Git for new commits.');
+
+        if ($result['dispatched'] || $result['outcome'] === 'deploy_queued') {
+            $this->toastSuccess($message);
+
+            return;
+        }
+
+        if ($result['outcome'] === 'error') {
+            $this->toastError($message);
+
+            return;
+        }
+
+        $this->toastSuccess($message);
+    }
+
     public function queueRemoveRemoteRepository(): void
     {
         $this->authorize('update', $this->site);
@@ -252,7 +294,7 @@ trait ManagesSiteRepositoryConfig
             return;
         }
 
-        if ($this->site->usesFunctionsRuntime() || $this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
+        if ($this->site->usesDockerRuntime() || $this->site->usesKubernetesRuntime()) {
             $this->toastError(__('This runtime does not use a traditional VM repository path.'));
 
             return;
@@ -305,7 +347,7 @@ trait ManagesSiteRepositoryConfig
     public function updatedFunctionsRepositorySelection(string $value): void
     {
         foreach ($this->availableFunctionsRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
+            if ($repository['url'] !== $value) {
                 continue;
             }
 
@@ -352,73 +394,43 @@ trait ManagesSiteRepositoryConfig
         $this->functionsOverridesTouched = true;
     }
 
+    /**
+     * Target capabilities handed to the runtime detector.
+     *
+     * ServerlessTargetCapabilityResolver resolved this per host (DO Functions
+     * / AWS Lambda) and was deleted with the serverless module
+     * (remove-cloud-edge-serverless). No serverless target survives, so this is
+     * that resolver's "unknown target" branch, inlined: detection still runs
+     * and reports nothing supported rather than fataling.
+     *
+     * @return array<string, mixed>
+     */
+    private static function detectionCapabilities(): array
+    {
+        return [
+            'target' => 'unknown',
+            'supports_runtime_detection' => false,
+            'supports_php_runtime' => false,
+            'supports_node_runtime' => false,
+            'supports_python_runtime' => false,
+            'supports_go_runtime' => false,
+            'default_runtime' => '',
+            'default_php_runtime' => '',
+            'default_python_runtime' => 'python3.12',
+            'default_entrypoint' => '',
+            'default_package' => '',
+            'host_label' => 'Unknown',
+            'features' => [],
+        ];
+    }
+
     private function refreshFunctionsDetection(): void
     {
-        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return;
-        }
-
-        $repositoryUrl = trim($this->git_repository_url);
-        $branch = trim($this->git_branch);
-
-        if ($repositoryUrl === '' || $branch === '') {
-            $this->functionsDetection = [];
-
-            return;
-        }
-
-        $checkout = null;
-
-        try {
-            $checkout = app(ServerlessRepositoryCheckout::class)->checkout(
-                'preview-site-'.$this->site->id.'-'.md5($repositoryUrl.'|'.$branch.'|'.$this->functions_repository_subdirectory),
-                $repositoryUrl,
-                $branch,
-                $this->functions_repository_subdirectory,
-                $this->site->user_id,
-                $this->functions_repo_source === 'provider' ? $this->functions_source_control_account_id : null,
-            );
-
-            $this->functionsDetection = app(ServerlessRuntimeDetector::class)->detect(
-                $checkout['working_directory'],
-                app(ServerlessTargetCapabilityResolver::class)->forServer($this->server),
-            );
-
-            if (! $this->functionsOverridesTouched) {
-                $this->functions_runtime = (string) ($this->functionsDetection['runtime'] ?? $this->functions_runtime);
-                $this->functions_entrypoint = (string) ($this->functionsDetection['entrypoint'] ?? $this->functions_entrypoint);
-                $this->functions_build_command = (string) ($this->functionsDetection['build_command'] ?? $this->functions_build_command);
-                $this->functions_artifact_output_path = (string) ($this->functionsDetection['artifact_output_path'] ?? $this->functions_artifact_output_path);
-            }
-        } catch (\Throwable $e) {
-            $this->functionsDetection = [
-                'framework' => 'unknown',
-                'language' => 'unknown',
-                'runtime' => '',
-                'entrypoint' => '',
-                'build_command' => '',
-                'artifact_output_path' => '',
-                'package' => 'default',
-                'confidence' => 'low',
-                'reasons' => [],
-                'warnings' => [$e->getMessage()],
-                'unsupported_for_target' => false,
-            ];
-        } finally {
-            if (is_array($checkout) && isset($checkout['workspace_path']) && is_string($checkout['workspace_path'])) {
-                app(ServerlessRepositoryCheckout::class)->cleanup($checkout['workspace_path']);
-            }
-        }
     }
 
     public function generateDeployKey(): void
     {
         $this->authorize('update', $this->site);
-        if ($this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            $this->toastError(__('Serverless-backed sites deploy from the configured artifact zip instead of a server-side git checkout.'));
-
-            return;
-        }
 
         try {
             [$private, $public] = SiteDeployKeyGenerator::generate();
@@ -434,31 +446,5 @@ trait ManagesSiteRepositoryConfig
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         $this->linkedSourceControlAccounts = $repositoryBrowser->accountsForUser(request()->user());
-
-        if (! $this->server->hostCapabilities()->supportsFunctionDeploy()) {
-            return;
-        }
-
-        if ($this->linkedSourceControlAccounts === []) {
-            $this->functions_repo_source = 'manual';
-
-            return;
-        }
-
-        if ($this->functions_repo_source === 'provider' && $this->functions_source_control_account_id === '') {
-            $this->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
-        }
-
-        if ($this->functions_repo_source !== 'provider') {
-            return;
-        }
-
-        $user = request()->user();
-        $account = $user !== null
-            ? app(GitIdentityResolver::class)->forId($user, $this->functions_source_control_account_id)
-            : null;
-        $this->availableFunctionsRepositories = $account
-            ? $repositoryBrowser->repositoriesForAccount($account)
-            : [];
     }
 }

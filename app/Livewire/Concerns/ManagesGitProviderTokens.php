@@ -32,6 +32,19 @@ trait ManagesGitProviderTokens
         $this->resetErrorBag(['patLabel', 'patToken', 'patApiBaseUrl']);
     }
 
+    /**
+     * Who the new token belongs to. Personal by default — the profile page; the
+     * org Credentials page overrides this to create the shared machine-user
+     * credential instead. Exactly one owner column, enforced by a DB check
+     * constraint (docs/adr/org-owned-git-credentials.md).
+     *
+     * @return array<string, mixed>
+     */
+    protected function gitProviderTokenOwnerAttributes(): array
+    {
+        return ['user_id' => auth()->id()];
+    }
+
     public function cancelAddPat(): void
     {
         $this->addingPatProvider = null;
@@ -63,7 +76,7 @@ trait ManagesGitProviderTokens
         }
 
         $created = GitProviderToken::create([
-            'user_id' => auth()->id(),
+            ...$this->gitProviderTokenOwnerAttributes(),
             'provider' => $provider,
             'provider_id' => $result['profile']['id'],
             'label' => $this->patLabel === '' ? null : $this->patLabel,
@@ -86,7 +99,7 @@ trait ManagesGitProviderTokens
      * what to fix. The biggest footgun is a fine-grained GitHub PAT without
      * "Read access to profile information" — the most common shape.
      *
-     * @param  array{profile: array|null, status: int|null, message: string|null}  $result
+     * @param  array{profile: array<string, mixed>|null, status: int|null, message: string|null}  $result
      */
     private function describePatRejection(string $provider, array $result): string
     {

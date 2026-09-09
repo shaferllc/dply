@@ -37,7 +37,8 @@ html.dark .docs-markdown-prose .docs-spec-card__title {
 }
 
 .docs-markdown-prose .docs-spec-card__fields dt {
-    font-size: 10px;
+    font-size: var(--text-2xs, 10px);
+    line-height: var(--text-2xs--line-height, 1rem);
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -121,7 +122,8 @@ html.dark .docs-markdown-prose .docs-compare-card__list {
 }
 
 .docs-markdown-prose .docs-compare-card__matrix dt {
-    font-size: 10px;
+    font-size: var(--text-2xs, 10px);
+    line-height: var(--text-2xs--line-height, 1rem);
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;

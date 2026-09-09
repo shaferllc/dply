@@ -101,7 +101,7 @@ trait ManagesApacheWebserver
         try {
             $status = app(ApacheEngineCacheConfig::class)->read($this->server);
             $this->apache_cache_status = $status;
-            $this->apache_mod_cache_enabled = (bool) ($status['apache_mod_cache_enabled'] ?? false);
+            $this->apache_mod_cache_enabled = (bool) $status['apache_mod_cache_enabled'];
             $this->apache_cache_loaded = true;
             $this->apache_cache_error = null;
             $this->apache_cache_flash = null;
@@ -340,15 +340,15 @@ trait ManagesApacheWebserver
             $result = app(ApacheCustomVhostsConfig::class)->read($this->server);
             $form = [];
             foreach ($result['vhosts'] as $vhost) {
-                $slug = (string) ($vhost['slug'] ?? '');
+                $slug = (string) $vhost['slug'];
                 if ($slug === '') {
                     continue;
                 }
                 $form[$slug] = [
-                    'server_name' => (string) ($vhost['server_name'] ?? ''),
-                    'server_aliases' => implode("\n", $vhost['server_aliases'] ?? []),
-                    'document_root' => (string) ($vhost['document_root'] ?? ''),
-                    'php_socket' => (string) ($vhost['php_socket'] ?? ''),
+                    'server_name' => (string) $vhost['server_name'],
+                    'server_aliases' => implode("\n", $vhost['server_aliases']),
+                    'document_root' => (string) $vhost['document_root'],
+                    'php_socket' => (string) $vhost['php_socket'],
                 ];
             }
             $this->apache_custom_vhosts_form = $form;
@@ -410,7 +410,7 @@ trait ManagesApacheWebserver
         $this->apache_custom_vhosts_error = null;
 
         $fields = $this->apacheCustomVhostFieldsFromForm($this->apache_custom_vhosts_new);
-        $slug = (string) ($this->apache_custom_vhosts_new['slug'] ?? '');
+        $slug = (string) $this->apache_custom_vhosts_new['slug'];
 
         $consoleId = $this->seedManageConsoleAction(
             $this->server->fresh(),

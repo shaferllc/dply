@@ -21,7 +21,7 @@
                 <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger zone') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger zone') }}</p>
                 <h2 class="mt-0.5 text-lg font-semibold text-brand-ink">
                     {{ $dropIsSqlite ? __('Delete SQLite file on server') : __('Drop database on server') }}
                 </h2>
@@ -53,7 +53,7 @@
                                    class="font-medium text-brand-ink hover:underline" wire:navigate>
                                     {{ $dropOwnerSite->name ?: __('Site') }}
                                 </a>
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('owner') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('owner') }}</span>
                             </li>
                         @endif
                         @foreach ($dropConsumers as $consumer)
@@ -64,9 +64,9 @@
                                 </a>
                                 <span class="text-xs text-brand-moss">{{ $consumer['server_name'] }}</span>
                                 @if ($consumer['is_remote'])
-                                    <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-700">{{ __('remote') }}</span>
+                                    <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-700">{{ __('remote') }}</span>
                                 @endif
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $consumer['type'] }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $consumer['type'] }}</span>
                             </li>
                         @endforeach
                     </ul>

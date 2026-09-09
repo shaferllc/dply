@@ -10,6 +10,7 @@
     @if (! empty($useOrgShell))
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <x-organization-shell
+                dense
                 :organization="$organization"
                 :section="$orgShellSection ?? 'notifications'"
                 :title="$pageTitle"
@@ -19,89 +20,68 @@
             >
                 <x-slot:actions>
                     @if (! empty($showBulkAssign ?? false))
-                        <x-outline-link href="{{ route('profile.notification-channels.bulk-assign') }}" wire:navigate>
-                            <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        <a
+                            href="{{ route('profile.notification-channels.bulk-assign') }}"
+                            wire:navigate
+                            class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                        >
+                            <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Bulk assign') }}
-                        </x-outline-link>
+                        </a>
                     @endif
                     @if ($showShellAdd)
                         <button
                             type="button"
                             wire:click="openCreateChannelModal"
-                            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                            class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Add channel') }}
                         </button>
                     @endif
                 </x-slot:actions>
 
-                @include('livewire.settings.partials.notification-channels-content')
+                @include($contentPartial)
             </x-organization-shell>
         </div>
     @else
         <x-profile-shell
+            dense
             :title="$pageTitle"
             :description="$intro"
             icon="heroicon-o-bell"
         >
+            {{-- No "Back to profile": the breadcrumb already covers it. --}}
             <x-slot:actions>
-                <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                    <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Back to profile') }}
-                </x-outline-link>
                 @if (! empty($showBulkAssign ?? false))
-                    <x-outline-link href="{{ route('profile.notification-channels.bulk-assign') }}" wire:navigate>
-                        <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    <a
+                        href="{{ route('profile.notification-channels.bulk-assign') }}"
+                        wire:navigate
+                        class="inline-flex h-6 items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Bulk assign') }}
-                    </x-outline-link>
+                    </a>
                 @endif
                 @if ($showShellAdd)
                     <button
                         type="button"
                         wire:click="openCreateChannelModal"
-                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        class="inline-flex h-6 items-center gap-1 rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Add channel') }}
                     </button>
                 @endif
             </x-slot:actions>
 
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-2">
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Personal') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $channelCount }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('channel|channels', $channelCount) }}</span>
-                        </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ __('You own') }}</p>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organization') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ isset($organizationChannels) ? $organizationChannels->count() : 0 }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', isset($organizationChannels) ? $organizationChannels->count() : 0) }}</span>
-                        </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ ($currentOrganization ?? null) ? $currentOrganization->name : __('No current org') }}</p>
-                    </div>
-                    <div class="rounded-xl border border-brand-ink/10 bg-white/80 px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
-                        <dd class="mt-1 flex items-baseline gap-1.5">
-                            <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count()) }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', ($teamChannelGroups ?? collect())->sum(fn ($e) => $e['channels']->count())) }}</span>
-                        </dd>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n team|:n teams', ($teamChannelGroups ?? collect())->count(), ['n' => ($teamChannelGroups ?? collect())->count()]) }}</p>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
-            @include('livewire.settings.partials.notification-channels-content')
+            @include($contentPartial)
         </x-profile-shell>
     @endif
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- The page root is a plain <div>, not a component, so a named "modals"
+         slot here is orphaned on every Livewire re-render — which left the
+         delete confirmation never appearing. The partial teleports to <body>,
+         so include it directly (same fix as sites/show.blade.php). --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

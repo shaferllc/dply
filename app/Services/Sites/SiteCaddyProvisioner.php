@@ -120,9 +120,6 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         return $out;
     }
 
-    /**
-     * @return array{ok: bool, message: string}
-     */
     public function readCurrentSiteConfig(Site $site): ?string
     {
         $server = $this->ensureServerReady($site);
@@ -135,7 +132,6 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function validatePendingOnServer(Site $site, string $pendingConfig): array
     {
         $server = $this->ensureServerReady($site);

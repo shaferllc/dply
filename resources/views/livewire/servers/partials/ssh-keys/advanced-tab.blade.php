@@ -1,19 +1,22 @@
             <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Settings') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Advanced') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Break-glass sync controls, post-sync health checks, and key label templates.') }}</p>
-                </div>
-                <div class="space-y-6 px-6 py-5 sm:px-8">
-                    <form wire:submit="requestSaveAdvancedSettings" class="max-w-xl space-y-4">
-                        <div class="flex items-start gap-3">
+                {{-- Dense head, matching the rest of the workspace. --}}
+                <x-workspace-panel-head
+                    dense
+                    icon="heroicon-o-adjustments-horizontal"
+                    :title="__('Advanced')"
+                    :note="__('Break-glass sync controls, post-sync health checks, and key label templates.')"
+                    class="border-b border-brand-ink/10"
+                />
+                <div class="space-y-4 px-4 py-3.5 sm:px-5">
+                    <form wire:submit="requestSaveAdvancedSettings" class="max-w-xl space-y-3.5">
+                        <div class="flex items-start gap-2.5">
                             <input id="adv_disable" type="checkbox" wire:model.boolean="advanced_disable_sync" class="mt-1 rounded border-brand-ink/20" />
                             <div>
                                 <x-input-label for="adv_disable" :value="__('Disable authorized_keys sync (break-glass)')" class="!mb-0" />
                                 <p class="text-xs text-brand-moss">{{ __('Blocks automated and dashboard writes until turned off.') }}</p>
                             </div>
                         </div>
-                        <div class="flex items-start gap-3">
+                        <div class="flex items-start gap-2.5">
                             <input id="adv_health" type="checkbox" wire:model.boolean="advanced_health_check" class="mt-1 rounded border-brand-ink/20" />
                             <div>
                                 <x-input-label for="adv_health" :value="__('Run sshd -t and stat after each sync')" class="!mb-0" />

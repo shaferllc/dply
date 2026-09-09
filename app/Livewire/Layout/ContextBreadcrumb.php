@@ -66,8 +66,13 @@ class ContextBreadcrumb extends Component
         $organizations = $user->organizations()->orderBy('name')->get();
 
         foreach ($organizations as $organization) {
-            if ($organization->relationLoaded('pivot') && $organization->pivot !== null) {
-                $organization->rememberMemberRoleFor($user, (string) $organization->pivot->role);
+            // `pivot` is attached dynamically by the belongsToMany (withPivot('role')),
+            // so it is a loaded relation rather than a declared property.
+            if ($organization->relationLoaded('pivot')) {
+                $pivot = $organization->getRelation('pivot');
+                if ($pivot !== null) {
+                    $organization->rememberMemberRoleFor($user, (string) $pivot->getAttribute('role'));
+                }
             }
         }
 

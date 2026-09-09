@@ -6,19 +6,21 @@
         'currentIcon' => 'light-bulb',
     ])
 
-    <x-hero-card
-        :eyebrow="__('Site')"
-        :title="__('Insights')"
-        :description="__('Monitoring and recommendations for this site.')"
-        icon="light-bulb"
-    >
-        <x-slot:topAction>
-            <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
-                <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-            </x-primary-button>
-        </x-slot:topAction>
-    </x-hero-card>
+    <section class="dply-card min-w-0 overflow-hidden p-0 mb-6">
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-light-bulb"
+            :title="__('Insights')"
+            :note="__('Monitoring and recommendations for this site.')"
+        >
+            <x-slot:actions>
+                <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                    <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+                </x-primary-button>
+            </x-slot:actions>
+        </x-workspace-panel-head>
+    </section>
 
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ session('success') }}</div>
@@ -121,7 +123,7 @@
                     <x-heroicon-o-clipboard-document-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
                 </div>
             </div>
@@ -184,7 +186,10 @@
         </div>
     @endif
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Included directly, not via a "modals" layout slot: this page's root is
+         a plain <div>, so Blade has no component to bind the slot to and drops
+         it — the confirm dialog never renders and the destructive action
+         silently does nothing. Same fix as credentials/index,
+         organizations/api-tokens and organizations/secrets. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

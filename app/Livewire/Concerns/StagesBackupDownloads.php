@@ -2,10 +2,11 @@
 
 namespace App\Livewire\Concerns;
 
-use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Models\BackupDownloadStaging;
+use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Modules\Backups\Services\BackupDownloadStager;
 use App\Modules\Backups\Services\BackupStagingS3ClientFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Component;
 
@@ -27,7 +28,11 @@ trait StagesBackupDownloads
     /** The backup id currently being prepared — lets the view show a per-row spinner. */
     public ?string $stagingBackupId = null;
 
-    /** backup id => error message, surfaced inline next to the row. */
+    /**
+     * backup id => error message, surfaced inline next to the row.
+     *
+     * @var array<string, string>
+     */
     public array $stagingErrors = [];
 
     /**
@@ -143,7 +148,10 @@ trait StagesBackupDownloads
         return redirect()->away($url);
     }
 
-    private function stagingQuery(Model $backup)
+    /**
+     * @return Builder<BackupDownloadStaging>
+     */
+    private function stagingQuery(Model $backup): Builder
     {
         return BackupDownloadStaging::query()
             ->where('backupable_type', $backup->getMorphClass())

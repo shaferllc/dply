@@ -21,12 +21,12 @@
             'mb-2' => ! $compact,
             'mb-2.5' => $compact,
         ])>
-            <p class="text-[11px] leading-relaxed text-rose-200">{{ $error }}</p>
+            <p class="text-xs leading-relaxed text-rose-200">{{ $error }}</p>
             @if ($showRetry)
                 <button
                     type="button"
                     wire:click="verifyActiveServer"
-                    class="mt-1 text-[10px] font-semibold text-rose-200 underline-offset-2 hover:underline"
+                    class="mt-1 text-2xs font-semibold text-rose-200 underline-offset-2 hover:underline"
                 >
                     {{ __('Retry connection') }}
                 </button>
@@ -57,7 +57,7 @@
             wire:loading.attr="disabled"
             wire:target="run,runQuickAction,selectServer"
             @disabled(! $serverReady)
-            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-[11px] font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-semibold text-[#0b1020] shadow-sm transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
             <span wire:loading.remove wire:target="run,runQuickAction">{{ __('Run') }}</span>
             <span wire:loading wire:target="run,runQuickAction" class="inline-flex items-center gap-1.5">
@@ -68,6 +68,6 @@
     </div>
 
     @error('command')
-        <p class="mt-1.5 text-[11px] text-rose-300">{{ $message }}</p>
+        <p class="mt-1.5 text-xs text-rose-300">{{ $message }}</p>
     @enderror
 </form>

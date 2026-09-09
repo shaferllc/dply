@@ -80,7 +80,6 @@ class HaproxyBackendsConfig
     /**
      * @return array{backends: list<array{name: string, servers: list<string>, values: array<string, string>, raw: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -182,8 +181,8 @@ class HaproxyBackendsConfig
             $payload = $updates[$block['name']];
             $rendered = $this->renderBackend(
                 $block['name'],
-                array_values((array) ($payload['servers'] ?? [])),
-                (array) ($payload['values'] ?? []),
+                (array) $payload['servers'],
+                (array) $payload['values'],
             );
             $newContents = str_replace($block['raw'], $rendered, $newContents);
             $rewritten++;
@@ -201,7 +200,7 @@ class HaproxyBackendsConfig
     }
 
     /**
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      * @param  array<string, mixed> $values
      *
      * @throws \RuntimeException
@@ -279,7 +278,7 @@ class HaproxyBackendsConfig
     }
 
     /**
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      * @param  array<string, mixed> $values
      */
     private function renderBackend(string $name, array $servers, array $values): string
@@ -333,7 +332,7 @@ class HaproxyBackendsConfig
         if (preg_match_all('/^backend\s+(\S+)/m', $contents, $matches, PREG_OFFSET_CAPTURE) === false) {
             return [];
         }
-        foreach ($matches[0] ?? [] as $i => $headerMatch) {
+        foreach ($matches[0] as $i => $headerMatch) {
             $name = $matches[1][$i][0];
             $headerStart = $headerMatch[1];
             $bodyStart = $this->findLineEnd($contents, $headerStart + strlen($headerMatch[0]));

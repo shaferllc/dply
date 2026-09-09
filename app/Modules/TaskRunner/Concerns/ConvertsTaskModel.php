@@ -103,7 +103,6 @@ trait ConvertsTaskModel
     /**
      * Get the task summary.
      */
-    /** @return array<string, mixed> */
     public function getSummary(): array
     {
         return [
@@ -224,7 +223,6 @@ trait ConvertsTaskModel
     /**
      * Get task information for monitoring and management.
      */
-    /** @return array<string, mixed> */
     public function getTaskInfo(): array
     {
         return [

@@ -160,7 +160,7 @@ BASH;
      * Replace the engine's `save` schedule. `$schedule` is a list of [seconds, changes] pairs;
      * an empty list disables RDB snapshots entirely (`CONFIG SET save ""`). Persisted via
      * CONFIG REWRITE so the change survives restart.
-     * @param  array<string, mixed> $schedule
+     * @param  list<array<string, int>> $schedule
      */
     public function setSaveSchedule(Server $server, ServerCacheService $cacheService, array $schedule): bool
     {

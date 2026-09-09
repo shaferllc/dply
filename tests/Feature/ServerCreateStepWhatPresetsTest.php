@@ -9,10 +9,23 @@ use App\Models\Organization;
 use App\Models\ServerCreateDraft;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+/*
+| Only 'laravel' and 'wordpress' ship today — config/server_create.php's
+| `available_presets` gates the rest, and applyPreset() refuses an unavailable
+| id with a ":name is coming soon." toast before touching the form.
+|
+| These tests cover the preset → form mapping, which is live code regardless of
+| which tiles are currently switched on, so enable the full catalog here. Note
+| the refusal itself is asserted separately by the coming-soon test below,
+| which sets its own narrower config.
+*/
+beforeEach(function (): void {
+    config(['server_create.available_presets' => \App\Services\Servers\ServerCreatePresetCatalog::DEFAULT_AVAILABLE_IDS]);
+});
 
 test('apply preset for laravel pins php 84 mysql redis', function () {
     $user = seedUserWithDraft();
@@ -155,16 +168,17 @@ test('step what hides app templates for dedicated redis server purpose', functio
         ->assertSee('Localhost only')
         ->assertSee('Other servers on my network')
         ->assertSee('Provision preview')
+        // Valkey is generally available, so it renders as a selectable engine
+        // tile rather than a disabled "Soon" one. The still-gated engines are
+        // re-added as Soon tiles by dedicatedCacheEngineOptions(), so "Soon"
+        // and their labels still appear on this page — only Valkey's status
+        // changed.
         ->assertSee('Valkey')
-        ->assertSee('Soon')
         ->assertDontSee('Pick a stack template')
         ->assertDontSee('Polyglot host');
 });
 
 test('dedicated cache wizard supports engine and network access pickers', function () {
-    config(['features.cache.valkey' => true]);
-    Feature::flushCache();
-
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);

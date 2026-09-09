@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Scheduling\DplySchedule;
 use App\Models\Site;
 use App\Services\Sites\TenantDnsProvisioner;
 use Illuminate\Console\Command;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  * sure each tenant hostname has an A record pointing at its server — wherever dply
  * holds a credential for that hostname's zone. Idempotent (upserts), so tenants
  * created before the on-add provisioning, or whose record drifted, get fixed
- * without an operator touching them. Scheduled hourly (see {@see \App\Console\Scheduling\DplySchedule}).
+ * without an operator touching them. Scheduled hourly (see {@see DplySchedule}).
  */
 class ReconcileTenantDnsCommand extends Command
 {
@@ -40,7 +41,7 @@ class ReconcileTenantDnsCommand extends Command
         $skipped = 0;
 
         foreach ($sites as $site) {
-            if (trim((string) ($site->server?->ip_address ?? '')) === '') {
+            if (trim((string) ($site->server->ip_address ?? '')) === '') {
                 $skipped += $site->tenantDomains->count();
 
                 continue;

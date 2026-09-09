@@ -37,8 +37,22 @@ Queues and process counts are defined in `config/horizon.php` (`$heavyQueues` / 
 
 | Supervisor | Queues | Purpose |
 |------------|--------|---------|
-| `supervisor-heavy` | `dply-provision`, `dply` | Edge builds, BYO deploys |
+| `supervisor-build` | `dply-provision` | Edge build/publish, server provision — CPU + RAM bound |
+| `supervisor-deploy` | `dply` | BYO deploys, general control-plane work — blocked on SSH |
 | `supervisor-fast` | `default`, `dply-control`, `dply-manage`, probes… | Notifications, insights, short jobs |
+
+Build and deploy work are deliberately **separate pools**. Builds saturate cores
+(`docker run`), so keep `HORIZON_BUILD_MAX_PROCESSES` at or below the worker
+box's vCPU count. Deploys spend their time waiting on SSH round-trips, so
+`HORIZON_DEPLOY_MAX_PROCESSES` can be over-subscribed well past core count.
+Pooling them (the old `supervisor-heavy`) let one long Astro build skew the
+`time` autoscaling maths and starve the other queue.
+
+The control plane reads `HORIZON_BUILD_*` / `HORIZON_DEPLOY_*` / `HORIZON_FAST_*`.
+The generic `HORIZON_MAX_PROCESSES`, `HORIZON_BALANCE`, `HORIZON_TRIES`,
+`HORIZON_WORKER_MEMORY`, `HORIZON_JOB_TIMEOUT` and `HORIZON_QUEUES` names belong
+to the **customer worker-pool** feature (`WorkerPoolHorizonConfig`) and are
+ignored here — setting them in the control-plane `.env` does nothing.
 
 Required for split deploys:
 
@@ -72,10 +86,25 @@ Web tier: nginx + php-fpm are **not** in these snippets — configure them separ
 3. **Worker 1** — pull → `horizon:terminate` → restart Horizon + `schedule:work`
 4. **Web** — pull → reload php-fpm (realtime is the Cloudflare relay — nothing to restart on-box)
 
+## Edge build Docker (workers)
+
+Horizon drains Edge builds as **`www-data`**. Each worker needs a working Docker
+daemon and socket access for that user (not the SSH user `dply`).
+
+```bash
+# Once per worker (as root), then recycle Horizon
+sudo php artisan dply:edge:ensure-build-docker
+php artisan horizon:terminate
+```
+
+Or provision workers with `DPLY_PROVISION_EDGE_BUILD_DOCKER=true`. Self-deploy's
+`dply:self-horizon-restart` will try to ensure Docker when the process can
+elevate; otherwise `dply:runtime:check` keeps failing until the one-shot above.
+
 ## Health checks
 
 - Supervisor auto-restart on each box
-- `php artisan dply:runtime:check` (included in worker supervisor templates every 5 minutes)
+- `php artisan dply:runtime:check` (included in worker supervisor templates every 5 minutes; includes Docker probe)
 - `php artisan dply:about` shows runtime mode and configuration warnings
 - Horizon dashboard on web for queue wait times and both worker masters
 

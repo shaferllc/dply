@@ -17,7 +17,7 @@
 @endphp
 
 <div class="sm:col-span-2 rounded-xl bg-brand-sand/30 px-4 py-3.5 ring-1 ring-brand-ink/8">
-    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Placement') }}</p>
+    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Placement') }}</p>
     <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
         {{ ($editing_deploy_hook_id ?? null) !== null
             ? __('When and type for this hook. Change placement from the timeline if needed.')

@@ -2,11 +2,11 @@
 
 namespace Tests\Feature\Livewire\Billing\ShowBillBreakdownTest;
 
-use App\Modules\Billing\Livewire\Show as BillingShow;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerMetricSnapshot;
 use App\Models\User;
+use App\Modules\Billing\Livewire\Show as BillingShow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Livewire\Livewire;
@@ -24,7 +24,7 @@ beforeEach(function () {
 test('empty fleet shows the free plan at no cost', function () {
     Livewire::actingAs($this->admin)
         ->test(BillingShow::class, ['organization' => $this->org])
-        ->assertSee('Your bill')
+        ->assertSee('What you owe')
         ->assertSee('dply plan — Free')
         ->assertSee('$0.00');
 });
@@ -129,14 +129,20 @@ test('subscribe buttons show when org has a stripe id but no subscription', func
         ->assertSee('Pay yearly — save 20%');
 });
 
-test('plan line appears in the bill hero', function () {
+test('the plan band names the tier and the cost of crossing into the next one', function () {
     server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-1');
     server(org: $this->org, cpuCount: 4, memMb: 8192, ageDays: 5, name: 'web-2');
 
-    Livewire::actingAs($this->admin)
-        ->test(BillingShow::class, ['organization' => $this->org])
-        ->assertSee('Your plan')
-        ->assertSee('Starter');
+    $component = Livewire::actingAs($this->admin)
+        ->test(BillingShow::class, ['organization' => $this->org]);
+
+    $component->assertSee('Plan')->assertSee('Starter');
+
+    // Two servers sit mid-Starter (ceiling 3), so no crossing warning yet.
+    expect($component->get('nextTier'))->not->toBeNull();
+    expect($component->get('nextTier')['label'])->toBe('Pro');
+    expect($component->get('nextTier')['delta'])->toBe(10.0);
+    expect($component->get('nextTier')['servers_until'])->toBe(2);
 });
 
 function server(Organization $org, int $cpuCount, int $memMb, int $ageDays, string $name): Server

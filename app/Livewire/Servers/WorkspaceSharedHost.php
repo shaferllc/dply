@@ -47,7 +47,6 @@ class WorkspaceSharedHost extends Component
     /** @var list<string> */
     public const SHARED_HOST_TABS = ['radar', 'budgets', 'contention', 'notifications'];
 
-    /** @var 'radar'|'budgets'|'contention'|'notifications' */
     #[Url(as: 'tab', except: 'radar', history: true)]
     public string $shared_host_tab = 'radar';
 
@@ -181,7 +180,7 @@ class WorkspaceSharedHost extends Component
             return;
         }
 
-        $flag = $this->requiredFeature ?? '';
+        $flag = $this->requiredFeature;
         if ($flag !== '' && ! Feature::active($flag)) {
             abort(404);
         }
@@ -231,7 +230,7 @@ class WorkspaceSharedHost extends Component
     private function hydrateBudgetForm(): void
     {
         $settings = app(SharedHostBudgetSettings::class)->forServer($this->server);
-        $this->budgetAlertsEnabled = (bool) ($settings['alerts_enabled'] ?? true);
-        $this->budgetSiteRows = $settings['site_rows'] ?? [];
+        $this->budgetAlertsEnabled = $settings['alerts_enabled'];
+        $this->budgetSiteRows = $settings['site_rows'];
     }
 }

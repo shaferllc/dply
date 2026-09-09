@@ -12,7 +12,7 @@ namespace App\Modules\Secrets\Services;
 final class VaultBlobRef
 {
     /**
-     * @param  array<string, mixed> $stores
+     * @param  list<string>  $stores
      */
     public function __construct(
         public readonly string $key,
@@ -27,7 +27,6 @@ final class VaultBlobRef
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function toMeta(string $writer): array
     {
         return [
@@ -43,7 +42,7 @@ final class VaultBlobRef
 
     /**
      * @param  array<string, mixed> $meta
-     * @param  array<string, mixed> $stores
+     * @param  list<string>  $stores
      */
     public static function fromMeta(string $key, array $meta, array $stores = []): self
     {

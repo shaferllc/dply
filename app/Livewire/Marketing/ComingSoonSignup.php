@@ -7,6 +7,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
+/**
+ * Livewire exposes get<Name>Property() methods as $this-><name> in PHP and
+ * Blade (the pre-#[Computed] convention). PHPStan cannot see that magic,
+ * so the contract is stated here.
+ *
+ * @property-read string $successMessage
+ */
 class ComingSoonSignup extends Component
 {
     public string $email = '';

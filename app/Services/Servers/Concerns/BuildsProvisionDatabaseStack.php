@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\Concerns;
 
+use App\Modules\Database\Support\DockerDatabase;
+use App\Services\Servers\DockerDatabaseProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -13,8 +16,6 @@ use App\Support\Servers\DatabaseEngineInstallScripts;
  */
 trait BuildsProvisionDatabaseStack
 {
-
-
     /**
      * @return list<string>
      */
@@ -27,10 +28,153 @@ trait BuildsProvisionDatabaseStack
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     public function installEngineLines(string $engineId): array
     {
         return $this->installDatabaseIfNeeded($engineId);
+    }
+
+    /**
+     * Container-host variant of {@see installDatabaseIfNeeded()}.
+     *
+     * On a Docker server the engine belongs in a container, not in apt — that
+     * is the whole point of picking the role. Previously `roleDocker()` took a
+     * `$database` argument and ignored it, so choosing "Docker server" plus an
+     * engine silently produced a host with no database at all.
+     *
+     * Engines dply has no image mapping for (sqlite, mongodb, clickhouse) fall
+     * through to the native installer rather than being dropped, with a log
+     * line saying so — silently installing nothing is what caused this.
+     *
+     * @return list<string>
+     */
+    private function installDatabaseInDockerIfNeeded(string $database): array
+    {
+        if ($database === 'none') {
+            return [];
+        }
+
+        $family = DedicatedDatabaseServerProvisionConfig::engineFamily($database);
+
+        // mariadb shares the mysql client/protocol but not the image; without a
+        // dedicated mapping it would silently launch mysql:8.0 under a MariaDB
+        // label, so it takes the native path until an image is configured.
+        $dockerEngine = match ($family) {
+            'postgres' => 'postgres',
+            'mysql' => 'mysql',
+            default => null,
+        };
+
+        if ($dockerEngine === null) {
+            return array_merge(
+                ['echo "[dply] '.$family.' has no Docker image mapping — installing it natively on this Docker host."'],
+                $this->installDatabaseIfNeeded($database),
+            );
+        }
+
+        return $this->withStep(
+            'Starting '.($dockerEngine === 'postgres' ? 'PostgreSQL' : 'MySQL').' container',
+            $this->dockerEngineLines($database, $dockerEngine),
+        );
+    }
+
+    /**
+     * Provision-time container launch. Mirrors the idiom in
+     * {@see DockerDatabaseProvisioner::baseScript()} —
+     * named volume, `--restart unless-stopped`, loopback bind unless remote
+     * access was requested — but reads credentials from the create wizard
+     * instead of a site binding.
+     *
+     * Unlike the native Postgres path this waits for readiness and fails loud:
+     * a container that never becomes ready is a failed provision, not a silent
+     * one.
+     *
+     * @return list<string>
+     */
+    private function dockerEngineLines(string $database, string $dockerEngine): array
+    {
+        $config = DedicatedDatabaseServerProvisionConfig::fromServer($this->server, $database);
+
+        $image = DockerDatabase::imageForEngine($dockerEngine);
+        $internalPort = DockerDatabase::containerPortForEngine($dockerEngine);
+        $hostPort = $config->defaultPort();
+        $bindHost = $config->remoteAccess ? '0.0.0.0' : '127.0.0.1';
+        $container = 'dply-db-'.$dockerEngine;
+        $volume = 'dply-db-'.$dockerEngine.'-data';
+
+        $dbName = $config->databaseName !== '' ? $config->databaseName : 'app';
+        $user = $config->username !== '' ? $config->username : 'dply_app';
+        $password = (string) ($config->password ?? '');
+
+        // No credentials means no usable database: both images refuse to
+        // initialise without a root/superuser password.
+        if ($password === '') {
+            return [
+                'echo "[dply] ERROR: no database password was generated for this server; cannot start the '.$dockerEngine.' container." >&2',
+                'exit 1',
+            ];
+        }
+
+        [$envFlags, $readyCheck] = $dockerEngine === 'postgres'
+            ? [
+                [
+                    '  -e POSTGRES_DB='.escapeshellarg($dbName).' \\',
+                    '  -e POSTGRES_USER='.escapeshellarg($user).' \\',
+                    '  -e POSTGRES_PASSWORD='.escapeshellarg($password).' \\',
+                ],
+                'docker exec "$CONTAINER" pg_isready -U '.escapeshellarg($user).' -d '.escapeshellarg($dbName).' >/dev/null 2>&1',
+            ]
+            : [
+                [
+                    '  -e MYSQL_DATABASE='.escapeshellarg($dbName).' \\',
+                    '  -e MYSQL_USER='.escapeshellarg($user).' \\',
+                    '  -e MYSQL_PASSWORD='.escapeshellarg($password).' \\',
+                    '  -e MYSQL_ROOT_PASSWORD='.escapeshellarg($password).' \\',
+                ],
+                'docker exec "$CONTAINER" mysqladmin ping -h 127.0.0.1 -u root -p'.escapeshellarg($password).' >/dev/null 2>&1',
+            ];
+
+        $mount = $dockerEngine === 'postgres' ? '/var/lib/postgresql/data' : '/var/lib/mysql';
+
+        return array_merge(
+            [
+                'if ! command -v docker >/dev/null 2>&1; then',
+                '  echo "[dply] ERROR: Docker is not available on this host — cannot start the database container." >&2',
+                '  exit 1',
+                'fi',
+                'CONTAINER='.escapeshellarg($container),
+                'docker pull '.escapeshellarg($image),
+                'docker rm -f "$CONTAINER" >/dev/null 2>&1 || true',
+                'docker volume create '.escapeshellarg($volume).' >/dev/null 2>&1 || true',
+                'docker run -d --name "$CONTAINER" \\',
+            ],
+            $envFlags,
+            [
+                '  -p '.escapeshellarg($bindHost.':'.$hostPort.':'.$internalPort).' \\',
+                '  -v '.escapeshellarg($volume.':'.$mount).' \\',
+                '  --restart unless-stopped \\',
+                '  '.escapeshellarg($image),
+                'echo "[dply] waiting for the '.$dockerEngine.' container to accept connections..."',
+                'DPLY_DB_READY=0',
+                'for i in $(seq 1 60); do',
+                '  if '.$readyCheck.'; then',
+                '    echo "[dply] '.$dockerEngine.' container is ready (after $((i * 2))s)."',
+                '    DPLY_DB_READY=1',
+                '    break',
+                '  fi',
+                '  sleep 2',
+                'done',
+                'if [ "$DPLY_DB_READY" != "1" ]; then',
+                '  echo "[dply] ERROR: the '.$dockerEngine.' container did not become ready within 120s." >&2',
+                '  echo "[dply] === docker logs '.$container.' (last 60 lines) ===" >&2',
+                '  docker logs --tail 60 "$CONTAINER" >&2 2>&1 || true',
+                '  exit 1',
+                'fi',
+                'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
+            ],
+            $config->remoteAccess ? $config->ufwAllowLines() : [
+                'ufw deny '.$hostPort.'/tcp || true',
+            ],
+        );
     }
 
     private function installDatabaseIfNeeded(string $database): array
@@ -57,10 +201,12 @@ trait BuildsProvisionDatabaseStack
 
         if (str_starts_with($database, 'mariadb')) {
             return $this->withStep('Installing MariaDB', [
+                ...$this->pinMariadbSeries($database),
                 ...$this->ensurePackagesInstalled(
                     ['mariadb-server'],
                     '[dply] mariadb-server already installed; skipping package install.'
                 ),
+                ...$this->ensureMysqlCompatShims(),
                 'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
                 $this->writeFileWithRollback('/etc/mysql/mariadb.conf.d/99-dply.cnf', "[mysqld]\nbind-address = 127.0.0.1\nmax_connections = 200\ninnodb_buffer_pool_size = 256M\n"),
                 'systemctl enable --now mariadb',
@@ -118,7 +264,17 @@ trait BuildsProvisionDatabaseStack
                 // Detect database version live from the running engine.
                 'DPLY_INSTALLED_DATABASE_VERSION=""',
                 'case "${DPLY_INSTALLED_DATABASE:-}" in',
-                '  mysql*|mariadb*)',
+                // mariadb first, and via the `mariadb` binary: on MariaDB 11
+                // `mysqladmin` lives in a Recommends-only compat package, so it
+                // can be absent. An empty version here reads downstream as "no
+                // version known" and quietly disables the requested-vs-installed
+                // drift banner — i.e. it would hide exactly the mismatch this
+                // probe exists to surface.
+                '  mariadb*)',
+                '    DPLY_INSTALLED_DATABASE_VERSION=$( (mariadb --version 2>/dev/null || mysqladmin --version 2>/dev/null) \\',
+                '      | sed -n \'s/.*Distrib \([0-9.]*\).*/\1/p\' | head -n1)',
+                '    ;;',
+                '  mysql*)',
                 '    DPLY_INSTALLED_DATABASE_VERSION=$(mysqladmin --version 2>/dev/null \\',
                 '      | sed -n \'s/.*Distrib \([0-9.]*\).*/\1/p\')',
                 '    ;;',
@@ -192,6 +348,270 @@ trait BuildsProvisionDatabaseStack
      *
      * @return list<string>
      */
+    /**
+     * Point apt at MySQL's own repo when the distro cannot supply the series
+     * the wizard asked for.
+     *
+     * Ubuntu ships exactly one MySQL in `mysql-server` — 8.0.x on noble — so
+     * `mysql84`, `mysql80` and `mysql57` all used to install the same package
+     * and land on whatever the release happened to carry. A 8.4 request came
+     * back as 8.0.46 and only the version field ever said so.
+     *
+     * Mirrors the Postgres branch, which has always pinned via PGDG. Three
+     * deliberate properties:
+     *
+     *  - **Checks first.** `apt-cache policy` decides. On a release where
+     *    mysql-server IS already the requested series this adds nothing, so
+     *    the repo disappears on its own as Ubuntu moves forward.
+     *  - **Never fatal.** A missing key or a codename MySQL does not publish
+     *    for removes the sources file and continues on the distro package.
+     *    A pinned minor is not worth failing a provision over — the marker
+     *    at the end of the branch records what actually landed.
+     *  - **5.7 is not offered.** EOL October 2023 and absent from the repo
+     *    for any codename dply provisions; it stays on the distro path.
+     *
+     * @return list<string>
+     */
+    private function pinMysqlSeries(string $wizardDatabase): array
+    {
+        // Repo component per series. MySQL publishes LTS and innovation
+        // tracks under separate components in the same suite.
+        $component = match ($wizardDatabase) {
+            'mysql84' => 'mysql-8.4-lts',
+            'mysql80' => 'mysql-8.0',
+            default => null,
+        };
+
+        if ($component === null) {
+            return [];
+        }
+
+        $series = $wizardDatabase === 'mysql84' ? '8.4' : '8.0';
+
+        $keyUrls = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mysql_repo_key_urls', [])))),
+        ));
+        $fingerprints = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mysql_repo_key_fingerprints', [])))),
+        ));
+
+        // No configured key means no verifiable repo; the distro package is the
+        // only honest outcome, and the caller already warns when the requested
+        // series is not what installs.
+        if ($keyUrls === '') {
+            return [];
+        }
+
+        return [
+            // debconf preseed: the community package prompts for a root
+            // password and an auth-plugin choice that the distro package
+            // never asks. Empty root password keeps the socket login the
+            // rest of this branch (and the ping below) already assumes;
+            // bind-address stays 127.0.0.1 either way.
+            'echo "mysql-community-server mysql-community-server/root-pass password " | debconf-set-selections',
+            'echo "mysql-community-server mysql-community-server/re-root-pass password " | debconf-set-selections',
+            'echo "mysql-server mysql-server/default-auth-override select Use Strong Password Encryption (RECOMMENDED)" | debconf-set-selections',
+            'DPLY_MYSQL_CANDIDATE=$(apt-cache policy mysql-server 2>/dev/null | awk \'/Candidate:/ {print $2}\')',
+            'DPLY_MYSQL_PIN=1',
+            'case "${DPLY_MYSQL_CANDIDATE:-}" in '.$series.'*) DPLY_MYSQL_PIN=0; echo "[dply] distro mysql-server is already ${DPLY_MYSQL_CANDIDATE} — no repo needed." ;; esac',
+            'if [ "$DPLY_MYSQL_PIN" = "1" ]; then '
+                .'echo "[dply] distro mysql-server is ${DPLY_MYSQL_CANDIDATE:-unavailable}; adding MySQL apt repo for '.$series.' ('.$component.')."; '
+                .'install -d /usr/share/keyrings; '
+                // Every candidate key is verified on the box before it is
+                // installed. The 2023 key expired, which apt reports as
+                // EXPKEYSIG and which silently downgraded every 8.4 pin to the
+                // distro package, so a hardcoded single URL is the bug.
+                .'DPLY_MYSQL_KEY_OK=0; '
+                .'for DPLY_MYSQL_KEY_URL in '.$keyUrls.'; do '
+                    .'if dply_install_apt_key "$DPLY_MYSQL_KEY_URL" /usr/share/keyrings/dply-mysql.gpg '.$fingerprints.'; then '
+                        .'echo "[dply] MySQL signing key accepted from ${DPLY_MYSQL_KEY_URL}."; '
+                        .'DPLY_MYSQL_KEY_OK=1; break; '
+                    .'fi; '
+                .'done; '
+                .'if [ "$DPLY_MYSQL_KEY_OK" = "1" ]; then '
+                    .'. /etc/os-release; '
+                    .'echo "deb [signed-by=/usr/share/keyrings/dply-mysql.gpg] https://repo.mysql.com/apt/ubuntu ${VERSION_CODENAME} '.$component.'" > /etc/apt/sources.list.d/dply-mysql.list; '
+                    // dply_apt_update returns 0 even when the repo is
+                    // unusable (an expired MySQL signing key reads as
+                    // `EXPKEYSIG` / "is not signed"), so test the status
+                    // sentinel it sets. Testing the return value left the
+                    // dead repo in sources.list.d, where it broke every
+                    // later apt-get update on the box.
+                    .'dply_apt_update; '
+                    .'if [ "${DPLY_APT_UPDATE_STATUS:-0}" != "0" ]; then '
+                        .'echo "[dply] WARNING: MySQL apt repo unusable on ${VERSION_CODENAME} — removing it and falling back to the distro mysql-server." >&2; '
+                        .'rm -f /etc/apt/sources.list.d/dply-mysql.list /usr/share/keyrings/dply-mysql.gpg; '
+                        .'dply_apt_update || true; '
+                    .'fi; '
+                    // Even a repo that verifies can lack the component for
+                    // this suite. Either way the install below silently takes
+                    // the distro package, so say so while the reason is still
+                    // on screen.
+                    .'DPLY_MYSQL_CANDIDATE=$(apt-cache policy mysql-server 2>/dev/null | awk \'/Candidate:/ {print $2}\'); '
+                    .'case "${DPLY_MYSQL_CANDIDATE:-}" in '.$series.'*) : ;; '
+                        .'*) echo "[dply] WARNING: MySQL '.$series.' is not installable here (candidate: ${DPLY_MYSQL_CANDIDATE:-unavailable}) — installing the distro mysql-server instead." >&2 ;; '
+                    .'esac; '
+                .'else '
+                    .'echo "[dply] WARNING: no usable MySQL signing key (every candidate failed to fetch or verify) — falling back to the distro mysql-server." >&2; '
+                    // Nothing may reference a key that was refused.
+                    .'rm -f /usr/share/keyrings/dply-mysql.gpg /etc/apt/sources.list.d/dply-mysql.list; '
+                .'fi; '
+            .'fi',
+        ];
+    }
+
+    /**
+     * Point apt at MariaDB's own repo when the distro cannot supply the series
+     * the wizard asked for. The MariaDB twin of {@see pinMysqlSeries()}, and it
+     * exists for the same reason: Ubuntu ships exactly one MariaDB in
+     * `mariadb-server` (10.11.14 on noble), so `mariadb114`, `mariadb11` and
+     * `mariadb1011` all installed that same package and only the version field
+     * downstream ever admitted it. A "MariaDB 11.4" request came back 10.11.14.
+     *
+     * Same three properties as the MySQL branch — checks first via
+     * `apt-cache policy`, never fatal, and it says so when the pin does not
+     * take — with one difference that is easy to miss:
+     *
+     * **Epoch.** Both Ubuntu's package ("1:10.11.14-0ubuntu0.24.04.1") and
+     * MariaDB's own ("1:11.4.13+maria~ubu2404") carry a `1:` epoch, which MySQL
+     * versions do not. Comparing the raw candidate the way pinMysqlSeries can
+     * would never match, so the pin would re-add the repo and warn on every
+     * provision. Every comparison here runs on `${…#*:}` instead.
+     *
+     * @return list<string>
+     */
+    private function pinMariadbSeries(string $wizardDatabase): array
+    {
+        // Repo path per series. "11" is MariaDB's rolling major (11.8 today),
+        // which is exactly what the wizard's bare "MariaDB 11" option promises.
+        $series = match ($wizardDatabase) {
+            'mariadb114' => '11.4',
+            'mariadb11' => '11',
+            'mariadb1011' => '10.11',
+            default => null,
+        };
+
+        if ($series === null) {
+            return [];
+        }
+
+        $keyUrls = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mariadb_repo_key_urls', [])))),
+        ));
+        $fingerprints = implode(' ', array_map(
+            escapeshellarg(...),
+            array_values(array_filter(array_map('strval', (array) config('server_provision.mariadb_repo_key_fingerprints', [])))),
+        ));
+
+        // No configured key means no verifiable repo; the distro package is the
+        // only honest outcome, and the warning below still fires.
+        if ($keyUrls === '') {
+            return [];
+        }
+
+        // Anchored so "11" cannot swallow a hypothetical "110.x", and so the
+        // exact-series case ("11.4" with no patch) still matches.
+        $match = $series.'.*|'.$series;
+
+        $pin = [
+            'DPLY_MARIADB_CANDIDATE=$(apt-cache policy mariadb-server 2>/dev/null | awk \'/Candidate:/ {print $2}\')',
+            'DPLY_MARIADB_PIN=1',
+            'case "${DPLY_MARIADB_CANDIDATE#*:}" in '.$match.') DPLY_MARIADB_PIN=0; echo "[dply] distro mariadb-server is already ${DPLY_MARIADB_CANDIDATE} — no repo needed." ;; esac',
+            'if [ "$DPLY_MARIADB_PIN" = "1" ]; then '
+                .'echo "[dply] distro mariadb-server is ${DPLY_MARIADB_CANDIDATE:-unavailable}; adding MariaDB apt repo for '.$series.'."; '
+                .'install -d /usr/share/keyrings; '
+                .'DPLY_MARIADB_KEY_OK=0; '
+                .'for DPLY_MARIADB_KEY_URL in '.$keyUrls.'; do '
+                    .'if dply_install_apt_key "$DPLY_MARIADB_KEY_URL" /usr/share/keyrings/dply-mariadb.gpg '.$fingerprints.'; then '
+                        .'echo "[dply] MariaDB signing key accepted from ${DPLY_MARIADB_KEY_URL}."; '
+                        .'DPLY_MARIADB_KEY_OK=1; break; '
+                    .'fi; '
+                .'done; '
+                .'if [ "$DPLY_MARIADB_KEY_OK" = "1" ]; then '
+                    .'. /etc/os-release; '
+                    .'echo "deb [signed-by=/usr/share/keyrings/dply-mariadb.gpg] https://dlm.mariadb.com/repo/mariadb-server/'.$series.'/repo/ubuntu ${VERSION_CODENAME} main" > /etc/apt/sources.list.d/dply-mariadb.list; '
+                    // Same sentinel check as the MySQL branch: dply_apt_update
+                    // returns 0 even when a repo is unusable, and a dead
+                    // sources.list.d entry breaks every later apt-get update.
+                    .'dply_apt_update; '
+                    .'if [ "${DPLY_APT_UPDATE_STATUS:-0}" != "0" ]; then '
+                        .'echo "[dply] WARNING: MariaDB apt repo unusable on ${VERSION_CODENAME} — removing it and falling back to the distro mariadb-server." >&2; '
+                        .'rm -f /etc/apt/sources.list.d/dply-mariadb.list /usr/share/keyrings/dply-mariadb.gpg; '
+                        .'dply_apt_update || true; '
+                    .'fi; '
+                    .'DPLY_MARIADB_CANDIDATE=$(apt-cache policy mariadb-server 2>/dev/null | awk \'/Candidate:/ {print $2}\'); '
+                    .'case "${DPLY_MARIADB_CANDIDATE#*:}" in '.$match.') : ;; '
+                        .'*) echo "[dply] WARNING: MariaDB '.$series.' is not installable here (candidate: ${DPLY_MARIADB_CANDIDATE:-unavailable}) — installing the distro mariadb-server instead." >&2 ;; '
+                    .'esac; '
+                .'else '
+                    .'echo "[dply] WARNING: no usable MariaDB signing key (every candidate failed to fetch or verify) — falling back to the distro mariadb-server." >&2; '
+                    .'rm -f /usr/share/keyrings/dply-mariadb.gpg /etc/apt/sources.list.d/dply-mariadb.list; '
+                .'fi; '
+            .'fi',
+        ];
+
+        // force_reinstall genuinely re-installs the package, so the pin is what
+        // makes the reinstall land on the requested series — let it run.
+        if ($this->forceReinstall()) {
+            return $pin;
+        }
+
+        // Otherwise: never write a different-series repo onto a box that
+        // already has MariaDB. ensurePackagesInstalled() skips the install when
+        // the package is present, so the repo would just sit in sources.list.d
+        // until some later `apt-get upgrade` performed an unattended major
+        // upgrade against a datadir from the old series. Re-provisioning an
+        // existing mariadb114 server must not arm that. Changing series on a
+        // live datadir is a migration, not a provision step.
+        return [
+            implode("\n", [
+                'if dpkg -s mariadb-server >/dev/null 2>&1; then',
+                '  echo "[dply] mariadb-server is already installed — leaving apt sources alone (switching series on an existing datadir is a migration, not a provision step)."',
+                'else',
+                implode("\n", $pin),
+                'fi',
+            ]),
+        ];
+    }
+
+    /**
+     * Restore the `mysql*` command-line shims on MariaDB 11.x.
+     *
+     * MariaDB 11 moved `mysql`, `mysqldump`, `mysqladmin` and friends out of
+     * `mariadb-client`/`mariadb-server` into `mariadb-client-compat` /
+     * `mariadb-server-compat`, which are **Recommends, not Depends** — and every
+     * install here runs `--no-install-recommends`. dply shells out to those
+     * names everywhere (database + user creation, backups, quick download, and
+     * the installed-stack version probe), so pinning 11.4 without this leaves a
+     * server whose database tooling silently does nothing.
+     *
+     * Ubuntu's 10.11 packages have no separate compat packages at all — the
+     * shims are already in `mariadb-client` — so this is keyed off the missing
+     * binary rather than the version, and is a no-op on the distro path.
+     * Best-effort: a box that ends up without the shims gets a loud warning,
+     * not a failed provision.
+     *
+     * @return list<string>
+     */
+    private function ensureMysqlCompatShims(): array
+    {
+        return [
+            implode("\n", [
+                'if ! command -v mysqladmin >/dev/null 2>&1; then',
+                '  echo "[dply] mysql* client shims missing (MariaDB 11 splits them into *-compat) — installing them."',
+                '  dply_wait_for_apt_locks || true',
+                '  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends mariadb-client-compat mariadb-server-compat >/dev/null 2>&1 || true',
+                'fi',
+                'if ! command -v mysqladmin >/dev/null 2>&1; then',
+                '  echo "[dply] WARNING: mysqladmin is still missing after installing MariaDB — dply database management (backups, quick download, user creation) will not work on this server." >&2',
+                'fi',
+            ]),
+        ];
+    }
+
     private function installMysqlSequence(string $wizardDatabase): array
     {
         // Low-memory escape hatch wraps the whole MySQL sequence.
@@ -216,6 +636,7 @@ trait BuildsProvisionDatabaseStack
         ];
 
         $mysqlInstall = [
+            ...$this->pinMysqlSeries($wizardDatabase),
             // Pre-create the runtime dir; ownership is fixed up after the
             // mysql user is created by the package install.
             'install -d -m 0755 /var/run/mysqld',
@@ -283,10 +704,22 @@ trait BuildsProvisionDatabaseStack
                 .'fi; '
                 .'sleep 1; '
             .'done',
-            'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
-            // Reconciliation marker: normal-path mysql install, snapshot
-            // records the wizard-requested engine string verbatim.
-            'export DPLY_INSTALLED_DATABASE='.escapeshellarg($wizardDatabase),
+            // Reconciliation marker. Derived from what mysqld actually
+            // reports, not from the wizard string: when the repo pin above
+            // could not be applied (unsupported codename, key fetch failed)
+            // apt hands back the distro series instead, and recording the
+            // request verbatim would hide that. `divergesFromRequest()`
+            // compares the version, so an unmet pin surfaces in the UI.
+            'DPLY_MYSQL_INSTALLED_VERSION=$(mysqladmin --version 2>/dev/null | sed -n \'s/.*Distrib \\([0-9.]*\\).*/\\1/p\')',
+            'case "${DPLY_MYSQL_INSTALLED_VERSION:-}" in '
+                .'8.4*) export DPLY_INSTALLED_DATABASE="mysql84" ;; '
+                .'8.0*) export DPLY_INSTALLED_DATABASE="mysql80" ;; '
+                .'5.7*) export DPLY_INSTALLED_DATABASE="mysql57" ;; '
+                .'*) export DPLY_INSTALLED_DATABASE='.escapeshellarg($wizardDatabase).' ;; '
+            .'esac',
+            'if [ "$DPLY_INSTALLED_DATABASE" != '.escapeshellarg($wizardDatabase).' ]; then '
+                .'echo "[dply] NOTE: requested '.$wizardDatabase.' but MySQL ${DPLY_MYSQL_INSTALLED_VERSION:-unknown} is what installed." >&2; '
+            .'fi',
         ];
 
         // Wrap both branches in a single conditional. The bash script's
@@ -338,8 +771,48 @@ trait BuildsProvisionDatabaseStack
                 '[dply] postgresql-'.$ver.' already installed; skipping package install.'
             ),
             $this->writeFileWithRollback('/etc/postgresql/'.$ver.'/main/conf.d/99-dply.conf', "listen_addresses = '127.0.0.1'\nshared_buffers = '256MB'\nmax_connections = 200\n"),
-            'systemctl enable --now postgresql',
-            'systemctl restart postgresql || true',
+            // Start the cluster ourselves and fail loud, mirroring the MySQL
+            // branch above. `|| true` used to swallow a failed restart, and
+            // nothing waited for the socket — so the next step's psql hit
+            // "No such file or directory" with no way to tell whether Postgres
+            // had crashed or simply wasn't up yet.
+            'systemctl daemon-reload >/dev/null 2>&1 || true',
+            'systemctl enable postgresql >/dev/null 2>&1 || true',
+            'if ! systemctl restart postgresql; then '
+                .'echo "[dply] PostgreSQL failed to restart on first attempt — clearing systemd failure state and retrying." >&2; '
+                .'systemctl reset-failed postgresql "postgresql@'.$ver.'-main" >/dev/null 2>&1 || true; '
+                .'sleep 3; '
+                .'systemctl restart postgresql || { '
+                    .'echo "[dply] ERROR: PostgreSQL still not running after reset-failed retry." >&2; '
+                    .'echo "[dply] === journalctl -u postgresql@'.$ver.'-main (last 60 lines) ===" >&2; '
+                    .'journalctl -u "postgresql@'.$ver.'-main" --no-pager -n 60 >&2 || true; '
+                    .'echo "[dply] === /var/log/postgresql/postgresql-'.$ver.'-main.log (last 50 lines) ===" >&2; '
+                    .'tail -n 50 "/var/log/postgresql/postgresql-'.$ver.'-main.log" >&2 2>/dev/null || echo "(no cluster log)" >&2; '
+                    .'echo "[dply] === free -h ===" >&2; '
+                    .'free -h >&2 || true; '
+                    .'exit 1; '
+                .'}; '
+            .'fi',
+            // postgresql.service is a SysV-wrapped oneshot: it returns as soon
+            // as the init script forks, well before the cluster opens its
+            // socket. Everything downstream talks to that socket, so wait for
+            // it rather than racing it.
+            'echo "[dply] waiting for the PostgreSQL socket..."',
+            'DPLY_PG_READY=0',
+            'for i in $(seq 1 60); do '
+                .'if pg_isready -q -h /var/run/postgresql >/dev/null 2>&1; then '
+                    .'echo "[dply] PostgreSQL is accepting connections (after ${i}s)."; DPLY_PG_READY=1; break; '
+                .'fi; '
+                .'sleep 1; '
+            .'done',
+            'if [ "$DPLY_PG_READY" != "1" ]; then '
+                .'echo "[dply] ERROR: PostgreSQL did not accept connections within 60s." >&2; '
+                .'echo "[dply] === journalctl -u postgresql@'.$ver.'-main (last 60 lines) ===" >&2; '
+                .'journalctl -u "postgresql@'.$ver.'-main" --no-pager -n 60 >&2 || true; '
+                .'echo "[dply] === /var/log/postgresql/postgresql-'.$ver.'-main.log (last 50 lines) ===" >&2; '
+                .'tail -n 50 "/var/log/postgresql/postgresql-'.$ver.'-main.log" >&2 2>/dev/null || echo "(no cluster log)" >&2; '
+                .'exit 1; '
+            .'fi',
             'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
         ];
 

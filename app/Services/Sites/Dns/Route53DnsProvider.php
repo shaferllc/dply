@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\Route53Service;
+use App\Modules\Providers\Services\Route53Service;
 
 class Route53DnsProvider implements DnsProvider
 {
@@ -10,7 +10,6 @@ class Route53DnsProvider implements DnsProvider
         private readonly Route53Service $service,
     ) {}
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {

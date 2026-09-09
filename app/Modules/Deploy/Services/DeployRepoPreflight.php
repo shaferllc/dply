@@ -10,6 +10,7 @@ use App\Modules\SourceControl\Contracts\GitIdentity;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\GitProviderTokenHealth;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
+use App\Support\GitCloneUrl;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 
@@ -59,6 +60,11 @@ class DeployRepoPreflight
         if ($repo === '') {
             return null;
         }
+
+        // Serverless (and a few other surfaces) store GitHub repos as bare
+        // "owner/name". git ls-remote would treat that as a local path and
+        // fail with "does not appear to be a git repository" — expand first.
+        $repo = GitCloneUrl::normalize($repo);
 
         $keyFile = null;
 

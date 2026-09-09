@@ -47,7 +47,6 @@ class TaskChainException extends Exception
      * Get the chain results.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getChainResults(): array
     {
         return $this->chainResults;

@@ -101,7 +101,7 @@
                             <a href="{{ $href }}" @if ($external) target="_blank" rel="noopener noreferrer" @else wire:navigate @endif class="block px-3 py-2.5 transition hover:bg-brand-sand/30">
                                 <div class="flex items-center justify-between gap-3">
                                     <span class="inline-flex min-w-0 items-center gap-2 text-xs font-semibold text-brand-ink">
-                                        <x-entity-avatar :seed="$site['name'] ?? ''" :image="$site['logo_url'] ?? null" rounded="rounded-md" class="h-6 w-6 text-[10px]" />
+                                        <x-entity-avatar :seed="$site['name'] ?? ''" :image="$site['logo_url'] ?? null" rounded="rounded-md" class="h-6 w-6 text-2xs" />
                                         <span class="truncate">{{ $site['name'] ?? '' }}</span>
                                     </span>
                                     <span class="flex shrink-0 items-center gap-1">
@@ -111,7 +111,7 @@
                                         @endif
                                     </span>
                                 </div>
-                                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-moss">
                                     @if (! empty($site['type_label']))
                                         <span class="inline-flex items-center gap-1">
                                             <x-heroicon-o-cpu-chip class="h-3 w-3 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -151,14 +151,14 @@
                                 @endif
                                 <span class="truncate text-xs font-semibold text-brand-ink">{{ $engineLabel($service['engine'] ?? null) }}</span>
                                 @if (! empty($service['version']))
-                                    <span class="font-mono text-[11px] text-brand-moss">{{ $service['version'] }}</span>
+                                    <span class="font-mono text-xs text-brand-moss">{{ $service['version'] }}</span>
                                 @endif
                                 @if (! empty($service['is_default']))
-                                    <span class="rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Default') }}</span>
+                                    <span class="rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Default') }}</span>
                                 @endif
                             </span>
                             <span class="flex shrink-0 items-center gap-1">
-                                <span class="text-[11px] uppercase tracking-wide text-brand-mist">{{ ($service['kind'] ?? '') === 'cache' ? __('Cache') : __('Database') }}</span>
+                                <span class="text-xs uppercase tracking-wide text-brand-mist">{{ ($service['kind'] ?? '') === 'cache' ? __('Cache') : __('Database') }}</span>
                                 @if ($tone !== null)
                                     <x-badge size="sm" :tone="$tone">{{ ucfirst((string) ($service['status'] ?? '')) }}</x-badge>
                                 @endif
@@ -177,10 +177,10 @@
                                     <x-heroicon-o-server class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
                                     <span class="truncate text-xs font-semibold text-brand-ink">{{ $peer['name'] ?? '' }}</span>
                                     @if (! empty($peer['ip_address']))
-                                        <span class="font-mono text-[11px] text-brand-moss">{{ $peer['ip_address'] }}</span>
+                                        <span class="font-mono text-xs text-brand-moss">{{ $peer['ip_address'] }}</span>
                                     @endif
                                 </span>
-                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
                                     {{ $peer['reason'] ?? '' }}
                                 </span>
                             </a>

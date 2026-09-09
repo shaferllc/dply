@@ -8,11 +8,11 @@
 
     <div class="mb-6 flex flex-wrap items-end gap-3">
         <div class="min-w-[12rem] flex-1">
-            <label for="audit-search" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
+            <label for="audit-search" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Search') }}</label>
             <input id="audit-search" type="search" wire:model.live.debounce.300ms="search" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm" placeholder="{{ __('Action, user, or org…') }}" />
         </div>
         <div class="min-w-[10rem]">
-            <label for="audit-action" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Action') }}</label>
+            <label for="audit-action" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Action') }}</label>
             <select id="audit-action" wire:model.live="actionFilter" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
                 <option value="">{{ __('All actions') }}</option>
                 @foreach ($actions as $action)
@@ -21,7 +21,7 @@
             </select>
         </div>
         <div class="min-w-[12rem]">
-            <label for="audit-org" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Organization') }}</label>
+            <label for="audit-org" class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Organization') }}</label>
             <select id="audit-org" wire:model.live="organizationFilter" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm">
                 <option value="">{{ __('All organizations') }}</option>
                 @foreach ($organizations as $org)

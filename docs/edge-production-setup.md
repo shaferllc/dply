@@ -25,7 +25,7 @@ Customer Cloudflare tokens connected for DNS-only scopes are **not** sufficient 
   - Account → Workers KV Storage → Edit
   - Account → Workers R2 Storage → Edit
 - Wildcard DNS for Edge delivery domains (e.g. `*.on-dply.site`) routed to the Worker zone
-- Queue workers with **Docker** available for `BuildEdgeSiteJob`
+- Queue workers with **Docker** available for `BuildEdgeSiteJob` (bootstrap with `dply:edge:ensure-build-docker` — see [§6](#6-build-workers-docker-on-the-control-plane))
 
 ## 1. Bootstrap R2 + KV (API)
 
@@ -124,17 +124,37 @@ When `DPLY_EDGE_CF_ZONE_NAME` + `DPLY_EDGE_CF_WORKER_ROUTES` are set, `edge:work
 
 Custom domains attach per-site via the Edge dashboard; Laravel writes KV entries on publish.
 
-## 6. Build workers
+## 6. Build workers (Docker on the control plane)
 
-Edge builds run in Docker on queue workers:
+Edge builds (`BuildEdgeSiteJob`) run on dply's **control-plane worker** VMs
+(`DPLY_RUNTIME=worker`, queue `dply-provision`) — not customer VMs. Horizon and
+warm-images run as **`www-data`** (`deploy/supervisor/dply-worker*.conf`). The
+SSH deploy account is usually `dply`; Docker access must be granted to
+**www-data**.
+
+If deploys fail with *passwordless sudo* / *daemon unreachable*, bootstrap once
+as root on each worker:
+
+```bash
+sudo php artisan dply:edge:ensure-build-docker          # defaults to www-data
+php artisan horizon:terminate
+php artisan dply:edge:ensure-build-docker --check
+php artisan dply:edge:warm-build-images                   # optional
+```
+
+New control-plane workers: set `DPLY_PROVISION_EDGE_BUILD_DOCKER=true` so
+provision installs Docker and adds `www-data` (+ `dply`) to the docker group.
+
+`dply:edge:doctor` and `dply:runtime:check` both probe the Docker daemon.
 
 ```dotenv
 DPLY_EDGE_BUILD_IMAGE=node:20-bookworm
 DPLY_EDGE_BUILD_TIMEOUT=900
 DPLY_EDGE_ARTIFACT_MAX_BYTES=524288000
+# Horizon user on workers (default www-data — see deploy/supervisor/)
+# DPLY_EDGE_BUILD_DOCKER_USER=www-data
+# DPLY_PROVISION_EDGE_BUILD_DOCKER=true   # on control-plane workers only
 ```
-
-Ensure queue workers can run `docker run` (socket mounted or remote builder).
 
 ## 7. Smoke test
 

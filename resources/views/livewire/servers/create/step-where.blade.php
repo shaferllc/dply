@@ -15,13 +15,14 @@
     }
 @endphp
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
     <x-server-create-stepper :current="2" :reached="$reachedStep" :mode="$form->mode" :hostKind="$form->custom_host_kind" :providerHostKind="$form->provider_host_kind" />
 
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-        <div class="space-y-6 min-w-0">
+        <div class="space-y-4 min-w-0">
             {{-- Hero --}}
             <x-hero-card
+                compact
                 :eyebrow="__('Step :n of :total', ['n' => 2, 'total' => $totalSteps])"
                 :title="$isProvider ? __('Where it runs') : __('Connect your server')"
                 :description="$isProvider
@@ -29,48 +30,47 @@
                     : __('Give dply SSH access to the server you already have. We connect read-only at first to verify before doing anything destructive.')"
             >
                 <x-slot:leading>
-                    <x-icon-badge size="md">
+                    <x-icon-badge size="md" class="!h-9 !w-9 !rounded-xl">
                         @if ($isProvider)
-                            <x-heroicon-o-cloud-arrow-up class="h-6 w-6" aria-hidden="true" />
+                            <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
                         @else
-                            <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         @endif
                     </x-icon-badge>
                 </x-slot:leading>
 
+                {{-- Two facts, so two chips — same treatment as step 1. The
+                     bordered tiles with a caption line each cost ~70px of hero
+                     for values that read fine inline. --}}
                 <x-slot:stats>
-                    <dl class="grid grid-cols-2 gap-2">
+                    <dl class="flex flex-wrap items-center gap-1.5">
                         <div @class([
-                            'rounded-2xl border px-4 py-3 shadow-sm',
+                            'inline-flex items-baseline gap-1.5 rounded-lg border px-2 py-1',
                             'border-brand-sage/30 bg-brand-sage/8' => $isProvider ? filled($form->provider_host_kind) : filled($form->custom_host_kind),
                             'border-brand-ink/10 bg-white' => $isProvider ? blank($form->provider_host_kind) : blank($form->custom_host_kind),
                         ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host kind') }}</dt>
-                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host kind') }}</dt>
+                            <dd class="truncate text-xs font-semibold text-brand-ink">
                                 @if ($isProvider)
                                     {{ match ($form->provider_host_kind) { 'vm' => __('VM'), 'docker' => __('Docker host'), 'kubernetes' => __('Kubernetes'), default => __('Not set') } }}
                                 @else
                                     {{ match ($form->custom_host_kind) { 'vm' => __('VM / VPS'), 'docker' => __('Docker host'), default => __('Not set') } }}
                                 @endif
                             </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">{{ $isProvider ? __('Provider mode') : __('Custom mode') }}</p>
                         </div>
                         <div @class([
-                            'rounded-2xl border px-4 py-3 shadow-sm',
+                            'inline-flex items-baseline gap-1.5 rounded-lg border px-2 py-1',
                             'border-brand-sage/30 bg-brand-sage/8' => $isProvider ? (filled($form->type) && filled($form->provider_credential_id)) : filled($form->ip_address),
                             'border-brand-ink/10 bg-white' => $isProvider ? (blank($form->type) || blank($form->provider_credential_id)) : blank($form->ip_address),
                         ])>
-                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $isProvider ? __('Account') : __('Endpoint') }}</dt>
-                            <dd class="mt-1 truncate text-sm font-semibold text-brand-ink">
+                            <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $isProvider ? __('Account') : __('Endpoint') }}</dt>
+                            <dd class="truncate text-xs font-semibold text-brand-ink">
                                 @if ($isProvider)
                                     {{ filled($form->provider_credential_id) && filled($providerLabel) ? $providerLabel : ($providerLabel ?: __('Not set')) }}
                                 @else
                                     <span class="font-mono">{{ filled($form->ip_address) ? $form->ip_address : '—' }}</span>
                                 @endif
                             </dd>
-                            <p class="mt-1 text-[11px] text-brand-mist">
-                                {{ $isProvider ? __('Provider & credential') : __('IP / hostname') }}
-                            </p>
                         </div>
                     </dl>
                 </x-slot:stats>
@@ -79,41 +79,53 @@
             @if ($isProvider)
                 {{-- Provider host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM, Docker-only host, or register a managed Kubernetes cluster.') }}</p>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
-                    </div>
-                    <div class="p-6 sm:p-7">
-                        <div class="grid gap-3 sm:grid-cols-3">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cube"
+                        :title="__('Host kind')"
+                        :note="__('Traditional VM, Docker-only host, or register a managed Kubernetes cluster.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-3 py-3 sm:px-4">
+                        <div class="grid gap-2 sm:grid-cols-3">
                             @foreach ([
                                 ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM'), 'desc' => __('A traditional VPS — install whatever software and stack you need.')],
                                 ['kind' => 'docker', 'icon' => 'cube-transparent', 'label' => __('Docker host'), 'desc' => __('Skip the stack install. Dply provisions Docker and orchestrates containers.')],
                                 ['kind' => 'kubernetes', 'icon' => 'server-stack', 'label' => __('Managed Kubernetes'), 'desc' => __('Register an existing DOKS or EKS cluster — dply deploys into it.')],
                             ] as $opt)
-                                @php $selected = $selectedProviderHostKind === $opt['kind']; @endphp
+                                @php
+                                    $selected = $selectedProviderHostKind === $opt['kind'];
+                                    $kindEnabled = \App\Livewire\Servers\Create\StepWhere::providerHostKindAvailable($opt['kind']);
+                                    $selected = $selected && $kindEnabled;
+                                @endphp
                                 <button
                                     type="button"
-                                    wire:click="chooseProviderHostKind('{{ $opt['kind'] }}')"
-                                    wire:loading.attr="disabled"
-                                    wire:target="chooseProviderHostKind"
+                                    @if ($kindEnabled)
+                                        wire:click="chooseProviderHostKind('{{ $opt['kind'] }}')"
+                                        wire:loading.attr="disabled"
+                                        wire:target="chooseProviderHostKind"
+                                    @else
+                                        disabled
+                                        aria-disabled="true"
+                                        title="{{ __('Coming soon') }}"
+                                    @endif
                                     @class([
-                                        'group relative flex flex-col rounded-2xl border-2 p-4 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-60',
+                                        'group relative flex flex-col rounded-2xl border-2 p-3 text-left shadow-sm transition-all disabled:cursor-wait disabled:opacity-60',
                                         'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $selected,
-                                        'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => ! $selected,
+                                        'border-brand-ink/10 bg-white hover:-translate-y-0.5 hover:border-brand-sage/30 hover:shadow-md' => $kindEnabled && ! $selected,
+                                        'border-brand-ink/8 bg-brand-sand/20 opacity-70 shadow-none !cursor-not-allowed' => ! $kindEnabled,
                                     ])
                                 >
                                     <div class="flex items-start justify-between gap-3">
                                         <span @class([
-                                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
+                                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
                                             'bg-brand-sage text-white ring-brand-sage/30' => $selected,
-                                            'bg-brand-sage/15 text-brand-forest ring-brand-sage/25 group-hover:bg-brand-sage/20' => ! $selected,
+                                            'bg-brand-sage/15 text-brand-forest ring-brand-sage/25 group-hover:bg-brand-sage/20' => $kindEnabled && ! $selected,
+                                            'bg-brand-ink/5 text-brand-mist ring-brand-ink/10' => ! $kindEnabled,
                                         ])>
                                             @switch($opt['icon'])
                                                 @case('server')
@@ -127,18 +139,22 @@
                                                     @break
                                             @endswitch
                                         </span>
-                                        <span @class([
-                                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                                            'border-brand-sage bg-brand-sage text-white' => $selected,
-                                            'border-brand-ink/20 bg-white' => ! $selected,
-                                        ])>
-                                            @if ($selected)
-                                                <x-heroicon-s-check class="h-3 w-3" />
-                                            @endif
-                                        </span>
+                                        @if ($kindEnabled)
+                                            <span @class([
+                                                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+                                                'border-brand-sage bg-brand-sage text-white' => $selected,
+                                                'border-brand-ink/20 bg-white' => ! $selected,
+                                            ])>
+                                                @if ($selected)
+                                                    <x-heroicon-s-check class="h-3 w-3" />
+                                                @endif
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist ring-1 ring-brand-ink/10">{{ __('Coming soon') }}</span>
+                                        @endif
                                     </div>
-                                    <p class="mt-3 text-sm font-semibold text-brand-ink">{{ $opt['label'] }}</p>
-                                    <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ $opt['desc'] }}</p>
+                                    <p @class(['mt-3 text-sm font-semibold', 'text-brand-ink' => $kindEnabled, 'text-brand-moss' => ! $kindEnabled])>{{ $opt['label'] }}</p>
+                                    <p @class(['mt-1 text-xs leading-relaxed', 'text-brand-moss' => $kindEnabled, 'text-brand-mist' => ! $kindEnabled])>{{ $opt['desc'] }}</p>
                                 </button>
                             @endforeach
                         </div>
@@ -148,51 +164,64 @@
 
                 {{-- Provider tile picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick the cloud — connect an account right here if one is missing.') }}</p>
-                        </div>
-                        <x-add-provider-credential-link
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cloud"
+                        :title="$form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider')"
+                        :note="__('Pick the cloud — connect an account right here if one is missing.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <x-add-provider-credential-link
                             class="!inline-flex !items-center !gap-1.5 !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!underline-offset-0 hover:!no-underline whitespace-nowrap shrink-0"
-                        >
+                            >
                             <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Connect provider') }}
-                        </x-add-provider-credential-link>
-                    </div>
-                    <div class="p-6 sm:p-7">
-                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            </x-add-provider-credential-link>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-3 py-3 sm:px-4">
+                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                             @foreach ($providerCards as $card)
                                 @php
                                     $isCardSelected = $form->type === $card['id']
                                         || ($form->provider_host_kind === 'kubernetes' && $form->type === $card['id'].'_kubernetes');
+                                    $cardAvailable = ($card['available'] ?? true) !== false;
                                 @endphp
                                 <div
                                     wire:key="provider-card-{{ $card['id'] }}"
                                     @class([
-                                        'group flex flex-col rounded-2xl border-2 p-4 text-left shadow-sm transition-all',
-                                        'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $isCardSelected,
-                                        'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:shadow-md' => ! $isCardSelected,
+                                        'group flex flex-col rounded-2xl border-2 p-3 text-left shadow-sm transition-all',
+                                        'border-rose-300 bg-rose-50/70 ring-1 ring-rose-200' => ! $cardAvailable,
+                                        'border-brand-sage bg-brand-sage/5 ring-2 ring-brand-sage/30 ring-offset-2 ring-offset-white' => $cardAvailable && $isCardSelected,
+                                        'border-brand-ink/10 bg-white hover:border-brand-sage/30 hover:shadow-md' => $cardAvailable && ! $isCardSelected,
                                     ])
                                 >
                                     <button
                                         type="button"
-                                        wire:click="chooseProvider('{{ $card['id'] }}')"
+                                        @if ($cardAvailable)
+                                            wire:click="chooseProvider('{{ $card['id'] }}')"
+                                        @endif
                                         wire:loading.attr="disabled"
                                         wire:target="chooseProvider"
-                                        class="flex w-full items-center justify-between gap-3 text-left disabled:cursor-wait disabled:opacity-60"
+                                        @disabled(! $cardAvailable)
+                                        aria-disabled="{{ $cardAvailable ? 'false' : 'true' }}"
+                                        @class([
+                                            'flex w-full items-center justify-between gap-3 text-left disabled:cursor-wait disabled:opacity-60',
+                                            'cursor-not-allowed opacity-80' => ! $cardAvailable,
+                                        ])
                                     >
                                         <span class="min-w-0 truncate text-sm font-semibold text-brand-ink">{{ $card['label'] }}</span>
                                         <span @class([
-                                            'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $card['linked'],
-                                            'border-amber-200 bg-amber-50 text-amber-800' => ! $card['linked'],
+                                            'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide',
+                                            'border-rose-200 bg-rose-100 text-rose-800' => ! $cardAvailable,
+                                            'border-emerald-200 bg-emerald-50 text-emerald-700' => $cardAvailable && $card['linked'],
+                                            'border-amber-200 bg-amber-50 text-amber-800' => $cardAvailable && ! $card['linked'],
                                         ])>
-                                            @if ($card['linked'])
+                                            @if (! $cardAvailable)
+                                                <x-heroicon-m-no-symbol class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ __('Unavailable') }}
+                                            @elseif ($card['linked'])
                                                 <x-heroicon-m-check-circle class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                 {{ __('Connected') }}
                                             @else
@@ -201,8 +230,11 @@
                                             @endif
                                         </span>
                                     </button>
+                                    @if (! $cardAvailable && filled($card['unavailable_reason'] ?? null))
+                                        <p class="mt-2 text-xs leading-relaxed text-rose-900">{{ $card['unavailable_reason'] }}</p>
+                                    @endif
                                     @if ($card['linked'])
-                                        <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
+                                        <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-xs text-brand-moss">
                                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                                                 <span class="inline-flex items-center gap-1">
                                                     <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
@@ -216,7 +248,7 @@
                                             @if (($card['installed_roles'] ?? []) !== [])
                                                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                     @foreach ($card['installed_roles'] as $role)
-                                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink ring-1 ring-brand-ink/8">
+                                                        <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-ink ring-1 ring-brand-ink/8">
                                                             @if ($role['count'] > 1)
                                                                 {{ $role['count'] }}× {{ $role['label'] }}
                                                             @else
@@ -227,7 +259,7 @@
                                                 </div>
                                             @endif
                                             @if (($card['installed_locations'] ?? []) !== [])
-                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-brand-moss">
+                                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-brand-moss">
                                                     <span class="inline-flex items-center gap-1 font-medium text-brand-mist">
                                                         <x-heroicon-o-map-pin class="h-3 w-3 shrink-0" aria-hidden="true" />
                                                         {{ __('Installed in') }}
@@ -250,7 +282,7 @@
                                     @unless ($card['linked'])
                                         <x-add-provider-credential-link
                                             :provider="$card['id']"
-                                            class="!mt-3 !inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-2.5 !py-1 !text-[11px] !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
+                                            class="!mt-3 !inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-2.5 !py-1 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline"
                                         >
                                             <x-heroicon-m-plus class="h-3 w-3 shrink-0" aria-hidden="true" />
                                             {{ __('Connect') }}
@@ -265,31 +297,31 @@
 
                 {{-- Account / credential picker --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Use which API credential?') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick a stored token, or connect a fresh one without leaving this step.') }}</p>
-                        </div>
-                        @if ($form->type !== '' && $form->type !== 'custom')
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-key"
+                        :title="__('Use which API credential?')"
+                        :note="__('Pick a stored token, or connect a fresh one without leaving this step.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            @if ($form->type !== '' && $form->type !== 'custom')
                             @php $credentialProvider = str_replace('_kubernetes', '', $form->type); @endphp
                             <x-add-provider-credential-link
-                                :provider="$credentialProvider"
-                                class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
+                            :provider="$credentialProvider"
+                            class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
                             >
-                                <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Add new') }}
+                            <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Add new') }}
                             </x-add-provider-credential-link>
-                        @endif
-                    </div>
-                    <div class="p-6 sm:p-7">
+                            @endif
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-3 py-3 sm:px-4">
                         @if ($catalog['credentials']->isEmpty())
                             <div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-5">
                                 <div class="flex items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 {{ $tonePalette['amber'] }}">
                                         <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
                                     </span>
                                     <div class="min-w-0">
@@ -339,22 +371,81 @@
                 {{-- Region + size (VM / Docker hosts only). --}}
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Placement') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Pick where the VM lives and how big it should be.') }}</p>
-                                @if ($selectedServerRole)
-                                    <p class="mt-2 text-xs font-medium text-brand-forest">
-                                        {{ __('Sizing recommendations are tuned for :role.', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-globe-alt"
+                            :title="__('Region & size')"
+                            :note="__('Pick where the VM lives and how big it should be.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            {{-- The role-tuning line is a live consequence of an
+                                 earlier choice, so it stays visible — as a pill
+                                 beside the title rather than a fourth line. --}}
+                            @if ($selectedServerRole)
+                                <x-slot:actions>
+                                    <span class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-brand-sage/15 px-2 text-2xs font-semibold text-brand-forest ring-1 ring-brand-sage/25">
+                                        <x-heroicon-m-sparkles class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {{ __('Sized for :role', ['role' => $selectedServerRole['label'] ?? $form->server_role]) }}
+                                    </span>
+                                </x-slot:actions>
+                            @endif
+                        </x-workspace-panel-head>
+                        @php
+                            $catalogError = isset($catalog['error']) && is_string($catalog['error']) && $catalog['error'] !== ''
+                                ? $catalog['error']
+                                : null;
+                            $catalogFromPlatform = ($catalog['source'] ?? '') === 'platform';
+                            $catalogUnreachable = ! empty($catalog['provider_unreachable'])
+                                || \App\Support\Providers\ProviderCatalogFailure::isUnreachable($catalogError);
+                            $catalogAuthFailed = $catalogError !== null
+                                && ! $catalogUnreachable
+                                && \App\Support\Providers\ProviderAuthFailure::detected($catalogError);
+                            $catalogProvider = str_replace('_kubernetes', '', (string) $form->type);
+                        @endphp
+                        @if ($catalogError !== null)
+                            <div class="border-b border-brand-ink/10 px-4 py-3.5 sm:px-5">
+                                <div class="rounded-xl border border-rose-300 bg-rose-50/90 p-3 ring-1 ring-rose-200">
+                                    <p class="text-sm font-semibold text-rose-950">
+                                        @if ($catalogUnreachable)
+                                            {{ \App\Support\Providers\ProviderCatalogFailure::title($catalogProvider) }}
+                                        @elseif ($catalogAuthFailed && ! $catalogFromPlatform)
+                                            {{ \App\Support\Providers\ProviderAuthFailure::title($catalogProvider) }}
+                                        @else
+                                            {{ __('Couldn’t load regions and sizes') }}
+                                        @endif
                                     </p>
-                                @endif
+                                    <p class="mt-1 text-xs leading-relaxed text-rose-900">
+                                        @if ($catalogUnreachable)
+                                            {{ \App\Support\Providers\ProviderCatalogFailure::sanitize($catalogError, $catalogProvider) }}
+                                        @elseif ($catalogAuthFailed && ! $catalogFromPlatform)
+                                            {{ \App\Support\Providers\ProviderAuthFailure::message($catalogProvider) }}
+                                        @else
+                                            {{ $catalogError }}
+                                        @endif
+                                    </p>
+                                    @if ($catalogUnreachable)
+                                        <button
+                                            type="button"
+                                            wire:click="retryProviderCatalog"
+                                            wire:loading.attr="disabled"
+                                            class="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-rose-800 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-900 disabled:opacity-60"
+                                        >
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Try again') }}
+                                        </button>
+                                    @elseif (! $catalogFromPlatform)
+                                        <x-add-provider-credential-link
+                                            :provider="$catalogProvider"
+                                            class="!mt-2.5 !inline-flex !items-center !gap-1.5 !rounded-md !bg-rose-800 !px-2.5 !py-1.5 !text-xs !font-semibold !text-white !shadow-sm hover:!bg-rose-900 hover:!no-underline hover:!text-white"
+                                        >
+                                            <x-heroicon-o-key class="h-3.5 w-3.5" aria-hidden="true" />
+                                            {{ __('Add a new token') }}
+                                        </x-add-provider-credential-link>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
-                        <div class="grid grid-cols-1 gap-6 p-6 sm:grid-cols-2 sm:items-start sm:p-7">
+                        @endif
+                        <div class="grid grid-cols-1 gap-4 px-4 py-3.5 sm:grid-cols-2 sm:items-start sm:px-5">
                             @include('livewire.servers.create._provider-region-picker', [
                                 'existingServersByRegion' => $existingServersByRegion ?? [],
                             ])
@@ -365,23 +456,21 @@
                     </section>
                 @endif
 
-                {{-- Private network picker (DO VPC UUID / Hetzner Network ID) --}}
-                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner'], true))
+                {{-- Private network picker (DO VPC UUID / Hetzner Network ID / Vultr VPC) --}}
+                @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner', 'vultr'], true))
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Networking') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Private network') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Attach this server to a private network so it can reach other servers (Redis, database, workers) on a private IP without exposing ports to the internet. Optional — leave blank to skip.') }}
-                                </p>
-                            </div>
-                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
-                        </div>
-                        <div class="p-6 sm:p-7">
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-share"
+                            :title="__('Private network')"
+                            :note="__('Attach this server to a private network so it can reach other servers (Redis, database, workers) on a private IP without exposing ports to the internet. Optional — leave blank to skip.')"
+                            class="border-b border-brand-ink/10"
+                        >
+                            <x-slot:actions>
+                                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Optional') }}</span>
+                            </x-slot:actions>
+                        </x-workspace-panel-head>
+                        <div class="px-3 py-3 sm:px-4">
                             @if ($form->type === 'digitalocean')
                                 <div>
                                     <div class="flex items-center justify-between">
@@ -392,7 +481,7 @@
                                                 wire:click="loadDoVpcs"
                                                 wire:loading.attr="disabled"
                                                 wire:target="loadDoVpcs"
-                                                class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                                class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
                                             >
                                                 <span wire:loading.remove wire:target="loadDoVpcs">{{ empty($form->do_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
                                                 <span wire:loading wire:target="loadDoVpcs">{{ __('Loading…') }}</span>
@@ -465,6 +554,47 @@
 
                                     <x-input-error :messages="$errors->get('form.hetzner_network_id')" class="mt-1" />
                                 </div>
+                            @elseif ($form->type === 'vultr')
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <x-input-label for="vultr_vpc_id" :value="__('VPC')" />
+                                        @if ($form->region !== '' && $form->provider_credential_id !== '')
+                                            <button
+                                                type="button"
+                                                wire:click="loadVultrVpcs"
+                                                wire:loading.attr="disabled"
+                                                wire:target="loadVultrVpcs"
+                                                class="text-xs font-medium text-brand-sage hover:underline disabled:opacity-50"
+                                            >
+                                                <span wire:loading.remove wire:target="loadVultrVpcs">{{ empty($form->vultr_vpcs) ? __('Load VPCs') : __('Refresh') }}</span>
+                                                <span wire:loading wire:target="loadVultrVpcs">{{ __('Loading…') }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @if (! empty($form->vultr_vpcs))
+                                        <select
+                                            id="vultr_vpc_id"
+                                            wire:model.live="form.vultr_vpc_id"
+                                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                        >
+                                            <option value="">{{ __('None — no private VPC') }}</option>
+                                            @foreach ($form->vultr_vpcs as $vpc)
+                                                <option value="{{ $vpc['id'] }}">{{ $vpc['name'] }}@if (! empty($vpc['ip_range'])) — {{ $vpc['ip_range'] }}@endif</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <x-text-input
+                                            id="vultr_vpc_id"
+                                            wire:model.live.debounce.300ms="form.vultr_vpc_id"
+                                            type="text"
+                                            class="mt-1 block w-full font-mono"
+                                            placeholder="e.g. 08422775-5be0-4371-afba-64b03f9ad22d"
+                                            autocomplete="off"
+                                        />
+                                    @endif
+                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Attach a Vultr VPC so the instance gets a private IP. Click "Load VPCs" to pick from your account, or paste a VPC id.') }}</p>
+                                    <x-input-error :messages="$errors->get('form.vultr_vpc_id')" class="mt-1" />
+                                </div>
                             @endif
                         </div>
                     </section>
@@ -474,35 +604,30 @@
                 @if ($form->provider_host_kind === 'kubernetes' && $form->provider_credential_id !== '')
                     @php $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS'); @endphp
                     <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a cluster on the next step') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                    {{ __('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel]) }}
-                                </p>
-                            </div>
-                        </div>
+                        <x-workspace-panel-head
+                            dense
+                            icon="heroicon-o-server-stack"
+                            :title="__('Pick a cluster on the next step')"
+                            :note="__('You will pick the cluster from your :provider account on the next step. Region is inherited from the cluster.', ['provider' => $k8sProviderLabel])"
+                            class="border-b border-brand-ink/10"
+                        />
                     </section>
                 @endif
             @else
                 {{-- Custom (BYO) host kind --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Traditional VM/VPS over SSH, or a Docker host for container workloads.') }}</p>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
-                    </div>
-                    <div class="p-6 sm:p-7">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-cube"
+                        :title="__('Host kind')"
+                        :note="__('Traditional VM/VPS over SSH, or a Docker host for container workloads.')"
+                        class="border-b border-brand-ink/10"
+                    >
+                        <x-slot:actions>
+                            <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Required') }}</span>
+                        </x-slot:actions>
+                    </x-workspace-panel-head>
+                    <div class="px-3 py-3 sm:px-4">
                         <div class="grid gap-3 sm:grid-cols-2">
                             @foreach ([
                                 ['kind' => 'vm', 'icon' => 'server', 'label' => __('Traditional VM / VPS'), 'desc' => __('Your server — install whatever software and stack you need.')],
@@ -522,7 +647,7 @@
                                 >
                                     <div class="flex items-start justify-between gap-3">
                                         <span @class([
-                                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 transition-colors',
+                                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors',
                                             'bg-brand-sage text-white ring-brand-sage/30' => $selected,
                                             'bg-brand-sage/15 text-brand-forest ring-brand-sage/25 group-hover:bg-brand-sage/20' => ! $selected,
                                         ])>
@@ -553,17 +678,14 @@
 
                 {{-- SSH connection --}}
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <x-icon-badge>
-                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connection') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('We connect read-only first to verify access. Private key is stored encrypted at rest.') }}</p>
-                        </div>
-                    </div>
-                    <div class="space-y-5 p-6 sm:p-7">
+                    <x-workspace-panel-head
+                        dense
+                        icon="heroicon-o-lock-closed"
+                        :title="__('SSH connection')"
+                        :note="__('We connect read-only first to verify access. Private key is stored encrypted at rest.')"
+                        class="border-b border-brand-ink/10"
+                    />
+                    <div class="space-y-3 px-4 py-3.5 sm:px-5">
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <x-input-label for="ip_address" :value="__('IP address or hostname')" />
@@ -675,7 +797,7 @@
         </div>
 
         {{-- Sidebar: live recommendations + preflight teaser --}}
-        <aside class="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
+        <aside class="space-y-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start">
             @if ($form->mode === 'provider')
                 @include('livewire.servers.create._sidebar-provider', [
                     'preflight' => $preflight,

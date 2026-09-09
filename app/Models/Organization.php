@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
-use App\Modules\Realtime\Models\RealtimeApp;
-use AppModulesRealtimeModelsRealtimeApp;
-
 use App\Models\Concerns\ManagesOrganizationBeta;
+use App\Models\Concerns\ManagesOrganizationEmailRecipients;
 use App\Models\Concerns\ManagesOrganizationMembership;
 use App\Models\Concerns\ManagesOrganizationPreferences;
 use App\Models\Concerns\ManagesOrganizationQuotas;
 use App\Models\Concerns\ManagesOrganizationSubscription;
 use App\Models\Concerns\ManagesOrganizationTrialState;
+use App\Models\Concerns\RoutesIntercomNotifications;
+use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Realtime\Models\RealtimeApp;
 use Database\Factories\OrganizationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -34,17 +36,17 @@ use Laravel\Cashier\Billable;
  * @property bool $deploy_email_notifications_enabled
  * @property bool $email_server_credentials_enabled
  * @property bool $email_database_credentials_enabled
- * @property array<string, mixed> $server_site_preferences
+ * @property ?array<string, mixed> $server_site_preferences
  * @property ?string $default_site_script_id
  * @property ?Carbon $cron_maintenance_until
  * @property ?string $cron_maintenance_note
- * @property array<string, mixed> $firewall_settings
+ * @property ?array<string, mixed> $firewall_settings
  * @property ?string $edge_data_region
- * @property array<string, mixed> $database_workspace_settings
- * @property array<string, mixed> $insights_preferences
- * @property array<string, mixed> $services_preferences
+ * @property ?array<string, mixed> $database_workspace_settings
+ * @property ?array<string, mixed> $insights_preferences
+ * @property ?array<string, mixed> $services_preferences
  * @property ?string $alert_slack_webhook_url
- * @property array<string, mixed> $alert_extra_emails
+ * @property array<string, mixed>|null $alert_extra_emails
  * @property ?string $invoice_email
  * @property ?string $vat_number
  * @property ?string $billing_currency
@@ -56,31 +58,32 @@ use Laravel\Cashier\Billable;
  * @property bool $is_internal
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $users
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Team> $teams
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Server> $servers
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Site> $sites
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Script> $scripts
- * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationChannel> $notificationChannels
- * @property-read \Illuminate\Database\Eloquent\Collection<int, WebserverTemplate> $webserverTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSshKey> $organizationSshKeys
- * @property-read \Illuminate\Database\Eloquent\Collection<int, RealtimeApp> $realtimeApps
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationBillingSnapshot> $billingSnapshots
- * @property-read \Illuminate\Database\Eloquent\Collection<int, BillingSubscriptionSyncEvent> $billingSubscriptionSyncEvents
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationCronJobTemplate> $cronJobTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSupervisorProgramTemplate> $supervisorProgramTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, FirewallRuleTemplate> $firewallRuleTemplates
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ServerBlueprint> $serverBlueprints
+ * @property-read Collection<int, User> $users
+ * @property-read Collection<int, Team> $teams
+ * @property-read Collection<int, Server> $servers
+ * @property-read Collection<int, Site> $sites
+ * @property-read Collection<int, OrganizationSecret> $sharedSecrets
+ * @property-read Collection<int, Script> $scripts
+ * @property-read Collection<int, NotificationChannel> $notificationChannels
+ * @property-read Collection<int, WebserverTemplate> $webserverTemplates
+ * @property-read Collection<int, OrganizationSshKey> $organizationSshKeys
+ * @property-read Collection<int, RealtimeApp> $realtimeApps
+ * @property-read Collection<int, OrganizationBillingSnapshot> $billingSnapshots
+ * @property-read Collection<int, BillingSubscriptionSyncEvent> $billingSubscriptionSyncEvents
+ * @property-read Collection<int, OrganizationCronJobTemplate> $cronJobTemplates
+ * @property-read Collection<int, OrganizationSupervisorProgramTemplate> $supervisorProgramTemplates
+ * @property-read Collection<int, FirewallRuleTemplate> $firewallRuleTemplates
+ * @property-read Collection<int, ServerBlueprint> $serverBlueprints
  * @property-read ?Script $defaultSiteScript
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Project> $projects
- * @property-read \Illuminate\Database\Eloquent\Collection<int, Workspace> $workspaces
- * @property-read \Illuminate\Database\Eloquent\Collection<int, StatusPage> $statusPages
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ProviderCredential> $providerCredentials
- * @property-read \Illuminate\Database\Eloquent\Collection<int, BackupConfiguration> $backupConfigurations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationInvitation> $invitations
- * @property-read \Illuminate\Database\Eloquent\Collection<int, AuditLog> $auditLogs
- * @property-read \Illuminate\Database\Eloquent\Collection<int, ApiToken> $apiTokens
- * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationWebhookDestination> $notificationWebhookDestinations
+ * @property-read Collection<int, Project> $projects
+ * @property-read Collection<int, Workspace> $workspaces
+ * @property-read Collection<int, StatusPage> $statusPages
+ * @property-read Collection<int, ProviderCredential> $providerCredentials
+ * @property-read Collection<int, BackupConfiguration> $backupConfigurations
+ * @property-read Collection<int, OrganizationInvitation> $invitations
+ * @property-read Collection<int, AuditLog> $auditLogs
+ * @property-read Collection<int, ApiToken> $apiTokens
+ * @property-read Collection<int, NotificationWebhookDestination> $notificationWebhookDestinations
  */
 class Organization extends Model
 {
@@ -88,11 +91,13 @@ class Organization extends Model
     use Billable, HasFactory, HasUlids;
 
     use ManagesOrganizationBeta;
+    use ManagesOrganizationEmailRecipients;
     use ManagesOrganizationMembership;
     use ManagesOrganizationPreferences;
     use ManagesOrganizationQuotas;
     use ManagesOrganizationSubscription;
     use ManagesOrganizationTrialState;
+    use RoutesIntercomNotifications;
 
     protected $fillable = [
         'name',
@@ -104,6 +109,7 @@ class Organization extends Model
         'deploy_email_notifications_enabled',
         'email_server_credentials_enabled',
         'email_database_credentials_enabled',
+        'email_recipient_prefs',
         'server_site_preferences',
         'default_site_script_id',
         'cron_maintenance_until',
@@ -127,6 +133,7 @@ class Organization extends Model
     protected function casts(): array
     {
         return [
+            'email_recipient_prefs' => 'array',
             'trial_ends_at' => 'datetime',
             'beta_joined_at' => 'datetime',
             'is_internal' => 'boolean',
@@ -202,6 +209,20 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    /** @return HasMany<OrganizationSecret, $this> */
+    public function sharedSecrets(): HasMany
+    {
+        return $this->hasMany(OrganizationSecret::class)->orderBy('key');
+    }
+
+    /**
+     * Whether this org has any Cloud (container) apps.
+     *
+     * Gates the Cloud-alerts section on Automation: that form configures alert
+     * routing for Cloud apps specifically, so showing it to an org with none is
+     * noise. Deliberately an exists() rather than a count — the caller only
+     * needs the boolean.
+     */
     /** The org's secret-residency encryption key (per-org age keypair), if minted. *
      * @return HasOne<OrgSecretKey, $this>
      */
@@ -221,6 +242,12 @@ class Organization extends Model
     public function lookoutProjects(): HasMany
     {
         return $this->hasMany(LookoutProject::class);
+    }
+
+    /** @return HasMany<QueueNamespace, $this> */
+    public function queueNamespaces(): HasMany
+    {
+        return $this->hasMany(QueueNamespace::class);
     }
 
     /** @return HasMany<OrganizationBillingSnapshot, $this> */
@@ -329,6 +356,31 @@ class Organization extends Model
     public function notificationChannels(): MorphMany
     {
         return $this->morphMany(NotificationChannel::class, 'owner');
+    }
+
+    /**
+     * Hand back the instance $user->currentOrganization() already memoized when
+     * the route binds that same org, so a page render holds ONE Organization
+     * object for the row. Two instances each lazy-load their own `subscriptions`
+     * relation and their own serverIds() memo — the debug bar showed both
+     * queries firing twice on an org-scoped page (route-bound $org in the
+     * component, memoized org in the shell/command palette).
+     *
+     * Admin routes that bind a foreign org fall through to the default lookup.
+     */
+    public function resolveRouteBinding($value, $field = null): ?static
+    {
+        $user = auth()->user();
+        $current = $user instanceof User ? $user->currentOrganization() : null;
+        $key = $field ?? $this->getRouteKeyName();
+
+        if ($current instanceof static && (string) $current->getAttribute($key) === (string) $value) {
+            return $current;
+        }
+
+        $resolved = parent::resolveRouteBinding($value, $field);
+
+        return $resolved instanceof static ? $resolved : null;
     }
 
     /**

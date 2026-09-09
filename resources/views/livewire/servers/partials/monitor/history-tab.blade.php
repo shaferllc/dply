@@ -15,75 +15,71 @@
         }
     @endphp
 
-    <div class="px-5 py-5 sm:px-6" wire:key="metrics-chart-{{ $metricsRange }}">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Recent usage') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Per-metric history across the selected window. Filled band shows the min/max for each bucket; line is the average.') }}
-                </p>
-                @if ($chartFrom && $chartTo)
-                    <p class="mt-2 text-xs tabular-nums text-brand-mist">
-                        {{ $chartFrom->timezone($chartTimezone)->format('M j H:i') }}
-                        —
-                        {{ $chartTo->timezone($chartTimezone)->format('M j H:i') }}
-                        <span class="text-brand-moss">·</span>
-                        {{ trans_choice(':count sample|:count samples', $rangeSampleCount, ['count' => $rangeSampleCount]) }}
-                    </p>
-                @endif
-            </div>
+    <div wire:key="metrics-chart-{{ $metricsRange }}">
+        <x-workspace-panel-head
+            dense
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-chart-bar"
+            :title="__('Recent usage')"
+            :note="$chartFrom && $chartTo
+                ? ($chartFrom->timezone($chartTimezone)->format('M j H:i').' — '.$chartTo->timezone($chartTimezone)->format('M j H:i').' · '.trans_choice(':count sample|:count samples', $rangeSampleCount, ['count' => $rangeSampleCount]))
+                : __('Per-metric history across the selected window.')"
+        >
+            <x-slot:actions>
+                {{-- Segmented time-range selector with localStorage persistence
+                     keyed per server so each box remembers its last view. --}}
+                <div
+                    x-data="{
+                        range: @js($metricsRange),
+                        storageKey: @js('dply.metrics-range:'.$server->id),
+                        init() {
+                            try {
+                                const saved = window.localStorage?.getItem(this.storageKey);
+                                if (saved && saved !== this.range && @js($metricsRangeOptions).includes(saved)) {
+                                    this.range = saved;
+                                    this.$wire.setMetricsRange(saved);
+                                }
+                            } catch (e) { /* ignore */ }
+                        },
+                        pick(r) {
+                            this.range = r;
+                            try { window.localStorage?.setItem(this.storageKey, r); } catch (e) { /* ignore */ }
+                            this.$wire.setMetricsRange(r);
+                        },
+                    }"
+                    x-init="init()"
+                    class="inline-flex h-6 shrink-0 items-center gap-0.5 rounded-md border border-brand-ink/10 bg-white p-0.5 shadow-sm"
+                    role="group"
+                    aria-label="{{ __('Time range') }}"
+                >
+                    @foreach ($metricsRangeOptions as $opt)
+                        <button
+                            type="button"
+                            @click="pick(@js($opt))"
+                            :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
+                            class="rounded px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide transition-colors"
+                        >
+                            {{ $rangeLabels[$opt] ?? $opt }}
+                        </button>
+                    @endforeach
+                </div>
+            </x-slot:actions>
+        </x-workspace-panel-head>
 
-            {{-- Segmented time-range selector with localStorage persistence
-                 keyed per server so each box remembers its last view. --}}
-            <div
-                x-data="{
-                    range: @js($metricsRange),
-                    storageKey: @js('dply.metrics-range:'.$server->id),
-                    init() {
-                        try {
-                            const saved = window.localStorage?.getItem(this.storageKey);
-                            if (saved && saved !== this.range && @js($metricsRangeOptions).includes(saved)) {
-                                this.range = saved;
-                                this.$wire.setMetricsRange(saved);
-                            }
-                        } catch (e) { /* ignore */ }
-                    },
-                    pick(r) {
-                        this.range = r;
-                        try { window.localStorage?.setItem(this.storageKey, r); } catch (e) { /* ignore */ }
-                        this.$wire.setMetricsRange(r);
-                    },
-                }"
-                x-init="init()"
-                class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/10 bg-white p-1 shadow-sm"
-                role="group"
-                aria-label="{{ __('Time range') }}"
-            >
-                @foreach ($metricsRangeOptions as $opt)
-                    <button
-                        type="button"
-                        @click="pick(@js($opt))"
-                        :class="range === @js($opt) ? 'bg-brand-ink text-brand-cream' : 'bg-transparent text-brand-moss hover:bg-brand-sand/40'"
-                        class="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide transition-colors"
-                    >
-                        {{ $rangeLabels[$opt] ?? $opt }}
-                    </button>
-                @endforeach
-            </div>
-        </div>
+        <div class="px-3 py-2.5 sm:px-4">
 
         @if ($rangeSampleCount === 0)
             <x-empty-state
-                class="mt-6"
+                class="mt-3"
                 borderless
                 icon="heroicon-o-chart-bar"
                 :title="__('No history in this range yet')"
                 :description="__('Once the monitor agent reports samples, these panels populate automatically — try a wider window like 24H or 7D.')"
             />
         @else
-            <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {{-- CPU --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-cpu-chip class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['cpu']) }}" aria-hidden="true" />
@@ -93,7 +89,7 @@
                             {{ isset($latestPayload['cpu_pct']) ? number_format((float) $latestPayload['cpu_pct'], 1).'%' : '—' }}
                         </p>
                     </header>
-                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                    <p class="mt-0.5 text-xs text-brand-mist">
                         {{ trans_choice(':count core|:count cores', (int) ($latestPayload['cpu_count'] ?? 0), ['count' => (int) ($latestPayload['cpu_count'] ?? 0)]) }}
                         @if (! empty($latestPayload['load_per_cpu_1m']))
                             <span class="text-brand-moss">· {{ number_format((float) $latestPayload['load_per_cpu_1m'], 2) }} {{ __('load/core') }}</span>
@@ -112,7 +108,7 @@
                 </section>
 
                 {{-- Memory --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-circle-stack class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['mem']) }}" aria-hidden="true" />
@@ -122,7 +118,7 @@
                             {{ isset($latestPayload['mem_pct']) ? number_format((float) $latestPayload['mem_pct'], 1).'%' : '—' }}
                         </p>
                     </header>
-                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                    <p class="mt-0.5 text-xs text-brand-mist">
                         @if (! empty($latestPayload['mem_total_kb']))
                             {{ $fmtBytes((int) $latestPayload['mem_total_kb'] * 1024) }} {{ __('total') }}
                         @endif
@@ -143,7 +139,7 @@
                 </section>
 
                 {{-- Disk --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['disk']) }}" aria-hidden="true" />
@@ -153,7 +149,7 @@
                             {{ isset($latestPayload['disk_pct']) ? number_format((float) $latestPayload['disk_pct'], 1).'%' : '—' }}
                         </p>
                     </header>
-                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                    <p class="mt-0.5 text-xs text-brand-mist">
                         @if (isset($latestPayload['disk_used_bytes'], $latestPayload['disk_total_bytes']))
                             {{ $fmtBytes((int) $latestPayload['disk_used_bytes']) }} / {{ $fmtBytes((int) $latestPayload['disk_total_bytes']) }}
                         @endif
@@ -174,7 +170,7 @@
                 </section>
 
                 {{-- Load --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-chart-bar class="h-5 w-5 shrink-0 {{ $statusTextClass($metricStatuses['load']) }}" aria-hidden="true" />
@@ -184,7 +180,7 @@
                             {{ isset($latestPayload['load_1m']) ? number_format((float) $latestPayload['load_1m'], 2) : '—' }}
                         </p>
                     </header>
-                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                    <p class="mt-0.5 text-xs text-brand-mist">
                         @if (isset($latestPayload['load_5m'], $latestPayload['load_15m']))
                             {{ number_format((float) $latestPayload['load_5m'], 2) }} / {{ number_format((float) $latestPayload['load_15m'], 2) }} (5m / 15m)
                         @endif
@@ -202,7 +198,7 @@
                 </section>
 
                 {{-- Network: lg:col-span-2 row, two overlaid lines (rx/tx) --}}
-                <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                     <header class="flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2">
                             <x-heroicon-o-signal class="h-5 w-5 shrink-0 text-sky-600" aria-hidden="true" />
@@ -212,7 +208,7 @@
                             $rxBps = is_numeric($rxRate) ? (float) $rxRate : 0;
                             $txBps = is_numeric($txRate) ? (float) $txRate : 0;
                         @endphp
-                        <p class="text-[11px] text-brand-mist">
+                        <p class="text-xs text-brand-mist">
                             <span class="text-sky-700">↓ {{ $fmtRate($rxBps) }}</span>
                             <span class="text-brand-moss">·</span>
                             <span class="text-violet-700">↑ {{ $fmtRate($txBps) }}</span>
@@ -220,7 +216,7 @@
                     </header>
                     <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700">↓ {{ __('Inbound') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-sky-700">↓ {{ __('Inbound') }}</p>
                             <x-metrics-line-chart
                                 :series="$networkSeriesRx"
                                 :y-min="0"
@@ -230,7 +226,7 @@
                             />
                         </div>
                         <div>
-                            <p class="text-[10px] font-semibold uppercase tracking-wide text-violet-700">↑ {{ __('Outbound') }}</p>
+                            <p class="text-2xs font-semibold uppercase tracking-wide text-violet-700">↑ {{ __('Outbound') }}</p>
                             <x-metrics-line-chart
                                 :series="$networkSeriesTx"
                                 :y-min="0"
@@ -261,13 +257,13 @@
                     $hasIoData = ($ioReadSeries !== [] || $ioWriteSeries !== []) || $ioReadBps !== null || $ioWriteBps !== null;
                 @endphp
                 @if ($hasIoData)
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-arrows-up-down class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
                                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Disk I/O') }}</h3>
                             </div>
-                            <p class="text-[11px] text-brand-mist">
+                            <p class="text-xs text-brand-mist">
                                 <span class="text-emerald-700">↻ {{ $ioReadBps !== null ? $fmtRate($ioReadBps) : '—' }}</span>
                                 <span class="text-brand-moss">·</span>
                                 <span class="text-amber-700">⇡ {{ $ioWriteBps !== null ? $fmtRate($ioWriteBps) : '—' }}</span>
@@ -275,7 +271,7 @@
                         </header>
                         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">↻ {{ __('Read') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-emerald-700">↻ {{ __('Read') }}</p>
                                 <x-metrics-line-chart
                                     :series="$ioReadSeries"
                                     :y-min="0"
@@ -285,7 +281,7 @@
                                 />
                             </div>
                             <div>
-                                <p class="text-[10px] font-semibold uppercase tracking-wide text-amber-700">⇡ {{ __('Write') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-wide text-amber-700">⇡ {{ __('Write') }}</p>
                                 <x-metrics-line-chart
                                     :series="$ioWriteSeries"
                                     :y-min="0"
@@ -306,13 +302,13 @@
                     $disks = is_array($latestPayload['disks'] ?? null) ? $latestPayload['disks'] : [];
                 @endphp
                 @if (! empty($disks) && count($disks) > 1)
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-server-stack class="h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
                                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Mounted filesystems') }}</h3>
                             </div>
-                            <p class="text-[11px] text-brand-mist">{{ trans_choice(':count mount|:count mounts', count($disks), ['count' => count($disks)]) }}</p>
+                            <p class="text-xs text-brand-mist">{{ trans_choice(':count mount|:count mounts', count($disks), ['count' => count($disks)]) }}</p>
                         </header>
                         <ul class="mt-3 space-y-1.5">
                             @foreach ($disks as $disk)
@@ -348,13 +344,13 @@
                     $topMem = is_array($latestPayload['top_mem'] ?? null) ? $latestPayload['top_mem'] : [];
                 @endphp
                 @if (! empty($topCpu) || ! empty($topMem))
-                    <section class="rounded-2xl border border-brand-ink/10 bg-white p-4 sm:p-5 lg:col-span-2">
+                    <section class="rounded-lg border border-brand-ink/10 bg-white p-3 sm:p-5 lg:col-span-2">
                         <header class="flex items-center justify-between gap-3">
                             <div class="flex items-center gap-2">
                                 <x-heroicon-o-list-bullet class="h-5 w-5 shrink-0 text-brand-forest" aria-hidden="true" />
                                 <h3 class="text-sm font-semibold text-brand-ink">{{ __('Top processes') }}</h3>
                             </div>
-                            <p class="text-[11px] text-brand-mist">
+                            <p class="text-xs text-brand-mist">
                                 @if ($latest)
                                     {{ __('Sampled') }} {{ $latest->captured_at->diffForHumans() }}
                                 @endif
@@ -362,7 +358,7 @@
                         </header>
                         <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('By CPU') }}</p>
+                                <p class="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('By CPU') }}</p>
                                 <ul class="space-y-1">
                                     @forelse ($topCpu as $row)
                                         <li class="flex items-center justify-between gap-3 text-xs">
@@ -375,7 +371,7 @@
                                 </ul>
                             </div>
                             <div>
-                                <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('By memory') }}</p>
+                                <p class="mb-1.5 text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('By memory') }}</p>
                                 <ul class="space-y-1">
                                     @forelse ($topMem as $row)
                                         <li class="flex items-center justify-between gap-3 text-xs">
@@ -392,5 +388,6 @@
                 @endif
             </div>
         @endif
+        </div>
     </div>
 @endif

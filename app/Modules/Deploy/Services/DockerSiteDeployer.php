@@ -25,7 +25,6 @@ final class DockerSiteDeployer
     /**
      * @return array{output: string, sha: ?string, compose_yaml: string, dockerfile: string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site): array
     {
         $server = $site->server;

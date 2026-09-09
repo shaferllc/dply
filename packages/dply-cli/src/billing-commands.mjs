@@ -58,10 +58,7 @@ export async function billingShow(flags) {
   info(c.bold('Fleet counts (billable)'));
   printKeyValues([
     ['BYO servers', String(counts.servers ?? 0)],
-    ['Serverless', String(counts.serverless ?? 0)],
     ['Managed servers', String(counts.managed_servers ?? 0)],
-    ['Cloud apps', String(counts.cloud ?? 0)],
-    ['Edge sites', String(counts.edge ?? 0)],
   ]);
 
   if (data.is_free) {

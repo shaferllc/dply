@@ -71,7 +71,10 @@ test('webserver config subtab renders the editor inline without redirecting', fu
         ->test(WorkspaceWebserver::class, ['server' => $server])
         ->assertNoRedirect()
         ->assertSet('engine_subtab', 'config')
-        ->assertSee(__('Config editor'));
+        // The panel head lost its "Config editor" eyebrow when the webserver
+        // panels moved to the dense x-workspace-panel-head; the title is now
+        // "<engine> configuration".
+        ->assertSee(__(':engine configuration', ['engine' => 'nginx']));
 });
 
 test('edge proxy config subtab no longer redirects to the standalone configuration workspace', function (): void {

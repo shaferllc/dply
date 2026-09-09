@@ -24,7 +24,6 @@ class TraefikAdminApiResolver
      *
      * @throws \RuntimeException
      */
-    /** @return array<string, mixed> */
     public function resolve(Server $server): array
     {
         if ($server->edgeProxy() !== 'traefik') {
@@ -67,7 +66,6 @@ class TraefikAdminApiResolver
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function loadParsed(Server $server): array
     {
         $ssh = new SshConnection($server);
@@ -108,7 +106,7 @@ BASH;
 
     /**
      * @param  array<string, mixed> $parsed
-     * @param  array<string, mixed> $candidates
+     * @param  list<string> $candidates
      */
     private function buildUnreachableException(Server $server, array $parsed, array $candidates): \RuntimeException
     {

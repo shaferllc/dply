@@ -23,7 +23,6 @@ class TraefikCustomMiddlewaresConfig
     /**
      * @return array{middlewares: list<array{slug: string, path: string, type: string, config_summary: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -60,7 +59,7 @@ class TraefikCustomMiddlewaresConfig
             );
         }
 
-        usort($rows, fn (array $a, array $b): int => strcmp((string) ($a['slug'] ?? ''), (string) ($b['slug'] ?? '')));
+        usort($rows, fn (array $a, array $b): int => strcmp((string) $a['slug'], (string) $b['slug']));
 
         return ['middlewares' => $rows, 'unreadable' => false];
     }
@@ -74,7 +73,7 @@ class TraefikCustomMiddlewaresConfig
     {
         $slug = $this->normalizeSlug($slug);
         foreach ($this->read($server)['middlewares'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 throw new \RuntimeException("Middleware `{$slug}` already exists.");
             }
         }
@@ -91,7 +90,7 @@ class TraefikCustomMiddlewaresConfig
         $slug = $this->normalizeSlug($slug);
         $found = false;
         foreach ($this->read($server)['middlewares'] as $row) {
-            if (($row['slug'] ?? '') === $slug) {
+            if ($row['slug'] === $slug) {
                 $found = true;
                 break;
             }
@@ -124,7 +123,7 @@ class TraefikCustomMiddlewaresConfig
     public function render(string $slug, array $fields): string
     {
         $name = self::FILE_PREFIX.$slug;
-        $type = (string) ($fields['type'] ?? 'stripPrefix');
+        $type = (string) $fields['type'];
         if (! in_array($type, self::TYPES, true)) {
             throw new \InvalidArgumentException('Unsupported middleware type.');
         }
@@ -133,8 +132,7 @@ class TraefikCustomMiddlewaresConfig
             'stripPrefix' => $this->stripPrefixBlock((string) ($fields['prefix'] ?? '/')),
             'redirectScheme' => $this->redirectSchemeBlock((string) ($fields['scheme'] ?? 'https')),
             'headers' => $this->headersBlock((string) ($fields['header_key'] ?? ''), (string) ($fields['header_value'] ?? '')),
-            'basicAuth' => $this->basicAuthBlock((string) ($fields['users'] ?? '')),
-            default => throw new \InvalidArgumentException('Unsupported middleware type.'),
+            default => $this->basicAuthBlock((string) ($fields['users'] ?? '')),
         };
 
         return <<<YAML

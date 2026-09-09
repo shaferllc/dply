@@ -27,7 +27,6 @@ use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Servers\TraefikEntrypointsConfig;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
@@ -108,6 +107,20 @@ class WorkspaceWebserver extends WorkspaceManage
     #[Url(as: 'sub', except: 'overview')]
     public string $engine_subtab = 'overview';
 
+    /**
+     * Local-only panel preview. Renders a non-active engine's sub-tab panels
+     * (Routes / Snippets / Modules / Admin …) so their layouts can be reviewed
+     * without switching the server's webserver, which is a destructive,
+     * multi-minute operation.
+     *
+     * Read-only by construction: {@see previewingEnginePanels()} is the single
+     * gate, panels treat preview like the deployer role (every mutating control
+     * disabled), and the sub-tab data boot is skipped so nothing SSHes to an
+     * engine that isn't installed. Ignored outside the local environment.
+     */
+    #[Url(as: 'preview', except: false)]
+    public bool $engine_preview = false;
+
     // ---- Config editor state -----------------------------------------
 
     // ---- Log viewer state --------------------------------------------
@@ -165,6 +178,19 @@ class WorkspaceWebserver extends WorkspaceManage
     public function setWorkspaceTab(string $tab): void
     {
         $allowed = ['overview', 'change', 'health', 'nginx', 'caddy', 'apache', 'openlitespeed', 'advanced', 'notifications'];
+
+        // Parked engines and the switch flow are not reachable by tab key
+        // either — otherwise a stale wire:click or a hand-crafted request
+        // lands the operator on a panel that renders nothing.
+        $allowed = array_values(array_diff(
+            $allowed,
+            WebserverWorkspaceViewData::switchHidden() ? ['change'] : [],
+            array_diff(
+                WebserverWorkspaceViewData::hiddenEngines(),
+                [strtolower((string) (($this->server->meta['webserver'] ?? 'nginx')))],
+            ),
+        ));
+
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'overview';
         // Reset the sub-tab on every top-level switch so the operator always
         // lands on the actionable view first. Skipping this would leave
@@ -203,6 +229,29 @@ class WorkspaceWebserver extends WorkspaceManage
     public function setEngineSubtab(string $subtab): void
     {
         $this->engine_subtab = $subtab;
+    }
+
+    /** Local-only: is the panel-preview escape hatch available at all? */
+    public function enginePanelPreviewAvailable(): bool
+    {
+        return app()->environment('local');
+    }
+
+    /** Local-only: are we rendering a non-active engine's panels read-only? */
+    public function previewingEnginePanels(): bool
+    {
+        return $this->engine_preview && $this->enginePanelPreviewAvailable();
+    }
+
+    public function toggleEnginePanelPreview(): void
+    {
+        if (! $this->enginePanelPreviewAvailable()) {
+            $this->engine_preview = false;
+
+            return;
+        }
+
+        $this->engine_preview = ! $this->engine_preview;
     }
 
     public function updatedEngineSubtab(): void
@@ -271,41 +320,6 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->engine_subtab !== 'backends') {
             $this->haproxy_backends_show_add = false;
         }
-    }
-
-    private function mergeTraefikStaticEntrypointsIntoMeta(): void
-    {
-        $server = $this->server->fresh();
-        $meta = (array) ($server->meta ?? []);
-        $state = data_get($meta, 'webserver_live_state.traefik');
-
-        if (
-            ! is_array($state)
-            || ! empty($state['units']['entrypoints'] ?? [])
-        ) {
-            return;
-        }
-
-        $read = app(TraefikEntrypointsConfig::class)->read($server);
-        $entrypoints = $read['entrypoints'] ?? [];
-
-        if (empty($entrypoints)) {
-            return;
-        }
-
-        $state['units']['entrypoints'] = array_map(
-            static fn (array $ep): array => [
-                'name' => $ep['name'],
-                'address' => $ep['address'],
-                'transport' => 'static',
-                'status' => 'configured',
-            ],
-            $entrypoints
-        );
-
-        $meta['webserver_live_state']['traefik'] = $state;
-
-        $server->update(['meta' => $meta]);
     }
 
     public function syncManageRemoteTaskFromCache(): void

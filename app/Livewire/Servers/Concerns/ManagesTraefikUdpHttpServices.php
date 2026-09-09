@@ -29,10 +29,10 @@ trait ManagesTraefikUdpHttpServices
             $result = app(TraefikUdpRoutesConfig::class)->read($this->server);
             $form = [];
             foreach ($result['routes'] as $route) {
-                $slug = (string) ($route['slug'] ?? '');
+                $slug = (string) $route['slug'];
                 $form[$slug] = [
-                    'entry_points' => implode(' ', $route['entry_points'] ?? []),
-                    'server_address' => (string) ($route['server_address'] ?? ''),
+                    'entry_points' => implode(' ', $route['entry_points']),
+                    'server_address' => (string) $route['server_address'],
                 ];
             }
             $this->traefik_udp_routes_form = $form;
@@ -60,10 +60,10 @@ trait ManagesTraefikUdpHttpServices
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $slug = (string) ($this->traefik_udp_routes_new['slug'] ?? '');
+        $slug = (string) $this->traefik_udp_routes_new['slug'];
         $fields = [
-            'entry_points' => (string) ($this->traefik_udp_routes_new['entry_points'] ?? ''),
-            'server_address' => (string) ($this->traefik_udp_routes_new['server_address'] ?? ''),
+            'entry_points' => (string) $this->traefik_udp_routes_new['entry_points'],
+            'server_address' => (string) $this->traefik_udp_routes_new['server_address'],
         ];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik UDP route: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
@@ -87,7 +87,7 @@ trait ManagesTraefikUdpHttpServices
             return;
         }
         $row = $this->traefik_udp_routes_form[$slug];
-        $fields = ['entry_points' => (string) ($row['entry_points'] ?? ''), 'server_address' => (string) ($row['server_address'] ?? '')];
+        $fields = ['entry_points' => (string) $row['entry_points'], 'server_address' => (string) $row['server_address']];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik UDP route: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
@@ -129,8 +129,8 @@ trait ManagesTraefikUdpHttpServices
             $result = app(TraefikHttpServicesConfig::class)->read($this->server);
             $form = [];
             foreach ($result['services'] as $svc) {
-                $slug = (string) ($svc['slug'] ?? '');
-                $form[$slug] = ['servers' => implode("\n", $svc['servers'] ?? [])];
+                $slug = (string) $svc['slug'];
+                $form[$slug] = ['servers' => implode("\n", $svc['servers'])];
             }
             $this->traefik_http_services_form = $form;
             $this->traefik_http_services_loaded = true;
@@ -158,8 +158,8 @@ trait ManagesTraefikUdpHttpServices
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $slug = (string) ($this->traefik_http_services_new['slug'] ?? '');
-        $fields = ['servers' => (string) ($this->traefik_http_services_new['servers'] ?? '')];
+        $slug = (string) $this->traefik_http_services_new['slug'];
+        $fields = ['servers' => (string) $this->traefik_http_services_new['servers']];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik HTTP service: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {
@@ -181,7 +181,7 @@ trait ManagesTraefikUdpHttpServices
         if ($this->currentUserIsDeployer() || ! isset($this->traefik_http_services_form[$slug])) {
             return;
         }
-        $fields = ['servers' => (string) ($this->traefik_http_services_form[$slug]['servers'] ?? '')];
+        $fields = ['servers' => (string) $this->traefik_http_services_form[$slug]['servers']];
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik HTTP service: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
         try {

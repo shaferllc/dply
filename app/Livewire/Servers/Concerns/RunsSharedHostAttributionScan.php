@@ -49,8 +49,6 @@ trait RunsSharedHostAttributionScan
         $wantRoot = (bool) config('server_settings.inventory_use_root_ssh', true);
         $fallback = (bool) config('server_settings.inventory_fallback_to_deploy_user_ssh', true);
         $candidates = $wantRoot && $deploy !== 'root' ? array_filter(['root', $fallback ? $deploy : null]) : [$deploy];
-        $candidates = array_values(array_filter($candidates));
-
         $this->resetRemoteSshStreamTargets();
         $lastError = null;
         $out = null;
@@ -60,7 +58,11 @@ trait RunsSharedHostAttributionScan
                 $ssh = new SshConnection($this->server, $loginUser);
                 $out = trim($ssh->execWithCallback(
                     $wrapped,
-                    fn (string $chunk): mixed => $this->remoteSshStreamAppendStdout($chunk),
+                    function (string $chunk): mixed {
+                        $this->remoteSshStreamAppendStdout($chunk);
+
+                        return null;
+                    },
                     $timeout,
                 ));
                 $ssh->disconnect();

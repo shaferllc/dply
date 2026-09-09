@@ -24,7 +24,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: Test Task')
             ->expectsOutputToContain('Task completed successfully');
@@ -36,20 +36,20 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['name' => 'Unique Task Name'])
+        $this->artisan('task:run', ['--task' => 'Unique Task Name'])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: Unique Task Name')
             ->expectsOutputToContain('Task completed successfully');
     });
 
     it('shows error when task not found by ID', function () {
-        $this->artisan('task:run', ['id' => 99999])
+        $this->artisan('task:run', ['--task' => 99999])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task not found');
     });
 
     it('shows error when task not found by name', function () {
-        $this->artisan('task:run', ['name' => 'Non-existent Task'])
+        $this->artisan('task:run', ['--task' => 'Non-existent Task'])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task not found');
     });
@@ -60,7 +60,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['name' => 'Duplicate Task Name'])
+        $this->artisan('task:run', ['--task' => 'Duplicate Task Name'])
             ->assertExitCode(1)
             ->expectsOutputToContain('Multiple tasks found with name: Duplicate Task Name');
     });
@@ -74,7 +74,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--background' => true,
         ])
             ->assertExitCode(0)
@@ -88,7 +88,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--timeout' => 300,
         ])
             ->assertExitCode(0)
@@ -102,7 +102,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--user' => 'testuser',
         ])
             ->assertExitCode(0)
@@ -116,7 +116,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--instance' => 'test-instance',
         ])
             ->assertExitCode(0)
@@ -130,7 +130,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--option' => ['key1=value1', 'key2=value2'],
         ])
             ->assertExitCode(0)
@@ -144,7 +144,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--verbose' => true,
         ])
             ->assertExitCode(0)
@@ -158,7 +158,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--dry-run' => true,
         ])
             ->assertExitCode(0)
@@ -173,7 +173,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--wait' => true,
         ])
             ->assertExitCode(0)
@@ -187,7 +187,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--show-output' => true,
         ])
             ->assertExitCode(0)
@@ -227,7 +227,7 @@ describe('TaskRunCommand', function () {
             };
         });
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task execution failed');
     });
@@ -265,7 +265,7 @@ describe('TaskRunCommand', function () {
             };
         });
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task execution failed');
     });
@@ -277,7 +277,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--timeout' => -1,
         ])
             ->assertExitCode(1)
@@ -291,7 +291,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--user' => '',
         ])
             ->assertExitCode(1)
@@ -305,7 +305,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--instance' => '',
         ])
             ->assertExitCode(1)
@@ -319,7 +319,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--option' => ['key1=value1', 'key2=value2', 'key3=value with spaces'],
         ])
             ->assertExitCode(0)
@@ -333,7 +333,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--option' => ['invalid-option'],
         ])
             ->assertExitCode(1)
@@ -358,7 +358,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Running,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task is already running');
     });
@@ -369,7 +369,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Finished,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task is already finished');
     });
@@ -380,7 +380,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Failed,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(1)
             ->expectsOutputToContain('Task has failed');
     });
@@ -392,7 +392,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--force' => true,
         ])
             ->assertExitCode(0)
@@ -406,7 +406,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--force' => true,
         ])
             ->assertExitCode(0)
@@ -421,7 +421,7 @@ describe('TaskRunCommand', function () {
         ]);
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--dry-run' => true,
         ])
             ->assertExitCode(0)
@@ -437,7 +437,7 @@ describe('TaskRunCommand', function () {
             'timeout' => null,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: No Timeout Task');
     });
@@ -448,7 +448,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: No User Task');
     });
@@ -459,7 +459,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: No Instance Task');
     });
@@ -470,7 +470,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: No Options Task');
     });
@@ -509,7 +509,7 @@ describe('TaskRunCommand', function () {
         });
 
         $this->artisan('task:run', [
-            'id' => $task->id,
+            '--task' => $task->id,
             '--verbose' => true,
         ])
             ->assertExitCode(0)
@@ -525,7 +525,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: Task with Special Chars !@#$%^&*()');
     });
@@ -536,7 +536,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: Task with Unicode こんにちは世界');
     });
@@ -548,7 +548,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: '.$longName);
     });
@@ -559,7 +559,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: ');
     });
@@ -570,7 +570,7 @@ describe('TaskRunCommand', function () {
             'status' => TaskStatus::Pending,
         ]);
 
-        $this->artisan('task:run', ['id' => $task->id])
+        $this->artisan('task:run', ['--task' => $task->id])
             ->assertExitCode(0)
             ->expectsOutputToContain('Running task: ');
     });

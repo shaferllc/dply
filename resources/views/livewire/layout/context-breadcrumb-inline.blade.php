@@ -26,11 +26,11 @@
                         :aria-expanded="orgOpen.toString()"
                         aria-haspopup="listbox"
                     >
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sage text-[10px] font-bold text-white shadow-inner shadow-brand-forest/20" aria-hidden="true">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sage text-2xs font-bold text-white shadow-inner shadow-brand-forest/20" aria-hidden="true">
                             {{ \App\Livewire\Layout\ContextBreadcrumb::initials($currentOrg->name ?? __('Org')) }}
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
+                            <span class="block text-2xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</span>
                             <span class="block truncate text-xs font-semibold text-brand-ink">{{ $currentOrg->name ?? __('None') }}</span>
                         </span>
                         <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-brand-moss group-hover:text-brand-ink" aria-hidden="true" />
@@ -48,7 +48,7 @@
                         class="absolute left-0 z-50 mt-2 w-[min(100vw-2rem,20rem)] dply-dropdown-panel py-2"
                         role="listbox"
                     >
-                        <p class="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch organization') }}</p>
+                        <p class="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch organization') }}</p>
                         <ul class="max-h-64 overflow-y-auto px-2">
                             @foreach ($organizations as $org)
                                 <li>
@@ -116,9 +116,9 @@
                     <div class="relative min-w-0 shrink-0" @click.outside="teamOpen = false">
                         @if ($teams->isEmpty())
                             <div class="flex max-w-[min(42vw,11rem)] items-center gap-2 rounded-lg border border-dashed border-brand-ink/15 bg-white/50 px-2 py-1.5 text-xs text-brand-moss">
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/80 text-[10px] font-bold text-brand-moss">—</span>
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand-sand/80 text-2xs font-bold text-brand-moss">—</span>
                                 <span class="min-w-0">
-                                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block text-2xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
                                     <a href="{{ route('organizations.show', $currentOrg) }}" wire:navigate class="block truncate font-medium text-brand-sage hover:text-brand-ink">{{ __('No teams yet — set up on the org page') }}</a>
                                 </span>
                             </div>
@@ -130,7 +130,7 @@
                                 :aria-expanded="teamOpen.toString()"
                                 aria-haspopup="listbox"
                             >
-                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#3b6fb6] text-[10px] font-bold text-white shadow-inner shadow-brand-ink/10" aria-hidden="true">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#3b6fb6] text-2xs font-bold text-white shadow-inner shadow-brand-ink/10" aria-hidden="true">
                                     @if ($currentTeam)
                                         {{ \App\Livewire\Layout\ContextBreadcrumb::initials($currentTeam->name) }}
                                     @else
@@ -138,7 +138,7 @@
                                     @endif
                                 </span>
                                 <span class="min-w-0 flex-1">
-                                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
+                                    <span class="block text-2xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Team') }}</span>
                                     <span class="block truncate text-xs font-semibold text-brand-ink">
                                         {{ $currentTeam?->name ?? __('All teams') }}
                                     </span>
@@ -158,7 +158,7 @@
                                 class="absolute left-0 z-50 mt-2 w-[min(100vw-2rem,20rem)] dply-dropdown-panel py-2 sm:left-auto sm:right-0"
                                 role="listbox"
                             >
-                                <p class="px-4 pb-2 text-[11px] font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch team') }}</p>
+                                <p class="px-4 pb-2 text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Switch team') }}</p>
                                 <ul class="max-h-64 overflow-y-auto px-2">
                                     <li>
                                         <button

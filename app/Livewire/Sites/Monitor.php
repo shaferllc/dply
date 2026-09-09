@@ -13,7 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeIncident;
 use App\Models\SiteUptimeMonitor;
-use App\Modules\Serverless\Services\FunctionStatsRangeQuery;
+use App\Services\Sites\EnsuresDefaultUptimeMonitors;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\SiteUptimeHistorySummary;
 use App\Services\Sites\UptimeProbeRegionResolver;
@@ -59,7 +59,7 @@ class Monitor extends Component
 
     public string $newLabel = '';
 
-    public string $newCheckType = SiteUptimeMonitor::CHECK_HTTP;
+    public string $newCheckType = SiteUptimeMonitor::CHECK_HTTPS;
 
     public string $newPath = '';
 
@@ -85,7 +85,6 @@ class Monitor extends Component
 
     /** Function-activity chart window: 1h | 24h | 7d (serverless only). */
     #[Url]
-    public string $statsRange = '24h';
 
     public function mount(Server $server, Site $site): void
     {
@@ -100,58 +99,31 @@ class Monitor extends Component
         // Needed by CorrelatesWindowLogs to gate the "logs around this incident" jump.
         $this->server->loadMissing('logAgent');
 
-        // Default the probe worker to the one nearest the host; the region
-        // label follows the worker (falling back to nearest region when no
-        // worker is configured).
+        // Worker routes the queue; the stored/displayed region is the host's
+        // nearest probe_regions key, not the worker box.
         $workerResolver = app(UptimeProbeWorkerResolver::class);
         $this->newProbeWorker = $workerResolver->forSite($this->site);
-        $this->newProbeRegion = $workerResolver->regionFor($this->newProbeWorker)
-            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
-
-        if (! FunctionStatsRangeQuery::isValidRange($this->statsRange)) {
-            $this->statsRange = FunctionStatsRangeQuery::defaultRange();
-        }
+        $this->newProbeRegion = app(UptimeProbeRegionResolver::class)->forSite($this->site);
 
         if (! in_array($this->monitorTab, self::MONITOR_TABS, true)) {
             $this->monitorTab = 'monitors';
         }
 
-        $this->ensureFunctionUptimeMonitor();
+        $this->ensureDefaultUptimeMonitors();
     }
 
     /**
-     * Backfill the default "Homepage check" monitor for a function that has
-     * none — functions created before AppServiceProvider's Site::created
-     * hook never got one. New sites still get theirs at creation; this just
-     * catches the older ones so their Monitor page isn't empty. Idempotent.
+     * Seed or backfill the default HTTP + HTTPS homepage pair. New sites
+     * get both at creation; this catches older sites (and the legacy single
+     * "Homepage check") so the Monitor page is not empty or one-sided.
+     * Idempotent.
      */
-    private function ensureFunctionUptimeMonitor(): void
+    private function ensureDefaultUptimeMonitors(): void
     {
-        if (! $this->site->usesFunctionsRuntime() || $this->site->uptimeMonitors->isNotEmpty()) {
-            return;
-        }
-
-        if (array_keys(config('site_uptime.probe_regions', [])) === []) {
-            return;
-        }
-
-        $workerResolver = app(UptimeProbeWorkerResolver::class);
-        $worker = $workerResolver->forSite($this->site);
-
-        $monitor = SiteUptimeMonitor::query()->firstOrCreate(
-            ['site_id' => $this->site->id, 'sort_order' => 0],
-            [
-                'label' => __('Homepage check'),
-                'path' => null,
-                'probe_region' => $workerResolver->regionFor($worker)
-                    ?? app(UptimeProbeRegionResolver::class)->forSite($this->site),
-                'probe_worker' => $worker,
-            ],
-        );
-
+        $created = app(EnsuresDefaultUptimeMonitors::class)->ensure($this->site);
         $this->site->load('uptimeMonitors');
 
-        if ($monitor->wasRecentlyCreated) {
+        foreach ($created as $monitor) {
             RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
         }
     }
@@ -160,16 +132,6 @@ class Monitor extends Component
     {
         $this->monitorTab = in_array($tab, self::MONITOR_TABS, true) ? $tab : 'monitors';
     }
-
-    public function setStatsRange(string $range): void
-    {
-        $this->statsRange = FunctionStatsRangeQuery::isValidRange($range)
-            ? $range
-            : FunctionStatsRangeQuery::defaultRange();
-    }
-
-    /** Re-renders, which re-queries the function-activity series. */
-    public function refreshStats(): void {}
 
     /** Reset the form to add-mode defaults and open the modal. */
     public function startAddMonitor(): void
@@ -192,7 +154,9 @@ class Monitor extends Component
 
         $this->editingMonitorId = $monitor->id;
         $this->newLabel = (string) $monitor->label;
-        $this->newCheckType = $monitor->isSslCheck() ? SiteUptimeMonitor::CHECK_SSL : SiteUptimeMonitor::CHECK_HTTP;
+        $this->newCheckType = in_array($monitor->check_type, SiteUptimeMonitor::CHECK_TYPES, true)
+            ? $monitor->check_type
+            : SiteUptimeMonitor::CHECK_HTTPS;
         $this->newPath = (string) ($monitor->path ?? '');
         $this->newProbeWorker = $monitor->probe_worker;
         $this->newKeyword = (string) ($monitor->keywordAssertion() ?? '');
@@ -216,7 +180,7 @@ class Monitor extends Component
 
         $rules = [
             'newLabel' => 'required|string|max:120',
-            'newCheckType' => ['required', Rule::in([SiteUptimeMonitor::CHECK_HTTP, SiteUptimeMonitor::CHECK_SSL])],
+            'newCheckType' => ['required', Rule::in(SiteUptimeMonitor::CHECK_TYPES)],
         ];
         if (! $isSsl) {
             $rules['newPath'] = 'nullable|string|max:2048';
@@ -242,12 +206,11 @@ class Monitor extends Component
         }
 
         $worker = $workerOptions !== [] ? $this->newProbeWorker : null;
-        $region = $workerResolver->regionFor($worker)
-            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
+        $region = app(UptimeProbeRegionResolver::class)->forSite($this->site);
 
         $attributes = [
             'label' => $this->newLabel,
-            'check_type' => $isSsl ? SiteUptimeMonitor::CHECK_SSL : SiteUptimeMonitor::CHECK_HTTP,
+            'check_type' => $this->newCheckType,
             'path' => $isSsl ? null : $this->normalizePathInput($this->newPath),
             'config' => $this->buildConfig($isSsl),
             'probe_region' => $region,
@@ -410,11 +373,6 @@ class Monitor extends Component
         $runtimeTarget = $this->site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 
-        // Function-activity dashboard — serverless functions only.
-        $functionStats = $this->site->usesFunctionsRuntime()
-            ? app(FunctionStatsRangeQuery::class)->forSite($this->site, $this->statsRange)
-            : null;
-
         // Inline history for the expanded monitor only — keeps the page cheap
         // when nothing is expanded.
         $expandedHistory = null;
@@ -441,7 +399,6 @@ class Monitor extends Component
             'section' => $section,
             'runtimePublication' => $runtimePublication,
             'runtimeMode' => $runtimeMode,
-            'functionStats' => $functionStats,
             'expandedHistory' => $expandedHistory,
             'operationalState' => $operationalState,
             'uptimeNotifChannels' => $onAlertsTab ? $this->assignableUptimeNotificationChannels() : collect(),

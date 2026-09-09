@@ -108,7 +108,6 @@
         </aside>
 
         <div class="min-w-0 lg:col-span-9">
-            <x-trial-pause-banner :organization="$workspace->organization" />
             {{ $slot }}
         </div>
     </div>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Deploy\Services;
 
+use App\Models\CloudDatabase;
 use App\Models\LookoutProject;
 use App\Models\Site;
 use App\Models\SiteBinding;
@@ -12,6 +13,7 @@ use App\Modules\Deploy\Services\Concerns\ManagesAiBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesBroadcastingBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesCacheBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesCaptchaBindings;
+use App\Modules\Deploy\Services\Concerns\ManagesConnectedAppBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesDatabaseBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesErrorTrackingBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesLoggingBindings;
@@ -25,7 +27,6 @@ use App\Modules\Deploy\Services\Concerns\ManagesSessionBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesSmsBindings;
 use App\Modules\Deploy\Services\Concerns\ManagesStorageBindings;
 use App\Modules\Deploy\Services\Concerns\ResolvesReachableResources;
-use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
@@ -52,6 +53,7 @@ class SiteBindingManager
     use ManagesBroadcastingBindings;
     use ManagesCacheBindings;
     use ManagesCaptchaBindings;
+    use ManagesConnectedAppBindings;
     use ManagesDatabaseBindings;
     use ManagesErrorTrackingBindings;
     use ManagesLoggingBindings;
@@ -67,7 +69,6 @@ class SiteBindingManager
     use ResolvesReachableResources;
 
     public function __construct(
-        private readonly ServerDatabaseProvisioner $databaseProvisioner,
         private readonly ObjectStorageBucketProvisioner $bucketProvisioner,
     ) {}
 
@@ -86,10 +87,6 @@ class SiteBindingManager
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function reachableServerIdsForSite(Site $site): array
     {
         $server = $site->server;
@@ -98,12 +95,19 @@ class SiteBindingManager
     }
 
     /**
+     * Server IDs whose Redis-family services this site can attach: private-
+     * network peers plus same-org dedicated cache hosts. Empty when the site
+     * has no server.
+     *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string>>
-     */
+    public function attachableCacheServerIdsForSite(Site $site): array
+    {
+        $server = $site->server;
+
+        return $server === null ? [] : $this->attachableCacheServerIds($server);
+    }
+
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
@@ -140,6 +144,7 @@ class SiteBindingManager
             'search' => $this->attachSearch($site, $params),
             'payments' => $this->attachPayments($site, $params),
             'oauth' => $this->attachOauth($site, $params),
+            'connected_app' => $this->attachConnectedApp($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
         };
@@ -160,19 +165,51 @@ class SiteBindingManager
 
         $binding = match ($type) {
             'database' => $this->provisionDatabase($site, $params),
+            'redis' => $this->provisionRedis($site, $params),
             'storage' => $this->provisionBucket($site, $params),
             // Error tracking provisions only for Lookout (creates a project on
             // uselookout.app); every other provider has nothing to spin up and
             // falls back to attach inside provisionErrorTracking.
             'error_tracking' => $this->provisionErrorTracking($site, $params),
-            // Redis/queue/cache/scheduler/workers have no separate resource to
-            // spin up beyond what attach already wires, so provision falls back
+            // Queue/cache/scheduler/workers have no separate resource to spin
+            // up beyond what attach already wires, so provision falls back
             // to the attach path for v1 (which already adopts).
             default => $this->attachExisting($site, $type, $params),
         };
 
         $this->stampSetupProvenance($site, $binding);
         $this->adoptInjectedEnv($site, $binding);
+
+        return $binding;
+    }
+
+    /**
+     * Update an existing provisioned binding in place (connection name, driver
+     * wiring). Does not remake the underlying cluster or VM.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    public function updateEditedBinding(SiteBinding $binding, array $params): SiteBinding
+    {
+        $site = $binding->site;
+        if ($site === null) {
+            throw new InvalidArgumentException(__('That binding has no site.'));
+        }
+
+        $connection = $this->resolveInstanceConnectionName($site, $binding->type, $params);
+        $primary = $this->connectionIsPrimary($connection);
+        $config = is_array($binding->config) ? $binding->config : [];
+        $config['connection'] = $primary ? '' : $connection;
+        $config['use_for_drivers'] = filter_var($params['use_for_drivers'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        $binding->forceFill([
+            'name' => $primary ? 'primary' : $connection,
+            'config' => $config,
+        ])->save();
+
+        if ($binding->type === 'redis' && $primary && $config['use_for_drivers']) {
+            $this->applyRedisToDriverBindings($site);
+        }
 
         return $binding;
     }
@@ -281,10 +318,6 @@ class SiteBindingManager
      *
      * @return list<string> every key removed across all bindings
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function reAdoptAll(Site $site): array
     {
         $removed = [];
@@ -307,7 +340,7 @@ class SiteBindingManager
      *
      * @return list<string>
      */
-    private function ownedEnvKeys(SiteBinding $binding): array
+    public function ownedEnvKeys(SiteBinding $binding): array
     {
         return match ($binding->type) {
             // Only the PRIMARY (default) mailer owns the bare MAIL_* namespace.
@@ -351,8 +384,29 @@ class SiteBindingManager
             'search' => $this->searchOwnedEnvKeys(),
             'payments' => $this->paymentsOwnedEnvKeys(),
             'oauth' => $this->oauthOwnedEnvKeys(),
+            'connected_app' => $this->connectedAppOwnedEnvKeys($binding),
             default => [],
         };
+    }
+
+    /**
+     * Keys every attached binding owns on this site — injected or not.
+     * API mailers do not write MAIL_USERNAME / MAIL_SCHEME, but they still
+     * own the MAIL_* namespace so those keys are not "missing".
+     *
+     * @return list<string>
+     */
+    public function ownedEnvKeysForSite(Site $site): array
+    {
+        $site->loadMissing('bindings');
+        $keys = [];
+        foreach ($site->bindings as $binding) {
+            foreach ($this->ownedEnvKeys($binding) as $key) {
+                $keys[] = $key;
+            }
+        }
+
+        return array_values(array_unique($keys));
     }
 
     // ---- shared helpers ---------------------------------------------------
@@ -384,25 +438,33 @@ class SiteBindingManager
 
     /**
      * Guard a driver-style binding (queue/cache/session) against a missing
-     * dependency. The `redis` driver only injects QUEUE_CONNECTION/CACHE_STORE/
-     * SESSION_DRIVER=redis — the actual REDIS_HOST/PORT/PASSWORD come from a
-     * Redis binding. Without one, the config saves, the app boots, then dies at
-     * runtime the first time it touches the store. Block it up front with a
-     * message that says what to do instead. (We only enforce Redis: a database
-     * connection commonly already exists via server defaults or loose DB_* env,
-     * so requiring a database binding would false-positive too often.)
+     * store. `redis` and `database` only inject the selector
+     * (QUEUE_CONNECTION / CACHE_STORE / SESSION_DRIVER) — the actual
+     * REDIS_* / DB_* credentials come from those resource bindings. Without
+     * one, the config saves, the app boots, then dies at runtime the first
+     * time it touches the store. File / cookie / array stay unguarded.
      */
     private function assertDriverDependency(Site $site, string $resource, string $driver): void
     {
-        if ($driver !== 'redis') {
+        $need = match ($driver) {
+            'redis' => 'redis',
+            'database' => 'database',
+            default => null,
+        };
+        if ($need === null) {
             return;
         }
-        if (! $site->bindings()->where('type', 'redis')->exists()) {
-            throw new InvalidArgumentException(__(
-                'Attach a Redis resource before setting :resource to the redis driver — Redis supplies REDIS_HOST and the connection credentials.',
-                ['resource' => $resource],
-            ));
+        if ($site->bindings()->where('type', $need)->exists()) {
+            return;
         }
+
+        $label = $need === 'redis' ? __('Redis') : __('a database');
+        $keys = $need === 'redis' ? 'REDIS_HOST' : 'DB_HOST';
+
+        throw new InvalidArgumentException(__(
+            'Attach :store before setting :resource to the :driver driver — :store supplies :keys and the connection credentials.',
+            ['store' => $label, 'resource' => $resource, 'driver' => $driver, 'keys' => $keys],
+        ));
     }
 
     private function attachMarker(Site $site, string $type): SiteBinding
@@ -426,8 +488,8 @@ class SiteBindingManager
      * is therefore unaffected.
      *
      * @param  array<string, mixed>  $attributes
-     * @param  array<string, mixed>  $matchOn  Attribute keys (from $attributes, plus the
-     *                                         implicit site_id/type) to match the existing row on.
+     * @param  array<int, string>  $matchOn  Attribute keys (from $attributes, plus the
+     *                                       implicit site_id/type) to match the existing row on.
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {
@@ -522,6 +584,58 @@ class SiteBindingManager
      *
      * @param  array<string, mixed>  $attributes
      */
+    /**
+     * Env key NAMES this binding contributes, usable before it has any values.
+     *
+     * A configured binding answers from what it actually injected. A binding
+     * still coming up (a dedicated DB VM takes minutes; injected_env is [] until
+     * the provisioning job wires it) answers from the per-type key list that
+     * lives beside its generator — so the environment-mapping editor can render
+     * mappable rows during exactly the window when you want to set them up.
+     *
+     * Types with no key list fall back to whatever is already injected, which
+     * is complete for every configured binding and empty for a pending one.
+     * The editor then tells the operator to wait, which is honest.
+     *
+     * Lives here rather than on {@see SiteBinding} because the answer needs the
+     * generators, which are module code — and the model is kernel.
+     *
+     * @return list<string>
+     */
+    public function expectedEnvKeys(SiteBinding $binding): array
+    {
+        $injected = array_keys($binding->connectionEnv());
+        if ($injected !== []) {
+            return array_map(strval(...), $injected);
+        }
+
+        $config = is_array($binding->config) ? $binding->config : [];
+        $connection = (string) ($config['connection'] ?? '');
+
+        return match ($binding->type) {
+            'database' => $this->databaseEnvKeys((string) ($config['engine'] ?? ''), $connection),
+            'redis' => $this->redisEnvKeys($connection),
+            default => [],
+        };
+    }
+
+    /**
+     * @see ManagesRedisBindings — mirrors the key set built when a cache service
+     *      is attached. Redis has a pending window too (the dedicated cache-VM
+     *      placement wires injected_env from a job).
+     *
+     * @return list<string>
+     */
+    private function redisEnvKeys(string $connection): array
+    {
+        $primary = $this->connectionIsPrimary($connection);
+        $p = $primary ? 'REDIS_' : 'REDIS_'.strtoupper($connection).'_';
+
+        $keys = [$p.'HOST', $p.'PORT', $p.'PASSWORD'];
+
+        return $primary ? array_merge(['REDIS_CLIENT'], $keys) : $keys;
+    }
+
     private function persistInstanceBinding(Site $site, string $type, array $attributes, bool $primary, string $editingId): SiteBinding
     {
         $name = (string) ($attributes['name'] ?? '');
@@ -600,5 +714,28 @@ class SiteBindingManager
         if ($other instanceof SiteBinding) {
             throw new InvalidArgumentException(__('This site already has a primary :type (":name"). It will not be replaced — give this one a connection name to add it alongside, or detach/edit the existing primary first.', ['type' => $type, 'name' => $other->name]));
         }
+    }
+
+    private function previousCloudDatabaseTargetId(Site $site, string $editingId): string
+    {
+        if ($editingId === '') {
+            return '';
+        }
+
+        $existing = $site->bindings()->whereKey($editingId)->first();
+        if (! $existing instanceof SiteBinding || $existing->target_type !== 'cloud_database') {
+            return '';
+        }
+
+        return (string) ($existing->target_id ?? '');
+    }
+
+    private function forgetReplacedCloudDatabase(string $previousTargetId, string $newTargetId): void
+    {
+        if ($previousTargetId === '' || $previousTargetId === $newTargetId) {
+            return;
+        }
+
+        CloudDatabase::query()->whereKey($previousTargetId)->delete();
     }
 }

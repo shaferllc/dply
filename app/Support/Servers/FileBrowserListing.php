@@ -10,7 +10,7 @@ namespace App\Support\Servers;
 class FileBrowserListing
 {
     /**
-     * @param  array<string, mixed> $entries
+     * @param  list<\App\Support\Servers\FileBrowserEntry> $entries
      */
     public function __construct(
         public readonly string $path,

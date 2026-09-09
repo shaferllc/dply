@@ -4,7 +4,7 @@
             <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Plugins') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Plugins') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Plugins') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live list pulled from `wp plugin list`. Each row is cross-checked against Wordfence Intelligence for known CVEs.') }}</p>
         </div>
@@ -39,7 +39,7 @@
     @if ($canMutate)
         <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-6 py-3">
             <div class="min-w-0 flex-1">
-                <x-input-label for="wp_plugin_install" :value="__('Install plugin (wp.org slug)')" class="text-[11px]" />
+                <x-input-label for="wp_plugin_install" :value="__('Install plugin (wp.org slug)')" class="text-xs" />
                 <x-text-input id="wp_plugin_install" wire:model="pluginInstallSlug" wire:keydown.enter="installPlugin" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="wordpress-seo" />
             </div>
             <button
@@ -66,7 +66,7 @@
     @else
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/30 text-left text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
                         <th class="px-4 py-3 sm:px-6">{{ __('Plugin') }}</th>
                         <th class="px-4 py-3">{{ __('Version') }}</th>
@@ -83,13 +83,13 @@
                             <td class="px-4 py-3 text-brand-moss">v{{ $plugin['version'] }}</td>
                             <td class="px-4 py-3">
                                 <span @class([
-                                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                    'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                     'bg-brand-sage/15 text-brand-forest' => $active,
                                     'bg-brand-sand/40 text-brand-moss' => ! $active,
                                 ])>{{ $plugin['status'] }}</span>
                             </td>
                             <td class="px-4 py-3">
-                                <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                <div class="flex flex-wrap items-center gap-1.5 text-xs">
                                     @if ($plugin['update'] === 'available')
                                         <span class="rounded-full bg-brand-gold/20 px-2 py-0.5 font-semibold text-brand-ink">{{ __('Update available') }}</span>
                                     @endif
@@ -131,7 +131,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="px-6 py-3 text-[11px] text-brand-mist">{{ __('Vulnerability data: Wordfence Intelligence (free tier, 24h cache). Updates and activation changes queue and apply in the background — refresh to see the new state.') }}</p>
+        <p class="px-6 py-3 text-xs text-brand-mist">{{ __('Vulnerability data: Wordfence Intelligence (free tier, 24h cache). Updates and activation changes queue and apply in the background — refresh to see the new state.') }}</p>
     @endif
 
     <x-input-error :messages="$errors->get('plugins')" class="px-6 pb-4" />

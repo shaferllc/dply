@@ -42,7 +42,7 @@
                         'border-brand-gold/40 bg-brand-gold/8' => $unreadCount > 0,
                         'border-brand-ink/10 bg-white' => $unreadCount === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Unread') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Unread') }}</dt>
                         <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $unreadCount }}</dd>
                     </div>
                     <div @class([
@@ -50,15 +50,15 @@
                         'border-amber-200 bg-amber-50/60' => $attentionCount > 0,
                         'border-brand-ink/10 bg-white' => $attentionCount === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Attention') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Attention') }}</dt>
                         <dd class="mt-1 font-mono text-xl font-semibold tabular-nums {{ $attentionCount > 0 ? 'text-amber-700' : 'text-brand-ink' }}">{{ $attentionCount }}</dd>
                     </div>
                     <div class="rounded-2xl border border-brand-ink/10 bg-white px-3 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Saved') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Saved') }}</dt>
                         <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $savedCount }}</dd>
                     </div>
                     <div class="rounded-2xl border border-brand-ink/10 bg-white px-3 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total') }}</dt>
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Total') }}</dt>
                         <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalCount }}</dd>
                     </div>
                 </dl>
@@ -86,7 +86,7 @@
                             @php $tabCount = $key === 'unread' ? $unreadCount : ($key === 'saved' ? $savedCount : $totalCount); @endphp
                             @if ($tabCount > 0)
                                 <span @class([
-                                    'rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums',
+                                    'rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums',
                                     'bg-brand-cream/20 text-brand-cream' => $filter === $key,
                                     'bg-brand-sand/60 text-brand-moss' => $filter !== $key,
                                 ])>{{ $tabCount }}</span>
@@ -127,7 +127,7 @@
                     <button type="button" wire:click="unsaveSelected" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-white/70">
                         <x-heroicon-o-star class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {{ __('Unsave') }}
                     </button>
-                    <button type="button" wire:click="openConfirmActionModal('deleteSelected', [], @js(__('Delete selected notifications?')), @js(__('Saved (starred) ones are kept. This cannot be undone.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
+                    <button type="button" wire:click="openConfirmActionModal('deleteSelected', [], @js(__('Delete selected notifications?')), @js(__('Saved (starred) ones are kept. This cannot be undone.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">
                         <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {{ __('Delete') }}
                     </button>
                     <button type="button" wire:click="$set('selected', [])" class="ml-auto text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('Clear selection') }}</button>

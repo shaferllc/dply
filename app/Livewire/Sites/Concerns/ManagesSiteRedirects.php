@@ -105,7 +105,7 @@ trait ManagesSiteRedirects
         $this->new_redirect_code = 301;
         $this->new_redirect_header_rows = [['name' => '', 'value' => '']];
         $this->new_redirect_comment = '';
-        $this->finalizeRoutingMutation('Redirect added.');
+        $this->finalizeRoutingMutation('Redirect added.', closeModal: 'add-redirect-modal');
     }
 
     /**
@@ -114,7 +114,6 @@ trait ManagesSiteRedirects
      * inline edit form gets the same per-field error UX as the add form.
      *
      * @param  array<int, array{name?: string|null, value?: string|null}>  $rows
-     * @return array<string, string>|null Normalized headers, or null if all rows were blank.
      */
     protected function validateAndNormalizeRedirectHeaders(array $rows, string $errorKeyPrefix): ?array
     {
@@ -171,9 +170,7 @@ trait ManagesSiteRedirects
         $this->authorize('update', $this->site);
         $redirect = SiteRedirect::query()->where('site_id', $this->site->id)->findOrFail($redirectId);
         $this->editing_redirect_id = (string) $redirect->id;
-        $this->editing_redirect_kind = $redirect->kind instanceof SiteRedirectKind
-            ? $redirect->kind->value
-            : (string) $redirect->kind;
+        $this->editing_redirect_kind = $redirect->kind->value;
         $this->editing_redirect_from = (string) $redirect->from_path;
         $this->editing_redirect_to = (string) $redirect->to_url;
         $this->editing_redirect_code = (int) $redirect->status_code;
@@ -318,7 +315,7 @@ trait ManagesSiteRedirects
         }
 
         $this->bulk_redirect_input = '';
-        $this->finalizeRoutingMutation(__(':count redirect(s) imported.', ['count' => count($parsed)]));
+        $this->finalizeRoutingMutation(__(':count redirect(s) imported.', ['count' => count($parsed)]), closeModal: 'add-redirect-modal');
     }
 
     public function addNewRedirectHeaderRow(): void

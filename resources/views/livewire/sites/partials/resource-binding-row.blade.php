@@ -26,7 +26,7 @@
             <p class="mt-1 text-xs text-slate-500">{{ __('Queue driver: :driver', ['driver' => $driver]) }}</p>
         @endif
     </div>
-    <span class="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ ($binding['status'] ?? 'pending') === 'configured' ? $configuredClass : 'bg-slate-100 text-slate-700' }}">
+    <span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold {{ ($binding['status'] ?? 'pending') === 'configured' ? $configuredClass : 'bg-slate-100 text-slate-700' }}">
         {{ str($binding['status'] ?? 'pending')->headline() }}
     </span>
 </div>

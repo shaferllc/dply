@@ -36,7 +36,7 @@ test('nav shows all items when stack summary is missing', function () {
     expect($keys)->toContain('runtime', 'databases', 'daemons', 'network');
 });
 
-test('nav hides php and databases when stack excludes them', function () {
+test('nav hides php when the stack excludes it but keeps databases', function () {
     $server = serverWithStack([
         'webserver' => 'haproxy',
         'php_version' => 'none',
@@ -54,8 +54,11 @@ test('nav hides php and databases when stack excludes them', function () {
         ->all();
 
     expect($memberKeys)->not->toContain('php');
-    expect($keys)->not->toContain('databases');
-    expect($memberKeys)->not->toContain('databases');
+
+    // Databases stays visible even with no engine installed — the page itself is
+    // where MySQL/MariaDB/PostgreSQL/SQLite get installed, so the nav entry can't
+    // be gated on one already being there (same rule as daemons, below).
+    expect($keys)->toContain('databases');
 
     // Daemons stays visible even without supervisor installed — the page itself
     // offers the Install Supervisor CTA, so the nav entry can't be gated on it.
@@ -188,7 +191,7 @@ test('route gate returns 404 for php when php is not installed', function () {
         ->assertNotFound();
 });
 
-test('route gate returns 404 for databases when no db is installed', function () {
+test('route gate allows databases when no db is installed so one can be installed', function () {
     $server = serverWithStack([
         'webserver' => 'nginx',
         'php_version' => '8.3',
@@ -197,9 +200,12 @@ test('route gate returns 404 for databases when no db is installed', function ()
         'expected_services' => ['nginx', 'php-fpm'],
     ]);
 
+    // The Databases workspace is the install surface for database engines, and a
+    // site's Database tab links here ("Manage server databases") exactly when the
+    // server has none — 404ing this deep link left the operator with no way in.
     $this->actingAs($server->user)
         ->get(route('servers.databases', $server))
-        ->assertNotFound();
+        ->assertOk();
 });
 
 test('route gate allows php when php is installed', function () {

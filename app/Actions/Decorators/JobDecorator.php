@@ -184,8 +184,8 @@ class JobDecorator implements ShouldQueue
             return $this->parameters;
         }
 
-        /** @var ReflectionParameter $firstParameter */
-        if (! $firstParameter = Arr::first($reflectionMethod->getParameters())) {
+        $firstParameter = Arr::first($reflectionMethod->getParameters());
+        if (! $firstParameter instanceof ReflectionParameter) {
             return $this->parameters;
         }
 

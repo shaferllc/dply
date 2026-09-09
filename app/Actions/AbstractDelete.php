@@ -102,6 +102,19 @@ use Illuminate\Support\Str;
  * - `shouldForceDelete()` - Control force delete behavior
  * - `beforeDelete($resource, array $arguments)` - Pre-deletion tasks
  * - `afterDelete($result, array $arguments)` - Post-deletion tasks
+ *
+ * Subclasses define handle() with their own domain signature, so it cannot be
+ * declared `abstract` here (not contravariant with a variadic parent). The tag
+ * states the contract the As* traits call through; a real handle() overrides it.
+ *
+ * @method mixed handle(mixed ...$arguments)
+ *
+ * @phpstan-consistent-constructor
+ *   The As* traits construct actions late-bound — AsEvent does
+ *   `new static(...$arguments)`, AsResource `new static($item)`. The
+ *   constructor comes from AsDependent and is variadic, so every subclass
+ *   shares it; declaring that makes the late-bound construction safe
+ *   instead of unchecked, and PHPStan now enforces the consistency.
  */
 #[TransactionAttempts(1)]
 #[WatermarkMode('append')]
@@ -801,13 +814,11 @@ abstract class AbstractDelete
      */
     protected function storeReversalData($resource, array $additionalData = []): void
     {
-        if (method_exists($this, 'setReversalData')) {
-            $this->setReversalData(array_merge([
-                'resource_id' => $resource->id ?? null,
-                'resource_type' => get_class($resource),
-                'resource_state' => $this->getResourceState($resource),
-            ], $additionalData));
-        }
+        $this->setReversalData(array_merge([
+            'resource_id' => $resource->id ?? null,
+            'resource_type' => get_class($resource),
+            'resource_state' => $this->getResourceState($resource),
+        ], $additionalData));
     }
 
     /**

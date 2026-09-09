@@ -175,7 +175,6 @@ class ApplyInsightFixJob implements ShouldQueue
         return new InsightsBannerStream(
             entity: $entity,
             runId: (string) $this->runId,
-            findingId: $finding->id,
             statusKeyConfig: 'insights_workspace.meta_fix_status_key',
             finishedKeyConfig: 'insights_workspace.meta_fix_finished_at_key',
             errorKeyConfig: 'insights_workspace.meta_fix_error_key',

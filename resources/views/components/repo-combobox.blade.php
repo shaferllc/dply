@@ -10,16 +10,21 @@
     // Currently-selected URL, so the trigger can show its label on first paint.
     'selected' => null,
     'placeholder' => null,
+    'searchPlaceholder' => null,
+    'mono' => true,
+    'emptyMessage' => null,
 ])
 
 @php
     $placeholder ??= __('Select a repository…');
+    $searchPlaceholder ??= __('Filter repositories…');
+    $emptyMessage ??= __('No repositories match your filter.');
     // Normalize to a flat {label,url} list once, server-side, so the Alpine
     // filter has a stable shape regardless of what the provider browser returns.
     $normalized = collect($repositories)
         ->map(fn ($r) => [
-            'label' => (string) ($r['label'] ?? $r['name'] ?? $r['url'] ?? ''),
-            'url' => (string) ($r['url'] ?? ''),
+            'label' => (string) ($r['label'] ?? $r['name'] ?? $r['url'] ?? $r['id'] ?? ''),
+            'url' => (string) ($r['url'] ?? $r['value'] ?? $r['id'] ?? ''),
         ])
         ->values();
     $selectedRepository = $normalized->firstWhere('url', $selected);
@@ -37,6 +42,26 @@
         open: false,
         search: '',
         active: 0,
+        panelStyle: '',
+        /**
+         * Measure the trigger and pin the teleported panel to it. Flips above
+         * when there is not room below, so a field near the viewport bottom does
+         * not open off-screen.
+         */
+        positionPanel() {
+            const trigger = this.$refs.trigger;
+            if (! trigger) return;
+            const r = trigger.getBoundingClientRect();
+            const gap = 8;
+            const desired = 320;
+            const below = window.innerHeight - r.bottom;
+            const flip = below < desired && r.top > below;
+            const vertical = flip
+                ? `bottom:${window.innerHeight - r.top + gap}px;`
+                : `top:${r.bottom + gap}px;`;
+            const maxH = Math.max(160, (flip ? r.top : below) - gap * 2);
+            this.panelStyle = `left:${r.left}px; width:${r.width}px; ${vertical} max-height:${maxH}px; overflow:auto;`;
+        },
         prop: @js($property),
         repos: @js($normalized),
         get filtered() {
@@ -46,7 +71,7 @@
         },
         get current() { return $wire.get(this.prop); },
         toggle() { this.open ? this.close() : this.openList(); },
-        openList() { this.open = true; this.active = 0; this.$nextTick(() => this.$refs.repoSearch && this.$refs.repoSearch.focus()); },
+        openList() { this.open = true; this.active = 0; this.$nextTick(() => this.positionPanel()); this.$nextTick(() => this.$refs.repoSearch && this.$refs.repoSearch.focus()); },
         close() { this.open = false; this.search = ''; },
         move(delta) {
             const n = this.filtered.length;
@@ -72,7 +97,7 @@
         wire:loading.attr="disabled" wire:target="{{ $target }}"
         class="flex w-full items-center justify-between gap-3 rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2.5 text-left text-sm shadow-sm transition focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink dark:bg-brand-ink/20"
     >
-        <span class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">
+        <span @class(['min-w-0 flex-1 truncate text-sm text-brand-ink', 'font-mono' => $mono])>
             <span wire:loading.remove wire:target="{{ $target }}">{{ $selectedRepository['label'] ?? $placeholder }}</span>
             <span wire:loading wire:target="{{ $target }}" class="inline-flex items-center gap-1.5 text-brand-moss">
                 <x-spinner size="sm" />
@@ -82,14 +107,24 @@
         <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" aria-hidden="true" />
     </button>
 
-    <div
-        x-cloak
-        x-show="open"
-        x-transition.origin.top
-        x-on:click.outside="close()"
-        role="listbox"
-        class="absolute z-20 mt-2 w-full rounded-2xl border border-brand-ink/10 bg-white p-2 shadow-xl shadow-brand-ink/10"
-    >
+    {{-- Fixed + teleported to body: every create/settings surface wraps this in
+         x-profile-shell, which is overflow-hidden (it clips the sand header's
+         rounded corners), so an absolutely-positioned panel gets cut off at the
+         card edge. Position is measured from the trigger and kept in sync while
+         open. --}}
+    <template x-teleport="body">
+        <div
+            x-cloak
+            x-show="open"
+            x-transition.origin.top
+            x-on:click.outside="close()"
+            x-effect="open && positionPanel()"
+            x-on:resize.window="open && positionPanel()"
+            x-on:scroll.window.passive="open && positionPanel()"
+            role="listbox"
+            x-bind:style="panelStyle"
+            class="fixed z-[120] rounded-2xl border border-brand-ink/10 bg-white p-2 shadow-xl shadow-brand-ink/10"
+        >
         <div class="relative">
             <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-moss" aria-hidden="true" />
             <input
@@ -100,7 +135,7 @@
                 x-on:keydown.arrow-up.prevent="move(-1)"
                 x-on:keydown.enter.prevent="chooseActive()"
                 type="text"
-                placeholder="{{ __('Filter repositories…') }}"
+                placeholder="{{ $searchPlaceholder }}"
                 class="block w-full rounded-xl border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm text-brand-ink placeholder:text-brand-mist focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink"
             />
         </div>
@@ -119,11 +154,12 @@
                         'bg-brand-sand/40 ring-1 ring-brand-ink/15': repo.url === current && i !== active,
                         'hover:bg-brand-sand/30': i !== active && repo.url !== current,
                     }"
-                    class="block w-full rounded-lg px-3 py-2 text-left font-mono text-sm text-brand-ink transition"
+                    class="block w-full rounded-lg px-3 py-2 text-left text-sm text-brand-ink transition {{ $mono ? 'font-mono' : '' }}"
                     x-text="repo.label"
                 ></button>
             </template>
-            <p x-show="filtered.length === 0" class="px-3 py-2 text-xs text-brand-moss">{{ __('No repositories match your filter.') }}</p>
+            <p x-show="filtered.length === 0" class="px-3 py-2 text-xs text-brand-moss">{{ $emptyMessage }}</p>
+            </div>
         </div>
-    </div>
+    </template>
 </div>

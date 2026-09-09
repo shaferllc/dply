@@ -6,15 +6,16 @@ namespace App\Actions\Servers;
 
 use App\Actions\Concerns\AsObject;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\AwsEc2Service;
-use App\Modules\Cloud\Services\AzureComputeService;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\OracleComputeService;
-use App\Modules\Cloud\Services\OvhService;
-use App\Modules\Cloud\Services\UpCloudService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\AwsEc2Service;
+use App\Modules\Providers\Services\AzureComputeService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\OracleComputeService;
+use App\Modules\Providers\Services\OvhService;
+use App\Modules\Providers\Services\UpCloudService;
+use App\Modules\Providers\Services\VultrService;
+use App\Support\Providers\ProviderAuthFailure;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
@@ -83,13 +84,13 @@ final class BuildProviderCredentialHealth
     private function runHealthCheck(string $type, ProviderCredential $credential): void
     {
         match ($type) {
-            'digitalocean', 'digitalocean_functions', 'digitalocean_kubernetes' => (new DigitalOceanService($credential))->validateToken(),
+            'digitalocean', 'digitalocean_kubernetes' => (new DigitalOceanService($credential))->validateToken(),
             'hetzner' => (new HetznerService($credential))->validateToken(),
             'linode' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),
             'ovh' => (new OvhService($credential))->validateToken(),
             'upcloud' => (new UpCloudService($credential))->validateToken(),
-            'aws', 'aws_lambda' => (new AwsEc2Service($credential))->validateCredentials(),
+            'aws' => (new AwsEc2Service($credential))->validateCredentials(),
             'azure' => (new AzureComputeService($credential))->validateCredentials(),
             'oracle' => (new OracleComputeService($credential))->validateCredentials(),
             default => throw new \InvalidArgumentException('Unsupported provider type for health check.'),
@@ -102,6 +103,10 @@ final class BuildProviderCredentialHealth
     private function classifyFailure(string $type, Throwable $e): array
     {
         $message = strtolower(trim($e->getMessage()));
+
+        if (ProviderAuthFailure::detected($e->getMessage())) {
+            return ['invalid', 'error', __('Credential validation failed'), __('The provider rejected this credential. Re-enter or rotate it before provisioning.')];
+        }
 
         if (str_contains($message, 'required')
             || str_contains($message, 'project id')

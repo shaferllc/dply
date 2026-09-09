@@ -30,7 +30,6 @@ final class ServerReleaseHygiene
      *     prune_command: array{name: string, description: string, installed: bool},
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get([
@@ -310,7 +309,7 @@ final class ServerReleaseHygiene
             return ['pct' => null, 'captured_at' => null];
         }
 
-        $payload = is_array($snapshot->payload) ? $snapshot->payload : [];
+        $payload = $snapshot->payload;
         $pct = isset($payload['disk_pct']) ? (float) $payload['disk_pct'] : null;
 
         return [

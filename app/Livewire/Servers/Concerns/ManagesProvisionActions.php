@@ -28,8 +28,6 @@ use App\Support\Servers\ProvisionPipelineLog;
  */
 trait ManagesProvisionActions
 {
-
-
     public function openCancelProvisionModal(): void
     {
         $this->authorize('update', $this->server);
@@ -166,7 +164,7 @@ trait ManagesProvisionActions
 
         ProvisionPipelineLog::info('server.provision.journey.retry_cloud_dispatched', $fresh, [
             'phase' => 'ui',
-            'provider' => $fresh->provider?->value,
+            'provider' => $fresh->provider->value,
         ]);
 
         $job::dispatch($fresh);
@@ -240,7 +238,7 @@ trait ManagesProvisionActions
 
         ProvisionPipelineLog::info('server.provision.journey.edit_and_retry_dispatched', $server, [
             'phase' => 'ui',
-            'provider' => $server->provider?->value,
+            'provider' => $server->provider->value,
         ]);
 
         // Drop the failed server — no provider resource exists so this
@@ -266,7 +264,7 @@ trait ManagesProvisionActions
         // we don't want to expose the plaintext just to round-trip it.
         return [
             'mode' => 'provider',
-            'type' => $server->provider?->value ?? '',
+            'type' => $server->provider->value,
             'name' => (string) ($server->name ?? ''),
             'provider_credential_id' => (string) ($server->provider_credential_id ?? ''),
             'region' => (string) ($server->region ?? ''),

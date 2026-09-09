@@ -65,15 +65,15 @@
                             <a href="{{ route('sites.show', [$member->server, $member]) }}" wire:navigate class="text-sm font-semibold text-brand-ink hover:text-brand-forest hover:underline">{{ $member->name }}</a>
                             <span class="text-xs text-brand-moss">{{ $member->server?->name ?? __('Server') }}</span>
                             @if ((string) $group->leader_site_id === (string) $member->id)
-                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Leader') }}</span>
+                                <span class="rounded-full bg-brand-forest/10 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Leader') }}</span>
                             @endif
                         </div>
                         @if ($canManage)
                             <div class="flex items-center gap-2">
                                 @if ((string) $group->leader_site_id !== (string) $member->id)
-                                    <button type="button" wire:click="setLeader('{{ $group->id }}', '{{ $member->id }}')" class="rounded-lg border border-brand-ink/15 px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Make leader') }}</button>
+                                    <button type="button" wire:click="setLeader('{{ $group->id }}', '{{ $member->id }}')" class="rounded-lg border border-brand-ink/15 px-2.5 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Make leader') }}</button>
                                 @endif
-                                <button type="button" wire:click="removeSite('{{ $member->id }}')" class="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
+                                <button type="button" wire:click="removeSite('{{ $member->id }}')" class="rounded-lg border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50">{{ __('Remove') }}</button>
                             </div>
                         @endif
                     </div>

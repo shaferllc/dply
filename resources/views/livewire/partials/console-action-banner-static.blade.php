@@ -188,7 +188,16 @@
                     </div>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                    @if (! $busyRow)
+                    @if ($run->isCancellable() && method_exists($this, 'cancelConsoleActionRun'))
+                        <button
+                            type="button"
+                            wire:click="cancelConsoleActionRun('{{ $run->id }}')"
+                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
+                        >
+                            <x-heroicon-o-stop class="h-4 w-4" />
+                            {{ __('Stop') }}
+                        </button>
+                    @elseif (! $busyRow)
                         <button
                             type="button"
                             wire:click="dismissConsoleActionRun('{{ $run->id }}')"
@@ -309,7 +318,7 @@
                             <p class="mt-0.5 text-xs text-brand-mist">{{ __('Started :time', ['time' => $run->started_at->diffForHumans()]) }}{{ $run->finished_at ? ' — '.__('finished :time', ['time' => $run->finished_at->diffForHumans()]) : '' }}</p>
                         @endif
                     </div>
-                    <span class="shrink-0 rounded-full bg-brand-ink/10 px-2 py-0.5 font-mono text-[10px] text-brand-moss">{{ count($lines) }} {{ trans_choice('line|lines', count($lines)) }}</span>
+                    <span class="shrink-0 rounded-full bg-brand-ink/10 px-2 py-0.5 font-mono text-2xs text-brand-moss">{{ count($lines) }} {{ trans_choice('line|lines', count($lines)) }}</span>
                 </div>
                 <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                     <div class="relative" x-data="{ copied: false, copy() { navigator.clipboard.writeText(this.$refs.out.innerText).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">

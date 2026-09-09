@@ -11,8 +11,17 @@ namespace App\Modules\Realtime\Services;
  */
 class RealtimeBackendFactory
 {
+    /**
+     * An explicitly bound backend wins over both branches below, so a caller
+     * that needs to substitute one — a test asserting on the order of relay
+     * calls, say — can bind it rather than reach through these statics.
+     */
     public static function make(): RealtimeBackend
     {
+        if (app()->bound(RealtimeBackend::class)) {
+            return app(RealtimeBackend::class);
+        }
+
         if (self::fakeEnabled()) {
             return new FakeRealtimeBackend;
         }

@@ -30,6 +30,9 @@ final class ServerSshSessionManager
         string $publicKey,
         Carbon $expiresAt,
         string $targetLinuxUser = '',
+        string $keyOptions = '',
+        ?string $privateKey = null,
+        bool $syncNow = true,
     ): ServerSshSession {
         $organization = $server->organization;
         if (! $organization instanceof Organization) {
@@ -64,6 +67,7 @@ final class ServerSshSessionManager
             'target_linux_user' => trim($targetLinuxUser),
             'expires_at' => $expiresAt,
             'provisioned_at' => now(),
+            'private_key' => $privateKey,
         ]);
 
         $authorizedKey = ServerAuthorizedKey::query()->create([
@@ -73,12 +77,15 @@ final class ServerSshSessionManager
             'managed_key_id' => $session->id,
             'name' => $this->keyName($session),
             'public_key' => $line,
+            'key_options' => trim($keyOptions) !== '' ? trim($keyOptions) : null,
             'review_after' => $expiresAt->toDateString(),
         ]);
 
         $session->update(['server_authorized_key_id' => $authorizedKey->id]);
 
-        if ($server->isReady()) {
+        // Callers on an HTTP request pass syncNow: false and queue the sync —
+        // SSH in the render path blocks until max_execution_time.
+        if ($syncNow && $server->isReady()) {
             try {
                 $this->synchronizer->sync($server);
             } catch (\Throwable $e) {
@@ -100,7 +107,7 @@ final class ServerSshSessionManager
         return $session->fresh(['serverAuthorizedKey', 'createdBy']);
     }
 
-    public function revoke(ServerSshSession $session): void
+    public function revoke(ServerSshSession $session, bool $syncNow = true): void
     {
         if ($session->isRevoked()) {
             return;
@@ -117,7 +124,7 @@ final class ServerSshSessionManager
         $session->update(['revoked_at' => now()]);
 
         $server = $session->server;
-        if ($server instanceof Server && $server->isReady()) {
+        if ($syncNow && $server instanceof Server && $server->isReady()) {
             try {
                 $this->synchronizer->sync($server);
             } catch (\Throwable $e) {

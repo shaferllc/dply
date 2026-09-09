@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
-use App\Jobs\PreflightSiteSetupJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
@@ -14,16 +14,14 @@ use App\Livewire\Sites\Concerns\ManagesRepositoryBrowsing;
 use App\Livewire\Sites\Concerns\ManagesRepositoryConnection;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployment;
-use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
@@ -49,6 +47,7 @@ class Repository extends Component
 {
     use BuildsRepositoryView;
     use ConfiguresGitRepository;
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesRepositoryBrowsing;
     use ManagesRepositoryConnection;
@@ -114,7 +113,6 @@ class Repository extends Component
     #[Url(as: 'commits_page', except: 1)]
     public int $commitsPage = 1;
 
-
     // Connection-tab repository picker state (repo_source, source_control_account_id,
     // repository_selection, git_repository_url, git_branch, git_ref_kind,
     // linkedSourceControlAccounts, availableRepositories) lives in the
@@ -128,10 +126,6 @@ class Repository extends Component
     {
         if ($this->embedded || $this->lockedTab !== '') {
             return view('livewire.sites.partials._panel-skeleton');
-        }
-
-        if (! isset($this->server, $this->site)) {
-            return view('livewire.servers.partials.workspace-placeholder-empty');
         }
 
         $tabs = [
@@ -185,7 +179,6 @@ class Repository extends Component
         $this->primeRepositoryPicker(app(SourceControlRepositoryBrowser::class));
     }
 
-
     /** Trait hook: linked accounts refreshed after connecting a provider mid-flow. */
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
@@ -197,7 +190,6 @@ class Repository extends Component
         }
         $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
     }
-
 
     /**
      * Trait hook (before the account list/selection clears): authorize the edit.
@@ -239,20 +231,11 @@ class Repository extends Component
         $this->clearRepoRefSelection();
     }
 
-    protected function onRepositoryAutoselected(): void
-    {
-        $this->clearRepoRefSelection();
-    }
-
-
     /* ──────────── Files navigation ──────────── */
-
 
     /* ──────────── Branches ──────────── */
 
-
     /* ──────────── Connection tab actions ──────────── */
-
 
     /* ──────────── Render ──────────── */
 
@@ -282,6 +265,9 @@ class Repository extends Component
             // owns this site (held for env/resources, scanning, or scan failure).
             // It disappears the moment the first deploy lands.
             'showSetupTab' => $this->site->isInFirstDeploySetup() || $this->site->needsFirstDeploySetup(),
+            // Resolved up front: the no-repo branch below returns early, and the
+            // view reads $activeTab on every path (tablist + CLI footer).
+            'activeTab' => $this->activeTab(),
         ];
 
         // Embedded/locked hosts (the Deployments page) render eagerly — they
@@ -297,8 +283,7 @@ class Repository extends Component
             return view('livewire.sites.repository', $payload + $this->renderConnectionPayload($browser, $user));
         }
 
-        $activeTab = $this->activeTab();
-        $payload['activeTab'] = $activeTab;
+        $activeTab = $payload['activeTab'];
 
         if (! $lazyHost && ($activeTab === 'connection' || $activeTab === 'webhook')) {
             $this->primeConnectionRepositories();
@@ -349,6 +334,4 @@ class Repository extends Component
      * remote reads); 'webhook' is included for the locked webhook embed.
      */
     private const LAZY_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'webhook'];
-
-
 }

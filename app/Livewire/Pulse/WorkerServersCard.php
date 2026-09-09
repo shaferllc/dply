@@ -21,6 +21,9 @@ class WorkerServersCard extends ServiceServersCard
         return 'heroicon-o-cpu-chip';
     }
 
+    /**
+     * @return Collection<int, int|string>
+     */
     protected function serverIds(): Collection
     {
         return Server::query()->whereNotNull('pool_role')->pluck('id');

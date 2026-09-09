@@ -8,7 +8,9 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
+use App\Modules\Database\Jobs\AllowReplicaServersOnManagedDatabasesJob;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use Illuminate\Support\Str;
 
 /**
@@ -27,6 +29,34 @@ class WorkerWorkloadReplayer
         private readonly SiteDeployPipelineManager $pipelines,
         private readonly PoolEnvTransformer $envTransformer,
     ) {}
+
+    /**
+     * Copy one origin web site onto a worker box as a hidden fleet replica.
+     * Always applies the replica transform (no scheduler).
+     */
+    public function replicateOriginSite(Site $originSite, Server $target): int
+    {
+        $originSite->loadMissing(['processes', 'bindings']);
+        $crossRegion = (bool) ($target->meta['cross_region'] ?? false);
+        $result = $this->replicateSite($originSite, $target, asReplica: true, crossRegion: $crossRegion, fleetReplica: true);
+
+        $meta = is_array($target->meta) ? $target->meta : [];
+        $pool = $meta['pool'] ?? [];
+        $pool['pending_deploys'] = [$result['site_id']];
+        if ($crossRegion) {
+            $pool['exposures'] = $result['exposures'];
+        }
+        $meta['pool'] = $pool;
+        $target->forceFill(['meta' => $meta])->save();
+
+        return 1;
+    }
+
+    /** Replica .env transform (demote DPLY_WORKER_ROLE=primary). */
+    public function replicaEnv(string $env): string
+    {
+        return $this->transformEnv($env, asReplica: true);
+    }
 
     /**
      * Replicate all of $source's sites onto $target. $target should already be
@@ -70,7 +100,7 @@ class WorkerWorkloadReplayer
     /**
      * @return array{site_id: string, exposures: list<array<string, mixed>>}
      */
-    private function replicateSite(Site $sourceSite, Server $target, bool $asReplica, bool $crossRegion = false): array
+    private function replicateSite(Site $sourceSite, Server $target, bool $asReplica, bool $crossRegion = false, bool $fleetReplica = false): array
     {
         $exposures = [];
         $env = $this->transformEnv((string) $sourceSite->env_file_content, $asReplica);
@@ -118,19 +148,32 @@ class WorkerWorkloadReplayer
             'deployment_environment' => $sourceSite->deployment_environment ?: 'production',
             'restart_supervisor_programs_after_deploy' => (bool) $sourceSite->restart_supervisor_programs_after_deploy,
             'env_file_content' => $env,
-            'meta' => $this->replicaSiteMeta($sourceSite, $pinnedSha),
+            'meta' => $this->replicaSiteMeta($sourceSite, $pinnedSha, $fleetReplica),
         ]);
 
         $this->replicateProcesses($sourceSite, $newSite, $asReplica);
         $this->replicateBindings($sourceSite, $newSite);
 
-        // Seed the deploy pipeline from runtime defaults (mirrors normal create).
-        $framework = (string) ($sourceSite->meta['framework'] ?? '');
-        $this->pipelines->seedRuntimeDefaults(
-            $newSite,
-            $newSite->runtime,
-            $framework !== '' ? $framework : null,
-        );
+        // Inherit the PRIMARY's deploy pipeline rather than seeding generic
+        // runtime defaults — a replica that deploys differently from the site it
+        // replicates is not a replica. Falls back to defaults only when the
+        // primary has no pipeline of its own to copy.
+        $projected = app(WorkerReplicaDeployConfigSync::class)->sync($sourceSite, $newSite);
+
+        if (! $projected) {
+            $framework = (string) ($sourceSite->meta['framework'] ?? '');
+            $this->pipelines->seedRuntimeDefaults(
+                $newSite,
+                $newSite->runtime,
+                $framework !== '' ? $framework : null,
+            );
+        }
+
+        // A hosted (managed) database locks its trusted sources to the server
+        // present when it was provisioned, so a replica on a new droplet cannot
+        // reach it — right credentials, connection times out. Allowlist the new
+        // server as soon as it exists rather than waiting for a deploy.
+        AllowReplicaServersOnManagedDatabasesJob::dispatch((string) $sourceSite->id);
 
         // Provision the site (caddy + worker page for a worker host). The first
         // deploy is owned by the reconciler, which fires it only once this site
@@ -203,7 +246,7 @@ class WorkerWorkloadReplayer
     /**
      * @return array<string, mixed>
      */
-    private function replicaSiteMeta(Site $sourceSite, string $pinnedSha = ''): array
+    private function replicaSiteMeta(Site $sourceSite, string $pinnedSha = '', bool $fleetReplica = false): array
     {
         $meta = is_array($sourceSite->meta) ? $sourceSite->meta : [];
 
@@ -214,6 +257,11 @@ class WorkerWorkloadReplayer
         }
 
         $meta['replicated_from_site_id'] = (string) $sourceSite->id;
+        if ($fleetReplica) {
+            $meta['fleet_replica_of_site_id'] = (string) $sourceSite->id;
+            $meta['fleet_hidden'] = true;
+            $meta['worker_mode'] = true;
+        }
 
         // When pinned to a specific commit, the git ref kind must be 'commit' so
         // the deploy checks out that SHA instead of treating it as a branch.

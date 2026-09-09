@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Modules\TaskRunner\Exceptions\ConnectionNotFoundException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 test('can create ConnectionNotFoundException with default constructor', function () {
     $exception = new ConnectionNotFoundException;

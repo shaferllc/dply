@@ -129,7 +129,7 @@ trait ConfiguresGitRepository
     public function updatedRepositorySelection(string $value): void
     {
         foreach ($this->availableRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
+            if ($repository['url'] !== $value) {
                 continue;
             }
             $this->git_repository_url = (string) $repository['url'];
@@ -163,8 +163,35 @@ trait ConfiguresGitRepository
     }
 
     /**
-     * Reload {@see $availableRepositories} for the selected account, and
-     * auto-select the first repo when nothing is chosen yet.
+     * Re-fetch the repository list for the selected account.
+     *
+     * The list is fetched once when an account is picked and then held in a
+     * Livewire property, so a repository created after that point never appears
+     * and there was no way to ask again short of reloading the page. The
+     * browser hits the provider API live (nothing is cached server-side), so
+     * this genuinely returns new repos.
+     */
+    public function refreshRepositoryList(SourceControlRepositoryBrowser $repositoryBrowser): void
+    {
+        $before = count($this->availableRepositories);
+
+        $this->refreshRepositories($repositoryBrowser);
+
+        $after = count($this->availableRepositories);
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess($after > $before
+                ? trans_choice('Found :count new repository|Found :count new repositories', $after - $before, ['count' => $after - $before])
+                : __('Repository list is up to date.'));
+        }
+    }
+
+    /**
+     * Reload {@see $availableRepositories} for the selected account.
+     *
+     * Leaves Repository unselected unless the operator already picked one, or
+     * an explicit prefill (query / last-used / pasted URL) already matches a
+     * row. Never defaults to the first repo in the list.
      */
     protected function refreshRepositories(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
@@ -179,13 +206,40 @@ trait ConfiguresGitRepository
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
 
-        if ($this->availableRepositories !== [] && $this->repository_selection === '') {
-            $first = $this->availableRepositories[0];
-            $this->repository_selection = (string) $first['url'];
-            $this->git_repository_url = (string) $first['url'];
-            $this->git_branch = (string) ($first['branch'] ?: 'main');
-            $this->git_ref_kind = 'branch';
-            $this->onRepositoryAutoselected();
+        $this->restorePrefillRepositorySelection();
+    }
+
+    /**
+     * If the operator (or a prefill) already named a repo, keep that row
+     * selected when it is still in the list. Do not invent a first-repo default.
+     */
+    private function restorePrefillRepositorySelection(): void
+    {
+        if ($this->availableRepositories === []) {
+            return;
+        }
+
+        $preferred = trim($this->repository_selection) !== ''
+            ? trim($this->repository_selection)
+            : trim($this->git_repository_url);
+
+        if ($preferred === '') {
+            return;
+        }
+
+        foreach ($this->availableRepositories as $repository) {
+            if ((string) $repository['url'] !== $preferred) {
+                continue;
+            }
+
+            $this->repository_selection = (string) $repository['url'];
+            $this->git_repository_url = (string) $repository['url'];
+            if (trim($this->git_branch) === '') {
+                $this->git_branch = (string) ($repository['branch'] ?: 'main');
+                $this->git_ref_kind = 'branch';
+            }
+
+            return;
         }
     }
 
@@ -394,7 +448,4 @@ trait ConfiguresGitRepository
 
     /** Host hook: after a manual repository URL is typed. */
     protected function onManualRepoUrlChanged(): void {}
-
-    /** Host hook: after the first repository is auto-selected on account load. */
-    protected function onRepositoryAutoselected(): void {}
 }

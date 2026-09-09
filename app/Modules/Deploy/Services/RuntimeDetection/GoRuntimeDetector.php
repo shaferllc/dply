@@ -46,7 +46,7 @@ final class GoRuntimeDetector implements RuntimeDetector
         $reasons[] = "Suggested build: `{$buildCommand}`.";
         $reasons[] = "Suggested start: `{$startCommand}`.";
 
-        $confidence = $framework !== null && $framework !== 'go' ? 'high' : 'medium';
+        $confidence = $framework !== 'go' ? 'high' : 'medium';
 
         return new RuntimeDetection(
             runtime: 'go',
@@ -63,8 +63,8 @@ final class GoRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      */
     private function detectVersion(
         string $root,
@@ -108,7 +108,7 @@ final class GoRuntimeDetector implements RuntimeDetector
                     continue;
                 }
                 $parts = preg_split('/\s+/', $line);
-                if (is_array($parts) && isset($parts[0]) && $parts[0] !== '') {
+                if (is_array($parts) && $parts[0] !== '') {
                     $imports[] = $parts[0];
                 }
             }
@@ -125,10 +125,10 @@ final class GoRuntimeDetector implements RuntimeDetector
     }
 
     /**
-     * @param  array<string, mixed> $imports
-     * @param  array<string, mixed> $reasons
+     * @param  list<string> $imports
+     * @param  list<string>  $reasons
      */
-    private function detectFramework(array $imports, array &$reasons): ?string
+    private function detectFramework(array $imports, array &$reasons): string
     {
         $frameworks = [
             'gin' => '/^github\.com\/gin-gonic\/gin(\/|$)/',
@@ -155,8 +155,8 @@ final class GoRuntimeDetector implements RuntimeDetector
      * layout), falls back to `main.go` at the repo root, then to a generic
      * `./...` build of all packages.
      *
-     * @param  array<string, mixed> $detectedFiles
-     * @param  array<string, mixed> $reasons
+     * @param  list<string>  $detectedFiles
+     * @param  list<string>  $reasons
      * @return array{0: string, 1: string} [entrypointName, packagePath]
      */
     private function detectEntrypoint(string $root, array &$detectedFiles, array &$reasons): array

@@ -1,0 +1,66 @@
+{
+  "findings": [
+    {
+      "id": "F-2026-0001",
+      "rule_id": "AUD-CON-003",
+      "title": "Process-lifetime static cache bypasses its own TTL and is never flushed outside tests",
+      "domain": "conventions",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "open",
+      "summary": "ServerInstalledServices::stackSummary() checks a static array before consulting the 300-second Cache entry, and returns the static value whenever the key is present. The static array has no expiry. The two methods written to clear it — flushCaches() and forgetStackSummary() — have zero callers in application code; flushCaches() is referenced only from five test files, and forgetStackSummary() is called from nowhere at all despite its docblock instructing callers to invoke it after (re)provisioning. In any long-lived process the answer is therefore frozen for the life of that process.",
+      "why_it_matters": "This is not theoretical for this application. RunServerConfigOpJob implements ShouldQueue and runs inside long-lived Horizon workers; it calls ServerConfigFileCatalog::webserverEngineForPath() (line 194), which calls ServerInstalledServices::tagsFor() (line 479), which reads the static cache. A worker that handles a config operation for a server caches that server's installed-service tags until the worker recycles, so the documented 300-second refresh never happens on that path. Installing PHP or switching web server on a box will not be observed by that worker. The blast radius has grown recently: this same stack summary now gates which application installers AppCatalog offers and which runtimes Server::availableSiteRuntimes() will let a site switch to, so a stale 'no php' answer can hide correct options from an operator. The exposure increases substantially if laravel/octane (installed, v2.19.0) is ever put in front of HTTP traffic, since every web request would then share the worker's frozen value; config/octane.php already declares RequestReceived and RequestTerminated listener arrays, which is where such a flush would belong and where nothing currently registers it.",
+      "evidence": [
+        {
+          "type": "file",
+          "reference": "app/Support/Servers/ServerInstalledServices.php",
+          "line": 183,
+          "end_line": 220,
+          "note": "stackSummary() returns from the static $stackSummaryCache before reaching Cache::remember(), so the STACK_SUMMARY_CACHE_TTL_SECONDS = 300 expiry only applies on a static miss."
+        },
+        {
+          "type": "file",
+          "reference": "app/Support/Servers/ServerInstalledServices.php",
+          "line": 42,
+          "end_line": 74,
+          "note": "$stackSummaryCache is a static array; flushCaches() and forgetStackSummary() are the declared clearing paths."
+        },
+        {
+          "type": "file",
+          "reference": "app/Jobs/RunServerConfigOpJob.php",
+          "line": 194,
+          "note": "Queued job (implements ShouldQueue, line 29) calling ServerConfigFileCatalog::webserverEngineForPath()."
+        },
+        {
+          "type": "file",
+          "reference": "app/Services/Servers/ServerConfigFileCatalog.php",
+          "line": 479,
+          "note": "ServerInstalledServices::tagsFor($server) — the queued entry point into the static cache."
+        },
+        {
+          "type": "dependency",
+          "reference": "laravel/octane",
+          "note": "v2.19.0 installed; config/octane.php declares RequestReceived/RequestTerminated listener arrays with no flush registered for this class."
+        },
+        {
+          "type": "symbol",
+          "reference": "ServerInstalledServices::forgetStackSummary",
+          "note": "grep across app/ returns no application caller; the only invocations are in tests."
+        }
+      ],
+      "affected_resources": [
+        "app/Support/Servers/ServerInstalledServices.php",
+        "app/Services/Servers/ServerConfigFileCatalog.php",
+        "app/Jobs/RunServerConfigOpJob.php",
+        "config/octane.php"
+      ],
+      "recommendation": "Either give the static tier the same lifetime as the Cache tier, or wire the existing flush hooks to a real lifecycle boundary. Calling forgetStackSummary() from the provisioning and inventory-refresh paths it was written for is the smallest change that restores correctness on the queued path.",
+      "remediation": "1. Call ServerInstalledServices::forgetStackSummary($serverId) wherever a server's installed stack changes — provisioning completion and the inventory probe writing meta.manage_* are the natural points. 2. Register ServerInstalledServices::flushCaches() on Octane's RequestTerminated listener in config/octane.php before Octane is used to serve HTTP, and consider the same between queue jobs. 3. Alternatively, drop the static tier and rely on the Cache entry alone, which already carries the intended 300s TTL and is shared across workers.",
+      "verification_notes": "Verified by reading the code path end to end: static-before-Cache read order in stackSummary(); ShouldQueue on RunServerConfigOpJob:29; the call chain at RunServerConfigOpJob:194 -> ServerConfigFileCatalog:479 -> tagsFor(). Verified by grep that flushCaches() has no non-test caller and forgetStackSummary() has none at all. NOT verified at runtime: I did not observe a stale answer in a live Horizon worker, so this is 'high' confidence rather than 'confirmed'. Production currently serves HTTP via php8.4-fpm, not Octane (confirmed this session when reloading php8.4-fpm restored the site), so the web-request exposure is latent rather than active; the queue-worker exposure is active today.",
+      "metadata": {
+        "priority": "p2",
+        "subsystem": "servers"
+      }
+    }
+  ]
+}

@@ -40,7 +40,6 @@ class WorkerPoolExposureApplier
     /**
      * @return array{applied: list<string>, warnings: list<string>}
      */
-    /** @return array<string, mixed> */
     public function applyForPool(WorkerPool $pool, ?string $actorId = null): array
     {
         $pool->load('servers');
@@ -84,9 +83,9 @@ class WorkerPoolExposureApplier
     }
 
     /**
-     * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $cidrs
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeBackendPort(WorkerPool $pool, Server $backend, int $port, array $cidrs, ?string $actorId, array &$applied, array &$warnings): void
     {
@@ -104,16 +103,16 @@ class WorkerPoolExposureApplier
             return;
         }
 
-        $warnings[] = __('No database engine or cache service found on :server port :port — expose it manually.', [
+        $warnings[] = (string) __('No database engine or cache service found on :server port :port — expose it manually.', [
             'server' => $backend->name,
             'port' => $port,
         ]);
     }
 
     /**
-     * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $cidrs
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeDatabase(WorkerPool $pool, Server $backend, ServerDatabaseEngine $engine, array $cidrs, array &$applied, array &$warnings): void
     {
@@ -129,7 +128,7 @@ class WorkerPoolExposureApplier
                 asRoot: true,
             );
             if ($out->exitCode !== 0) {
-                $warnings[] = __('Enabling remote access on :server (:engine) reported a non-zero exit — check the database manually.', [
+                $warnings[] = (string) __('Enabling remote access on :server (:engine) reported a non-zero exit — check the database manually.', [
                     'server' => $backend->name,
                     'engine' => $engine->engine,
                 ]);
@@ -137,27 +136,27 @@ class WorkerPoolExposureApplier
             $engine->update(['remote_access' => true, 'allowed_from' => implode(',', $cidrs)]);
         } catch (\Throwable $e) {
             Log::warning('worker-pool: db expose failed', ['server_id' => $backend->id, 'error' => $e->getMessage()]);
-            $warnings[] = __('Could not enable remote access on :server: :err', ['server' => $backend->name, 'err' => $e->getMessage()]);
+            $warnings[] = (string) __('Could not enable remote access on :server: :err', ['server' => $backend->name, 'err' => $e->getMessage()]);
 
             return;
         }
 
         $this->ensureFirewallRules($pool, $backend, (int) $engine->port, $cidrs, 'db:'.$engine->engine);
-        $applied[] = __(':engine on :server now accepts the pool workers (password-gated, firewalled to their IPs).', [
+        $applied[] = (string) __(':engine on :server now accepts the pool workers (password-gated, firewalled to their IPs).', [
             'engine' => strtoupper((string) $engine->engine),
             'server' => $backend->name,
         ]);
     }
 
     /**
-     * @param  array<string, mixed> $cidrs
-     * @param  array<string, mixed> $applied
-     * @param  array<string, mixed> $warnings
+     * @param  list<string>  $cidrs
+     * @param  list<string>  $applied
+     * @param  list<string>  $warnings
      */
     private function exposeCache(WorkerPool $pool, Server $backend, ServerCacheService $cache, array $cidrs, ?string $actorId, array &$applied, array &$warnings): void
     {
         if (blank($cache->auth_password)) {
-            $warnings[] = __(':engine on :server has no password — exposing it publicly is unsafe. Set a password (and update REDIS_PASSWORD on the sites) before relying on cross-region workers.', [
+            $warnings[] = (string) __(':engine on :server has no password — exposing it publicly is unsafe. Set a password (and update REDIS_PASSWORD on the sites) before relying on cross-region workers.', [
                 'engine' => ucfirst((string) $cache->engine),
                 'server' => $backend->name,
             ]);
@@ -169,13 +168,13 @@ class WorkerPoolExposureApplier
             $this->cacheExposure->expose($backend, $cache, $cidrs[0], $actorId);
         } catch (\Throwable $e) {
             Log::warning('worker-pool: cache expose failed', ['server_id' => $backend->id, 'error' => $e->getMessage()]);
-            $warnings[] = __('Could not expose :engine on :server: :err', ['engine' => $cache->engine, 'server' => $backend->name, 'err' => $e->getMessage()]);
+            $warnings[] = (string) __('Could not expose :engine on :server: :err', ['engine' => $cache->engine, 'server' => $backend->name, 'err' => $e->getMessage()]);
 
             return;
         }
 
         $this->ensureFirewallRules($pool, $backend, (int) $cache->port, $cidrs, 'cache:'.$cache->engine);
-        $applied[] = __(':engine on :server now accepts the pool workers (firewalled to their IPs).', [
+        $applied[] = (string) __(':engine on :server now accepts the pool workers (firewalled to their IPs).', [
             'engine' => ucfirst((string) $cache->engine),
             'server' => $backend->name,
         ]);
@@ -184,7 +183,7 @@ class WorkerPoolExposureApplier
     /**
      * Create + apply one allow rule per worker /32 (idempotent), tagged for the pool.
      *
-     * @param  array<string, mixed> $cidrs
+     * @param  list<string>  $cidrs
      */
     private function ensureFirewallRules(WorkerPool $pool, Server $backend, int $port, array $cidrs, string $label): void
     {

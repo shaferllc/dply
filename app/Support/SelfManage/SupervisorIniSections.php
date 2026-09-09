@@ -22,18 +22,19 @@ final class SupervisorIniSections
         $currentKey = null;
         $currentLines = [];
 
-        $flush = static function () use (&$sections, &$currentKey, &$currentLines): void {
-            if ($currentKey === null) {
+        // Takes the section it should record as arguments rather than capturing
+        // them by reference — the by-ref form hid every mutation from static
+        // analysis, which then read the whole body as unreachable.
+        $flush = static function (?string $key, array $sectionLines) use (&$sections): void {
+            if ($key === null) {
                 return;
             }
-            $sections[$currentKey] = rtrim(implode("\n", $currentLines))."\n";
-            $currentKey = null;
-            $currentLines = [];
+            $sections[$key] = rtrim(implode("\n", $sectionLines))."\n";
         };
 
         foreach ($lines as $line) {
             if (preg_match('/^\s*\[([^\]]+)\]\s*$/', $line, $m) === 1) {
-                $flush();
+                $flush($currentKey, $currentLines);
                 $currentKey = trim($m[1]);
                 $currentLines = [$line];
 
@@ -46,7 +47,7 @@ final class SupervisorIniSections
                 $currentLines[] = $line;
             }
         }
-        $flush();
+        $flush($currentKey, $currentLines);
 
         return [
             'preamble' => rtrim(implode("\n", $preamble)),

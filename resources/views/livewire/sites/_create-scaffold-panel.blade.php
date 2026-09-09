@@ -38,7 +38,7 @@
                     <span class="mt-3 block text-base font-semibold text-brand-ink">{{ $tile['name'] }}</span>
                     <span class="mt-1 block text-sm leading-relaxed text-brand-moss">{{ $tile['description'] }}</span>
                     @if ($form->scaffold_framework === $framework)
-                        <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                        <span class="absolute right-3 top-3 inline-flex items-center gap-0.5 rounded-full bg-brand-sage px-2 py-0.5 text-2xs font-semibold text-white shadow-sm">
                             <x-heroicon-m-check class="h-3 w-3" />
                             {{ __('Picked') }}
                         </span>

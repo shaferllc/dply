@@ -133,12 +133,6 @@ class PermissionDecorator
             return $user->getPermissionsViaRoles()->pluck('name')->toArray();
         }
 
-        // Try hasPermissionTo or can methods
-        if (method_exists($user, 'hasPermissionTo')) {
-            // For Spatie Permission package
-            return $user->getAllPermissions()->pluck('name')->toArray();
-        }
-
         return [];
     }
 

@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\Site;
 use App\Models\WorkerPool;
+use App\Modules\Database\Jobs\AllowReplicaServersOnManagedDatabasesJob;
 use App\Services\WorkerPools\WorkerPoolExposureApplier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -35,6 +37,18 @@ class ApplyWorkerPoolExposureJob implements ShouldQueue
         $pool = WorkerPool::query()->find($this->poolId);
         if (! $pool instanceof WorkerPool) {
             return;
+        }
+
+        // The applier covers ON-BOX engines only (ServerDatabaseEngine). A hosted
+        // cluster locks its trusted sources to the server it was provisioned
+        // with, so worker access there needs the provider's allowlist updating —
+        // otherwise "exposure applied" is only half true.
+        $primarySiteId = Site::query()
+            ->where('server_id', $pool->source_server_id ?: $pool->primary_server_id)
+            ->value('id');
+
+        if ($primarySiteId !== null) {
+            AllowReplicaServersOnManagedDatabasesJob::dispatch((string) $primarySiteId);
         }
 
         try {

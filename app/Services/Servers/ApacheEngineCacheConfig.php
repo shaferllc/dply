@@ -23,7 +23,6 @@ class ApacheEngineCacheConfig
      *     disk_cache_path: string,
      * }
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $feature = ServerWebserverCacheFeature::findOrCreateFor(
@@ -34,7 +33,7 @@ class ApacheEngineCacheConfig
         $modules = app(ApacheModulesConfig::class)->read($server);
         $enabled = [];
         foreach ($modules['modules'] as $row) {
-            if (($row['enabled']) === true) {
+            if ($row['enabled'] === true) {
                 $enabled[$row['name']] = true;
             }
         }

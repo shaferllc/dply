@@ -1,16 +1,12 @@
 <section class="space-y-4">
     <div class="border-b border-brand-ink/10">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Refs') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Branches') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pick the deploy branch or browse what other refs are currently visible on the remote.') }}</p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            class="border-b border-brand-ink/10"
+            icon="heroicon-o-rectangle-stack"
+            :title="__('Branches')"
+            :note="__('Pick the deploy branch or browse what other refs are currently visible on the remote.')"
+        />
+        <div class="px-5 py-4 sm:px-6">
             <label class="flex items-center gap-3 text-sm">
                 <x-heroicon-o-magnifying-glass class="h-4 w-4 text-brand-moss" />
                 <input
@@ -43,10 +39,10 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <code class="font-mono text-sm text-brand-ink">{{ $branch['name'] }}</code>
                             @if ($branch['name'] === $currentBranch)
-                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-900">{{ __('deploy branch') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-emerald-900">{{ __('deploy branch') }}</span>
                             @endif
                             @if (! empty($branch['is_default']))
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('default') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('default') }}</span>
                             @endif
                         </div>
                         <p class="mt-0.5 text-xs text-brand-moss">

@@ -34,7 +34,6 @@ final class ServerHealthCockpit
      *     monitoring: array<string, mixed>,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server): array
     {
         $sites = $server->sites()->get(['id', 'name', 'server_id', 'deploy_strategy', 'releases_to_keep']);
@@ -315,7 +314,7 @@ final class ServerHealthCockpit
 
         foreach ($certs as $cert) {
             $site = $cert->site;
-            $domain = is_array($cert->domains_json) ? (string) ($cert->domains_json[0] ?? '') : '';
+            $domain = (string) ($cert->domains_json[0] ?? '');
             $isFailed = $cert->status === SiteCertificate::STATUS_FAILED;
 
             if ($isFailed) {

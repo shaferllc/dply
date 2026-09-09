@@ -4,7 +4,6 @@ namespace App\Services\Servers;
 
 use phpseclib3\Crypt\Common\PublicKey;
 use phpseclib3\Crypt\PublicKeyLoader;
-use phpseclib3\Exception\NoKeyLoadedException;
 
 class SshPublicKeyFingerprint
 {
@@ -21,7 +20,7 @@ class SshPublicKeyFingerprint
         try {
             /** @var PublicKey $key */
             $key = PublicKeyLoader::loadPublicKey($line);
-        } catch (NoKeyLoadedException|\Throwable) {
+        } catch (\Throwable) {
             return null;
         }
 

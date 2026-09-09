@@ -22,11 +22,16 @@ These tokens are stored encrypted. They are **not** used to clone private Git re
 
 ## Git / source control
 
-**Where:** **Profile → Source control** (user-scoped).
+**Where:** **Profile → Source control** (user-scoped) for your own connections,
+and **Organization → Credentials** (filter: Git) for a shared machine-user token
+the whole org deploys with. OAuth accounts are always personal — they are also
+sign-in identities. See `docs/adr/org-owned-git-credentials.md`.
 
 **What:** OAuth links to **GitHub**, **GitLab**, or **Bitbucket** (when enabled).
 
-**Why:** Pick repositories for sites, receive webhooks, and drive deployments. One Git identity can serve multiple organizations you belong to.
+**Why:** Pick repositories for sites, receive webhooks, and drive deployments. One Git identity can serve multiple organizations you belong to. An
+organization-owned token is the reverse: it serves every member, and keeps
+deploying after the person who added it leaves.
 
 ## Mental model
 

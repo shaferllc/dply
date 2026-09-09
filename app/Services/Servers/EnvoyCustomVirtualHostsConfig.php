@@ -17,10 +17,6 @@ class EnvoyCustomVirtualHostsConfig
     /**
      * @return list<array{name: string, domains: list<string>, cluster: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -58,7 +54,7 @@ class EnvoyCustomVirtualHostsConfig
     }
 
     /**
-     * @param  array<string, mixed> $domains
+     * @param  list<string> $domains
      */
     public function add(
         Server $server,
@@ -76,7 +72,7 @@ class EnvoyCustomVirtualHostsConfig
 
         $rows = $this->read($server);
         foreach ($rows as $row) {
-            if (($row['name'] ?? '') === $name) {
+            if ($row['name'] === $name) {
                 throw new \RuntimeException("A virtual host named `{$name}` already exists.");
             }
         }
@@ -90,7 +86,7 @@ class EnvoyCustomVirtualHostsConfig
         $name = $this->normalizeName($name);
         $rows = array_values(array_filter(
             $this->read($server),
-            fn (array $row): bool => ($row['name'] ?? '') !== $name,
+            fn (array $row): bool => $row['name'] !== $name,
         ));
 
         if (count($rows) === count($this->read($server))) {
@@ -100,9 +96,6 @@ class EnvoyCustomVirtualHostsConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public static function virtualHostsFromServer(Server $server): array
     {
         return app(self::class)->read($server);
@@ -186,7 +179,7 @@ class EnvoyCustomVirtualHostsConfig
     {
         $known = self::knownClusterNames($server);
         foreach ($virtualHosts as $row) {
-            $cluster = (string) ($row['cluster'] ?? '');
+            $cluster = (string) $row['cluster'];
             if ($cluster === '') {
                 continue;
             }

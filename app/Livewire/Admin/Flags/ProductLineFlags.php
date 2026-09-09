@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin\Flags;
 
-use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Admin\Concerns\ManagesAdminFlagToggles;
+use App\Livewire\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Support\Admin\AdminFeatureFlags;
 use Illuminate\Contracts\View\View;

@@ -12,6 +12,7 @@ use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
 use App\Services\Sites\DotEnvFileParser;
@@ -239,12 +240,18 @@ class SiteSetup extends Component
 
         return array_map(function (array $s) use ($present, $bindingTypes, $bindingManager): array {
             $hasBinding = array_intersect($s['satisfying_types'], $bindingTypes) !== [];
+            $match = $this->site->bindings->first(
+                fn ($b): bool => in_array((string) $b->type, $s['satisfying_types'], true),
+            );
+            $bindingStatus = is_object($match) ? (string) $match->status : null;
+            $bindingReady = $hasBinding && $bindingStatus === SiteBinding::STATUS_CONFIGURED;
             $keysSatisfied = $s['matched_keys'] !== []
                 && ! collect($s['matched_keys'])->contains(fn ($k): bool => ! isset($present[$k]));
 
             $s['has_binding'] = $hasBinding;
+            $s['binding_status'] = $bindingStatus;
             $s['keys_satisfied'] = $keysSatisfied;
-            $s['satisfied'] = $hasBinding || $keysSatisfied;
+            $s['satisfied'] = $bindingReady || ($keysSatisfied && ! $hasBinding);
 
             // AUTO-FIND: how many existing resources of this type already live on
             // the site's server and could just be linked (existing databases,
@@ -328,7 +335,7 @@ class SiteSetup extends Component
     {
         $parser = app(DotEnvFileParser::class);
         $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
-        $vars = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+        $vars = $parsed['variables'];
 
         $wantsKey = array_key_exists('APP_KEY', $vars)
             || collect(data_get($this->site->envRequirements(), 'keys', []))
@@ -340,7 +347,7 @@ class SiteSetup extends Component
 
         $vars['APP_KEY'] = $this->freshAppKey();
         $this->site->forceFill([
-            'env_file_content' => app(DotEnvFileWriter::class)->render($vars, $parsed['comments'] ?? []),
+            'env_file_content' => app(DotEnvFileWriter::class)->render($vars, $parsed['comments']),
             'env_cache_origin' => 'local-edit',
         ])->save();
     }

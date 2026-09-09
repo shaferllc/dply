@@ -70,14 +70,6 @@ final class HostCapabilities
         return $this->supportsSsh();
     }
 
-    public function supportsFunctionDeploy(): bool
-    {
-        return in_array($this->kind(), [
-            Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            Server::HOST_KIND_AWS_LAMBDA,
-        ], true);
-    }
-
     public function supportsContainerDeploy(): bool
     {
         return $this->kind() === Server::HOST_KIND_DOCKER;
@@ -101,5 +93,15 @@ final class HostCapabilities
     public function supportsHttp3Certificates(): bool
     {
         return $this->supportsSsh();
+    }
+
+    /**
+     * Function / Lambda deploy is gone. Leftover host rows stay out of the
+     * Servers inventory via {@see Server::isServerlessHost()}; they cannot
+     * mint new sites.
+     */
+    public function supportsFunctionDeploy(): bool
+    {
+        return false;
     }
 }

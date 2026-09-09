@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * Canonical server list DTO — local Eloquent and Production API both map here
+ * Canonical server list DTO — local Eloquent rows map here
  * so `/servers` and `/live/servers` render the same Blade.
  */
 final readonly class ServerIndexRow
@@ -66,6 +66,8 @@ final readonly class ServerIndexRow
         public array $related = [],
         public ?array $provisioning = null,
         public ?string $journeyHref = null,
+        /** @var array{state: string, label: string, detail: string|null}|null */
+        public ?array $adopted = null,
     ) {}
 
     /**
@@ -105,154 +107,6 @@ final readonly class ServerIndexRow
     /**
      * @param  array<string, mixed>  $row
      */
-    public static function fromProductionApi(
-        array $row,
-        string $remoteBaseUrl,
-        ?string $defaultGroupLabel = null,
-    ): self {
-        $id = (string) ($row['id'] ?? '');
-
-        // Thin/legacy list payloads omit fleet-card fields. Fill display defaults
-        // so Ready hosts don't look mid-provision and groups use the connected org.
-        if (! array_key_exists('group_label', $row) || $row['group_label'] === null || $row['group_label'] === '') {
-            $row['group_label'] = $defaultGroupLabel ?: __('Organization');
-        }
-        if (! array_key_exists('setup_status', $row)) {
-            $row['setup_status'] = ((string) ($row['status'] ?? '')) === Server::STATUS_READY
-                ? Server::SETUP_STATUS_DONE
-                : '';
-        }
-        if (! array_key_exists('health_status', $row)
-            && ((string) ($row['status'] ?? '')) === Server::STATUS_READY
-            && ((string) ($row['setup_status'] ?? '')) === Server::SETUP_STATUS_DONE
-        ) {
-            // Unknown reachability on a ready host — paint like reachable for
-            // visual parity with the local fleet (green stripe + Ready).
-            $row['health_status'] = Server::HEALTH_REACHABLE;
-        }
-        if (! array_key_exists('deployable', $row)) {
-            $row['deployable'] = ((string) ($row['status'] ?? '')) === Server::STATUS_READY
-                && ((string) ($row['setup_status'] ?? '')) === Server::SETUP_STATUS_DONE;
-        }
-
-        return self::fromPayload(
-            $row,
-            manageHref: rtrim($remoteBaseUrl, '/').'/servers/'.$id,
-            manageExternal: true,
-            workspaceHref: null,
-            insightsHref: null,
-            journeyHref: rtrim($remoteBaseUrl, '/').'/servers/'.$id.'/journey',
-            canDelete: false,
-            rewriteNestedHrefs: true,
-            remoteBaseUrl: $remoteBaseUrl,
-        );
-    }
-
-    /**
-     * True when the remote list payload predates the fleet-card API
-     * (missing metrics / nested sites / setup_status).
-     *
-     * @param  list<array<string, mixed>>  $apiRows
-     */
-    public static function isLegacyApiPayload(array $apiRows): bool
-    {
-        if ($apiRows === []) {
-            return false;
-        }
-
-        $row = $apiRows[0];
-
-        return ! array_key_exists('setup_status', $row)
-            || ! array_key_exists('sites', $row)
-            || ! array_key_exists('metrics', $row);
-    }
-
-    /**
-     * Fill deploy_sync_count / deploy_anchor_site_id when the remote API omits
-     * them (older fleet-card payloads). Prefers git URLs on nested sites; falls
-     * back to local Site rows with the same ids (common when the local DB is a
-     * prod dump and Production mirror still talks to a host without sync meta).
-     *
-     * @param  list<array<string, mixed>>  $apiRows
-     * @return list<array<string, mixed>>
-     */
-    public static function enrichDeploySyncMeta(array $apiRows): array
-    {
-        if ($apiRows === []) {
-            return [];
-        }
-
-        $repoCounts = [];
-        $siteIds = [];
-        foreach ($apiRows as $row) {
-            foreach ($row['sites'] ?? [] as $site) {
-                if (! is_array($site)) {
-                    continue;
-                }
-                $siteId = isset($site['id']) ? (string) $site['id'] : '';
-                if ($siteId !== '') {
-                    $siteIds[] = $siteId;
-                }
-                $repo = SiteSyncPeers::canonicalRepo((string) ($site['git_repository_url'] ?? ''));
-                if ($repo !== '') {
-                    $repoCounts[$repo] = ($repoCounts[$repo] ?? 0) + 1;
-                }
-            }
-        }
-
-        $localSites = $siteIds !== []
-            ? Site::query()->whereIn('id', array_values(array_unique($siteIds)))->with('server')->get()->keyBy(fn (Site $s): string => (string) $s->id)
-            : collect();
-
-        if ($repoCounts === [] && $localSites->isNotEmpty()) {
-            foreach ($localSites as $site) {
-                $repo = SiteSyncPeers::canonicalRepo((string) $site->git_repository_url);
-                if ($repo !== '') {
-                    $repoCounts[$repo] = ($repoCounts[$repo] ?? 0) + 1;
-                }
-            }
-        }
-
-        return array_map(function (array $row) use ($repoCounts, $localSites): array {
-            $sites = is_array($row['sites'] ?? null) ? $row['sites'] : [];
-            $anchorId = isset($row['deploy_anchor_site_id']) && is_string($row['deploy_anchor_site_id']) && $row['deploy_anchor_site_id'] !== ''
-                ? $row['deploy_anchor_site_id']
-                : (isset($sites[0]['id']) ? (string) $sites[0]['id'] : null);
-            $existingCount = (int) ($row['deploy_sync_count'] ?? 0);
-            if ($existingCount > 1 && filled($anchorId)) {
-                $row['deploy_anchor_site_id'] = $anchorId;
-
-                return $row;
-            }
-
-            $repo = '';
-            if (isset($sites[0]['git_repository_url'])) {
-                $repo = SiteSyncPeers::canonicalRepo((string) $sites[0]['git_repository_url']);
-            }
-            if ($repo === '' && $anchorId !== null && $localSites->has($anchorId)) {
-                $repo = SiteSyncPeers::canonicalRepo((string) $localSites->get($anchorId)->git_repository_url);
-            }
-
-            $syncCount = $repo !== '' ? (int) ($repoCounts[$repo] ?? 0) : 0;
-            if ($syncCount <= 1 && $anchorId !== null && $localSites->has($anchorId)) {
-                $syncCount = SiteSyncPeers::forSite($localSites->get($anchorId))->count();
-            }
-
-            if ($syncCount > 1 && $anchorId !== null) {
-                $row['deploy_sync_count'] = $syncCount;
-                $row['deploy_anchor_site_id'] = $anchorId;
-                if (! array_key_exists('deployable', $row) || ! $row['deployable']) {
-                    $row['deployable'] = true;
-                }
-            }
-
-            return $row;
-        }, $apiRows);
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     */
     protected static function fromPayload(
         array $row,
         string $manageHref,
@@ -261,7 +115,6 @@ final readonly class ServerIndexRow
         ?string $insightsHref,
         ?string $journeyHref,
         bool $canDelete,
-        bool $rewriteNestedHrefs = false,
         string $remoteBaseUrl = '',
     ): self {
         $status = (string) ($row['status'] ?? '');
@@ -270,7 +123,7 @@ final readonly class ServerIndexRow
         $setupStatus = array_key_exists('setup_status', $row) && $row['setup_status'] !== null && $row['setup_status'] !== ''
             ? (string) $row['setup_status']
             : ($status === Server::STATUS_READY ? Server::SETUP_STATUS_DONE : '');
-        $healthStatus = isset($row['health_status']) && $row['health_status'] !== null && $row['health_status'] !== ''
+        $healthStatus = isset($row['health_status']) && $row['health_status'] !== ''
             ? (string) $row['health_status']
             : null;
         $id = (string) ($row['id'] ?? '');
@@ -305,19 +158,6 @@ final readonly class ServerIndexRow
         $sites = self::listOfMaps($row['sites'] ?? null);
         $services = self::listOfMaps($row['services'] ?? null);
         $related = self::listOfMaps($row['related'] ?? null);
-        if ($rewriteNestedHrefs && $remoteBaseUrl !== '') {
-            $sites = array_map(static function (array $site) use ($remoteBaseUrl, $id): array {
-                $site['href'] = rtrim($remoteBaseUrl, '/').'/servers/'.$id.'/sites/'.($site['id'] ?? '');
-
-                return $site;
-            }, $sites);
-            $related = array_map(static function (array $peer) use ($remoteBaseUrl): array {
-                $peer['href'] = rtrim($remoteBaseUrl, '/').'/servers/'.($peer['id'] ?? '');
-
-                return $peer;
-            }, $related);
-        }
-
         $provisioning = null;
         if (isset($row['provisioning']) && is_array($row['provisioning'])) {
             $provisioning = [
@@ -383,6 +223,7 @@ final readonly class ServerIndexRow
             related: $related,
             provisioning: $provisioning,
             journeyHref: $journeyHref,
+            adopted: isset($row['adopted']) && is_array($row['adopted']) ? $row['adopted'] : null,
         );
     }
 

@@ -24,7 +24,6 @@ final class DocsSearchIndex
     /**
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function cached(): array
     {
         if (app()->environment('local')) {
@@ -41,10 +40,6 @@ final class DocsSearchIndex
 
     /**
      * @return list<array<string, mixed>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<int, array<string, mixed>>
      */
     public function build(): array
     {
@@ -100,7 +95,7 @@ final class DocsSearchIndex
     {
         preg_match_all('/^#{1,3}\s+(.+?)\s*#*$/m', $markdown, $m);
 
-        return collect($m[1] ?? [])
+        return collect($m[1])
             ->map(fn (string $h): string => trim(preg_replace('/[`*_]/', '', $h)))
             ->filter()
             ->unique()

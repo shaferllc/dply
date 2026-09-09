@@ -75,3 +75,40 @@ test('managed vultr provision fails clearly when the platform token is missing',
     expect($server->status)->toBe(Server::STATUS_ERROR)
         ->and(data_get($server->meta, 'provision_error.message'))->toContain('not configured');
 });
+
+test('managed vultr poll uses platform token when credential is null', function () {
+    config([
+        'managed_servers.provider' => 'vultr',
+        'managed_servers.vultr.api_token' => 'platform-vultr-tok',
+        'server_provision_fake.env_flag' => false,
+    ]);
+
+    Queue::fake();
+    Http::fake([
+        'https://api.vultr.com/v2/instances/vps-9001' => Http::response([
+            'instance' => [
+                'id' => 'vps-9001',
+                'main_ip' => '203.0.113.44',
+                'vpc_ids' => ['vpc-managed-1'],
+                'internal_ip' => '10.1.0.5',
+            ],
+        ], 200),
+    ]);
+
+    $server = managedVultrServer();
+    $server->update([
+        'provider_id' => 'vps-9001',
+        'status' => Server::STATUS_PROVISIONING,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+    ]);
+
+    (new PollVultrIpJob($server))->handle();
+    $server->refresh();
+
+    expect($server->ip_address)->toBe('203.0.113.44')
+        ->and($server->private_ip_address)->toBe('10.1.0.5')
+        ->and($server->status)->toBe(Server::STATUS_READY);
+
+    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer platform-vultr-tok')
+        && str_contains($request->url(), '/instances/vps-9001'));
+});

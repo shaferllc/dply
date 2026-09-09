@@ -4,9 +4,10 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Modules\Cloud\Services\LinodeService;
+use App\Modules\Providers\Services\LinodeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -43,7 +44,8 @@ class ProvisionLinodeServerJob implements ShouldQueue
 
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
-            $image = ServerImageCatalog::resolveForServer($this->server, 'linode')
+            $image = ServerImageCatalog::bootImageForServer($this->server)
+                ?? ServerImageCatalog::resolveForServer($this->server, 'linode')
                 ?? config('services.linode.default_image', 'linode/ubuntu24.04');
 
             $id = $linode->createInstance(
@@ -51,7 +53,8 @@ class ProvisionLinodeServerJob implements ShouldQueue
                 region: $this->server->region,
                 type: $this->server->size,
                 image: $image,
-                authorizedKeys: [$keys['recovery_public_key']]
+                authorizedKeys: [$keys['recovery_public_key']],
+                tags: ProviderResourceTags::tags($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

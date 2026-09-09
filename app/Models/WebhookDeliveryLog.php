@@ -8,16 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $detail
- * @property string $http_status
+ * @property ?string $detail
+ * @property ?string $http_status
  * @property string $outcome
  * @property ?string $provider_delivery_id
- * @property string $provider_event
- * @property string $request_ip
+ * @property ?string $provider_event
+ * @property ?string $request_ip
  * @property ?string $site_id
  * @property-read ?Site $site
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WebhookDeliveryLog extends Model
 {

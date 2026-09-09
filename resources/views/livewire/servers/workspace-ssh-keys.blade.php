@@ -9,21 +9,14 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('SSH keys') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Authorize keys, preview drift, audit changes, and sync authorized_keys.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-key"
+            :title="__('SSH keys')"
+            :note="__('Authorize keys, preview drift, audit changes, and sync authorized_keys.')"
+            class="border-b border-brand-ink/10"
+        />
 
         @if ($opsReady)
             @if ($bannerKind !== null)
@@ -32,42 +25,38 @@
                 </div>
             @endif
 
-            <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-                <x-server-workspace-tablist :aria-label="__('SSH keys workspace')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
-                    <x-server-workspace-tab id="ssh-tab-keys" :active="$ssh_workspace_tab === 'keys'" wire:click="setSshWorkspaceTab('keys')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-key class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Keys') }}
-                        </span>
+            <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                <x-server-workspace-tablist :aria-label="__('SSH keys workspace')" scroll bare class="!mb-0 w-full">
+                    <x-server-workspace-tab id="ssh-tab-keys" icon="heroicon-o-key" :active="$ssh_workspace_tab === 'keys'" wire:click="setSshWorkspaceTab('keys')">
+                        {{ __('Keys') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="ssh-tab-preview" :active="$ssh_workspace_tab === 'preview'" wire:click="setSshWorkspaceTab('preview')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-arrows-right-left class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Drift') }}
-                        </span>
+                    <x-server-workspace-tab id="ssh-tab-preview" icon="heroicon-o-arrows-right-left" :active="$ssh_workspace_tab === 'preview'" wire:click="setSshWorkspaceTab('preview')">
+                        {{ __('Drift') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="ssh-tab-advanced" :active="$ssh_workspace_tab === 'advanced'" wire:click="setSshWorkspaceTab('advanced')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-adjustments-horizontal class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Advanced') }}
-                        </span>
+                    <x-server-workspace-tab id="ssh-tab-advanced" icon="heroicon-o-adjustments-horizontal" :active="$ssh_workspace_tab === 'advanced'" wire:click="setSshWorkspaceTab('advanced')">
+                        {{ __('Advanced') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="ssh-tab-activity" :active="$ssh_workspace_tab === 'activity'" wire:click="setSshWorkspaceTab('activity')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Activity') }}
-                        </span>
+                    <x-server-workspace-tab id="ssh-tab-activity" icon="heroicon-o-clock" :active="$ssh_workspace_tab === 'activity'" wire:click="setSshWorkspaceTab('activity')">
+                        {{ __('Activity') }}
                     </x-server-workspace-tab>
-                    <x-server-workspace-tab id="ssh-tab-notifications" :active="$ssh_workspace_tab === 'notifications'" wire:click="setSshWorkspaceTab('notifications')">
-                        <span class="inline-flex items-center gap-1.5">
-                            <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                            {{ __('Notifications') }}
-                        </span>
+                    <x-server-workspace-tab id="ssh-tab-notifications" icon="heroicon-o-bell" :active="$ssh_workspace_tab === 'notifications'" wire:click="setSshWorkspaceTab('notifications')">
+                        {{ __('Notifications') }}
                     </x-server-workspace-tab>
                 </x-server-workspace-tablist>
             </div>
 
-            <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setSshWorkspaceTab">
+            {{-- Tab-switch skeleton. The wrapper is stable and the key sits on the
+                 inner div, so a morph can't leave the previous tab's subtree
+                 orphaned as a visible sibling. wire:loading.block, not bare
+                 wire:loading, or the skeleton shrink-wraps to inline-block. --}}
+            <div wire:loading.block wire:target="setSshWorkspaceTab" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                <div wire:key="ssh-skeleton-{{ $ssh_workspace_tab }}">
+                    @include('livewire.servers.partials.ssh-keys._tab-skeleton', ['tab' => $ssh_workspace_tab])
+                </div>
+            </div>
+
+            <div class="relative" wire:loading.remove wire:target="setSshWorkspaceTab">
                 @if ($ssh_workspace_tab === 'keys')
                     <x-server-workspace-tab-panel
                         id="ssh-panel-keys"

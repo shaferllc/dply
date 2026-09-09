@@ -58,7 +58,7 @@ final class UptimeProbeWorkerResolver
         return is_string($queue) && $queue !== '' ? $queue : self::FALLBACK_QUEUE;
     }
 
-    /** The `probe_regions` key for a worker, used to derive the cosmetic label. */
+    /** The `probe_regions` key for a worker (queue routing / worker picker). */
     public function regionFor(?string $workerKey): ?string
     {
         $region = $workerKey !== null ? ($this->workers()[$workerKey]['region'] ?? null) : null;
@@ -71,7 +71,6 @@ final class UptimeProbeWorkerResolver
      *
      * @return array<string, string>
      */
-    /** @return array<string, mixed> */
     public function options(): array
     {
         $regions = (array) config('site_uptime.probe_regions', []);

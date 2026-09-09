@@ -4,11 +4,11 @@
                                 <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSL') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSL') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview & SSL') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Preview hostname reachability and the latest certificate state for this site.') }}</p>
                             </div>
-                            <span class="ml-auto inline-flex shrink-0 items-center self-center rounded-full bg-brand-sand/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss">
+                            <span class="ml-auto inline-flex shrink-0 items-center self-center rounded-full bg-brand-sand/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss">
                                 {{ $site->currentSslSummary() }}
                             </span>
                         </div>
@@ -16,15 +16,15 @@
                         <div class="space-y-4 px-6 py-6 sm:px-7">
                         <dl class="grid gap-4 sm:grid-cols-2">
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Preview hostname') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Preview hostname') }}</dt>
                                 <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ $previewDomain?->hostname ?? __('No preview domain') }}</dd>
                             </div>
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Preview DNS') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Preview DNS') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">{{ $previewDomain?->dns_status ?? __('Not configured') }}</dd>
                             </div>
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest certificate') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest certificate') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">
                                     @if ($latestCertificate)
                                         {{ ucfirst($latestCertificate->provider_type) }} · {{ $latestCertificate->status }}
@@ -34,17 +34,17 @@
                                 </dd>
                             </div>
                             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Certificate scope') }}</dt>
+                                <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Certificate scope') }}</dt>
                                 <dd class="mt-2 text-sm text-brand-ink">{{ $latestCertificate ? ucfirst($latestCertificate->scope_type) : __('—') }}</dd>
                             </div>
                             @if ($latestCertificate)
                                 <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Certificate domains') }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Certificate domains') }}</dt>
                                     <dd class="mt-2 break-all font-mono text-sm text-brand-ink">{{ implode(', ', $latestCertificate->domainHostnames()) }}</dd>
                                 </div>
                                 @if (! empty($latestCertificate->last_output))
                                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4 sm:col-span-2">
-                                        <dt class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest certificate output') }}</dt>
+                                        <dt class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Latest certificate output') }}</dt>
                                         <dd class="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-brand-ink">{{ \Illuminate\Support\Str::limit($latestCertificate->last_output, 800) }}</dd>
                                     </div>
                                 @endif

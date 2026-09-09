@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Settings;
 
+use App\Livewire\Concerns\BuildsIntercomChannelInput;
+use App\Livewire\Concerns\BuildsPagerDutyChannelInput;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -9,7 +11,10 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
 use App\Support\NotificationSubscriptionRules;
 use App\Support\ServerSystemdServiceNotificationKeys;
 use Illuminate\Contracts\View\View;
@@ -24,6 +29,8 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class BulkNotificationAssignments extends Component
 {
+    use BuildsIntercomChannelInput;
+    use BuildsPagerDutyChannelInput;
     use DispatchesToastNotifications;
 
     /** @var list<int|string> */
@@ -37,6 +44,13 @@ class BulkNotificationAssignments extends Component
 
     /** @var list<int|string> */
     public array $selected_site_ids = [];
+
+    /**
+     * Subscribe the whole organization instead of picking targets: the routing
+     * resolver already matches Organization-scoped subscriptions for any event
+     * carrying an organization_id, so this covers servers and sites added later.
+     */
+    public bool $apply_org_wide = false;
 
     public ?string $context_server_id = null;
 
@@ -76,6 +90,34 @@ class BulkNotificationAssignments extends Component
 
     public string $quick_new_mobile_platform = 'ios';
 
+    public string $quick_new_intercom_access_token = '';
+
+    public string $quick_new_intercom_region = 'us';
+
+    public string $quick_new_intercom_admin_id = '';
+
+    public string $quick_new_intercom_recipient = '';
+
+    public string $quick_new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $quick_new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $quick_new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $quick_new_intercom_subject = '';
+
+    public string $quick_new_pagerduty_routing_key = '';
+
+    public string $quick_new_pagerduty_region = 'us';
+
+    public string $quick_new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $quick_new_pagerduty_source = '';
+
+    public string $quick_new_pagerduty_component = '';
+
+    public string $quick_new_pagerduty_group = '';
+
     public string $quick_new_webhook_url = '';
 
     public function mount(): void
@@ -88,6 +130,14 @@ class BulkNotificationAssignments extends Component
         $this->quick_new_owner_scope = $this->canManageOrganizationNotificationChannels() ? 'organization' : 'personal';
         $serverId = request()->string('server')->toString();
         $siteId = request()->string('site')->toString();
+        $channelId = request()->string('channel')->toString();
+
+        // ?channel= arrives from the "not routed" nudge on a channels page —
+        // land here with that channel already ticked. Validated against the
+        // assignable set, so a stale or foreign id just no-ops.
+        if ($channelId !== '' && $this->channelsForUser()->contains(fn (NotificationChannel $c) => (string) $c->id === $channelId)) {
+            $this->selected_channel_ids = [$channelId];
+        }
 
         if ($org && $serverId !== '' && Server::query()->where('organization_id', $org->id)->whereKey($serverId)->exists()) {
             $this->context_server_id = $serverId;
@@ -210,10 +260,10 @@ class BulkNotificationAssignments extends Component
             }
         }
 
-        if ($needsServers && $this->selected_server_ids === []) {
+        if ($needsServers && ! $this->apply_org_wide && $this->selected_server_ids === []) {
             return false;
         }
-        if ($needsSites && $this->selected_site_ids === []) {
+        if ($needsSites && ! $this->apply_org_wide && $this->selected_site_ids === []) {
             return false;
         }
 
@@ -272,12 +322,12 @@ class BulkNotificationAssignments extends Component
             }
         }
 
-        if ($needsServers && $this->selected_server_ids === []) {
+        if ($needsServers && ! $this->apply_org_wide && $this->selected_server_ids === []) {
             $this->addError('selected_server_ids', __('Select at least one server for the chosen notification types.'));
 
             return;
         }
-        if ($needsSites && $this->selected_site_ids === []) {
+        if ($needsSites && ! $this->apply_org_wide && $this->selected_site_ids === []) {
             $this->addError('selected_site_ids', __('Select at least one site for the chosen notification types.'));
 
             return;
@@ -292,6 +342,12 @@ class BulkNotificationAssignments extends Component
 
         $created = 0;
 
+        if ($this->apply_org_wide && ! $org->hasAdminAccess(Auth::user())) {
+            $this->addError('apply_org_wide', __('Only organization admins can subscribe the whole organization.'));
+
+            return;
+        }
+
         DB::transaction(function () use (&$created, $org): void {
             foreach ($this->selected_channel_ids as $cid) {
                 $channel = NotificationChannel::query()->findOrFail((string) $cid);
@@ -299,6 +355,21 @@ class BulkNotificationAssignments extends Component
 
                 foreach ($this->selected_event_keys as $event) {
                     $class = NotificationSubscriptionRules::subscribableClassForEvent($event);
+
+                    if ($this->apply_org_wide) {
+                        $row = NotificationSubscription::firstOrCreate([
+                            'notification_channel_id' => $channel->id,
+                            'subscribable_type' => Organization::class,
+                            'subscribable_id' => $org->id,
+                            'event_key' => $event,
+                        ]);
+                        if ($row->wasRecentlyCreated) {
+                            $created++;
+                        }
+
+                        continue;
+                    }
+
                     if ($class === Server::class) {
                         foreach ($this->selected_server_ids as $sid) {
                             $server = Server::query()->where('organization_id', $org->id)->findOrFail((string) $sid);
@@ -435,7 +506,7 @@ class BulkNotificationAssignments extends Component
                 'quick_new_pushover_user_key' => ['required', 'string', 'max:255'],
             ],
             NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000'],
+                'quick_new_teams_webhook_url' => ['required', 'url', 'max:2000', MicrosoftTeamsClient::urlRule()],
             ],
             NotificationChannel::TYPE_ROCKETCHAT => $base + [
                 'quick_new_rocketchat_webhook_url' => ['required', 'url', 'max:2000'],
@@ -447,6 +518,8 @@ class BulkNotificationAssignments extends Component
                 'quick_new_mobile_device_token' => ['required', 'string', 'max:4000'],
                 'quick_new_mobile_platform' => ['required', 'string', 'in:ios,android'],
             ],
+            NotificationChannel::TYPE_INTERCOM => $base + $this->intercomValidationRules('quick_new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $base + $this->pagerDutyValidationRules('quick_new_'),
             default => $base + [
                 'quick_new_webhook_url' => ['required', 'url', 'max:2000'],
             ],
@@ -458,7 +531,7 @@ class BulkNotificationAssignments extends Component
      */
     protected function quickChannelValidationAttributes(): array
     {
-        return [
+        return $this->intercomValidationAttributes('quick_new_') + $this->pagerDutyValidationAttributes('quick_new_') + [
             'quick_new_owner_scope' => __('owner'),
             'quick_new_type' => __('type'),
             'quick_new_label' => __('label'),
@@ -506,6 +579,8 @@ class BulkNotificationAssignments extends Component
                 'device_token' => $this->quick_new_mobile_device_token,
                 'platform' => $this->quick_new_mobile_platform,
             ],
+            NotificationChannel::TYPE_INTERCOM => $this->intercomConfigFromInput('quick_new_'),
+            NotificationChannel::TYPE_PAGERDUTY => $this->pagerDutyConfigFromInput('quick_new_'),
             default => ['url' => $this->quick_new_webhook_url],
         };
     }
@@ -526,6 +601,20 @@ class BulkNotificationAssignments extends Component
         $this->quick_new_google_chat_webhook_url = '';
         $this->quick_new_mobile_device_token = '';
         $this->quick_new_mobile_platform = 'ios';
+        $this->quick_new_intercom_access_token = '';
+        $this->quick_new_intercom_region = 'us';
+        $this->quick_new_intercom_admin_id = '';
+        $this->quick_new_intercom_recipient = '';
+        $this->quick_new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->quick_new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->quick_new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->quick_new_intercom_subject = '';
+        $this->quick_new_pagerduty_routing_key = '';
+        $this->quick_new_pagerduty_region = 'us';
+        $this->quick_new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->quick_new_pagerduty_source = '';
+        $this->quick_new_pagerduty_component = '';
+        $this->quick_new_pagerduty_group = '';
         $this->quick_new_webhook_url = '';
     }
 
@@ -534,6 +623,7 @@ class BulkNotificationAssignments extends Component
         $org = Auth::user()->currentOrganization();
 
         return view('livewire.settings.bulk-notification-assignments', [
+            'bodyPartial' => 'livewire.settings.partials.bulk-assign-body',
             'assignableChannels' => $this->channelsForUser(),
             'eventCatalog' => config('notification_events.categories', []),
             'servers' => $this->serversForCurrentOrg($org),

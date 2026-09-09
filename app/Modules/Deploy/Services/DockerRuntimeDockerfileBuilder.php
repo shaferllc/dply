@@ -28,6 +28,8 @@ FROM php:{$phpVersion}-apache
 
 WORKDIR /var/www/html
 
+# Distro repos only, inside a build: failing loudly beats producing a
+# half-provisioned image. Not a candidate for the day-two tolerance. (T-021)
 RUN apt-get update \
     && apt-get install -y git unzip zip \
     && rm -rf /var/lib/apt/lists/*

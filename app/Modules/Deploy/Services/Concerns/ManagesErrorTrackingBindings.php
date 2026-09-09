@@ -175,7 +175,7 @@ trait ManagesErrorTrackingBindings
         // the Lookout API token (not the per-project key) for reuse — it's the
         // reusable secret, so the next site can mint its own project without
         // re-pasting it. The managed model has no per-customer token to save.
-        if (! $managed && $token !== '') {
+        if (! $managed) {
             $this->maybeSaveErrorTrackingCredential($site, 'lookout', $params, ['token' => $token, 'organization_id' => $org]);
         }
 
@@ -203,7 +203,7 @@ trait ManagesErrorTrackingBindings
                 throw new InvalidArgumentException(__('That saved error tracking credential is no longer available.'));
             }
 
-            return is_array($cred->credentials) ? $cred->credentials : [];
+            return $cred->credentials;
         }
 
         return match ($provider) {

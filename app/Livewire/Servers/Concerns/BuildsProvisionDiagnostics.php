@@ -19,8 +19,6 @@ use Illuminate\Support\Collection;
  */
 trait BuildsProvisionDiagnostics
 {
-
-
     /**
      * Extract a one-line "why did this fail" headline + a few supporting lines from the
      * captured step output (or full task output as a fallback). Surfaces the actual error
@@ -176,7 +174,7 @@ trait BuildsProvisionDiagnostics
             // Strip prefix and split "<path> :: <action> :: <detail>".
             $body = trim((string) preg_replace('/^.*\[dply-rollback\]\s*/', '', $line));
             $segments = array_map('trim', explode('::', $body, 3));
-            $path = $segments[0] ?? '';
+            $path = $segments[0];
             $action = strtolower($segments[1] ?? '');
             $detail = $segments[2] ?? '';
 
@@ -338,7 +336,7 @@ trait BuildsProvisionDiagnostics
     }
 
     /**
-     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta:?array{seconds:int,samples:int}}>  $steps
+     * @param  list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string,eta?:array{seconds:int,samples:int}|null}>  $steps
      * @return array{eta:string,eta_samples:?int,running_for:string,last_output:?string,stalled:bool,warning:?string}|null
      */
     protected function stallState(?Task $task, array $steps): ?array
@@ -364,10 +362,15 @@ trait BuildsProvisionDiagnostics
         // when sample size cleared the configured threshold.
         $etaSamples = null;
         $stepEta = $activeStep['eta'] ?? null;
-        if (is_array($stepEta) && ($stepEta['seconds'] ?? 0) > 0) {
-            $eta = sprintf('Avg %s', $this->formatRunDuration((int) $stepEta['seconds']));
-            $etaSamples = (int) ($stepEta['samples'] ?? 0);
+        if (is_array($stepEta) && $stepEta['seconds'] > 0) {
+            $eta = sprintf('Avg %s', $this->formatRunDuration($stepEta['seconds']));
+            $etaSamples = $stepEta['samples'];
         } else {
+            // firstWhere() returns null when no step is currently 'active' —
+            // an active task whose steps are all still pending, or all already
+            // complete. The `eta` lookup above is null-safe via `??`; this one
+            // was not, so that window fataled with "Trying to access array
+            // offset on null". null falls through to the default arm.
             $eta = match ($activeStep['key'] ?? null) {
                 'provisioning', 'ip', 'ssh' => 'Usually 2-5 minutes',
                 'setup' => 'Usually 5-10 minutes',
@@ -380,7 +383,16 @@ trait BuildsProvisionDiagnostics
         // still tip into "looks stalled" sooner rather than later).
         $minutesSinceUpdate = (int) ceil($secondsSinceUpdate / 60);
         $minutesRunning = (int) ceil($secondsRunning / 60);
-        $stalled = $minutesSinceUpdate >= 3 || $minutesRunning >= 8;
+
+        // Silence — not elapsed time — is what makes a run look stalled. The
+        // long-run clause only makes the warning fire SOONER on a run that has
+        // been going a while; it must never latch it on. Gating both clauses on
+        // the same 30s quiet window as `last_output` means the banner clears on
+        // the next poll as soon as output starts flowing again. (Before this,
+        // `|| $minutesRunning >= 8` pinned the warning up permanently past the
+        // 8-minute mark even while steps kept completing.)
+        $quiet = $secondsSinceUpdate >= 30;
+        $stalled = $quiet && ($minutesSinceUpdate >= 3 || $minutesRunning >= 8);
 
         return [
             'eta' => $eta,

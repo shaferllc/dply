@@ -96,7 +96,7 @@ trait ManagesServerRemovalForm
                 'organization_name' => $org->name,
                 'scheduled_for_display' => $display,
                 'reason' => $reason,
-                'actor_name' => $actor?->name ?? $actor?->email ?? '?',
+                'actor_name' => $actor->name ?? $actor->email ?? '?',
             ],
         );
 

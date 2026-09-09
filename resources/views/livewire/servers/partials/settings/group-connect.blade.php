@@ -6,29 +6,27 @@
         && $server->recoverySshPrivateKey() !== null
         && ($server->ssh_user ?? 'root') !== 'root';
 
-    $inputClass = 'mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30';
+    $inputClass = 'mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30';
     $monoInputClass = $inputClass.' font-mono';
 @endphp
 
 <section id="settings-group-connect" aria-labelledby="settings-group-connect-title">
     <div id="settings-connection" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connect') }}</p>
-                <h2 id="settings-group-connect-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connection & identity') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Name, tags, workspace, and SSH details control how Dply reaches this server. Changes to host, port, user, or workspace are recorded in your organization audit log.') }}</p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-link"
+            :title="__('Connection & identity')"
+            :note="__('Name, tags, workspace, and SSH details control how Dply reaches this server. Changes to host, port, user, or workspace are recorded in your organization audit log.')"
+            title-id="settings-group-connect-title"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
-            <form wire:submit="saveServerSettingsInfo" class="space-y-8">
+        <div class="px-5 py-4 sm:px-6">
+            <form wire:submit="saveServerSettingsInfo" class="space-y-5">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Identity') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('How this server is labelled and grouped in Dply.') }}</p>
-                    <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Identity') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('How this server is labelled and grouped in Dply.') }}</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <div class="sm:col-span-2">
                             <x-input-label for="settings-name" value="{{ __('Server name') }}" />
                             <input
@@ -44,52 +42,69 @@
                             <x-input-label for="settings-tags" value="{{ __('Tags') }}" />
                             @php
                                 $tagsDisabled = ! $this->canEditServerSettings;
+                                $tagChips = array_values(array_unique(array_filter(array_map('trim', explode(',', (string) $this->settingsTags)))));
                             @endphp
+                            {{-- Hidden wire:model carries the canonical comma string: it is what the
+                                 floating unsaved bar (clientDirty) watches for `input`, and what the
+                                 component validates/saves. Two rules keep the pills honest:
+
+                                 1. `chips` is PLAIN reactive Alpine state — a getter reading the input's
+                                    DOM value gives x-for no dependency to track, so pills never re-render.
+                                 2. x-effect re-derives it from `$wire.settingsTags` (Livewire's reactive
+                                    proxy), so save/discard normalisation flows back in. Do NOT re-read
+                                    `$refs.model.value` on the commit hook — the input renders without a
+                                    value attribute mid-morph, so that reads '' and wipes every pill. --}}
                             <div
                                 x-data="{
-                                    raw: @entangle('settingsTags'),
                                     draft: '',
                                     disabled: @js($tagsDisabled),
-                                    get chips() {
-                                        return this.raw
-                                            .split(',')
-                                            .map((t) => t.trim())
-                                            .filter((t) => t.length > 0);
+                                    chips: @js($tagChips),
+                                    parse(raw) {
+                                        return (raw ?? '').split(',').map((t) => t.trim()).filter(Boolean);
                                     },
-                                    sync(list) {
-                                        this.raw = list.join(', ');
+                                    write(list) {
+                                        this.chips = list;
+                                        const el = this.$refs.model;
+                                        if (! el) return;
+                                        el.value = list.join(', ');
+                                        el.dispatchEvent(new Event('input', { bubbles: true }));
                                     },
                                     add() {
                                         if (this.disabled) return;
-                                        const value = this.draft.trim().replace(/,+$/, '').trim();
+                                        const next = [...this.chips];
+                                        this.parse(this.draft).forEach((value) => {
+                                            if (! next.includes(value)) next.push(value);
+                                        });
                                         this.draft = '';
-                                        if (value === '') return;
-                                        const list = this.chips;
-                                        if (! list.includes(value)) {
-                                            list.push(value);
-                                            this.sync(list);
-                                        }
+                                        if (next.length !== this.chips.length) this.write(next);
                                     },
                                     remove(index) {
                                         if (this.disabled) return;
-                                        const list = this.chips;
-                                        list.splice(index, 1);
-                                        this.sync(list);
+                                        const next = [...this.chips];
+                                        next.splice(index, 1);
+                                        this.write(next);
                                     },
                                     backspace() {
-                                        if (this.disabled || this.draft !== '') return;
-                                        const list = this.chips;
-                                        if (list.length > 0) {
-                                            list.pop();
-                                            this.sync(list);
-                                        }
+                                        if (this.disabled || this.draft !== '' || this.chips.length === 0) return;
+                                        this.write(this.chips.slice(0, -1));
                                     },
                                 }"
+                                x-effect="chips = parse($wire.settingsTags)"
                                 class="mt-1 flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-sm shadow-sm focus-within:border-brand-sage focus-within:ring-2 focus-within:ring-brand-sage/30"
                                 :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-text'"
                                 @click="$refs.tagInput && $refs.tagInput.focus()"
                             >
-                                <template x-for="(chip, index) in chips" :key="index">
+                                {{-- value= is required: Livewire renders hidden inputs without it, so a
+                                     post-save morph would otherwise blank the string the chips derive from. --}}
+                                <input
+                                    type="hidden"
+                                    wire:model="settingsTags"
+                                    id="settings-tags-model"
+                                    x-ref="model"
+                                    value="{{ $this->settingsTags }}"
+                                />
+                                {{-- Key by value (chips are de-duped) so removing one doesn't leave a stale pill. --}}
+                                <template x-for="(chip, index) in chips" :key="chip">
                                     <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
                                         <span x-text="chip"></span>
                                         <button
@@ -157,9 +172,9 @@
                 </div>
 
                 <div class="border-t border-brand-ink/10 pt-8">
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Dply reaches this host for deploys and Manage actions over SSH at the address, port, and user below. (Internal IP is private-networking metadata — it is not the SSH target.)') }}</p>
-                    <div class="mt-5 grid gap-5 sm:grid-cols-2">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Dply reaches this host for deploys and Manage actions over SSH at the address, port, and user below. (Internal IP is private-networking metadata — it is not the SSH target.)') }}</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="settings-ip" value="{{ __('IP address or hostname') }}" />
                             <input
@@ -281,18 +296,18 @@
 
                 @if ($this->canEditServerSettings)
                     <div class="flex flex-wrap items-center justify-end gap-3 border-t border-brand-ink/10 pt-6">
-                        <button
-                            type="button"
-                            wire:click="testSshConnection"
-                            wire:loading.attr="disabled"
-                            wire:target="testSshConnection"
-                            @disabled($this->operationalSshProbing)
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test connection') }}
-                        </button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save changes') }}</x-primary-button>
+                        {{-- Do not put Blade @if/@disabled on <x-*> tags — Livewire treats @ as Alpine. --}}
+                        @if ($this->operationalSshProbing)
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection" disabled>
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Testing…') }}
+                            </x-secondary-button>
+                        @else
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection">
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Test connection') }}
+                            </x-secondary-button>
+                        @endif
                     </div>
                 @endif
             </form>
@@ -300,25 +315,20 @@
     </div>
 
     <div id="settings-timezone" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Timezone') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Display timezone') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Used when showing times in this workspace. The guest OS keeps its own timezone unless you change it over SSH.') }}
-                </p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-clock"
+            :title="__('Display timezone')"
+            :note="__('Used when showing times in this workspace. The guest OS keeps its own timezone unless you change it over SSH.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
         <form wire:submit="saveServerTimezone" class="max-w-md">
             <x-input-label for="settings-tz" value="{{ __('Timezone') }}" />
             <select
                 id="settings-tz"
                 wire:model="settingsTimezone"
-                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                 @disabled(! $this->canEditServerSettings)
             >
                 @if ($this->settingsTimezone !== '' && ! in_array($this->settingsTimezone, $tzPreset, true))
@@ -329,33 +339,25 @@
                 @endforeach
             </select>
             <x-input-error :messages="$errors->get('settingsTimezone')" class="mt-2" />
-            @if ($this->canEditServerSettings)
-                <x-primary-button type="submit" class="mt-4" wire:loading.attr="disabled">{{ __('Save timezone') }}</x-primary-button>
-            @endif
         </form>
         </div>
     </div>
 
     <div id="settings-date-format" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Format') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Date format') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Controls how this server\'s timestamps render across the workspace — last sample, deploys, audit log, etc. Saved on the server, so different servers can use different formats.') }}
-                </p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-calendar-days"
+            :title="__('Date format')"
+            :note="__('Controls how this server\'s timestamps render across the workspace — last sample, deploys, audit log, etc. Saved on the server, so different servers can use different formats.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
         <form wire:submit="saveServerDateFormat" class="max-w-md">
             <x-input-label for="settings-date-format-select" value="{{ __('Format') }}" />
             <select
                 id="settings-date-format-select"
                 wire:model="settingsDateFormat"
-                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                 @disabled(! $this->canEditServerSettings)
             >
                 @foreach (config('server_settings.date_formats', []) as $key => $option)
@@ -368,9 +370,6 @@
                     ?? config('server_settings.date_formats.absolute_utc.sample');
             @endphp
             <p class="mt-3 text-xs text-brand-mist">{{ __('Preview:') }} <span class="font-mono text-brand-ink">{{ $previewSample }}</span></p>
-            @if ($this->canEditServerSettings)
-                <x-primary-button type="submit" class="mt-4" wire:loading.attr="disabled">{{ __('Save format') }}</x-primary-button>
-            @endif
         </form>
         </div>
     </div>
@@ -380,19 +379,15 @@
 
     @if ($showRepairCard)
         <div id="settings-connection-repair" class="{{ $card }} scroll-mt-24">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <x-icon-badge tone="amber">
-                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Recovery') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repair SSH access') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.') }}
-                    </p>
-                </div>
-            </div>
-            <div class="px-6 py-5 sm:px-7" @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-wrench-screwdriver"
+                :title="__('Repair SSH access')"
+                :note="__('If the deploy user no longer accepts Dply’s operational key, repair access from the hidden root recovery key without changing your saved connection details.')"
+                tone="amber"
+                class="border-b border-brand-ink/10"
+            />
+            <div class="px-5 py-3 sm:px-6" @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
                 @php $rs = $this->recoverySshStatus; @endphp
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0 space-y-3">
@@ -435,21 +430,23 @@
                         </dl>
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            wire:click="testSshConnection"
-                            wire:loading.attr="disabled"
-                            wire:target="testSshConnection"
-                            @disabled($this->operationalSshProbing)
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test operational access') }}
-                        </button>
-                        <x-primary-button type="button" wire:click="repairSshAccess" wire:loading.attr="disabled" wire:target="repairSshAccess">
-                            <span wire:loading.remove wire:target="repairSshAccess">{{ __('Repair SSH access') }}</span>
-                            <span wire:loading wire:target="repairSshAccess" class="inline-flex items-center gap-2">
+                    <div class="flex shrink-0 flex-wrap items-center justify-end gap-3">
+                        @if ($this->operationalSshProbing)
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection" disabled>
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Testing…') }}
+                            </x-secondary-button>
+                        @else
+                            <x-secondary-button type="button" size="xs" wire:click="testSshConnection" wire:loading.attr="disabled" wire:target="testSshConnection">
+                                <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Test operational access') }}
+                            </x-secondary-button>
+                        @endif
+                        {{-- Rewrites authorized_keys over SSH, so it explains itself in a
+                             confirm dialog first (confirmRepairSshAccess). --}}
+                        <x-primary-button type="button" size="xs" wire:click="confirmRepairSshAccess" wire:loading.attr="disabled" wire:target="confirmRepairSshAccess,repairSshAccess">
+                            <span wire:loading.remove wire:target="confirmRepairSshAccess,repairSshAccess">{{ __('Repair SSH access') }}</span>
+                            <span wire:loading wire:target="confirmRepairSshAccess,repairSshAccess" class="inline-flex items-center gap-2">
                                 <x-spinner variant="forest" size="sm" />
                                 {{ __('Repairing…') }}
                             </span>
@@ -461,17 +458,14 @@
     @endif
 
     <div id="settings-provider" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & lifecycle') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only provisioning metadata from when this server was created.') }}</p>
-            </div>
-        </div>
-        <div class="px-6 py-6 sm:px-7">
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-server-stack"
+            :title="__('Provider & lifecycle')"
+            :note="__('Read-only provisioning metadata from when this server was created.')"
+            class="border-b border-brand-ink/10"
+        />
+        <div class="px-5 py-4 sm:px-6">
             @php
                 $statusReady = $server->status === 'ready';
                 $healthOk = in_array($server->health_status, ['reachable', 'healthy', 'ok'], true);
@@ -483,22 +477,22 @@
             @endphp
             <dl class="grid gap-3 sm:grid-cols-2">
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                     <dd class="mt-1 flex items-center gap-2 text-sm font-medium text-brand-ink">
                         <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
                         <span>{{ __($server->status) }}@if ($server->health_status) <span class="text-brand-mist">/</span> {{ __($server->health_status) }}@endif</span>
                     </dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $providerLine }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
                     <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
                 </div>
                 @php
@@ -514,45 +508,186 @@
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3 sm:col-span-2">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
                             <dd class="mt-1 font-mono text-sm font-medium text-brand-ink">{{ $server->size ?: '—' }}</dd>
                             @if ($specBits !== [])
                                 <p class="mt-0.5 text-xs text-brand-moss">{{ implode(' · ', $specBits) }}</p>
                             @endif
                             @if (is_array($providerSpec) && ! empty($providerSpec['size_changed_from']))
-                                <p class="mt-1 text-[11px] text-emerald-700">{{ __('Resize detected — was :old', ['old' => $providerSpec['size_changed_from']]) }}</p>
+                                <p class="mt-1 text-xs text-emerald-700">{{ __('Resize detected — was :old', ['old' => $providerSpec['size_changed_from']]) }}</p>
                             @endif
                             @if (is_array($providerSpec) && ! empty($providerSpec['synced_at']))
-                                <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Verified with provider :ago', ['ago' => \Illuminate\Support\Carbon::parse($providerSpec['synced_at'])->diffForHumans()]) }}</p>
+                                <p class="mt-0.5 text-xs text-brand-mist">{{ __('Verified with provider :ago', ['ago' => \Illuminate\Support\Carbon::parse($providerSpec['synced_at'])->diffForHumans()]) }}</p>
                             @endif
                             @if (is_array($providerSpecError))
-                                <p class="mt-1 text-[11px] text-rose-700">{{ __('Last verify failed: :msg', ['msg' => $providerSpecError['message'] ?? __('unknown error')]) }}</p>
+                                <p class="mt-1 text-xs text-rose-700">{{ __('Last verify failed: :msg', ['msg' => $providerSpecError['message'] ?? __('unknown error')]) }}</p>
                             @endif
                         </div>
                         {{-- Post-resize re-sync: re-reads size/region/specs from the
                              provider API (queued), then re-probes the box + inventory. --}}
-                        <button
+                        <x-secondary-button
                             type="button"
+                            size="xs"
                             wire:click="syncProviderSpecs"
                             wire:loading.attr="disabled"
                             wire:target="syncProviderSpecs"
-                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                            class="shrink-0"
                             title="{{ __('Re-read the size and specs from the provider — use after resizing the machine.') }}"
                         >
-                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
+                            <x-heroicon-m-arrow-path class="h-4 w-4" aria-hidden="true" wire:loading.class="animate-spin" wire:target="syncProviderSpecs" />
                             {{ __('Verify with provider') }}
-                        </button>
+                        </x-secondary-button>
+                        @if ($this->canResizeServer)
+                            <x-secondary-button
+                                type="button"
+                                size="xs"
+                                wire:click="openResizeModal"
+                                wire:loading.attr="disabled"
+                                wire:target="openResizeModal"
+                                class="shrink-0"
+                                title="{{ __('Move this server onto a different plan at its provider.') }}"
+                            >
+                                <x-heroicon-m-arrows-pointing-out class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Resize') }}
+                            </x-secondary-button>
+                        @endif
                     </div>
+                    @php $resizeState = $server->meta['resize'] ?? null; @endphp
+                    @if (is_array($resizeState) && in_array($resizeState['state'] ?? null, ['powering_off', 'resizing', 'powering_on'], true))
+                        <p class="mt-2 text-xs font-medium text-amber-700">
+                            {{ __('Resize in progress → :size (:state). The server is offline until it finishes.', [
+                                'size' => $resizeState['target_size'] ?? '?',
+                                'state' => str_replace('_', ' ', (string) $resizeState['state']),
+                            ]) }}
+                        </p>
+                    @elseif (is_array($resizeState) && ($resizeState['state'] ?? null) === 'failed')
+                        <p class="mt-2 text-xs text-rose-700">
+                            {{ __('Last resize to :size failed: :msg', [
+                                'size' => $resizeState['target_size'] ?? '?',
+                                'msg' => $resizeState['error'] ?? __('unknown error'),
+                            ]) }}
+                        </p>
+                    @endif
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>
                 </div>
                 <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
-                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inventory last checked') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inventory last checked') }}</dt>
                     <dd class="mt-1 text-sm font-medium text-brand-ink">{{ ($invAt ?? null) ? \Illuminate\Support\Carbon::parse($invAt)->timezone(config('app.timezone'))->toDayDateTimeString() : '—' }}</dd>
                 </div>
             </dl>
         </div>
     </div>
 </section>
+
+{{-- Resize confirm. Sizes come from ServerResizeOptions, which has already
+     dropped anything DigitalOcean would reject (wrong region, smaller disk). --}}
+<x-modal name="server-resize" :show="$showResizeModal" wire:model="showResizeModal" maxWidth="2xl">
+    <div class="p-6">
+        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Resize :name', ['name' => $server->name]) }}</h2>
+
+        @if ($resizeError !== null)
+            <p class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ $resizeError }}</p>
+        @endif
+
+        @if (is_array($resizeCatalog))
+            @php
+                $cur = $resizeCatalog['current'];
+                $opts = $resizeCatalog['options'];
+                $selected = collect($opts)->firstWhere('slug', $resizeTarget);
+            @endphp
+
+            <p class="mt-1 text-sm text-brand-moss">
+                {{ __('Currently :slug — :vcpu vCPU · :mem GB RAM in :region.', [
+                    'slug' => $cur['slug'] ?? '—',
+                    'vcpu' => $cur['vcpus'] ?? '—',
+                    'mem' => $cur['memory_mb'] ? round($cur['memory_mb'] / 1024, 1) : '—',
+                    'region' => $cur['region'] ?? '—',
+                ]) }}
+                @if ($cur['disk_gb'] !== null)
+                    {{ __('Disk :disk GB.', ['disk' => $cur['disk_gb']]) }}
+                @endif
+            </p>
+
+            @php $siteCount = $server->sites()->count(); @endphp
+            <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                @if ($resizePowerCycles)
+                    {{ __('The server is powered off for the resize and started again afterwards.') }}
+                @else
+                    {{ __('The provider reboots this machine while it applies the new plan.') }}
+                @endif
+                @if ($siteCount > 0)
+                    <strong class="font-semibold">{{ trans_choice('{1}1 site on it goes offline.|[2,*]:count sites on it go offline.', $siteCount, ['count' => $siteCount]) }}</strong>
+                    {{ __('Owners and admins are emailed when it starts and when it finishes.') }}
+                @else
+                    {{ __('No sites are deployed on it.') }}
+                @endif
+            </div>
+
+            @if ($opts === [])
+                <p class="mt-4 text-sm text-brand-moss">{{ __('No other size is available for this server in :region.', ['region' => $cur['region'] ?? '—']) }}</p>
+            @else
+                <label class="mt-4 block">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('New size') }}</span>
+                    <select wire:model.live="resizeTarget" class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30">
+                        <option value="">{{ __('Choose a size…') }}</option>
+                        @foreach ($opts as $opt)
+                            @php
+                                $optLabel = sprintf(
+                                    '%s — %d vCPU · %s GB',
+                                    $opt['slug'],
+                                    $opt['vcpus'],
+                                    rtrim(rtrim(number_format($opt['memory_mb'] / 1024, 1), '0'), '.'),
+                                );
+                                if ($opt['disk_gb'] !== null) {
+                                    $optLabel .= ' · '.$opt['disk_gb'].' GB disk';
+                                }
+                                if ($opt['price_monthly'] !== null) {
+                                    $optLabel .= ' · $'.rtrim(rtrim(number_format($opt['price_monthly'], 2), '0'), '.').'/mo';
+                                }
+                                if ($opt['grows_disk']) {
+                                    $optLabel .= ' · '.__('grows disk, permanent');
+                                }
+                            @endphp
+                            <option value="{{ $opt['slug'] }}">{{ $optLabel }}</option>
+                        @endforeach
+                    </select>
+                </label>
+
+                @if (is_array($selected) && $selected['grows_disk'])
+                    <div class="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                        <strong class="font-semibold">{{ __('This permanently grows the disk.') }}</strong>
+                        {{ __('Going from :from GB to :to GB cannot be undone — DigitalOcean will refuse every later resize to a plan with a smaller disk.', [
+                            'from' => $cur['disk_gb'] ?? '—',
+                            'to' => $selected['disk_gb'],
+                        ]) }}
+                    </div>
+                @elseif (is_array($selected) && $cur['disk_gb'] !== null)
+                    <p class="mt-3 text-xs text-brand-moss">{{ __('CPU and RAM only — the disk stays at :disk GB, so this can be reversed later.', ['disk' => $cur['disk_gb']]) }}</p>
+                @elseif (is_array($selected))
+                    {{-- EC2: the root volume is a separate EBS resource and is untouched. --}}
+                    <p class="mt-3 text-xs text-brand-moss">{{ __('Instance type only — storage is a separate volume and is not changed, so this can be reversed later.') }}</p>
+                @endif
+            @endif
+        @endif
+
+        <div class="mt-6 flex justify-end gap-2">
+            <x-secondary-button type="button" wire:click="$set('showResizeModal', false)">{{ __('Cancel') }}</x-secondary-button>
+            {{-- Only offered once a legal target is actually selected: with no
+                 catalog (provider error) or no choice there is nothing to confirm. --}}
+            @if ($resizeTarget !== '')
+                <x-danger-button
+                    type="button"
+                    wire:click="resizeServer"
+                    wire:loading.attr="disabled"
+                    wire:target="resizeServer"
+                >
+                    {{ __('Power off and resize') }}
+                </x-danger-button>
+            @endif
+        </div>
+    </div>
+</x-modal>
+

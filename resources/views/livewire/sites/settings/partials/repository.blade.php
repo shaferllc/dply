@@ -20,12 +20,12 @@
                     <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Branch, remote URL, and Git provider context. Changing the URL updates what Dply clones.') }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                         <span class="inline-flex items-center gap-1">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ $providerLabel }}
@@ -51,7 +51,7 @@
 
         <div class="px-6 py-6 sm:px-8">
             <div class="mb-5 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm text-sky-900">
-                {{ __('Quick deploy registers a webhook with your provider. Re-link GitHub/GitLab/Bitbucket under Profile → Source control if the provider rejects the request.') }}
+                {{ __('Quick deploy auto-deploys on new commits — webhook delivery (provider push) or poll delivery (dply checks Git). Re-link GitHub/GitLab/Bitbucket under Profile → Source control if the provider rejects the request.') }}
             </div>
 
             <form wire:submit="saveRepositoryWorkspace" id="save-repository-form" class="space-y-5">
@@ -166,7 +166,7 @@
                     <p class="text-sm font-medium text-brand-ink">{{ __('Public deploy key') }}</p>
                     <span class="text-xs text-brand-mist">{{ __('Add to your Git provider') }}</span>
                 </div>
-                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $site->git_deploy_key_public }}</pre>
+                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $site->git_deploy_key_public }}</pre>
             </div>
         @endif
     </section>
@@ -177,7 +177,19 @@
         @endif
     @endfeature
 
-    {{-- Quick deploy webhook toggle. --}}
+    {{-- Quick deploy: webhook or poll delivery. --}}
+    @php
+        $qdMode = $quick_deploy_mode_ui ?? null;
+        $qdIsPoll = $qdMode === 'poll';
+        $repoMetaForPoll = $site->repositoryMeta();
+        $pollTip = is_string($repoMetaForPoll['poll_last_tip_sha'] ?? null) ? (string) $repoMetaForPoll['poll_last_tip_sha'] : null;
+        $pollCheckedRaw = is_string($repoMetaForPoll['poll_last_checked_at'] ?? null) ? (string) $repoMetaForPoll['poll_last_checked_at'] : null;
+        $pollLog = is_array($repoMetaForPoll['poll_log'] ?? null) ? array_values($repoMetaForPoll['poll_log']) : [];
+        $pollCheckedLabel = null;
+        if ($pollCheckedRaw) {
+            try { $pollCheckedLabel = \Illuminate\Support\Carbon::parse($pollCheckedRaw)->diffForHumans(); } catch (\Throwable) { $pollCheckedLabel = $pollCheckedRaw; }
+        }
+    @endphp
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
@@ -185,17 +197,22 @@
                     <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Register a push webhook with your Git provider. Only the sync group leader registers an external webhook; peers deploy via coordination.') }}
+                        {{ __('Auto-deploy when new commits land. Choose webhook delivery (provider push) or poll delivery (dply checks Git on a short schedule).') }}
                     </p>
-                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-mist">
                         @if ($quick_deploy_enabled_ui)
                             <span class="inline-flex items-center gap-1">
                                 <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
-                                <span class="text-emerald-700">{{ __('Enabled') }}</span>
+                                <span class="text-emerald-700">
+                                    {{ $qdIsPoll ? __('Enabled · Delivery: Poll') : __('Enabled · Delivery: Webhook') }}
+                                </span>
                             </span>
+                            @if ($qdIsPoll && $pollCheckedLabel)
+                                <span>{{ __('Last checked :when', ['when' => $pollCheckedLabel]) }}@if ($pollTip) · <span class="font-mono">{{ \Illuminate\Support\Str::substr($pollTip, 0, 7) }}</span>@endif</span>
+                            @endif
                         @else
                             <span class="inline-flex items-center gap-1">
                                 <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist"></span>
@@ -204,21 +221,58 @@
                         @endif
                     </div>
 
-                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-[11px] leading-relaxed text-brand-mist" />
+                    <x-quick-deploy-oauth-hint :provider="$site->repositoryMeta()['git_provider_kind'] ?? 'custom'" class="mt-2 text-xs leading-relaxed text-brand-mist" />
+
+                    <details class="group mt-3 max-w-2xl rounded-lg border border-brand-ink/10 bg-white">
+                        <summary class="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-brand-ink marker:content-none [&::-webkit-details-marker]:hidden">
+                            <span class="inline-flex items-center gap-1.5">
+                                <x-heroicon-o-chevron-right class="h-3.5 w-3.5 text-brand-mist transition-transform group-open:rotate-90" />
+                                {{ __('Other ways to trigger a deploy') }}
+                            </span>
+                        </summary>
+                        <ul class="space-y-1.5 border-t border-brand-ink/10 px-3 py-2 text-xs leading-relaxed text-brand-moss">
+                            <li><span class="font-semibold text-brand-ink">{{ __('CLI') }}</span> — <code class="font-mono">dply deploy --follow</code></li>
+                            <li><span class="font-semibold text-brand-ink">{{ __('API') }}</span> — <code class="font-mono">POST /api/v1/sites/{{ $site->id }}/deploy</code></li>
+                            <li><span class="font-semibold text-brand-ink">{{ __('Signed hook') }}</span> — {{ __('POST the webhook URL with') }} <code class="font-mono">X-Dply-Signature</code></li>
+                            <li><span class="font-semibold text-brand-ink">{{ __('Schedule') }}</span> — <a href="{{ route('sites.deployments.index', [$server, $site, 'tab' => 'schedule']) }}" wire:navigate class="font-semibold text-brand-forest underline-offset-2 hover:underline">{{ __('Deployments → Schedule') }}</a></li>
+                            <li><span class="font-semibold text-brand-ink">{{ __('CI / CLI tokens') }}</span> — <a href="{{ route('profile.cli') }}" wire:navigate class="font-semibold text-brand-forest underline-offset-2 hover:underline">{{ __('Profile → CLI') }}</a></li>
+                        </ul>
+                    </details>
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 @if ($quick_deploy_enabled_ui)
                     <button
                         type="button"
-                        wire:click="disableQuickDeploy"
+                        wire:click="openConfirmActionModal('disableQuickDeploy', [], @js(__('Disable Quick deploy')), @js($qdIsPoll ? __('Stop polling for new commits on this site?') : __('Disable Quick deploy and remove the provider push webhook?')), @js(__('Disable')), true)"
                         wire:loading.attr="disabled"
                         wire:target="disableQuickDeploy"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <span wire:loading.remove wire:target="disableQuickDeploy">{{ __('Disable Quick deploy') }}</span>
+                        <span wire:loading.remove wire:target="disableQuickDeploy">{{ __('Disable') }}</span>
                         <span wire:loading wire:target="disableQuickDeploy">{{ __('Disabling…') }}</span>
                     </button>
+                    @if ($qdIsPoll)
+                        <button
+                            type="button"
+                            wire:click="enableQuickDeploy"
+                            wire:loading.attr="disabled"
+                            wire:target="enableQuickDeploy"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {{ __('Use webhook delivery') }}
+                        </button>
+                    @else
+                        <button
+                            type="button"
+                            wire:click="enableQuickDeployPoll"
+                            wire:loading.attr="disabled"
+                            wire:target="enableQuickDeployPoll"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {{ __('Use poll delivery') }}
+                        </button>
+                    @endif
                 @else
                     <button
                         type="button"
@@ -227,12 +281,30 @@
                         wire:target="enableQuickDeploy"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <span wire:loading.remove wire:target="enableQuickDeploy">{{ __('Enable Quick deploy') }}</span>
+                        <span wire:loading.remove wire:target="enableQuickDeploy">{{ __('Enable · Webhook') }}</span>
                         <span wire:loading wire:target="enableQuickDeploy">{{ __('Enabling…') }}</span>
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="enableQuickDeployPoll"
+                        wire:loading.attr="disabled"
+                        wire:target="enableQuickDeployPoll"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="enableQuickDeployPoll">{{ __('Enable · Poll') }}</span>
+                        <span wire:loading wire:target="enableQuickDeployPoll">{{ __('Enabling…') }}</span>
                     </button>
                 @endif
             </div>
         </div>
+        @if (($quick_deploy_enabled_ui && $qdIsPoll) || $pollLog !== [])
+            <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-8">
+                @include('livewire.sites.repository.partials.poll-log', [
+                    'isPoll' => $quick_deploy_enabled_ui && $qdIsPoll,
+                    'pollLog' => $pollLog,
+                ])
+            </div>
+        @endif
     </section>
 
     {{-- Synchronized deploy group. --}}
@@ -243,7 +315,7 @@
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Group sites that share a repository so one push or coordinated manual deploy can update multiple destinations.') }}
@@ -251,7 +323,7 @@
                 </div>
             </div>
             @if ($repoGroup)
-                <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
+                <span class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-brand-sand/40 px-2.5 py-1 text-xs font-semibold text-brand-moss">
                     <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                     {{ trans_choice('{1} :count site|[2,*] :count sites', $repoGroup->sites->count(), ['count' => $repoGroup->sites->count()]) }}
                 </span>
@@ -272,7 +344,7 @@
                             <li class="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                                 <span class="text-brand-ink">{{ $gs->name }}</span>
                                 @if ((string) $gs->id === (string) $repoGroup->leader_site_id)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                         <x-heroicon-m-star class="h-3 w-3" />
                                         {{ __('leader') }}
                                     </span>
@@ -352,7 +424,7 @@
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Atomic deploys can verify HTTP health before traffic switches. Failed deployments also trigger notification subscriptions when configured.') }}
@@ -370,7 +442,7 @@
         </div>
     </section>
 
-    {{-- Inbound deploy webhook URL + secret rotation. --}}
+    {{-- Webhook URL + secret (transport under Quick deploy / signed hooks). --}}
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
@@ -378,10 +450,10 @@
                     <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook URL') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy webhook URL') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Restrict which IPs may call it with the allow list below.') }}
+                        {{ __('Used by Quick deploy webhook delivery and signed hooks. Providers send signed POST payloads (GitHub/GitLab) or X-Dply-Signature. Restrict which IPs may call it with the allow list below.') }}
                     </p>
                 </div>
             </div>
@@ -389,14 +461,14 @@
 
         <div class="space-y-4 px-6 py-6 sm:px-8">
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Webhook URL') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Webhook URL') }}</p>
                 <div class="mt-2 flex items-stretch overflow-hidden rounded-lg border border-brand-ink/15 bg-white">
-                    <p class="flex-1 break-all px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $deployHookUrl }}</p>
+                    <p class="flex-1 break-all px-3 py-2 font-mono text-xs leading-relaxed text-brand-ink">{{ $deployHookUrl }}</p>
                     <button
                         type="button"
                         x-data="{ copied: false }"
                         x-on:click="navigator.clipboard.writeText(@js($deployHookUrl)); copied = true; setTimeout(() => copied = false, 2000)"
-                        class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
                         <x-heroicon-m-clipboard-document class="h-4 w-4" />
                         <span x-show="!copied">{{ __('Copy') }}</span>
@@ -408,7 +480,7 @@
             @if ($revealed_webhook_secret)
                 <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                     <p class="text-sm font-semibold text-amber-900">{{ __('Copy your new secret now:') }}</p>
-                    <pre class="mt-2 overflow-x-auto rounded-lg border border-amber-200 bg-white p-3 font-mono text-[11px] leading-relaxed text-amber-900">{{ $revealed_webhook_secret }}</pre>
+                    <pre class="mt-2 overflow-x-auto rounded-lg border border-amber-200 bg-white p-3 font-mono text-xs leading-relaxed text-amber-900">{{ $revealed_webhook_secret }}</pre>
                 </div>
             @else
                 <p class="text-xs text-brand-moss">{{ __('Secret is stored encrypted. Rotate to update the provider hook when Quick deploy is enabled.') }}</p>
@@ -437,7 +509,7 @@
             </div>
 
             <div class="border-t border-brand-ink/10 pt-4">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
                 <form wire:submit="saveWebhookSecurity" class="mt-2 space-y-3">
                     <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
                     <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
@@ -460,7 +532,7 @@
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
                     <h2 class="mt-0.5 text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900/80">
                         {{ __('Remove the deployed repository tree on the server without deleting this site in Dply.') }}

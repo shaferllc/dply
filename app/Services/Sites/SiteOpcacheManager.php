@@ -216,7 +216,7 @@ BASH,
         // should be live". Compared against `serving_release`, a mismatch is the
         // real worker pin (the DB SiteRelease row can lag actual deploys, so it
         // is NOT a reliable baseline). Captured in the same round-trip.
-        if (preg_match('/DPLY_CURRENT=(\S+)/', $buffer, $cm) && $cm[1] !== '') {
+        if (preg_match('/DPLY_CURRENT=(\S+)/', $buffer, $cm)) {
             $decoded['current_release'] = $cm[1];
         }
 

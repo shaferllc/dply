@@ -325,7 +325,7 @@
                             <p class="mt-1 text-xs text-brand-moss">{{ __('No run recorded yet. Use “Run now” to capture output here.') }}</p>
                         @endif
                     </div>
-                    <button
+                    <button class="dply-hit-44" aria-label="{{ __('Close') }}"
                         type="button"
                         wire:click="closeLogsModal"
                         class="rounded-lg p-2 text-brand-moss hover:bg-brand-sand/50 hover:text-brand-ink"

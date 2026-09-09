@@ -1,21 +1,23 @@
 {
   "name": "@dply/cli",
   "version": "0.1.0",
-  "description": "Command-line interface for the dply Edge platform — deploy, roll back, promote, manage domains, tail logs.",
+  "description": "Command-line interface for the dply Edge platform \u2014 deploy, roll back, promote, manage domains, tail logs.",
   "type": "module",
   "bin": {
     "dply": "bin/dply.mjs"
   },
   "files": [
+    "README.md",
     "bin",
-    "src",
-    "README.md"
+    "commands.json",
+    "src"
   ],
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "manifest": "node -e \"import('./src/manifest.mjs').then(m=>process.stdout.write(JSON.stringify({commands:m.COMMANDS,shortcuts:m.MULTI_TOKEN_SHORTCUTS},null,2)+'\\n'))\" > commands.json"
   },
   "license": "MIT",
   "homepage": "https://github.com/dply/dply",

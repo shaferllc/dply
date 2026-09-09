@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns\Site;
 
-use App\Models\EdgeDeployment;
-use App\Models\EdgeSiteAccessRule;
-use App\Models\EdgeSiteEnvVar;
-use App\Models\EdgeSiteMember;
-use App\Models\FunctionAction;
 use App\Models\InsightFinding;
 use App\Models\InsightSetting;
 use App\Models\NotificationSubscription;
 use App\Models\Organization;
+use App\Models\OrganizationSecret;
 use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Script;
@@ -33,7 +29,6 @@ use App\Models\SiteDeployStep;
 use App\Models\SiteDeploySyncGroup;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
-use App\Modules\Backups\Models\SiteFileBackup;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteRedirect;
@@ -46,6 +41,7 @@ use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\WorkerPool;
 use App\Models\Workspace;
+use App\Modules\Backups\Models\SiteFileBackup;
 use App\Services\Sites\SecretResidencyResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,7 +66,6 @@ use Illuminate\Support\Collection;
  * @property-read ?Project $project
  * @property-read ?ProviderCredential $dnsProviderCredential
  * @property-read ?ProviderCredential $edgeProviderCredential
- * @property-read ?ProviderCredential $serverlessProviderCredential
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomain> $domains
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SitePreviewDomain> $previewDomains
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDomainAlias> $domainAliases
@@ -85,16 +80,13 @@ use Illuminate\Support\Collection;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRelease> $releases
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteProcess> $processes
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteBinding> $bindings
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, OrganizationSecret> $organizationSecrets
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteRedirect> $redirects
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployHook> $deployHooks
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeployPipeline> $deployPipelines
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploymentSchedule> $deploymentSchedules
  * @property-read ?SiteDeployPipeline $activeDeployPipeline
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteFileBackup> $fileBackups
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeDeployment> $edgeDeployments
- * @property-read ?EdgeSiteAccessRule $edgeSiteAccessRule
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteEnvVar> $edgeEnvVars
- * @property-read \Illuminate\Database\Eloquent\Collection<int, EdgeSiteMember> $edgeSiteMembers
  * @property-read \Illuminate\Database\Eloquent\Collection<int, SiteDeploySyncGroup> $deploySyncGroups
  * @property-read \Illuminate\Database\Eloquent\Collection<int, NotificationSubscription> $notificationSubscriptions
  * @property-read ?InsightSetting $insightSetting
@@ -242,12 +234,6 @@ trait HasSiteRelationships
         return $this->belongsTo(ProviderCredential::class, 'edge_provider_credential_id');
     }
 
-    /** @return BelongsTo<ProviderCredential, $this> */
-    public function serverlessProviderCredential(): BelongsTo
-    {
-        return $this->belongsTo(ProviderCredential::class, 'serverless_provider_credential_id');
-    }
-
     /**
      * Provider credential used for DNS automation on this site (preview hostnames, DNS-01 defaults, etc.).
      * Uses the site override when set and DNS-capable; otherwise the latest DNS-capable credential for the organization (any provider).
@@ -280,21 +266,6 @@ trait HasSiteRelationships
     public function domains(): HasMany
     {
         return $this->hasMany(SiteDomain::class);
-    }
-
-    /**
-     * The OpenWhisk actions on this serverless function-Site. A Site is an
-     * OpenWhisk package: one `kind=code` action for a plain function, more
-     * once the package model lands. Code actions sort before sequences. *
-     *
-     * @return HasMany<FunctionAction, $this>
-     */
-    /** @return HasMany<FunctionAction, $this> */
-    public function functionActions(): HasMany
-    {
-        return $this->hasMany(FunctionAction::class)
-            ->orderByRaw("CASE WHEN kind = 'code' THEN 0 ELSE 1 END")
-            ->orderBy('name');
     }
 
     /** @return HasMany<SitePreviewDomain, $this> */
@@ -442,6 +413,14 @@ trait HasSiteRelationships
         return $this->hasMany(SiteBinding::class);
     }
 
+    /** @return BelongsToMany<OrganizationSecret, $this> */
+    public function organizationSecrets(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSecret::class, 'organization_secret_sites')
+            ->withPivot('key')
+            ->withTimestamps();
+    }
+
     /**
      * Per-key secret residency records — the env vars this site keeps OUT of the
      * loose plaintext-in-DB `.env` blob (escrowed under an org key, or referenced
@@ -513,30 +492,6 @@ trait HasSiteRelationships
     public function fileBackups(): HasMany
     {
         return $this->hasMany(SiteFileBackup::class)->orderByDesc('created_at');
-    }
-
-    /** @return HasMany<EdgeDeployment, $this> */
-    public function edgeDeployments(): HasMany
-    {
-        return $this->hasMany(EdgeDeployment::class)->orderByDesc('created_at');
-    }
-
-    /** @return HasOne<EdgeSiteAccessRule, $this> */
-    public function edgeSiteAccessRule(): HasOne
-    {
-        return $this->hasOne(EdgeSiteAccessRule::class);
-    }
-
-    /** @return HasMany<EdgeSiteEnvVar, $this> */
-    public function edgeEnvVars(): HasMany
-    {
-        return $this->hasMany(EdgeSiteEnvVar::class)->orderBy('key');
-    }
-
-    /** @return HasMany<EdgeSiteMember, $this> */
-    public function edgeSiteMembers(): HasMany
-    {
-        return $this->hasMany(EdgeSiteMember::class);
     }
 
     /** @return BelongsToMany<SiteDeploySyncGroup, $this> */

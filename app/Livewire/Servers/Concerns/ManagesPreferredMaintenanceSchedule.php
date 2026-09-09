@@ -40,7 +40,7 @@ trait ManagesPreferredMaintenanceSchedule
     {
         $this->authorize('update', $this->server);
 
-        if (method_exists($this, 'currentUserIsDeployer') && $this->currentUserIsDeployer()) {
+        if ($this->currentUserIsDeployer()) {
             $this->toastError(__('Deployers cannot change server settings.'));
 
             return;

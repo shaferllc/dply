@@ -66,14 +66,14 @@ class ProvisionStepEtaService
      * the journey UI calls this once for the whole "Up next" list so
      * each pending row gets an ETA chip without N+1 trips.
      *
-     * @param  array<string, mixed> $labelHashes
+     * @param  list<string> $labelHashes
      * @return array<string, array{seconds: int, samples: int}> keyed by label_hash; missing keys = below threshold
      */
     public function averagesForLabels(array $labelHashes, ?Organization $organization): array
     {
         $hashes = array_values(array_unique(array_filter(
             $labelHashes,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn (string $h): bool => $h !== '',
         )));
 
         if ($hashes === [] || $organization === null) {

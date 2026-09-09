@@ -258,7 +258,6 @@ BASH;
     /**
      * @return array{values: array<string, string>, exists: bool, unreadable: bool, raw: string}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         $values = $this->defaults();
@@ -505,7 +504,6 @@ YAML;
      * @param  array<string, mixed> $parsed
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function ensureDplyTraefikStaticDefaults(Server $server, array $parsed): array
     {
         if ($server->edgeProxy() !== 'traefik') {
@@ -555,7 +553,6 @@ YAML;
     /**
      * Walk a dot-path inside the parsed array.
      *
-     * @param  array<string, mixed> $parsed
      * @param  array<string, mixed> $tree
      */
     private function getByPath(array $tree, string $path): mixed
@@ -615,7 +612,7 @@ YAML;
 
     /**
      * @param  array<string, mixed> $tree
-     * @param  array<string, mixed> $segments
+     * @param  list<string>  $segments
      */
     private function recursiveUnset(array &$tree, array $segments): void
     {
@@ -907,6 +904,7 @@ YAML;
         return false;
     }
 
+    /** @phpstan-impure */
     private function execPrivileged(Server $server, SshConnection $ssh, string $command, int $timeout): string
     {
         return $ssh->exec($this->privilegedCommand($server, $command), $timeout);

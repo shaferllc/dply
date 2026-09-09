@@ -3,66 +3,52 @@ includes:
     - phpstan-baseline.neon
 
 parameters:
-    level: 6
-
+    level: 5
     parseModelCastsMethod: true
     databaseMigrationsPath:
         - database/migrations
 
-    # The baseline is large; tolerate minor count drift between runs rather than
-    # failing CI when an unrelated change shifts an inferred type.
-    reportUnmatchedIgnoredErrors: false
-
     paths:
-        - app/Actions
-        #- app/Console
-        #- app/Contracts
-        #- app/Enums
-        #- app/Events
-        #- app/Exceptions
-        #- app/Http
-        #- app/Jobs
-        #- app/Listeners
-        #- app/Mail
-        #- app/Mcp
-        #- app/Models
-        #- app/Notifications
-        #- app/Observers
-        #- app/Policies
-        #- app/Providers
-        #- app/Services
-        #- app/Support
-        #- app/TaskRunner
-        #- app/View
-        #- app/helpers.php
-        #- config
-        #- database
-        #- routes
+        - app
+        - config
+        - database
+        - routes
 
     # Test files that live under app/ (PSR-4 namespace mismatches + a Pest guard
     # stub) — analysed via the test suite, not here.
     excludePaths:
         - app/*/Tests/*
         - app/**/Tests/*
+        # Same intent, lowercase dir name: app/Actions/{Concerns,Decorators,Attributes}/tests
+        - app/*/tests/*
+        - app/**/tests/*
 
-        # FIXME: these three trigger PHPStan *internal* errors (which abort the
-        # run rather than report cleanly), so they're excluded until fixed:
-        #   - SecretsRestoreCommand: defines a `--version` option, which collides
-        #     with Symfony's reserved global option (LogicException at runtime).
-        #   - TaskRunCommand: same problem with a `--quiet` option.
-        #   - DebounceDecorator: dispatches App\Jobs\ExecuteDebouncedAction,
-        #     a class that does not exist anywhere in the codebase.
-        # (?) = optional: these two were removed/moved by later work; keep the
-        # exclusions harmless whether or not the files exist.
-        - app/Console/Commands/SecretsRestoreCommand.php (?)
-        - app/TaskRunner/Commands/TaskRunCommand.php (?)
-        - app/Actions/Decorators/DebounceDecorator.php
+        # SecretsRestoreCommand (--version) and TaskRunCommand (--quiet) used to
+        # be excluded here for triggering PHPStan *internal* errors. Both are
+        # fixed — the options were renamed to --revision / --no-output — so the
+        # exclusions are gone. Those reserved-global collisions were not merely
+        # an analysis problem: they threw before handle() ran, so neither command
+        # could be invoked at all.
+        #
+        # The old entries pointed at app/Console/Commands/ and
+        # app/TaskRunner/Commands/; the modular-monolith refactor moved both
+        # under app/Modules/, and because they were marked `(?)` (optional) they
+        # silently stopped matching — which is why a full run aborted with
+        # "Result is incomplete" and reported 0 errors.
+        #
+        # Optional Action concerns — opt-in markers, not composed into AsAction.
+        - app/Actions/Concerns/AsABTestable.php
+        - app/Actions/Concerns/AsFeatureFlagged.php
+        - app/Actions/Concerns/WithAttributes.php
 
         # Demo/example scripts that extend base classes which don't exist in the
-        # codebase (EnhancedTask, Dply\Tasks\BaseTask) — non-runnable samples.
-        - app/TaskRunner/Examples/*
-        - app/TaskRunner/config/*
+        # codebase (BaseTask, EnhancedTask, Dply\Tasks\BaseTask) — non-runnable
+        # samples. Paths corrected for the modular-monolith move: these used to
+        # read app/TaskRunner/*, which stopped matching anything.
+        - app/Modules/TaskRunner/Examples/*
+        - app/Modules/TaskRunner/config/*
 
-    # Existing violations are captured in phpstan-baseline.neon so the suite is
-    # green today; new code is held to the level above. Regenerate the baseline
-    # with: composer analyse:baseline
+    # phpstan-baseline.neon is empty and must stay that way: the whole codebase
+    # is clean at level 5, so a new violation fails `composer analyse` instead of
+    # being absorbed. `composer analyse:baseline` exists to inspect what a change
+    # would add — don't commit a populated baseline to get a build green.

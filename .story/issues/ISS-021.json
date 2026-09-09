@@ -1,0 +1,20 @@
+{
+  "components": [
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php"
+  ],
+  "createdBy": "autonomous-session-d3782ff0",
+  "dedupeKey": "iss-015-followup:taskshow-missing-arg-throws",
+  "discoveredDate": "2026-09-04",
+  "id": "ISS-021",
+  "impact": "'shows help when no arguments provided' calls `$this->artisan('task:show')` with no `task` argument and asserts exit code 1 plus 'Not enough arguments'. In-process, Symfony's Input::validate() throws `RuntimeException: Not enough arguments (missing: \"task\")` (vendor/symfony/console/Input/Input.php:69) before TaskShowCommand::handle() is ever entered, so the test errors rather than failing an assertion.\n\nThe test describes real terminal behaviour — at a shell, `php artisan task:show` does print that message and exit non-zero, because the console Application catches the exception and renders it. What it does not describe is `$this->artisan()`, which lets the exception propagate.\n\nSo the command is fine and the expectation is fine; only the mechanism is wrong. Assert the throw (`$this->expectException(RuntimeException::class)` or Pest's `->throws(...)`), which is what the in-process runner can actually observe.\n\nFound while fixing ISS-015; a different defect class from the renderer-mismatch assertions that issue covered.",
+  "location": [
+    "app/Modules/TaskRunner/Tests/Commands/TaskShowCommandTest.php:511"
+  ],
+  "phase": "test-debt",
+  "relatedTickets": [],
+  "resolution": null,
+  "resolvedDate": null,
+  "severity": "low",
+  "status": "open",
+  "title": "Missing-argument test expects exit code 1, but Symfony throws before the command runs"
+}

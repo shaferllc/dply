@@ -11,12 +11,10 @@ use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\User;
-use App\Modules\Billing\Services\EdgeSiteAccessAnalytics;
-use App\Modules\Billing\Services\EdgeSiteBillingAnalytics;
-use App\Modules\Billing\Services\EdgeSiteTrafficAnalytics;
 use App\Modules\Billing\Services\ManagedProductCostEstimator;
-use App\Support\Deployment\DeploymentContract;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Services\Sites\AppCatalog;
+use App\Support\Deployment\DeploymentContract;
 use App\Support\SiteSettingsHeader;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Support\Collection;
@@ -28,7 +26,7 @@ use Illuminate\Support\Collection;
 final class SiteSettingsViewData
 {
     /**
-     * @param  array<string, mixed> $deploymentPreflight
+     * @param  array<string, mixed>  $deploymentPreflight
      * @return array<string, mixed>
      */
     public static function for(
@@ -43,11 +41,10 @@ final class SiteSettingsViewData
             return self::forEdgeWorkspace($server, $site, $section, $user);
         }
 
-        $functionsHost = $server->hostCapabilities()->supportsFunctionDeploy();
+        $functionsHost = false;
         $supportsMachinePhp = $server->hostCapabilities()->supportsMachinePhpManagement();
         $supportsWebserverProvisioning = $server->hostCapabilities()->supportsWebserverProvisioning();
         $showWebserverConfigEditor = $server->hostCapabilities()->supportsSsh()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesDockerRuntime()
             && ! $site->usesKubernetesRuntime();
         $supportsHttp3Certificates = $server->hostCapabilities()->supportsHttp3Certificates();
@@ -99,6 +96,8 @@ final class SiteSettingsViewData
             'php' => 'heroicon-o-command-line',
             'ruby' => 'heroicon-o-command-line',
             'static' => 'heroicon-o-document',
+            // Shared by every mise-managed runtime (node/python/go/bun/deno/java).
+            'generic' => 'heroicon-o-command-line',
         ];
         $previewDomain = $site->primaryPreviewDomain();
         $activeCertificate = $site->certificates->firstWhere('status', SiteCertificate::STATUS_ACTIVE);
@@ -111,7 +110,10 @@ final class SiteSettingsViewData
                 SiteCertificate::STATUS_FAILED,
             ], true));
         $latestCertificate = $activeCertificate ?? $pendingCertificate ?? $site->certificates->first();
-        $serverlessRuntime = $site->usesFunctionsRuntime() ? $site->serverlessConfig() : [];
+        // Site::serverlessConfig() is removed with the serverless surface
+        // (remove-cloud-edge-serverless); the key stays so views that read it
+        // keep getting an array.
+        $serverlessRuntime = [];
         $dockerRuntime = $site->usesDockerRuntime() && is_array($site->meta['docker_runtime'] ?? null) ? $site->meta['docker_runtime'] : [];
         $kubernetesRuntime = $site->usesKubernetesRuntime() && is_array($site->meta['kubernetes_runtime'] ?? null) ? $site->meta['kubernetes_runtime'] : [];
         $runtimeTarget = $site->runtimeTarget();
@@ -246,9 +248,19 @@ final class SiteSettingsViewData
             ? self::recentDeploymentsWithPhaseResults($site)
             : collect();
         $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
+        // Whether the app picker has any real installer to offer on THIS server.
+        // AppCatalog gates its (all-PHP) installers on the box actually having
+        // PHP, so a Node/static host has none — and the "Install an app" shortcut
+        // would deep-link into a picker that can't show a single installer.
+        // Coming-soon installers still render in the picker (greyed), so they
+        // count — the shortcut is only pointless when there is no scaffold tile
+        // at all, which is exactly the php-less case.
+        $hasAppInstallers = collect(app(AppCatalog::class)->forServer($server))
+            ->contains(fn (array $tile): bool => ($tile['kind'] ?? '') === 'scaffold');
 
         return array_merge(
             compact(
+                'hasAppInstallers',
                 'functionsHost',
                 'supportsMachinePhp',
                 'supportsWebserverProvisioning',
@@ -354,7 +366,9 @@ final class SiteSettingsViewData
         $header = self::headerContext($site, $sectionHeader, $section, $user);
         $settingsBreadcrumbs = self::breadcrumbs($server, $site, $section, $sectionHeader);
         $edgeAnalytics = self::edgeAnalyticsForSection($site, $section);
-        $edgeContext = EdgeSiteViewData::context($site, $section);
+        // EdgeSiteViewData is removed with the Edge surface; an empty context
+        // keeps array_merge() and the compact() list below intact.
+        $edgeContext = [];
         $sectionConsoleActionKinds = (array) (config('console_actions.section_kinds.'.$section, []));
         $sectionConsoleActionRun = self::consoleActionRun($site, $sectionConsoleActionKinds);
         $contextualDocSlug = app(ContextualDocResolver::class)->resolveForSiteSection($site, $section);
@@ -445,8 +459,12 @@ final class SiteSettingsViewData
         $edgeUsageBillingEnabled = (bool) config('dply.edge.usage_billing.enabled', false);
         $edgeManagedFee = ((int) config('subscription.standard.edge_cents', 0)) / 100;
         $edgeUsageRates = app(ManagedProductCostEstimator::class)->edgeUsageRates();
-        $edgeSiteBilling = app(EdgeSiteBillingAnalytics::class)->forSite($site);
-        $edgeSiteTraffic = app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling);
+        // The three Edge analytics services are removed with the surface
+        // (remove-cloud-edge-serverless). Null is already a valid value for
+        // these keys — see the no-snapshot branches below — so callers and
+        // blades keep their shape.
+        $edgeSiteBilling = null;
+        $edgeSiteTraffic = null;
 
         return [
             'edgeUsageBillingEnabled' => $edgeUsageBillingEnabled,
@@ -540,17 +558,9 @@ final class SiteSettingsViewData
             ? app(ManagedProductCostEstimator::class)->edgeUsageRates()
             : [];
 
-        $edgeSiteBilling = ($needsBillingSnapshot || $needsTrafficSnapshot)
-            ? app(EdgeSiteBillingAnalytics::class)->forSite($site)
-            : null;
-
-        $edgeSiteTraffic = $needsTrafficSnapshot
-            ? app(EdgeSiteTrafficAnalytics::class)->forSite($site, billing: $edgeSiteBilling)
-            : null;
-
-        $edgeSiteAccess = $needsAccessSnapshot
-            ? app(EdgeSiteAccessAnalytics::class)->forSite($site)
-            : null;
+        $edgeSiteBilling = null;
+        $edgeSiteTraffic = null;
+        $edgeSiteAccess = null;
 
         $payload = [
             'edgeUsageBillingEnabled' => $flags['edgeUsageBillingEnabled'],
@@ -618,77 +628,14 @@ final class SiteSettingsViewData
      */
     private static function breadcrumbs(Server $server, Site $site, string $section, array $sectionHeader): array
     {
-        $isProductionMirror = data_get($site->meta, 'production_data_mirror') === true
-            && function_exists('production_data_mirror_connected')
-            && production_data_mirror_connected();
-
-        if ($isProductionMirror) {
-            $items = [
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Production'), 'href' => route('live.sites.index'), 'icon' => 'exclamation-triangle'],
-                ['label' => __('Sites'), 'href' => route('live.sites.index'), 'icon' => 'globe-alt'],
-                [
-                    'label' => $server->name,
-                    'href' => route('live.servers.index'),
-                    'icon' => 'server-stack',
-                    'avatar' => $server->name ?: (string) $server->id,
-                    'avatar_image' => $server->logoUrl(),
-                ],
-                [
-                    'label' => $site->name,
-                    'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                    'icon' => 'globe-alt',
-                    'avatar' => $site->name ?: (string) $site->id,
-                    'avatar_image' => $site->logoUrl(),
-                ],
-            ];
-
-            if ($section !== 'general') {
-                $items[] = [
-                    'label' => $sectionHeader['title'],
-                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
-                ];
-            }
-
-            return $items;
-        }
-
-        if ($site->usesEdgeRuntime()) {
-            $items = [
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
-            ];
-
-            $items[] = [
-                'label' => $site->name,
-                'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ];
-
-            if ($section !== 'general') {
-                $items[] = [
-                    'label' => $sectionHeader['title'],
-                    'icon' => SiteWorkspaceBreadcrumbs::iconKeyFromSection($section, $site, $server),
-                ];
-            }
-
-            return $items;
-        }
-
         $items = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
 
-        if ($server->workspace) {
-            $items[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
+        // Project deliberately omitted — see SiteWorkspaceBreadcrumbs: it isn't a
+        // step on the Dashboard → Servers → server → site path, and it pushed the
+        // trail to eight crumbs. Still reachable from the server overview.
 
         $items[] = [
             'label' => $server->name,
@@ -721,7 +668,7 @@ final class SiteSettingsViewData
     }
 
     /**
-     * @param  array<string, mixed> $kinds
+     * @param  array<string, mixed>  $kinds
      */
     private static function consoleActionRun(Site $site, array $kinds): ?ConsoleAction
     {

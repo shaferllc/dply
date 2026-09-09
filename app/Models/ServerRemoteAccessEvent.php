@@ -17,15 +17,15 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $finished_at
  * @property string $label
  * @property string $linux_user
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property ?string $server_id
  * @property string $source
  * @property ?Carbon $started_at
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerRemoteAccessEvent extends Model
 {

@@ -126,7 +126,6 @@ class RevertInsightFixJob implements ShouldQueue
         return new InsightsBannerStream(
             entity: $entity,
             runId: (string) $this->runId,
-            findingId: $finding->id,
             statusKeyConfig: 'insights_workspace.meta_revert_status_key',
             finishedKeyConfig: 'insights_workspace.meta_revert_finished_at_key',
             errorKeyConfig: 'insights_workspace.meta_revert_error_key',

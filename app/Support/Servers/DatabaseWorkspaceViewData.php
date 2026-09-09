@@ -34,7 +34,15 @@ final class DatabaseWorkspaceViewData
         $engineLabels = collect(DatabaseWorkspaceEngines::ENGINE_TABS)
             ->mapWithKeys(fn (string $engine): array => [$engine => DatabaseWorkspaceEngines::label($engine)])
             ->all();
-        $engines = DatabaseWorkspaceEngines::ENGINE_TABS;
+        // Gated engines are hidden outright, not badged "Soon" — same rule as
+        // the Caches workspace. An engine already installed on THIS server
+        // stays listed regardless of its flag, so parking one never orphans an
+        // existing install.
+        $engines = array_values(array_filter(
+            DatabaseWorkspaceEngines::ENGINE_TABS,
+            fn (string $engine): bool => DatabaseEngineAvailability::isAvailable($engine)
+                || $engineRows->contains(fn (ServerDatabaseEngine $row): bool => $row->engine === $engine),
+        ));
 
         // Engine => coming-soon bool. MySQL / PostgreSQL / SQLite are always
         // available; MariaDB, MongoDB, and ClickHouse are gated behind

@@ -7,6 +7,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Models\ConsoleAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CaddyGlobalOptionsConfig;
+use App\Services\Servers\CaddySnippetsConfig;
 use Illuminate\Support\Facades\DB;
 
 /**

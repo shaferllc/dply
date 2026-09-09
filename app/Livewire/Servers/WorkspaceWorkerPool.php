@@ -2,14 +2,6 @@
 
 namespace App\Livewire\Servers;
 
-use App\Actions\Servers\ResolveServerCreateCatalog;
-use App\Jobs\ApplyWorkerPoolExposureJob;
-use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
-use App\Jobs\CollectWorkerPoolStatsJob;
-use App\Jobs\DetectWorkerPoolHorizonConfigJob;
-use App\Jobs\PushWorkerPoolHorizonConfigJob;
-use App\Jobs\ReconcileWorkerPoolJob;
-use App\Jobs\RunWorkerPoolTestJobsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -19,16 +11,12 @@ use App\Livewire\Servers\Concerns\ManagesWorkerPoolHorizon;
 use App\Livewire\Servers\Concerns\ManagesWorkerPoolScaling;
 use App\Livewire\Servers\Concerns\ManagesWorkerPoolStats;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use App\Models\ConsoleAction;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\WorkerCloneProvisioner;
-use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
@@ -59,6 +47,20 @@ class WorkspaceWorkerPool extends Component
     #[Url(as: 'tab')]
     public string $tab = 'overview';
 
+    /**
+     * Explicit setter so the tab strip has a concrete wire:target — `wire:target`
+     * can't match a magic `$set`, so the tab's inline spinner never fired and a
+     * switch looked frozen for the whole round-trip.
+     */
+    public function setTab(string $value): void
+    {
+        if ($value === '' || $value === $this->tab) {
+            return;
+        }
+
+        $this->tab = $value;
+    }
+
     public string $pool_name = '';
 
     public int $desired_count = 1;
@@ -74,9 +76,14 @@ class WorkspaceWorkerPool extends Component
 
     public bool $cr_ack_secrets = false;
 
-    /** Loaded region/size catalog for the chosen provider+credential (empty → text fallback). */
+    /**
+     * Loaded region/size catalog for the chosen provider+credential (empty → text fallback).
+     *
+     * @var list<array<string, mixed>>
+     */
     public array $cr_regions = [];
 
+    /** @var list<array<string, mixed>> */
     public array $cr_sizes = [];
 
     // Autoscale config
@@ -125,6 +132,11 @@ class WorkspaceWorkerPool extends Component
         $this->bootWorkspace($server);
 
         $pool = $this->pool();
+        if ($pool instanceof WorkerPool && $pool->isSiteSourced()) {
+            $this->redirect($pool->workspaceUrl(), navigate: true);
+
+            return;
+        }
         if ($pool) {
             $this->desired_count = $pool->desired_count;
             $this->pool_name = $pool->name;
@@ -158,7 +170,6 @@ class WorkspaceWorkerPool extends Component
         // a provider/credential — not on mount, to avoid a provider API call on
         // every page view. Until then the cross-region form uses text inputs.
     }
-
 
     public function render(): View
     {
@@ -196,17 +207,17 @@ class WorkspaceWorkerPool extends Component
             ? $creds->where('provider', $this->cr_provider)->values()
             : collect();
 
-        // Per-worker monthly estimate from the primary's billing tier (clones
-        // default to the same size). Cents; 0 when specs aren't known yet.
-        $perWorkerCents = ($pool?->primaryServer ?? $this->server)->billingTier()->priceCents();
-
+        // No per-worker price is quoted here any more. It used to multiply the
+        // primary's XS-XL tier price by the worker count, but under the flat-plan
+        // model an extra worker costs either nothing (still inside the current
+        // plan's server allowance) or a whole plan step — never N × a per-size
+        // fee. A number that is wrong in both directions is worse than none.
         return view('livewire.servers.workspace-worker-pool', [
             'server' => $this->server,
             'pool' => $pool,
             'members' => $members,
             'providerOptions' => $providerOptions,
             'credentialOptions' => $credentialOptions,
-            'perWorkerCents' => $perWorkerCents,
             'scaleRun' => $this->scaleRun(),
             'testRun' => $this->testRun(),
             'statsRun' => $this->statsRun(),

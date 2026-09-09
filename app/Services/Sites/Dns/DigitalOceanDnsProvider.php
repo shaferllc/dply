@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 
 class DigitalOceanDnsProvider implements DnsProvider
 {
@@ -11,11 +11,15 @@ class DigitalOceanDnsProvider implements DnsProvider
     ) {}
 
     /** @return array<string, mixed> */
-    /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {
-        $record = $this->service->findDomainRecord($zone, $type, $name, $value)
-            ?? $this->service->createDomainRecord($zone, $type, $name, $value);
+        // Replace, don't append. This used to look the record up BY VALUE and
+        // create one when that missed — so re-pointing a hostname at a new
+        // server never matched the existing record and left both addresses
+        // live on the same name. DNS then round-robined between the old and
+        // new box. Every other provider here already delegates to a real
+        // upsert; this one now does too.
+        $record = $this->service->upsertDomainRecord($zone, $type, $name, $value);
 
         return [
             'id' => $record['id'] ?? null,

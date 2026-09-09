@@ -74,8 +74,11 @@ test('cert inventory page renders', function (): void {
         ->get(route('servers.cert-inventory', $server))
         ->assertOk()
         ->assertSee(__('Certificates'))
-        ->assertSee(__('Certificate stats'))
-        ->assertSee(__('All certificates'));
+        // Was 'Certificate stats' / 'All certificates' — neither string exists
+        // on the page (the summary is a stat strip, the table sits under an
+        // "Inventory" head). Assert what it actually renders.
+        ->assertSee(__('Inventory'))
+        ->assertSee(__('Expiring'));
 });
 
 test('deploys page deploy-window tab saves weekend freeze', function (): void {
@@ -100,7 +103,10 @@ test('deploys page renders the deploy-windows editor', function (): void {
     $this->actingAs($user)
         ->get(route('servers.deploys', ['server' => $server, 'tab' => 'deploy-windows']))
         ->assertOk()
-        ->assertSee(__('Deploy window policy'))
+        // The "Deploy window policy" head this used to assert restated the head
+        // pill and the enforcement banner directly above it; the tab opens on
+        // the figure strip now, and the editor head carries the title.
+        ->assertSee(__('Deny rules'))
         ->assertSee(__('Edit policy'))
         ->assertSee(__('Enable deploy window policy'));
 });
@@ -132,7 +138,9 @@ test('ssh access graph page renders', function (): void {
         ->get(route('servers.ssh-access', $server))
         ->assertOk()
         ->assertSee(__('Access graph'))
-        ->assertSee(__('Access over time'));
+        // Was 'Access over time' — the eyebrow above the timeline, dropped when
+        // the section heads went dense. Assert the section's own title instead.
+        ->assertSee(__('Active SSH access'));
 });
 
 test('security digest page renders', function (): void {
@@ -153,5 +161,5 @@ test('server cost page redirects to settings governance', function (): void {
 
     $this->actingAs($user)
         ->get(route('servers.cost', $server))
-        ->assertRedirect(route('servers.settings', ['server' => $server, 'section' => 'governance']).'#settings-cost-estimate');
+        ->assertRedirect(route('servers.settings', ['server' => $server, 'tab' => 'governance']).'#settings-cost-estimate');
 });

@@ -167,7 +167,7 @@ trait ManagesSiteSystemUsers
         );
 
         $this->closeSystemUserAssignModal();
-        $this->toastSuccess(__('System user assignment queued. Refresh in a moment to see updates.'));
+        $this->toastSuccess(__('System user assignment queued. Webserver config queued.'));
     }
 
     public function queueResetSitePermissions(): void

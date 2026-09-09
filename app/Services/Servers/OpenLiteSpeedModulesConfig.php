@@ -25,8 +25,6 @@ class OpenLiteSpeedModulesConfig
 {
     private const REMOTE_PATH = '/usr/local/lsws/conf/httpd_config.conf';
 
-    private const MODULES_DIR = '/usr/local/lsws/modules';
-
     /**
      * Managed elsewhere — the Cache sub-tab owns the full `module cache`
      * stanza. Disable from here would break dply LSCache wiring.
@@ -66,7 +64,6 @@ BLOCK,
     /**
      * @return array{modules: list<array{name: string, enabled: bool, protected: bool, on_disk: bool, type: string}>, unreadable: bool}
      */
-    /** @return array<string, mixed> */
     public function read(Server $server): array
     {
         try {
@@ -164,17 +161,13 @@ BASH;
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function parseRegisteredModuleNames(string $config): array
     {
         if ($config === '') {
             return [];
         }
         if (preg_match_all('/^[\t ]*module\s+([A-Za-z0-9_]+)\s*\{/m', $config, $matches) !== false) {
-            return array_values(array_unique($matches[1] ?? []));
+            return array_values(array_unique($matches[1]));
         }
 
         return [];

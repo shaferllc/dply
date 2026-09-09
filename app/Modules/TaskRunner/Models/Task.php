@@ -32,14 +32,14 @@ use Throwable;
  *
  * @property string $id
  * @property string $name
- * @property string $action
+ * @property ?string $action
  * @property ?string $script
  * @property ?string $script_content
  * @property ?string $instance
  * @property ?string $output
  * @property ?int $exit_code
  * @property ?int $timeout
- * @property string $user
+ * @property string|null $user
  * @property \App\Modules\TaskRunner\Enums\TaskStatus $status
  * @property ?string $server_id
  * @property ?string $created_by
@@ -666,7 +666,6 @@ class Task extends Model
      * Get the task performance metrics.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         return [
@@ -688,7 +687,6 @@ class Task extends Model
      * Get the task summary.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getSummary(): array
     {
         return [

@@ -124,7 +124,7 @@ trait ManagesSiteLogging
         // Repoint the default if it pointed at the removed channel.
         if (($this->loggingSpec['default'] ?? null) === $name) {
             $first = $this->loggingSpec['channels'][0]['name'] ?? 'single';
-            $this->loggingSpec['default'] = ($this->loggingSpec['stack'] ?? []) !== [] ? 'stack' : $first;
+            $this->loggingSpec['default'] = $this->loggingSpec['stack'] !== [] ? 'stack' : $first;
         }
     }
 

@@ -61,7 +61,7 @@
     <div>
         <div class="flex items-center gap-2">
             <x-input-label for="{{ $idPrefix }}-account" :value="__('Account')" :required="$required" />
-            <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-moss">
+            <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1 text-xs font-medium text-brand-moss">
                 <x-spinner size="sm" />
                 {{ __('Loading repositories…') }}
             </span>
@@ -76,7 +76,22 @@
         <x-input-error :messages="$errors->get('source_control_account_id')" class="mt-2" />
     </div>
     <div>
-        <x-input-label for="{{ $idPrefix }}-repo" :value="__('Repository')" :required="$required" />
+        {{-- The list is fetched once per account selection and then held in a
+             Livewire property, so a repo created after that never shows up.
+             This asks the provider again. --}}
+        <div class="flex items-center justify-between gap-2">
+            <x-input-label for="{{ $idPrefix }}-repo" :value="__('Repository')" :required="$required" />
+            <button type="button"
+                wire:click="refreshRepositoryList"
+                wire:loading.attr="disabled"
+                wire:target="refreshRepositoryList"
+                @disabled(($source_control_account_id ?? '') === '')
+                class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold text-brand-moss transition hover:bg-brand-sand/40 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40">
+                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshRepositoryList" aria-hidden="true" />
+                <span wire:loading.remove wire:target="refreshRepositoryList">{{ __('Refresh') }}</span>
+                <span wire:loading wire:target="refreshRepositoryList">{{ __('Refreshing…') }}</span>
+            </button>
+        </div>
         @if (count($availableRepositories) > 0)
             <x-repo-combobox
                 :repositories="$availableRepositories"
@@ -98,6 +113,7 @@
                 <span>{{ __('No repositories found for this account. Switch to “Paste a URL”, or pick another account.') }}</span>
             </p>
         @endif
+        <x-repo-access-hint :accounts="$linkedSourceControlAccounts" :selected="$source_control_account_id" />
         <x-input-error :messages="$errors->get('repository_selection')" class="mt-2" />
     </div>
 @else
@@ -132,12 +148,12 @@
                         <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <span class="font-mono text-sm font-semibold text-brand-ink">{{ $scannedRepoName }}</span>
                             <span @class([
-                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-bold uppercase tracking-wide',
                                 'bg-brand-sage/15 text-brand-forest' => $scannedVisibility === 'public',
                                 'bg-amber-100 text-amber-800' => $scannedVisibility !== 'public',
                             ])>{{ $scannedVisibility === 'public' ? __('Public') : __('Private') }}</span>
                             @if ($scannedStars > 0)
-                                <span class="flex items-center gap-0.5 text-[10px] text-brand-moss">
+                                <span class="flex items-center gap-0.5 text-2xs text-brand-moss">
                                     <x-heroicon-s-star class="h-3 w-3 text-brand-gold" aria-hidden="true" />
                                     {{ number_format($scannedStars) }}
                                 </span>

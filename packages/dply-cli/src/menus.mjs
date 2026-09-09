@@ -769,9 +769,6 @@ async function buildServersMenu(ctx) {
   };
 }
 
-/**
- * @param {{ rl: import('node:readline/promises').Interface, run: (argv: string[]) => Promise<number | void> }} ctx
- */
 async function buildEdgeMenu(ctx) {
   const rows = await fetchEdgeSitesSafe();
   /** @type {MenuItem[]} */

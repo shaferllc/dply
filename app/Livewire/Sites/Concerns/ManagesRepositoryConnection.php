@@ -8,10 +8,11 @@ use App\Jobs\PreflightSiteSetupJob;
 use App\Livewire\Sites\Commits;
 use App\Livewire\Sites\Files;
 use App\Models\Site;
-use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Modules\Deploy\Services\SiteQuickDeployCommitPoller;
 use App\Modules\SourceControl\Services\GitIdentityResolver;
 use App\Modules\SourceControl\Services\SourceControlRepositoryBrowser;
 use App\Modules\SourceControl\Services\SourceControlRepositoryReader;
+use App\Services\Sites\RepositoryWebhookProvisioner;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -22,8 +23,6 @@ use Illuminate\Support\Str;
  */
 trait ManagesRepositoryConnection
 {
-
-
     /**
      * One-shot deploy-branch self-heal. A site can carry a guessed default
      * ("main") that doesn't exist on the remote (whose default is, say,
@@ -130,7 +129,7 @@ trait ManagesRepositoryConnection
 
         if ($this->git_repository_url === '') {
             // Never connected — default to the provider picker; the repo list
-            // (and first-repo auto-select) loads lazily on the Connection tab.
+            // loads lazily on the Connection tab.
             $this->repo_source = 'provider';
             if ($this->source_control_account_id === '') {
                 $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
@@ -148,7 +147,7 @@ trait ManagesRepositoryConnection
             $storedProvider = $this->detectProviderKind($this->git_repository_url);
         }
         $accountProviders = array_map(
-            static fn (array $account): string => (string) ($account['provider'] ?? ''),
+            static fn (array $account): string => (string) $account['provider'],
             $this->linkedSourceControlAccounts,
         );
         $hasMatchingAccount = $this->source_control_account_id !== '' && in_array($storedProvider, $accountProviders, true);
@@ -328,6 +327,12 @@ trait ManagesRepositoryConnection
             : null;
         $account ??= $resolver->forSite($this->site, auth()->user(), $provider);
 
+        // Webhook creation needs admin:repo_hook, which fine-grained PATs rarely
+        // carry — so prefer an OAuth identity here even when the repo itself was
+        // connected with a token. Without this the app advised "connect via
+        // OAuth instead" while still using the PAT that had just been refused.
+        $account = $resolver->forWebhooks(auth()->user(), $provider, $account);
+
         if ($account === null) {
             $this->toastError(__('Link a :provider account before enabling quick deploy.', ['provider' => ucfirst($provider)]));
 
@@ -337,8 +342,8 @@ trait ManagesRepositoryConnection
         // The provisioner reads the provider kind + backing account from stored
         // meta, not the live URL. Sites created outside the connection form (e.g.
         // serverless workers) can carry a stale 'custom' kind, so sync what we
-        // just resolved into meta and persist it before the provisioner reloads
-        // the site via ->fresh() — otherwise the patch is dropped.
+        // just resolved into meta and persist it before enabling — otherwise an
+        // in-memory-only patch would be dropped if the site were reloaded.
         $patch = ['git_provider_kind' => $provider];
         if ((string) ($this->site->repositoryMeta()['git_source_control_account_id'] ?? '') === '') {
             $patch['git_source_control_account_id'] = $account->id();
@@ -347,15 +352,62 @@ trait ManagesRepositoryConnection
         $this->site->mergeRepositoryMeta($patch);
         $this->site->save();
 
-        $result = $provisioner->enable($this->site->fresh(), $account);
-        if (! ($result['ok'] ?? false)) {
-            $this->toastError((string) ($result['message'] ?? __('Could not enable quick deploy.')));
+        // Pass the already-loaded (and just-saved) instance — enable() mutates it
+        // in place; avoid fresh()/refresh() round-trips for the same site row.
+        $result = $provisioner->enable($this->site, $account);
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
+
+            return;
+        }
+
+        $this->toastSuccess((string) $result['message']);
+    }
+
+    /**
+     * Enable Quick deploy in poll mode (dply checks Git for new commits).
+     * Removes any inbound provider webhook registration.
+     */
+    public function enableQuickDeployPoll(RepositoryWebhookProvisioner $provisioner): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $provider = $this->detectProviderKind((string) ($this->site->git_repository_url ?? ''));
+        if (! in_array($provider, ['github', 'gitlab', 'bitbucket'], true)) {
+            $this->toastError(__('Quick deploy needs a GitHub, GitLab, or Bitbucket repository.'));
+
+            return;
+        }
+
+        $resolver = app(GitIdentityResolver::class);
+        $account = $this->source_control_account_id !== ''
+            ? $resolver->forId(auth()->user(), $this->source_control_account_id)
+            : null;
+        $account ??= $resolver->forSite($this->site, auth()->user(), $provider);
+
+        if ($account === null) {
+            $this->toastError(__('Link a :provider account before enabling poll mode so dply can read commits.', ['provider' => ucfirst($provider)]));
+
+            return;
+        }
+
+        $patch = ['git_provider_kind' => $provider];
+        if ((string) ($this->site->repositoryMeta()['git_source_control_account_id'] ?? '') === '') {
+            $patch['git_source_control_account_id'] = $account->id();
+            $this->source_control_account_id = (string) $account->id();
+        }
+        $this->site->mergeRepositoryMeta($patch);
+        $this->site->save();
+
+        $result = $provisioner->enablePoll($this->site);
+        if (! $result['ok']) {
+            $this->toastError((string) $result['message']);
 
             return;
         }
 
         $this->site->refresh();
-        $this->toastSuccess((string) ($result['message'] ?? __('Quick deploy enabled.')));
+        $this->toastSuccess((string) $result['message']);
     }
 
     public function disableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
@@ -365,6 +417,51 @@ trait ManagesRepositoryConnection
         $provisioner->disable($this->site->fresh());
         $this->site->refresh();
         $this->toastSuccess(__('Quick deploy disabled.'));
+    }
+
+    /**
+     * Run one Quick deploy poll tick for this site (operators shouldn't wait
+     * for the scheduled ~2 minute command).
+     */
+    public function checkQuickDeployPollNow(SiteQuickDeployCommitPoller $poller): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $mode = (string) ($this->site->repositoryMeta()['quick_deploy_mode'] ?? '');
+        if (! ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? false) || $mode !== 'poll') {
+            $this->toastError(__('Enable poll delivery before checking for new commits.'));
+
+            return;
+        }
+
+        $result = $poller->poll($this->site->fresh() ?? $this->site);
+        $this->site->refresh();
+
+        if (! $result['checked']) {
+            $this->toastError(__('Poll check skipped (:reason).', [
+                'reason' => (string) $result['reason'],
+            ]));
+
+            return;
+        }
+
+        $message = is_string($result['message'] ?? null) && $result['message'] !== ''
+            ? (string) $result['message']
+            : __('Checked Git for new commits.');
+
+        if ($result['dispatched'] || $result['outcome'] === 'deploy_queued') {
+            $this->toastSuccess($message);
+
+            return;
+        }
+
+        if ($result['outcome'] === 'error') {
+            $this->toastError($message);
+
+            return;
+        }
+
+        $this->toastSuccess($message);
     }
 
     public function regenerateWebhookSecret(RepositoryWebhookProvisioner $provisioner): void

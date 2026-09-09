@@ -27,6 +27,7 @@ final class SshKeysWorkspaceViewData
         bool $includePreviewContext = false,
         bool $includeActivityContext = false,
         ?Collection $auditEvents = null,
+        ?int $activityTotal = null,
     ): array {
         $card = 'border-b border-brand-ink/10';
         $opsReady = $server->isReady() && $server->hasAnySshPrivateKey();
@@ -163,7 +164,11 @@ final class SshKeysWorkspaceViewData
         }
 
         if ($includeActivityContext && $auditEvents !== null) {
-            $activityCount = $auditEvents->count();
+            // Prefer the caller's real total. Falling back to the collection
+            // size is what this used to do unconditionally, which under-reported
+            // the moment the query was capped — the head claimed "100 events"
+            // for any server with more than a hundred.
+            $activityCount = $activityTotal ?? $auditEvents->count();
             $latestActivity = $auditEvents->first()?->created_at;
 
             $data = array_merge($data, compact(

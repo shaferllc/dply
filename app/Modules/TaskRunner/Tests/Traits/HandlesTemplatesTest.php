@@ -5,6 +5,9 @@ declare(strict_types=1);
 use App\Modules\TaskRunner\Services\TemplateService;
 use App\Modules\TaskRunner\Traits\HandlesTemplates;
 use Illuminate\Support\Facades\Cache;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('HandlesTemplates Trait (Complex)', function () {
     beforeEach(function () {

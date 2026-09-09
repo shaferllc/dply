@@ -37,7 +37,7 @@ final class ServerIndexAssembler
             'cpu' => isset($payload['cpu_pct']) && is_numeric($payload['cpu_pct']) ? (float) $payload['cpu_pct'] : null,
             'ram' => isset($payload['mem_pct']) && is_numeric($payload['mem_pct']) ? (float) $payload['mem_pct'] : null,
             'disk' => isset($payload['disk_pct']) && is_numeric($payload['disk_pct']) ? (float) $payload['disk_pct'] : null,
-            'captured_at' => $snapshot?->captured_at?->toIso8601String(),
+            'captured_at' => $snapshot->captured_at?->toIso8601String(),
         ] : null;
 
         $groupLabel = __('Personal');
@@ -61,7 +61,7 @@ final class ServerIndexAssembler
                     'kind' => 'database',
                     'engine' => (string) $engine->engine,
                     'version' => $engine->version !== null ? (string) $engine->version : null,
-                    'status' => $engine->status !== null ? (string) $engine->status : null,
+                    'status' => (string) $engine->status,
                     'is_default' => (bool) $engine->is_default,
                 ];
             }
@@ -72,9 +72,18 @@ final class ServerIndexAssembler
                     'kind' => 'cache',
                     'engine' => (string) $cache->engine,
                     'version' => $cache->version !== null ? (string) $cache->version : null,
-                    'status' => $cache->status !== null ? (string) $cache->status : null,
+                    'status' => (string) $cache->status,
                     'is_default' => false,
                 ];
+            }
+        }
+
+        // Names only. Same relationLoaded guard as sites/services so callers
+        // that don't eager-load simply omit the key rather than N+1.
+        $databases = [];
+        if ($server->relationLoaded('serverDatabases')) {
+            foreach ($server->serverDatabases as $database) {
+                $databases[] = ['name' => (string) $database->name];
             }
         }
 
@@ -114,6 +123,31 @@ final class ServerIndexAssembler
             'workspace_name' => $server->workspace?->name,
             'group_label' => $groupLabel,
             'tags' => ServerTags::forServer($server),
+            // Role + installed stack travel with the fleet row so a consumer of
+            // this payload can reproduce the workspace faithfully — the role
+            // picks the sidebar profile (config/server_workspace.role_nav_keys),
+            // and the stack is what the Databases/Runtime tiles read. Without
+            // them a mirrored database host renders as a generic app server.
+            'server_role' => is_array($server->meta) && is_string($server->meta['server_role'] ?? null)
+                ? $server->meta['server_role']
+                : null,
+            // What kind of host this row actually is (vm / docker / kubernetes /
+            // …). A consumer that mirrors these rows needs it to avoid treating
+            // a non-machine host as a VM — and to apply the same
+            // onlyMachineHosts() judgement locally.
+            'host_kind' => $server->hostKind(),
+            'installed_stack' => InstalledStack::fromMeta($server)->toArray(),
+            // Reachability verdict already ships as health_status; the timestamp
+            // is what renders "Last checked 2 days ago" next to it.
+            'health_checked_at' => $server->last_health_check_at?->toIso8601String(),
+            'databases' => $databases,
+            // The private address is what the network map labels a host with,
+            // and what belongs in a connection string. Without it a consumer of
+            // this payload can only show the public IP. Deliberately no network
+            // ids: private_network_id is a local FK and hetzner_network_id is
+            // account-scoped, so copying either across a boundary would invent
+            // peer relationships that don't exist.
+            'private_ip_address' => $server->private_ip_address,
             'scheduled_deletion_at' => $server->scheduled_deletion_at?->toIso8601String(),
             'created_at' => $server->created_at?->toIso8601String(),
             'uptime_days' => $server->created_at !== null
@@ -136,6 +170,9 @@ final class ServerIndexAssembler
                 'step_total' => $digest->stepTotal,
                 'elapsed_human' => $digest->elapsedHuman(),
             ] : null,
+            // Adopted hosts get a discovery line in place of the journey they
+            // will never run: what dply found already installed.
+            'adopted' => AdoptedServerDigest::forServer($server),
         ];
     }
 
@@ -156,8 +193,8 @@ final class ServerIndexAssembler
             'name' => (string) $site->name,
             'status' => (string) $site->status,
             'status_label' => $site->statusLabel(),
-            'ssl_status' => $site->ssl_status !== null ? (string) $site->ssl_status : null,
-            'type_label' => $site->type?->label(),
+            'ssl_status' => (string) $site->ssl_status,
+            'type_label' => $site->type->label(),
             'runtime_chip' => $runtimeChip,
             'logo_url' => $site->logoUrl(),
             'git_repository_url' => filled($site->git_repository_url) ? (string) $site->git_repository_url : null,
@@ -169,6 +206,7 @@ final class ServerIndexAssembler
                     Site::STATUS_ERROR,
                     Site::STATUS_CONTAINER_FAILED,
                     Site::STATUS_EDGE_FAILED,
+                    Site::STATUS_FUNCTIONS_FAILED,
                     Site::STATUS_SCAFFOLD_FAILED,
                 ], true),
             'is_ready' => $site->isReadyForTraffic(),

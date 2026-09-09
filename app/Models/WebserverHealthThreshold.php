@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      Per-server / per-org override for one webserver-health alert threshold.
  *                      Resolution precedence + table semantics documented in the migration.
  * @property string $comparator
- * @property string $engine
+ * @property ?string $engine
  * @property string $metric
  * @property ?string $organization_id
  * @property ?string $server_id
@@ -21,8 +21,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property float $value
  * @property-read ?Organization $organization
  * @property-read ?Server $server
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class WebserverHealthThreshold extends Model
 {

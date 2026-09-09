@@ -55,7 +55,11 @@ class WorkspacePhp extends Component
 
     public ?string $phpConfigEditorValidationOutput = null;
 
-    /** Line numbers extracted from the last validation failure, used to highlight offending lines in the editor snippet. */
+    /**
+     * Line numbers extracted from the last validation failure, used to highlight offending lines in the editor snippet.
+     *
+     * @var list<int>
+     */
     public array $phpConfigEditorErrorLines = [];
 
     /** Optional user-supplied note attached to the next successful save's revision. */
@@ -150,7 +154,10 @@ class WorkspacePhp extends Component
                                 'set_new_site_default' => __('Saving new-site default'),
                                 default => "{$action} php{$version}",
                             };
-                            $emit->step('php', is_string($command) ? $command : (string) $command);
+                            // __() is typed string|array (a translation key can map
+                            // to an array), so a bare (string) cast here is an
+                            // Array-to-string conversion waiting to happen.
+                            $emit->step('php', is_string($command) ? $command : implode(' ', $command));
                         },
                         $migrateSitesBeforeUninstall,
                         auth()->id(),
@@ -160,23 +167,233 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    if (($result['status'] ?? null) === 'stale') {
-                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    if ($result['status'] === 'stale') {
+                        throw new \RuntimeException($result['message']);
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP action completed.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
             );
 
             $this->server->refresh();
-            $this->toastSuccess($result['message'] ?? __('PHP action completed.'));
+            $this->toastSuccess($result['message']);
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
             $this->remote_error = $msg;
             $this->toastError($msg);
         }
+    }
+
+    /** Version whose extension panel is expanded, or null when all are collapsed. */
+    public ?string $expandedExtensionsVersion = null;
+
+    /** Free-text package suffix for extensions outside the curated catalog. */
+    public string $customExtension = '';
+
+    /**
+     * Cache key of an in-flight apt task. Non-null drives the panel's
+     * wire:poll — apt installs run as a queued job because a PECL build can
+     * take minutes, well past PHP's max_execution_time.
+     */
+    public ?string $extensionTaskId = null;
+
+    /** Human label for the in-flight task, shown next to the spinner. */
+    public ?string $extensionTaskLabel = null;
+
+    public function toggleExtensionsPanel(string $version): void
+    {
+        $this->authorize('view', $this->server);
+
+        $this->expandedExtensionsVersion = $this->expandedExtensionsVersion === $version ? null : $version;
+        $this->customExtension = '';
+        $this->remote_error = null;
+    }
+
+    /**
+     * Install / uninstall / enable / disable one extension for one version.
+     *
+     * Toggles complete inline and report immediately. apt actions come back
+     * as 'queued' and the panel polls {@see syncExtensionTask()} until the job
+     * lands, which is also where the inventory gets re-probed.
+     */
+    public function runPhpExtensionAction(string $action, string $version, string $extension): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->remote_error = null;
+        $this->remote_output = null;
+
+        if (! $this->serverOpsReady()) {
+            $msg = __('Provisioning and SSH must be ready before managing PHP extensions.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $manager = app(ServerPhpManager::class);
+        $normalized = $manager->normalizeExtensionId($extension);
+
+        if ($normalized === null) {
+            $msg = __('That does not look like a PHP extension package name.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $entry = $manager->extensionCatalogEntry($version, $normalized);
+        $label = is_string($entry['label'] ?? null) ? $entry['label'] : $normalized;
+        $runLabel = __(':verb :label for PHP :version on :host', [
+            'verb' => ucfirst($action),
+            'label' => $label,
+            'version' => $version,
+            'host' => $this->server->name,
+        ]);
+
+        if ($manager->extensionActionIsQueued($action)) {
+            $this->queuePhpExtensionAction($manager, $action, $version, $normalized, $label, $runLabel);
+
+            return;
+        }
+
+        try {
+            $result = $this->runConsoleAction(
+                $this->server,
+                'php_extension_'.$action,
+                $runLabel,
+                function (ConsoleEmitter $emit) use ($manager, $action, $version, $normalized): array {
+                    $result = $manager->applyExtensionAction(
+                        $this->server,
+                        $action,
+                        $version,
+                        $normalized,
+                        function (string $step) use ($emit): void {
+                            $emit->step('php', $step);
+                        },
+                    );
+
+                    foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
+                        }
+                    }
+
+                    $emit->success('php', $result['message']);
+
+                    return $result;
+                },
+            );
+
+            $this->server->refresh();
+            $this->toastSuccess($result['message']);
+        } catch (\Throwable $e) {
+            $this->server->refresh();
+            $msg = $e->getMessage();
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+        }
+    }
+
+    /**
+     * Background path. Seeds the console row up front and hands it to the job,
+     * so the banner tracks the real apt/PECL run instead of being marked
+     * complete the moment the job is dispatched. A guard failure before
+     * dispatch has to fail the row itself — nothing else would.
+     */
+    protected function queuePhpExtensionAction(
+        ServerPhpManager $manager,
+        string $action,
+        string $version,
+        string $extension,
+        string $label,
+        string $runLabel,
+    ): void {
+        $consoleActionId = $this->seedConsoleActionRun($this->server, 'php_extension_'.$action, $runLabel);
+
+        try {
+            $result = $manager->applyExtensionAction(
+                $this->server,
+                $action,
+                $version,
+                $extension,
+                null,
+                $consoleActionId,
+            );
+        } catch (\Throwable $e) {
+            ConsoleAction::query()->whereKey($consoleActionId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+            ]);
+
+            $this->server->refresh();
+            $msg = $e->getMessage();
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->extensionTaskId = $result['task_id'] ?? null;
+        $this->extensionTaskLabel = $label;
+        $this->remote_output = $result['message'];
+        $this->toastSuccess($result['message']);
+    }
+
+    public function installCustomExtension(string $version): void
+    {
+        $this->runPhpExtensionAction('install', $version, $this->customExtension);
+    }
+
+    /**
+     * Poll target for an in-flight apt task. Clears the poll and refreshes the
+     * server once the job reaches a terminal state.
+     */
+    public function syncExtensionTask(): void
+    {
+        if ($this->extensionTaskId === null) {
+            return;
+        }
+
+        $payload = app(ServerPhpManager::class)->pollExtensionTask($this->server, $this->extensionTaskId);
+
+        if ($payload === null) {
+            // Cache entry gone (expired, or a prior poll consumed it) — stop
+            // polling rather than spinning forever on a task we cannot see.
+            $this->extensionTaskId = null;
+            $this->extensionTaskLabel = null;
+
+            return;
+        }
+
+        $status = $payload['status'];
+
+        if (! in_array($status, ['finished', 'failed'], true)) {
+            $this->remote_output = $payload['output'] !== ''
+                ? $payload['output']
+                : ($status === 'running' ? __('Running on server…') : __('Task queued…'));
+
+            return;
+        }
+
+        $this->extensionTaskId = null;
+        $this->extensionTaskLabel = null;
+        $this->remote_output = $payload['output'] !== '' ? $payload['output'] : null;
+        $this->server->refresh();
+
+        if ($status === 'failed') {
+            $msg = $payload['error'] ?? __('The extension task failed on the server.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->customExtension = '';
+        $this->toastSuccess($payload['message'] ?? __('Extension task finished.'));
     }
 
     public function openMigrateAndUninstallPhpModal(string $version, int $siteCount, string $targetVersion): void
@@ -228,17 +445,17 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    if (($result['status'] ?? null) === 'stale') {
-                        throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
+                    if ($result['status'] === 'stale') {
+                        throw new \RuntimeException($result['message']);
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP inventory refreshed.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
             );
 
             $this->server->refresh();
-            $this->toastSuccess($result['message'] ?? __('PHP inventory refreshed.'));
+            $this->toastSuccess($result['message']);
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -289,7 +506,7 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorPath = $result['path'];
             $this->phpConfigEditorContent = $result['content'];
             $this->phpConfigEditorOriginalContent = $result['content'];
-            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
+            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'];
             $this->phpConfigEditorSummary = '';
             $this->phpConfigEditorDiffRevisionId = null;
             $this->phpConfigEditorCompareMode = false;
@@ -317,7 +534,7 @@ class WorkspacePhp extends Component
             return;
         }
 
-        $snapshot = is_array($rev->snapshot) ? $rev->snapshot : [];
+        $snapshot = $rev->snapshot;
         $content = is_string($snapshot['content'] ?? null) ? $snapshot['content'] : '';
 
         $this->phpConfigEditorContent = $content;
@@ -557,7 +774,7 @@ class WorkspacePhp extends Component
                             $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    $emit->success('php', (string) ($result['message'] ?? __('PHP config saved.')));
+                    $emit->success('php', $result['message']);
 
                     return $result;
                 },
@@ -568,8 +785,8 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorSummary = '';
             $this->refreshRevisionState($editor);
 
-            $this->toastSuccess($result['message'] ?? __('PHP config saved.'));
-            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
+            $this->toastSuccess($result['message']);
+            $this->phpConfigEditorReloadGuidance = $result['reload_guidance'];
             $this->phpConfigEditorValidationOutput = $result['verification_output'] ?? null;
         } catch (ServerPhpConfigValidationException $e) {
             $this->phpConfigEditorValidationOutput = $e->validationOutput();
@@ -635,7 +852,15 @@ class WorkspacePhp extends Component
         // No $this->server->refresh() here: route binding (first load) and Livewire's
         // Eloquent synthesizer (subsequent requests) already provide a current row.
         // Action handlers that mutate the server refresh it themselves.
-        $phpData = app(ServerPhpManager::class)->workspaceData($this->server);
+        $manager = app(ServerPhpManager::class);
+        $phpData = $manager->workspaceData($this->server);
+
+        // Built only for the expanded version — see the extension_count note
+        // in BuildsPhpWorkspaceData::workspaceData().
+        $extensionPanel = $this->expandedExtensionsVersion !== null
+            ? $manager->extensionPanelData($this->server, $this->expandedExtensionsVersion)
+            : null;
+
         $meta = is_array($this->server->meta) ? $this->server->meta : [];
         $refreshMeta = is_array($meta['php_inventory_refresh'] ?? null) ? $meta['php_inventory_refresh'] : [];
         $inventoryMeta = is_array($meta['php_inventory'] ?? null) ? $meta['php_inventory'] : [];
@@ -675,10 +900,11 @@ class WorkspacePhp extends Component
             'phpInventoryNeverRun' => $opsReady
                 && $refreshMeta === []
                 && $inventoryMeta === []
-                && ((int) ($phpData['summary']['installed_count'] ?? 0) === 0),
+                && $phpData['summary']['installed_count'] === 0,
             'phpConfigRevisions' => $revisions,
             'phpConfigDiffText' => $diffText,
             'phpConfigDiffHeader' => $diffHeader,
+            'phpExtensionPanel' => $extensionPanel,
         ]);
     }
 
@@ -705,7 +931,7 @@ class WorkspacePhp extends Component
             return [
                 app(ConfigRevisionDiffRegistry::class)
                     ->rendererFor($a->kind)
-                    ->render(is_array($a->snapshot) ? $a->snapshot : [], is_array($b->snapshot) ? $b->snapshot : []),
+                    ->render($a->snapshot, $b->snapshot),
                 __('Comparing revisions :a → :b', [
                     'a' => optional($a->created_at)->format('Y-m-d H:i'),
                     'b' => optional($b->created_at)->format('Y-m-d H:i'),
@@ -725,7 +951,7 @@ class WorkspacePhp extends Component
             return [
                 app(ConfigRevisionDiffRegistry::class)
                     ->rendererFor($rev->kind)
-                    ->render(is_array($rev->snapshot) ? $rev->snapshot : [], $current),
+                    ->render($rev->snapshot, $current),
                 __('Revision :ts → current editor', [
                     'ts' => optional($rev->created_at)->format('Y-m-d H:i'),
                 ]),

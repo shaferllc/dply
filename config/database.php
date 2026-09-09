@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\Redis\RedisConnectionTls;
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
@@ -103,6 +104,70 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        /*
+        | dply Queue data plane — customer job rows only.
+        |
+        | Deliberately NOT the primary connection, for three reasons
+        | (docs/adr/dply-queue.md, decision 8):
+        |
+        |   1. Job payloads are arbitrary customer data, frequently PII. They
+        |      do not belong in the control-plane database.
+        |   2. The jobs table needs autovacuum tuned far more aggressively
+        |      than anything else here; on a shared cluster that competes with
+        |      every other table.
+        |   3. A runaway tenant backlog must not be able to degrade dply.
+        |
+        | Same split as dply Logs (metadata in Postgres, volume in ClickHouse).
+        | Defaults to the primary database in development so nothing extra has
+        | to be running locally; production points DPLY_QUEUE_DB_* at its own
+        | instance.
+        |
+        | Namespaces, credentials, and usage rollups stay on `pgsql`.
+        */
+        'dply_queue' => [
+            'driver' => 'pgsql',
+            'url' => env('DPLY_QUEUE_DB_URL'),
+            'host' => env('DPLY_QUEUE_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DPLY_QUEUE_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('DPLY_QUEUE_DB_DATABASE', env('DB_DATABASE', 'laravel')),
+            'username' => env('DPLY_QUEUE_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DPLY_QUEUE_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DPLY_QUEUE_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+            'timezone' => env('DB_TIMEZONE', 'UTC'),
+        ],
+
+        /*
+        | dply Cache's item store. Same fall-through shape as `dply_queue`
+        | above, and the same warning applies twice over: a cache is HIGHER
+        | churn than a queue, so leaving these unset puts that write volume on
+        | the Postgres serving the dashboard. `CacheStoreIsolation` surfaces
+        | the condition rather than failing closed — sharing is a legitimate
+        | way to run a small install.
+        |
+        | The items table itself is UNLOGGED, so even in the shared
+        | configuration it generates no WAL. See docs/adr/dply-cache.md,
+        | decision 5.
+        */
+        'dply_cache' => [
+            'driver' => 'pgsql',
+            'url' => env('DPLY_CACHE_DB_URL'),
+            'host' => env('DPLY_CACHE_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DPLY_CACHE_DB_PORT', env('DB_PORT', '5432')),
+            'database' => env('DPLY_CACHE_DB_DATABASE', env('DB_DATABASE', 'laravel')),
+            'username' => env('DPLY_CACHE_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DPLY_CACHE_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => env('DPLY_CACHE_DB_SSLMODE', env('DB_SSLMODE', 'prefer')),
+            'timezone' => env('DB_TIMEZONE', 'UTC'),
+        ],
+
     ],
 
     /*
@@ -157,9 +222,14 @@ return [
         | Redis that's healthy never retries, so this is free there. A sustained
         | outage still fails fast (retries exhaust within a few seconds) and hits
         | the friendly redis-unreachable handler in bootstrap/app.php.
+        |
+        | TLS: DigitalOcean managed Redis/Valkey on :25061 / *.db.ondigitalocean.com
+        | is TLS-only. RedisConnectionTls infers scheme=tls (and redis:// → rediss://)
+        | so a stale .env missing REDIS_SCHEME still handshakes. Local 127.0.0.1 stays tcp.
         */
         'default' => [
-            'url' => env('REDIS_URL'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -174,7 +244,8 @@ return [
         ],
 
         'cache' => [
-            'url' => env('REDIS_URL'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),
@@ -206,7 +277,8 @@ return [
         | the queue `block_for` (config/queue.php); -1 satisfies any block_for.
         */
         'queue' => [
-            'url' => env('REDIS_URL'),
+            'url' => RedisConnectionTls::url(env('REDIS_URL'), env('REDIS_HOST'), env('REDIS_PORT')),
+            'scheme' => RedisConnectionTls::scheme(env('REDIS_SCHEME'), env('REDIS_HOST'), env('REDIS_PORT'), env('REDIS_URL')),
             'host' => env('REDIS_HOST', '127.0.0.1'),
             'username' => env('REDIS_USERNAME'),
             'password' => env('REDIS_PASSWORD'),

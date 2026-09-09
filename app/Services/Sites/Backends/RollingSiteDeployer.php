@@ -35,7 +35,6 @@ class RollingSiteDeployer
     /**
      * @return array{output: string, sha: ?string}
      */
-    /** @return array<string, mixed> */
     public function deploy(Site $site, ?SiteDeployment $deployment = null): array
     {
         // Replicas first, primary last — validate the new release on a replica

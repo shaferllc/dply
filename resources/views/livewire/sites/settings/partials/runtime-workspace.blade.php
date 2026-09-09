@@ -3,11 +3,11 @@
 @endphp
 
 @if ($hasLanguageTabs)
-    <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
         <x-server-workspace-tablist
             :aria-label="__('Runtime sections')"
             scroll
-            class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+            bare class="!mb-0 w-full"
         >
             @foreach ($runtimeTabs as $tabKey => $tabLabel)
                 <x-server-workspace-tab
@@ -32,5 +32,7 @@
     @include('livewire.sites.settings.partials.runtime.ruby')
 @elseif ($runtimeTab === 'static')
     @include('livewire.sites.settings.partials.runtime.static')
+@elseif ($runtimeTab === 'generic')
+    @include('livewire.sites.settings.partials.runtime.generic')
 @endif
 </div>

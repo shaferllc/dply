@@ -17,13 +17,9 @@ final class DatabaseBackupS3ClientFactory
     /**
      * @return array{client: S3Client, bucket: string, key_prefix: string}
      */
-    /** @return array<string, mixed> */
     public function forConfiguration(BackupConfiguration $configuration): array
     {
         $config = $configuration->config ?? [];
-        if (! is_array($config)) {
-            throw new InvalidArgumentException('Backup destination config is invalid.');
-        }
 
         return match ($configuration->provider) {
             BackupConfiguration::PROVIDER_AWS_S3,

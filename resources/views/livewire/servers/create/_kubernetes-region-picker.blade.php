@@ -76,7 +76,7 @@
                             <div class="flex items-start justify-between gap-4">
                                 <div class="min-w-0">
                                     <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
-                                    <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                    <div class="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
                                 </div>
                             </div>
                         </button>

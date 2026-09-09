@@ -17,12 +17,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $health_check_protocol
  * @property int $listen_port
  * @property ?string $load_balancer_id
- * @property array<string, mixed> $meta
+ * @property array<string, mixed>|null $meta
  * @property string $protocol
  * @property bool $sticky_sessions
  * @property-read ?LoadBalancer $loadBalancer
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class LoadBalancerService extends Model
 {

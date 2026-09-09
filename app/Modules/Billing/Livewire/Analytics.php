@@ -23,6 +23,13 @@ class Analytics extends Component
     {
         $analytics = $billingAnalytics->forOrganization($this->organization);
 
+        // Seven of the fourteen payloads forOrganization() returns are no longer
+        // rendered (2026-08-22): edge_usage_daily / edge_sites / managed_products
+        // were dead once the Edge, Cloud and Serverless surfaces went; sync_events
+        // is operator telemetry that belongs in admin, not on a page the customer
+        // reads; billable_servers / excluded_servers duplicated the observatory's
+        // per-server table; subscription was already unused. The service still
+        // computes them — narrowing that is a separate change.
         return view('livewire.billing.analytics', [
             'costObservatory' => $analytics['cost_observatory'] ?? [],
             'summary' => $analytics['summary'] ?? [],
@@ -30,14 +37,7 @@ class Analytics extends Component
             'spendTrend' => $analytics['spend_trend'] ?? [],
             'categoryBreakdown' => $analytics['category_breakdown'] ?? [],
             'lineItems' => $analytics['line_items'] ?? [],
-            'edgeUsageDaily' => $analytics['edge_usage_daily'] ?? [],
-            'edgeSites' => $analytics['edge_sites'] ?? [],
-            'syncEvents' => $analytics['sync_events'] ?? [],
             'invoiceHistory' => $analytics['invoice_history'] ?? [],
-            'managedProducts' => $analytics['managed_products'] ?? [],
-            'billableServers' => $analytics['billable_servers'] ?? [],
-            'excludedServers' => $analytics['excluded_servers'] ?? [],
-            'subscription' => $analytics['subscription'] ?? [],
         ]);
     }
 }

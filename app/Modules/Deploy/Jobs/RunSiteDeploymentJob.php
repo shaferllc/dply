@@ -2,28 +2,31 @@
 
 namespace App\Modules\Deploy\Jobs;
 
+use App\Enums\DeploymentMethod;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
+use App\Jobs\SyncWorkerPoolEnvJob;
 use App\Jobs\TestSiteHealthJob;
-
-use App\Enums\DeploymentMethod;
 use App\Models\ConsoleAction;
+use App\Models\Organization;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploymentEphemeralCredential;
 use App\Models\User;
-use App\Notifications\SiteDeploymentCompletedNotification;
+use App\Modules\Database\Jobs\AllowReplicaServersOnManagedDatabasesJob;
 use App\Modules\Deploy\Services\DeployContext;
 use App\Modules\Deploy\Services\DeployEngineResolver;
 use App\Modules\Deploy\Services\DeployRepoPreflight;
 use App\Modules\Deploy\Services\DeployResumePlan;
 use App\Modules\Deploy\Services\EphemeralDeployCredentialManager;
+use App\Modules\Deploy\Services\WorkerReplicaDeployConfigSync;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
+use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use App\Services\Sites\AtomicDeployHealthChecker;
 use App\Services\Sites\Backends\CanarySiteDeployer;
@@ -93,6 +96,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (ProductLineKillSwitches::blocksVmSiteDeploy($this->site)) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -105,6 +109,27 @@ class RunSiteDeploymentJob implements ShouldQueue
             ]);
             $this->auditDeploy($deployment);
             $this->clearIdempotencyInflight();
+
+            return;
+        }
+
+        if ($this->site->isConvertingAtomicLayout()) {
+            $deployment = SiteDeployment::query()->create([
+                'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
+                'project_id' => $this->site->project_id,
+                'trigger' => $this->trigger,
+                'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_ALREADY_RUNNING,
+                'exit_code' => null,
+                'log_output' => 'This site is converting to a zero-downtime layout. Wait for that to finish before deploying.',
+                'started_at' => now(),
+                'finished_at' => now(),
+                'idempotency_key' => $this->apiIdempotencyHash,
+            ]);
+            $this->auditDeploy($deployment);
+            $this->clearIdempotencyInflight();
+            Cache::forget('site-deploy-active:'.$this->site->id);
 
             return;
         }
@@ -124,6 +149,7 @@ class RunSiteDeploymentJob implements ShouldQueue
 
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -148,6 +174,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $policyDecision['allowed']) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -173,6 +200,7 @@ class RunSiteDeploymentJob implements ShouldQueue
         if (! $lock->get()) {
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
+                'server_id' => $this->site->server_id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
@@ -214,6 +242,13 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'started_at' => now()->toIso8601String(),
                 'deployment_id' => $deployment->id,
             ], $this->timeout + 120);
+
+            // Retrying a failed first serverless deploy: leave the "failed"
+            // badge and return to configured-while-deploying so the journey /
+            // index read as in-flight, not still broken.
+            if ($this->site->status === Site::STATUS_FUNCTIONS_FAILED) {
+                $this->site->update(['status' => Site::STATUS_FUNCTIONS_CONFIGURED]);
+            }
 
             $this->notifyDeploymentStarted($deployment, $notificationPublisher);
 
@@ -328,8 +363,16 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $siteUpdates = [
                     'last_deploy_at' => now(),
                 ];
+
+                // Worker replicas are COPIES of the primary's env taken at
+                // scale-up, so without this they keep whatever credentials
+                // existed then and drift from the parent — which surfaces as a
+                // worker that cannot reach Redis or the database while the
+                // primary is fine. Syncing on every successful deploy makes the
+                // replicas' credentials always the parent's.
+                $this->syncWorkerReplicaEnv();
                 $caps = $this->site->server?->hostCapabilities();
-                if ($caps?->supportsFunctionDeploy() || $caps?->supportsClusterDeploy()) {
+                if ($caps?->supportsClusterDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
                 } elseif ($caps?->supportsEnvPushToHost()) {
                     // Self-heal on a VM web host: a successful deploy proves the
@@ -389,10 +432,13 @@ class RunSiteDeploymentJob implements ShouldQueue
                 }
             } catch (\Throwable $e) {
                 $msg = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($e->getMessage()));
+                $existingLog = trim((string) ($deployment->fresh()?->log_output ?? ''));
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_FAILED,
                     'exit_code' => 1,
-                    'log_output' => $msg,
+                    'log_output' => $existingLog !== '' && ! str_contains($existingLog, $msg)
+                        ? $existingLog."\n\n".$msg
+                        : $msg,
                     'finished_at' => now(),
                 ]);
                 $this->cacheIdempotencyFailure($deployment, $msg);
@@ -495,6 +541,35 @@ class RunSiteDeploymentJob implements ShouldQueue
             'Deployment blocked: the app requires environment variables that are not set: '
             .$shown.$more.'. Add them on the Deploy panel (or Settings → Environment) and redeploy.'
         );
+    }
+
+    /**
+     * Project the primary's env onto its worker replicas after a deploy.
+     *
+     * Queued, never inline: the fan-out SSHes to every replica. Silent when the
+     * site has no replicas, so the ordinary single-server deploy is unaffected.
+     */
+    private function syncWorkerReplicaEnv(): void
+    {
+        $hasReplicas = Site::query()
+            ->where('meta->replicated_from_site_id', (string) $this->site->id)
+            ->exists();
+
+        if (! $hasReplicas) {
+            return;
+        }
+
+        // Deploy configuration is the primary's to own, so project it before the
+        // env fan-out: a replica should run the same pipeline, from the same
+        // repo and ref, as the site it replicates.
+        app(WorkerReplicaDeployConfigSync::class)->syncReplicasOf($this->site);
+
+        SyncWorkerPoolEnvJob::dispatch((string) $this->site->id, $this->auditUserId);
+
+        // Credentials alone are not enough: managed clusters lock their trusted
+        // sources to the server present at provision time, so a replica must be
+        // allowlisted or it holds the right password and still times out.
+        AllowReplicaServersOnManagedDatabasesJob::dispatch((string) $this->site->id);
     }
 
     /**
@@ -688,14 +763,13 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         $org = $site->organization;
-        $userIds = collect([$site->user_id])->filter();
-        if ($org) {
-            $userIds = $userIds->merge(
-                $org->users()->wherePivotIn('role', ['owner', 'admin'])->pluck('users.id')
-            );
-        }
 
-        $users = User::query()->whereIn('id', $userIds->unique()->all())->get();
+        // Recipients are an organization setting now, not a rule baked in here.
+        // The default is what this block used to hardcode — site owner plus
+        // every owner and admin — so nothing changes until someone edits it.
+        $users = $org
+            ? $org->emailRecipients(Organization::EMAIL_DEPLOY, $site->user)
+            : User::query()->whereIn('id', collect([$site->user_id])->filter()->all())->get();
         $event = $notificationPublisher->publish(
             eventKey: 'site.deployments',
             subject: $deployment->fresh(),

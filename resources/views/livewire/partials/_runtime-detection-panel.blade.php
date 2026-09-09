@@ -3,7 +3,7 @@
 
     Keyed entirely off the $detectedPlan array populated by the
     DetectsRepositoryRuntime concern. Rendered identically by the VM site,
-    Cloud container, and serverless function create flows.
+    and Cloud container create flows.
 
     Optional include data:
       - $detectionInstallable (bool) — render the VM-only "install runtime on
@@ -11,7 +11,6 @@
         passes this; defaults to false everywhere else.
 --}}
 @php($detectionInstallable = $detectionInstallable ?? false)
-@php($detectionIsServerless = ($detectedPlan['kind'] ?? '') === 'serverless')
 
 @if (! empty($detectedPlan['error']))
     <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
@@ -21,13 +20,9 @@
 @elseif (! empty($detectedPlan['no_match']))
     <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         <p class="font-medium">{{ __('No runtime detected.') }}</p>
-        @if ($detectionIsServerless)
-            <p class="mt-1">{{ __('No framework markers, no OpenWhisk project.yml, and no recognized main() entry file at the repo root. Pick a runtime manually before deploying.') }}</p>
-        @else
-            <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
-        @endif
+        <p class="mt-1">{{ __('No dply.yaml manifest and no recognized runtime signals (composer.json, package.json, requirements.txt, Gemfile, go.mod, index.html, etc.) at the repo root.') }}</p>
     </div>
-@elseif (! empty($detectedPlan['runtime']) || $detectionIsServerless)
+@elseif (! empty($detectedPlan['runtime']))
     <div class="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm text-emerald-950 space-y-3">
         <div class="flex flex-wrap items-center gap-3">
             <span class="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-900">
@@ -39,51 +34,42 @@
             @if (! empty($detectedPlan['version']))
                 <span class="inline-flex items-center gap-1 rounded-full bg-white/70 px-3 py-1 font-mono text-xs text-emerald-900">{{ $detectedPlan['version'] }}</span>
             @endif
-            @if ($detectionIsServerless && ! empty($detectedPlan['deploy_kind']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['deploy_kind'] }} {{ __('action') }}</span>
-            @endif
             @if (! empty($detectedPlan['confidence']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ $detectedPlan['confidence'] }} confidence</span>
             @endif
             @if (! empty($detectedPlan['has_manifest']))
-                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-emerald-900/80">{{ __('dply.yaml present') }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-white/40 px-3 py-1 text-xs uppercase tracking-[0.16em] text-emerald-900/80">{{ __('dply.yaml present') }}</span>
             @endif
         </div>
 
         <dl class="grid gap-3 sm:grid-cols-2">
             @if (! empty($detectedPlan['build_command']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['build_command'] }}</dd>
                 </div>
             @endif
             @if (! empty($detectedPlan['output_dir']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['output_dir'] }}</dd>
                 </div>
             @endif
             @if (! empty($detectedPlan['start_command']))
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Start command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['start_command'] }}</dd>
-                </div>
-            @endif
-            @if ($detectionIsServerless && ! empty($detectedPlan['entrypoint']))
-                <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Entrypoint') }}</dt>
-                    <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['entrypoint'] }}</dd>
                 </div>
             @endif
         </dl>
 
         @if (! empty($detectedPlan['processes']))
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Suggested processes') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Suggested processes') }}</p>
                 <ul class="mt-1 space-y-1 text-xs">
                     @foreach ($detectedPlan['processes'] as $process)
                         <li class="flex items-start gap-2">
-                            <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-white/70 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-[10px] text-emerald-900">{{ $process['type'] }}</span>
+                            <span class="mt-0.5 inline-flex shrink-0 items-center rounded-full bg-white/70 px-2 py-0.5 font-semibold uppercase tracking-[0.12em] text-2xs text-emerald-900">{{ $process['type'] }}</span>
                             <span><span class="font-semibold">{{ $process['name'] }}</span> — <span class="font-mono">{{ $process['command'] }}</span></span>
                         </li>
                     @endforeach
@@ -133,4 +119,19 @@
             </div>
         @endif
     </div>
+@else
+    {{--
+        Nothing detected yet. Several call sites wrap this include in a card, so a
+        silent render leaves an empty box on the page — give it an empty state
+        instead. Borderless so it reads as the *contents* of that wrapper card
+        rather than a second nested box.
+    --}}
+    <x-empty-state
+        borderless
+        compact
+        tone="sage"
+        icon="heroicon-o-sparkles"
+        :title="__('No runtime detected yet')"
+        :description="__('Pick a repository and branch, then run detection — dply inspects the repo and previews the runtime, build command, and output directory before you deploy.')"
+    />
 @endif

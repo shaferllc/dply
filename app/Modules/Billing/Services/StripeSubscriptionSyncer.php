@@ -15,8 +15,8 @@ use Throwable;
  *   change (e.g. fleet grows past a ceiling) swaps the line: the new plan price
  *   is added and any other plan price removed in the same pass. A move to the
  *   Free plan removes all plan lines.
- * - One line per **managed product** (serverless / Cloud / Edge), quantity =
- *   live unit count.
+ * - One line per **managed product** (Cloud / Edge), quantity = live unit
+ *   count.
  * - A metered **Edge usage** line (monthly only).
  *
  * Safe to invoke when Stripe is not configured — missing price IDs cause the
@@ -35,8 +35,11 @@ class StripeSubscriptionSyncer
      */
     public function reconcile(Organization $organization, DesiredBillingState $desired): array
     {
+        // Cashier is bound to this module's Subscription model in
+        // AppServiceProvider, but Billable::subscription() is only typed as the
+        // base class — assert the binding rather than assume it.
         $subscription = $organization->subscription('default');
-        if (! $subscription || ! $subscription->valid()) {
+        if (! $subscription instanceof Subscription || ! $subscription->valid()) {
             return [];
         }
 
@@ -47,9 +50,6 @@ class StripeSubscriptionSyncer
         // momentarily empty during a plan swap.
         $this->reconcilePlanLine($subscription, $desired, $changes);
 
-        // Serverless functions — flat per-function line item.
-        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'serverless', $desired->serverlessCount);
-
         // dply Cloud + Edge — flat per live site (static/hybrid vs Worker-native SSR).
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeBaseCount());
@@ -59,8 +59,10 @@ class StripeSubscriptionSyncer
         $this->reconcileRealtimeTierLines($subscription, $desired, $changes);
         // Managed Lookout — one line per project tier in use.
         $this->reconcileLookoutTierLines($subscription, $desired, $changes);
+        // dply Queue — one line per capacity tier in use. Serverless-attached
+        // namespaces never appear: they are free and dropped upstream.
+        $this->reconcileQueueTierLines($subscription, $desired, $changes);
         $this->reconcileCloudResourceLine($subscription, $desired, $changes);
-        $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
         $this->reconcileEdgeUsageLine($subscription, $desired, $changes);
         $this->reconcileServerLogUsageLine($subscription, $desired, $changes);
@@ -323,6 +325,50 @@ class StripeSubscriptionSyncer
     }
 
     /**
+     * Reconcile dply Queue lines per capacity tier. The computer has already
+     * zeroed everything when queue_service.billing.enabled is off, so this
+     * drives each configured tier price to the count of namespaces that
+     * actually bill.
+     *
+     * @param  list<array<string, mixed>>  $changes
+     */
+    private function reconcileQueueTierLines(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        foreach ($this->allQueueTierPriceIds($subscription) as $tier => $priceId) {
+            if ($priceId === '') {
+                continue;
+            }
+
+            $desiredQty = max(0, $desired->queueTierQuantities[$tier] ?? 0);
+            $current = $this->currentQuantity($subscription, $priceId);
+            $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+            if ($change !== null) {
+                $changes[] = ['tier' => 'queue:'.$tier] + $change;
+            }
+        }
+    }
+
+    /**
+     * Configured Stripe price IDs for every queue capacity tier at the
+     * subscription's interval, keyed by tier slug.
+     *
+     * @return array<string, string>
+     */
+    private function allQueueTierPriceIds(Subscription $subscription): array
+    {
+        $bucket = $this->isYearly($subscription) ? 'queue_tiers_yearly' : 'queue_tiers';
+        $ids = [];
+        foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
+            $ids[(string) $tier] = (string) ($priceId ?? '');
+        }
+
+        return $ids;
+    }
+
+    /**
      * Metered dply Cloud resource line — the marked-up cost of the DigitalOcean
      * containers, workers, databases, and buckets backing the org's Cloud apps.
      * Uses the per-cent unit price (quantity = cents), same mechanism as the
@@ -354,36 +400,8 @@ class StripeSubscriptionSyncer
     }
 
     /**
-     * Metered managed-serverless usage + resources line (per-cent quantity),
-     * monthly only — mirrors the Cloud-resource and Edge-usage lines.
-     *
-     * @param  list<array<string, mixed>>  $changes
-     */
-    private function reconcileServerlessUsageLine(
-        Subscription $subscription,
-        DesiredBillingState $desired,
-        array &$changes,
-    ): void {
-        if ($this->isYearly($subscription)) {
-            return;
-        }
-
-        $priceId = (string) (config('subscription.standard.stripe.serverless_usage') ?? '');
-        if ($priceId === '') {
-            return;
-        }
-
-        $desiredQty = max(0, $desired->serverlessUsageSubtotalCents);
-        $current = $this->currentQuantity($subscription, $priceId);
-        $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
-        if ($change !== null) {
-            $changes[] = ['tier' => 'serverless_usage'] + $change;
-        }
-    }
-
-    /**
      * Metered dply-managed server line — all-in cost-plus billed as a per-cent
-     * quantity, monthly only. Mirrors the Cloud-resource and serverless-usage lines.
+     * quantity, monthly only. Mirrors the Cloud-resource line.
      *
      * @param  list<array<string, mixed>>  $changes
      */
@@ -480,7 +498,6 @@ class StripeSubscriptionSyncer
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
             array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
-                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),

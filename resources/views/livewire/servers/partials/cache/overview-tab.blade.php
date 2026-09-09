@@ -1,6 +1,6 @@
             @if ($cacheServices->isEmpty())
                 <div class="{{ $card }} px-5 py-5 sm:px-6">
-                    <div class="px-6 py-6 sm:px-8">
+                    <div class="px-4 py-3.5 sm:px-5">
                         <x-empty-state
                             borderless
                             icon="heroicon-o-bolt"
@@ -101,7 +101,7 @@
                             <dl class="mt-4 grid gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/40 p-4 sm:grid-cols-2 lg:grid-cols-4">
                                 @foreach ($stats as $label => $value)
                                     <div>
-                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
+                                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ $label }}</dt>
                                         <dd class="mt-1 font-mono text-xs text-brand-ink">{{ $value }}</dd>
                                     </div>
                                 @endforeach

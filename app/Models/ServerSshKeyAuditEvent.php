@@ -9,14 +9,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $event
- * @property string $ip_address
- * @property array<string, mixed> $meta
+ * @property ?string $ip_address
+ * @property ?array<string, mixed> $meta
  * @property ?string $server_id
  * @property ?string $user_id
  * @property-read ?Server $server
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerSshKeyAuditEvent extends Model
 {

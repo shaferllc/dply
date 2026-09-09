@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <x-seo-meta
         full-title="Migrate to {{ config('app.name') }} – in an afternoon"
-        description="Move from Laravel Forge, Ploi, or Vercel to dply in an afternoon. Import wizards bring servers, sites, env, and deploy hooks across — then you get a continuous parity view, not a one-shot handoff." />
+        description="Move from Laravel Forge or Ploi to dply in an afternoon. Import wizards bring servers, sites, env, and deploy hooks across — then you get a continuous parity view, not a one-shot handoff." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')
@@ -34,7 +34,7 @@
         </section>
 
         <section class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8">
-            <div class="mx-auto max-w-6xl grid gap-8 md:grid-cols-3">
+            <div class="mx-auto max-w-4xl grid gap-8 md:grid-cols-2">
                 @foreach ($sources as $slug => $source)
                     <a href="{{ route('migrate.show', $slug) }}" class="group flex flex-col rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm hover:border-brand-sage/40 hover:shadow-md transition">
                         <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">{{ $source['kicker'] }}</p>
@@ -53,7 +53,7 @@
             <div class="mx-auto max-w-3xl text-center">
                 <h2 class="text-2xl font-bold text-brand-ink sm:text-3xl">Why {{ config('app.name') }} after the import</h2>
                 <p class="mt-4 text-brand-moss leading-relaxed">
-                    Forge and Ploi own one lane (BYO PHP VMs); Vercel owns another (edge / SSR). {{ config('app.name') }} runs <strong class="text-brand-ink font-semibold">BYO + Cloud + Edge + Serverless in one org</strong> with one vault, one billing relationship, and one audit trail. So an afternoon of migration earns you the rest of the year of not stitching three panels together.
+                    Forge and Ploi own one lane: BYO PHP VMs, one panel per fleet. {{ config('app.name') }} keeps your servers, sites, secrets, and deploy history in <strong class="text-brand-ink font-semibold">one org</strong> with one vault, one billing relationship, and one audit trail. So an afternoon of migration earns you the rest of the year of not stitching panels together.
                 </p>
                 <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                     <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-ink text-brand-cream text-sm font-semibold hover:bg-brand-forest transition-colors shadow-md">Start 14-day trial</a>

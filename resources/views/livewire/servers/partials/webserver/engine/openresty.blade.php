@@ -32,13 +32,13 @@
 
                     <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                            <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
+                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Version') }}</dt>
                             <dd class="mt-1 font-mono text-sm text-brand-ink">{{ is_string($openrestyVersion) && $openrestyVersion !== '' ? $openrestyVersion : '—' }}</dd>
                         </div>
                         @if (is_array($openrestyOverview))
                             @foreach (['servers' => __('Server blocks'), 'upstreams' => __('Upstreams')] as $metric => $label)
                                 <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
-                                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</dt>
+                                    <dt class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ $label }}</dt>
                                     <dd class="mt-1 text-sm tabular-nums">{{ number_format((int) ($openrestyOverview[$metric] ?? 0)) }}</dd>
                                 </div>
                             @endforeach

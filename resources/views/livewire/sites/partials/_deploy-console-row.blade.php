@@ -66,7 +66,7 @@
         <div class="min-w-0 flex-1">
             <button type="button" x-on:click="open = ! open" class="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-brand-sand/20">
                 <span @class([
-                    'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold tracking-wide ring-1 ring-inset',
+                    'mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold tracking-wide ring-1 ring-inset',
                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $rs === 'success' && ! $row['in_progress'],
                     'bg-rose-50 text-rose-800 ring-rose-200' => $rs === 'failed',
                     'bg-brand-sand/70 text-brand-ink ring-brand-ink/10' => $row['in_progress'] || (! in_array($rs, ['success', 'failed'], true)),
@@ -86,16 +86,16 @@
                     <span class="flex flex-wrap items-center gap-1.5">
                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $row['name'] }}</span>
                         @if ($row['is_self'])
-                            <span class="rounded-md bg-brand-sand px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('this') }}</span>
+                            <span class="rounded-md bg-brand-sand px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('this') }}</span>
                         @endif
                         @if ($row['is_worker'])
-                            <span class="rounded-md bg-brand-ink/5 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-ink">{{ __('worker') }}</span>
+                            <span class="rounded-md bg-brand-ink/5 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-ink">{{ __('worker') }}</span>
                         @endif
                     </span>
 
                     {{-- Deploy context: server / branch / commit — always visible, not buried in the expanded timeline. --}}
                     @if ($row['server'] || $row['branch'] || $row['short_sha'])
-                        <span class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-brand-moss">
+                        <span class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-brand-moss">
                             @if ($row['server'])
                                 <span class="inline-flex min-w-0 items-center gap-1">
                                     <x-heroicon-o-server class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -138,13 +138,13 @@
 
                     <span class="mt-1.5 flex flex-wrap items-center gap-2">
                         <span @class([
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ring-1 ring-inset',
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] ring-1 ring-inset',
                             'bg-emerald-50 text-emerald-800 ring-emerald-200/80' => $rs === 'success' && ! $row['in_progress'],
                             'bg-rose-50 text-rose-800 ring-rose-200/80' => $rs === 'failed',
                             'bg-brand-sand/80 text-brand-ink ring-brand-ink/10' => $row['in_progress'] || (! in_array($rs, ['success', 'failed'], true)),
                         ])>{{ $statusLabel }}</span>
                         @if ($phaseTotal > 0)
-                            <span class="font-mono text-[11px] tabular-nums text-brand-mist">{{ $phaseDone }}/{{ $phaseTotal }}</span>
+                            <span class="font-mono text-xs tabular-nums text-brand-mist">{{ $phaseDone }}/{{ $phaseTotal }}</span>
                         @endif
                     </span>
 
@@ -179,7 +179,7 @@
                                 <p class="text-xs font-semibold text-brand-ink">
                                     {{ $row['starting_fresh'] ? __('Starting deploy') : __('Queued') }}
                                 </p>
-                                <p class="mt-0.5 text-[11px] text-brand-moss">
+                                <p class="mt-0.5 text-xs text-brand-moss">
                                     {{ $row['starting_fresh'] ? __('Clearing the previous run and handing off to a worker…') : __('Waiting for a worker to pick this up…') }}
                                 </p>
                             </div>
@@ -187,11 +187,11 @@
                     @else
                         <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-3.5 py-4">
                             <p class="text-xs font-semibold text-brand-ink">{{ __('Deploy finished') }}</p>
-                            <p class="mt-0.5 text-[11px] text-brand-moss">
+                            <p class="mt-0.5 text-xs text-brand-moss">
                                 {{ __('Phase details stay on the site deploy page — this sidebar keeps the list light.') }}
                             </p>
                             @if ($row['latest'] && $row['server_id'])
-                                <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
                                     {{ __('Open deploy log') }}
                                     <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
                                 </a>
@@ -223,10 +223,10 @@
                                         @endif
                                     </p>
                                     @if ($failOutput !== '')
-                                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failOutput }}</pre>
+                                        <pre class="mt-2 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-xs leading-relaxed text-rose-100/95">{{ $failOutput }}</pre>
                                     @endif
                                     @if ($row['latest'] && $row['server_id'])
-                                        <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-800 hover:underline">
+                                        <a href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}" wire:navigate class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-rose-800 hover:underline">
                                             {{ __('Open full deploy log') }}
                                             <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
                                         </a>
@@ -284,10 +284,10 @@
                                                 'text-brand-mist' => in_array($pst, ['pending', 'skipped'], true),
                                             ])>{{ $phase['label'] }}</span>
                                             @if ($pst === 'running')
-                                                <span class="rounded-md bg-brand-ink px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-cream">{{ __('live') }}</span>
+                                                <span class="rounded-md bg-brand-ink px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-brand-cream">{{ __('live') }}</span>
                                             @endif
                                         </span>
-                                        <span class="flex shrink-0 items-center gap-2 text-[10px] text-brand-mist">
+                                        <span class="flex shrink-0 items-center gap-2 text-2xs text-brand-mist">
                                             @if ($stepCount > 0)
                                                 <span class="tabular-nums">{{ $stepCount }} {{ trans_choice('step|steps', $stepCount) }}</span>
                                             @endif
@@ -321,7 +321,7 @@
                         <a
                             href="{{ route('sites.deployments.show', ['server' => $row['server_id'], 'site' => $row['id'], 'deployment' => $row['latest']]) }}"
                             wire:navigate
-                            class="mt-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-forest hover:underline"
+                            class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline"
                         >
                             {{ __('Full deploy log') }}
                             <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />

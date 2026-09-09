@@ -5,9 +5,9 @@ namespace App\Services\Servers;
 use App\Enums\ServerProvider;
 use App\Models\ProviderCredential;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\VultrService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 
@@ -38,12 +38,8 @@ class ServerProviderCostEstimator
     /**
      * Providers we know how to look up prices for.
      */
-    public static function isSupported(?ServerProvider $provider): bool
+    public static function isSupported(ServerProvider $provider): bool
     {
-        if (! $provider instanceof ServerProvider) {
-            return false;
-        }
-
         return in_array($provider, [
             ServerProvider::DigitalOcean,
             ServerProvider::Hetzner,
@@ -74,15 +70,9 @@ class ServerProviderCostEstimator
      *
      * @throws ProviderCostUnavailableException when the lookup cannot complete.
      */
-    /** @return array<string, mixed> */
     public function estimate(Server $server): array
     {
         $provider = $server->provider;
-        if (! $provider instanceof ServerProvider) {
-            throw new ProviderCostUnavailableException(
-                __('This server has no recorded provider, so cost cannot be looked up.')
-            );
-        }
 
         $credential = $this->resolveProviderCredential($server);
         if ($credential === null) {
@@ -163,7 +153,6 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
-    /** @return array<string, mixed> */
     protected function lookupDigitalOcean(Server $server): array
     {
         $do = new DigitalOceanService($server->providerCredential);
@@ -209,7 +198,6 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
-    /** @return array<string, mixed> */
     protected function lookupHetzner(Server $server): array
     {
         $types = $this->cachedCatalog(
@@ -262,7 +250,6 @@ class ServerProviderCostEstimator
     /**
      * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
      */
-    /** @return array<string, mixed> */
     protected function lookupVultr(Server $server): array
     {
         $plans = $this->cachedCatalog(
@@ -313,7 +300,6 @@ class ServerProviderCostEstimator
      *   runtime_hours_year: float,
      * }
      */
-    /** @return array<string, mixed> */
     protected function withRuntimeBreakdown(Server $server, array $base): array
     {
         $fetchedAt = CarbonImmutable::now();
@@ -371,7 +357,6 @@ class ServerProviderCostEstimator
      * @template TResult
      *
      * @param  callable(): TResult  $fetcher
-     * @param  array<string, mixed>  $base
      * @return TResult
      */
     protected function cachedCatalog(Server $server, string $tag, callable $fetcher): mixed
@@ -385,14 +370,14 @@ class ServerProviderCostEstimator
     }
 
     /**
-     * @param  array<string, mixed>  $rows
+     * @param  array<int, array<string, mixed>>  $rows
      * @param  callable(array<string, mixed>): bool  $predicate
      * @return array<string, mixed>|null
      */
     protected function findFirst(array $rows, callable $predicate): ?array
     {
         foreach ($rows as $row) {
-            if (is_array($row) && $predicate($row)) {
+            if ($predicate($row)) {
                 return $row;
             }
         }

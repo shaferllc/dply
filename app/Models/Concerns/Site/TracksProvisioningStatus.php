@@ -8,6 +8,7 @@ use App\Enums\SiteType;
 use App\Jobs\PreflightSiteSetupJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteWorkerPageBuilder;
@@ -36,8 +37,7 @@ trait TracksProvisioningStatus
      */
     public function supportsSshFileArchive(): bool
     {
-        if ($this->usesFunctionsRuntime()
-            || $this->usesDockerRuntime()
+        if ($this->usesDockerRuntime()
             || $this->usesKubernetesRuntime()) {
             return false;
         }
@@ -247,19 +247,12 @@ trait TracksProvisioningStatus
             return true;
         }
 
-        // Subsequent redeploys flip the site to STATUS_EDGE_PROVISIONING /
-        // STATUS_EDGE_FAILED. Without this carve-out a failed-first-deploy
-        // would land in the workspace showing a misleading "Open live site"
-        // header (no site ever went live). Both transient + failed states
-        // stay in the provisioning shell until a deploy actually publishes
-        // — `active_deployment_id` is only set by PublishEdgeDeploymentJob
-        // on a successful publish, so it's a reliable "has ever been live"
-        // signal that persists across re-deploys.
-        if (in_array($this->status, [self::STATUS_EDGE_PROVISIONING, self::STATUS_EDGE_FAILED], true)) {
-            $activeDeploymentId = $this->edgeMeta()['active_deployment_id'] ?? null;
-            if (is_string($activeDeploymentId) && $activeDeploymentId !== '') {
-                return true;
-            }
+        // Same idea for serverless: a failed first deploy must not open the
+        // normal function workspace. `last_deploy_at` is only set on success,
+        // so it's the "has ever been live" signal (redeploy failures on an
+        // already-active function keep STATUS_FUNCTIONS_ACTIVE).
+        if ($this->status === self::STATUS_FUNCTIONS_FAILED && $this->last_deploy_at !== null) {
+            return true;
         }
 
         return false;
@@ -321,6 +314,7 @@ trait TracksProvisioningStatus
             self::STATUS_KUBERNETES_ACTIVE => 'kubernetes active',
             self::STATUS_FUNCTIONS_CONFIGURED => 'functions configured',
             self::STATUS_FUNCTIONS_ACTIVE => 'functions active',
+            self::STATUS_FUNCTIONS_FAILED => 'functions failed',
             self::STATUS_CUSTOM_ACTIVE => 'custom active',
             default => str_replace('_', ' ', $this->status),
         };
@@ -529,6 +523,13 @@ trait TracksProvisioningStatus
             }
         }
 
+        assert($this instanceof Site);
+        $owned = array_flip(app(SiteBindingManager::class)->ownedEnvKeysForSite($this));
+        $missing = array_values(array_filter(
+            $missing,
+            static fn (string $name): bool => ! isset($owned[$name]),
+        ));
+
         return $missing;
     }
 
@@ -558,14 +559,18 @@ trait TracksProvisioningStatus
      * use a repo or have their own create flow. Sites mid-scaffold have
      * their own journey and are excluded too.
      */
-    private function lacksInstalledApp(): bool
+    /**
+     * No application installed yet: no scaffold, no completed choose-app, no
+     * repository, no deploy. Public because the runtime switch has to refuse
+     * proxied runtimes in this state — see {@see \App\Actions\Sites\SetSiteRuntime}.
+     */
+    public function lacksInstalledApp(): bool
     {
         if (! in_array($this->type, [SiteType::Php, SiteType::Node], true)) {
             return false;
         }
 
-        if ($this->usesFunctionsRuntime()
-            || $this->usesDockerRuntime()
+        if ($this->usesDockerRuntime()
             || $this->usesKubernetesRuntime()
             || $this->usesContainerRuntime()
             || $this->usesEdgeRuntime()) {

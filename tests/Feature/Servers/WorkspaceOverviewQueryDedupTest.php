@@ -16,8 +16,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 // Every flagged card below pulls "the latest metric snapshot" for the same
-// server during a single overview render — alongside the component itself and
-// Server::billingTier(). They must all reuse one lookup.
+// server during a single overview render, alongside the component itself.
+// They must all reuse one lookup.
 usesFeatures('workspace.health', 'workspace.server_cost', 'workspace.release_hygiene', 'workspace.patch_advisor');
 
 function overviewQueryDedupSetup(): array
@@ -64,8 +64,8 @@ test('overview render reads the latest metric snapshot only once', function (): 
 
     DB::disableQueryLog();
 
-    // Component card, health cockpit, cost card (capacity + hardware), release
-    // hygiene disk probe, and Server::billingTier() all fan out to the same
-    // memoized relation, so the latest snapshot is read exactly once.
+    // Component card, health cockpit, cost card (capacity + hardware), and the
+    // release-hygiene disk probe all fan out to the same memoized relation, so
+    // the latest snapshot is read exactly once.
     expect($snapshotQueries)->toHaveCount(1);
 });

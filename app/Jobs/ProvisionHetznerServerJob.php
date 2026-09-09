@@ -4,11 +4,12 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\HetznerCloudFirewallRules;
+use App\Support\Servers\ProviderResourceTags;
 use App\Support\Servers\ServerHostingPlatformContext;
 use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -67,7 +68,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
             $keyName = 'dply-'.$this->server->name.'-'.Str::random(6);
             $hetznerKey = $hetzner->addSshKey($keyName, $keys['recovery_public_key']);
             $sshKeyId = $hetznerKey['id'] ?? null;
-            if ($sshKeyId === null) {
+            if (! is_int($sshKeyId) && ! is_string($sshKeyId)) {
                 $this->markFailed('Hetzner accepted the SSH key request but returned no id — cannot create server.');
 
                 return;
@@ -79,12 +80,14 @@ class ProvisionHetznerServerJob implements ShouldQueue
             // setup script skip-fasts already-installed steps when launched from
             // it. Managed falls back to the platform default; BYO honours a
             // user-chosen OS image first, then stock Ubuntu.
+            $boot = ServerImageCatalog::bootImageForServer($this->server);
             $snapshot = ServerImageCatalog::bakedSnapshotForRegion('hetzner', $this->server->region);
-            $image = $managed
-                ? ($snapshot ?? $platform->defaultImage)
-                : (ServerImageCatalog::resolveForServer($this->server, 'hetzner')
-                    ?? $snapshot
-                    ?? config('services.hetzner.default_image', 'ubuntu-24.04'));
+            $image = $boot
+                ?? ($managed
+                    ? ($snapshot ?? $platform->defaultImage)
+                    : (ServerImageCatalog::resolveForServer($this->server, 'hetzner')
+                        ?? $snapshot
+                        ?? config('services.hetzner.default_image', 'ubuntu-24.04')));
 
             // Ensure a dply-managed Cloud Firewall that allows SSH (and the
             // server's service ports) BEFORE create, then attach it at boot so
@@ -130,6 +133,7 @@ class ProvisionHetznerServerJob implements ShouldQueue
                     : '',
                 firewallIds: $firewallId !== null ? [$firewallId] : [],
                 networkId: $networkId,
+                labels: ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

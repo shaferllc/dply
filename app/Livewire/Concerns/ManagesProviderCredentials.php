@@ -4,23 +4,21 @@ namespace App\Livewire\Concerns;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\AwsEc2Service;
-use App\Modules\Cloud\Services\AwsEc2ServiceFactory;
-use App\Modules\Cloud\Services\AzureComputeService;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
-use App\Modules\Cloud\Cloudflare\CloudflareEdgeCredentialValidator;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\GcpDnsService;
-use App\Modules\Cloud\Services\HetznerService;
 use App\Modules\Imports\Services\Forge\ForgeImportDriver;
 use App\Modules\Imports\Services\Ploi\PloiImportDriver;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\OracleComputeService;
-use App\Modules\Cloud\Services\OvhService;
-use App\Modules\Cloud\Services\UpCloudService;
-use App\Modules\Cloud\Services\VultrService;
-use App\Support\Cloud\GcpAccessToken;
-use App\Modules\Edge\Support\EdgeOrgCredentialConfig;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Services\AwsEc2ServiceFactory;
+use App\Modules\Providers\Services\AzureComputeService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\GcpDnsService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\OracleComputeService;
+use App\Modules\Providers\Services\OvhService;
+use App\Modules\Providers\Services\UpCloudService;
+use App\Modules\Providers\Services\VultrService;
+use App\Services\Providers\ProviderCredentialHealth;
+use App\Support\Providers\GcpAccessToken;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
@@ -809,10 +807,6 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
-                if (($this->capability ?? null) === 'cdn') {
-                    $accountId = (new CloudflareEdgeCredentialValidator)->validate($credential);
-                    EdgeOrgCredentialConfig::merge($credential, ['account_id' => $accountId]);
-                }
             } elseif ($provider === 'ploi') {
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
@@ -835,6 +829,8 @@ trait ManagesProviderCredentials
             'provider' => $provider,
             'name' => $credential->name,
         ]);
+
+        app(ProviderCredentialHealth::class)->markHealthy($credential);
 
         $this->toastSuccess('Provider connected.');
         $this->notifyProviderCredentialStored($provider);
@@ -878,27 +874,17 @@ trait ManagesProviderCredentials
                 return;
             }
 
-            match ($credential->provider) {
-                // Light GET /account — confirms the token works (same check as when connecting).
-                'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
-                'cloudflare' => EdgeOrgCredentialConfig::isBootstrapped($credential)
-                    ? (new CloudflareEdgeCredentialValidator)->validate($credential)
-                    : (new CloudflareDnsService($credential))->verifyToken(),
-                'hetzner' => (new HetznerService($credential))->validateToken(),
-                'linode' => (new LinodeService($credential))->validateToken(),
-                'vultr' => (new VultrService($credential))->validateToken(),
-                'upcloud' => (new UpCloudService($credential))->validateToken(),
-                'aws' => (new AwsEc2Service($credential))->validateCredentials(),
-                'gcp' => (new GcpDnsService($credential))->validateCredentials(),
-                'azure' => (new AzureComputeService($credential))->validateCredentials(),
-                'oracle' => (new OracleComputeService($credential))->validateCredentials(),
-                'ploi' => PloiImportDriver::for($credential)->validateConnection(),
-                'forge' => ForgeImportDriver::for($credential)->validateConnection(),
-                default => throw new \RuntimeException(__('Unknown provider.')),
-            };
-
-            $ok = true;
-            $this->toastSuccess(__('Credentials verified with the provider API.'));
+            $result = app(ProviderCredentialHealth::class)->refresh($credential, force: true);
+            if ($result === true) {
+                $ok = true;
+                $this->toastSuccess(__('Credentials verified with the provider API.'));
+            } elseif ($result === false) {
+                $error = $credential->fresh()?->validation_error ?: __('The provider rejected this credential.');
+                $this->toastError($error);
+            } else {
+                $error = __('Could not reach the provider just now. Try again in a moment.');
+                $this->toastError($error);
+            }
         } catch (\Throwable $e) {
             $error = $e->getMessage();
             $this->toastError($error);
@@ -917,6 +903,23 @@ trait ManagesProviderCredentials
                 ]);
             }
         }
+    }
+
+    public function promptDestroyCredential(string $id): void
+    {
+        $credential = ProviderCredential::findOrFail($id);
+        $this->authorize('delete', $credential);
+
+        $this->openConfirmActionModal(
+            'destroy',
+            [$id],
+            __('Remove credential'),
+            __('Remove :name? Anything using this token stops working until you replace it.', [
+                'name' => $credential->name !== '' ? $credential->name : __('this credential'),
+            ]),
+            __('Remove'),
+            true,
+        );
     }
 
     public function destroy(string|int $id): void

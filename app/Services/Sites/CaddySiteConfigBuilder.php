@@ -18,7 +18,12 @@ class CaddySiteConfigBuilder
 {
     public function build(Site $site, ?int $listenPort = null): string
     {
-        if ($site->type === SiteType::Custom) {
+        // Container sites are served by their container backend (App Platform /
+        // App Runner / local Docker), never by this box's webserver — and the
+        // match below has no Container arm, so letting one through threw an
+        // UnhandledMatchError and aborted the whole webserver switch. The
+        // provision query fetches every site on the server, unfiltered.
+        if ($site->type === SiteType::Custom || $site->type === SiteType::Container) {
             return '';
         }
 
@@ -106,7 +111,7 @@ CADDY;
             ? "php_fastcgi unix//{$phpSock} {\n{$phpEnv}    }"
             : "php_fastcgi unix//{$phpSock}";
 
-        return match ($site->type) {
+        return match ($site->configSiteType()) {
             SiteType::Php => <<<CADDY
 {$hosts} {
 {$managedErrors}{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
@@ -137,7 +142,7 @@ CADDY,
     reverse_proxy 127.0.0.1:{$site->app_port}
 }
 CADDY,
-            SiteType::Custom => '',
+            SiteType::Custom, SiteType::Container => '',
         };
     }
 
@@ -301,7 +306,7 @@ CADDY;
             if ($from === '') {
                 continue;
             }
-            $kind = $redirect->kind instanceof SiteRedirectKind ? $redirect->kind : SiteRedirectKind::Http;
+            $kind = $redirect->kind;
             if ($kind === SiteRedirectKind::InternalRewrite) {
                 $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $redirect->to_url);
                 if ($to === '') {
@@ -343,7 +348,7 @@ CADDY;
     }
 
     /**
-     * @param  Collection<int, string>  $hostnames
+     * @param  Collection<int, covariant string>  $hostnames
      */
     protected function vmDockerReverseProxyBlock(Site $site, ?int $listenPort, Collection $hostnames): string
     {

@@ -52,6 +52,87 @@
         @apply rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm sm:p-5;
     }
 
+    /* ── Control scale ────────────────────────────────────────────────────
+       Two button sizes and one radius, so a dense page reads as one system.
+       Hand-tuned call sites had drifted to four scales (px-1.5/py-0.5 up to
+       px-3/py-1.5) and five radii (rounded, -md, -lg, -xl, -full) sitting
+       side by side, which is what made the page look unfinished rather than
+       merely busy.
+
+       xs — inline actions inside a row or alert (Fix, Ignore, Re-scan).
+       sm — a card header's own actions (Add variable, Edit all).
+       Both are fixed-height so a row of mixed buttons shares one baseline. */
+    .dply-btn {
+        @apply inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    /* ── Keyboard focus ───────────────────────────────────────────────────
+       One ring for every control that isn't a form field. `focus-visible`
+       rather than `focus` so a mouse click doesn't leave a ring behind —
+       this matches what nav-link / dropdown-link / toggle-switch already do,
+       and the gold reads against both the cream and the zinc-900 surfaces.
+
+       Applied here so a control gets it by adding one token instead of
+       repeating three utilities at the call site; the button components'
+       `sm`/`xs` arms had simply omitted the ring their `default` arm carried,
+       which left every compact control in the workspace invisible to
+       keyboard users. */
+    .dply-focus {
+        @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35;
+    }
+
+    /* Pressed feedback. Half a pixel of travel — enough to register as a
+       physical click without shifting the row it sits in. Disabled controls
+       never match :active, so no guard is needed. */
+    .dply-pressable {
+        @apply active:translate-y-px;
+    }
+
+    /* Alert/finding row. Matches the sub-row idiom used across the app —
+       rounded, bordered, padded, sitting on the card's tint — rather than the
+       square full-bleed rows this page briefly used, which read as a different
+       product. Severity rides a left border on top of the normal border. */
+    .dply-row {
+        @apply flex items-start gap-3 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 transition-colors hover:border-brand-ink/20;
+    }
+
+    /* xs keeps h-6 (compact inline); sm is h-7. Both use text-xs (12px). */
+    .dply-btn-xs {
+        @apply h-6 px-2 text-xs leading-none;
+    }
+
+    .dply-btn-sm {
+        @apply h-7 px-2.5 text-xs leading-none;
+    }
+
+    /* Tones. Outline is the default for secondary work; ghost for tertiary
+       (Ignore/dismiss), which should recede until hovered. */
+    .dply-btn-outline {
+        @apply border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-ink/30 hover:bg-brand-sand/40;
+    }
+
+    .dply-btn-ghost {
+        @apply text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink;
+    }
+
+    .dply-btn-primary {
+        @apply bg-brand-forest text-brand-cream hover:bg-brand-forest/90;
+    }
+
+    .dply-btn-danger {
+        @apply bg-rose-700 text-white hover:bg-rose-800;
+    }
+
+    /* Icon-only control, square so it lines up with the button heights. */
+    .dply-icon-btn {
+        @apply inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-brand-moss transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/35 active:translate-y-px hover:bg-brand-sand/40 hover:text-brand-ink;
+    }
+
+    /* Inline token: an env key, a prefix filter, a count. Micro label scale. */
+    .dply-chip {
+        @apply inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-2xs font-semibold leading-none;
+    }
+
     /* Global "this button is talking to the server" affordance, toggled by
        the click handler in app.js for any wire:click element.
        Approach: hide the button's contents during the round-trip (so the
@@ -110,6 +191,29 @@
         @apply border-brand-mist/20 bg-zinc-900/95 shadow-black/25;
     }
 
+    /* ── Global tooltip ───────────────────────────────────────────────────
+       Single bubble owned by resources/js/tooltip.js — see that file for how
+       elements opt in. Wraps to a readable measure (the native title tooltip
+       it replaces ran off-screen on long panel notes) and sits above modals
+       (z-[100]) and toasts (z-[110]) so it is never the thing that's clipped. */
+    .dply-tooltip {
+        @apply pointer-events-none fixed left-0 top-0 z-[120] max-w-xs rounded-lg bg-brand-ink/95 px-2.5 py-1.5 text-xs font-medium leading-relaxed text-brand-cream shadow-lg ring-1 ring-brand-ink/40;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 120ms ease-out;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .dply-tooltip[data-show='true'] {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    html.dark .dply-tooltip {
+        @apply bg-zinc-800 text-zinc-100 ring-white/15;
+    }
+
     /** Shared form control surface — prefer over raw `bg-white` for predictable dark mode */
     .dply-input {
         @apply mt-1 block w-full rounded-xl border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:opacity-50;
@@ -143,6 +247,28 @@
 
 /* Surfaces that still use raw `bg-white` in Blade — sink them in dark mode */
 @layer utilities {
+    /*
+     * Icon-only controls (modal-header closes) keep their compact 24–28px visual
+     * box but get a 44x44 pointer target from a centred pseudo-element, so the
+     * layout does not shift. WCAG 2.2 AA 2.5.8 already passes at 24px; this meets
+     * the platform 44px guidance.
+     * ponytail: overlay — only put this on a control with >=10px clear space on
+     * every side, or it will swallow a neighbour's clicks.
+     */
+    .dply-hit-44 {
+        position: relative;
+    }
+
+    .dply-hit-44::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        height: 44px;
+        width: 44px;
+        transform: translate(-50%, -50%);
+    }
+
     html.dark .bg-white {
         background-color: rgb(24 24 27);
     }
@@ -389,10 +515,14 @@
 
     /* Let the icon tooltips escape the column: the card normally clips
        (overflow-hidden) and the content column paints over the sidebar, so lift
-       the sidebar's stacking and open up its overflow while collapsed. */
+       the sidebar's stacking and open up its overflow while collapsed. Keep it
+       BELOW the sticky <x-site-header> (z-30): at z-30 the rail tied with the
+       header and, being later in the DOM, painted over it while scrolled. z-20
+       still clears the content column (auto), and the aside's stacking context
+       keeps the tooltips (z-50) and the collapse handle contained. */
     html[data-wsnav="collapsed"] aside.ws-sidebar {
         position: relative;
-        z-index: 30;
+        z-index: 20;
     }
     html[data-wsnav="collapsed"] .ws-sidebar .dply-card {
         overflow: visible !important;
@@ -429,4 +559,68 @@
    everywhere else so it never duplicates the visible label. */
 .ws-tip {
     display: none;
+}
+
+/* Horizontally-scrolling tab strips (x-server-workspace-tablist scroll).
+   macOS "always show scrollbars" paints the bar INSIDE the scroll box, so with
+   the strip's own p-1 the bar sat on top of the tab row. Reserve its height
+   here rather than in a utility class: unlayered rules beat Tailwind's layered
+   utilities, so callers that pass p-0 (strips inside an already-padded wrapper)
+   still keep the clearance. Split the reservation across BOTH block edges: as
+   bottom-only padding it knocked the pills ~10px above centre inside the row's
+   symmetric py-2 (visible on every workspace sub-tab strip). Same total height,
+   same scrollbar clearance, tabs actually centred. */
+.dply-tablist-scroll {
+    padding-block: 0.3125rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(104 132 121 / 0.35) transparent;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background-color: rgb(104 132 121 / 0.3);
+}
+
+.dply-tablist-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgb(104 132 121 / 0.5);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────
+   The app animates in three places that matter to a motion-sensitive user:
+   the global button spinner (a continuous rotation), Alpine's x-transition on
+   every dropdown/flyout, and the colour/transform transitions on controls.
+
+   Rotation is the one thing that must not simply be shortened — a spinner
+   snapped to 0.01ms still reads as a stuttering strobe — so it is slowed to a
+   near-static crawl instead. Everything else collapses to effectively
+   instant, which keeps the state change visible without the travel.
+
+   Deliberately not `transition: none`: several panels rely on a transition
+   ending (opacity 0 -> hidden) rather than on a class toggle, and killing the
+   transition outright means `transitionend` never fires and the panel stays
+   on screen. A 0.01ms transition still fires the event.
+   ponytail: revisit if a component ever needs real motion for meaning —
+   then gate that one on the media query itself rather than widening this. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .dply-btn-busy::after {
+        animation-duration: 3s !important;
+        animation-iteration-count: infinite !important;
+    }
 }

@@ -5,7 +5,7 @@ namespace App\Services\Servers;
 use App\Jobs\ApplyFirewallJob;
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\HetznerService;
 use App\Support\Servers\HetznerCloudFirewallRules;
 use Illuminate\Support\Facades\Log;
 
@@ -122,7 +122,7 @@ class ServerFirewallProvisioner
      * Join non-empty UFW grammar segments with single spaces. Skipping empties lets the iface
      * branch be optional without sprinkling conditionals through every return path.
      *
-     * @param  array<string, mixed> $segments
+     * @param  array<int, string> $segments
      */
     private function joinUfwSegments(array $segments): string
     {

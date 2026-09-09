@@ -2,11 +2,13 @@
 
 use App\Support\Servers\DatabaseEngineAvailability;
 
-test('mysql postgres and sqlite are always available', function () {
+test('mysql mariadb postgres and sqlite are always available', function () {
     expect(DatabaseEngineAvailability::isAvailable('mysql'))->toBeTrue()
+        ->and(DatabaseEngineAvailability::isAvailable('mariadb'))->toBeTrue()
         ->and(DatabaseEngineAvailability::isAvailable('postgres'))->toBeTrue()
         ->and(DatabaseEngineAvailability::isAvailable('sqlite'))->toBeTrue()
-        ->and(DatabaseEngineAvailability::isComingSoon('mysql'))->toBeFalse();
+        ->and(DatabaseEngineAvailability::isComingSoon('mysql'))->toBeFalse()
+        ->and(DatabaseEngineAvailability::isComingSoon('mariadb'))->toBeFalse();
 });
 
 test('gated database engines follow features.database config defaults', function () {

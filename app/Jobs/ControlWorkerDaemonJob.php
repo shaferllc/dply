@@ -97,6 +97,34 @@ class ControlWorkerDaemonJob implements ShouldQueue
                 return;
             }
 
+            // Destroying a queue's contents: `queue:clear <connection> --queue=x`
+            // takes waiting, delayed AND reserved jobs. Separate from the
+            // failed-job branch below because its argument is a QUEUE NAME, and
+            // widening that branch's uuid allowlist to accept one would loosen
+            // the guard on a shell line for every caller.
+            if ($this->action === 'queue:clear') {
+                $dir = rtrim($site->effectiveEnvDirectory(), '/');
+                if ($site->server === null) {
+                    throw new \RuntimeException('Member server is not available.');
+                }
+                $queue = trim((string) $this->arg);
+                if ($queue === '' || ! preg_match('/^[A-Za-z0-9_\-:.]+$/', $queue)) {
+                    throw new \RuntimeException('Invalid queue name.');
+                }
+                $emit->step('queue', 'queue:clear --queue='.$queue.' (in '.$dir.')');
+                $out = $exec->runInlineBash(
+                    $site->server,
+                    'worker-pool:queue-clear',
+                    'cd '.escapeshellarg($dir).' && php artisan queue:clear --queue='.escapeshellarg($queue).' --force 2>&1',
+                    timeoutSeconds: 120,
+                    asRoot: false,
+                );
+                $emit(trim((string) $out->buffer) ?: '(no output)', 'info', 'queue');
+                $this->completeConsoleAction();
+
+                return;
+            }
+
             // Failed-job management: retry/forget a specific job (arg = uuid or
             // "all"), or flush them all — run via artisan in the app dir.
             if (in_array($this->action, ['queue:retry', 'queue:forget', 'queue:flush'], true)) {

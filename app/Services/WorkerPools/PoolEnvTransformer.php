@@ -23,7 +23,6 @@ class PoolEnvTransformer
     /**
      * @return array{env: string, exposures: list<array{server_id:string,server_name:string,public_ip:string,private_ip:string,ports:list<int>,keys:list<string>}>}
      */
-    /** @return array<string, mixed> */
     public function rewriteForCrossRegion(string $env, Server $clone): array
     {
         if (trim($env) === '') {
@@ -103,7 +102,6 @@ class PoolEnvTransformer
      *
      * @return list<array{server_id:string,server_name:string,public_ip:string,private_ip:string,ports:list<int>,keys:list<string>}>
      */
-    /** @return array<string, mixed> */
     public function exposurePlan(string $env, Server $clone): array
     {
         return $this->rewriteForCrossRegion($env, $clone)['exposures'];

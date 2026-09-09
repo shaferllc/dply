@@ -8,7 +8,7 @@ use App\Models\ObjectStorageCredential;
 use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -137,7 +137,7 @@ trait ManagesStorageBindings
         $disk = $this->resolveStorageDisk($site, $params);
 
         $result = $this->bucketProvisioner->create($provider, $region, $key, $secret, $bucket, awaitKeyPropagation: $autoMinted);
-        $endpoint = (string) ($result['endpoint'] ?? '');
+        $endpoint = (string) $result['endpoint'];
 
         $binding = $this->persist($site, 'storage', [
             'mode' => 'provision_new',

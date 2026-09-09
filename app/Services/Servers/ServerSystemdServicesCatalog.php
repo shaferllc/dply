@@ -14,10 +14,6 @@ final class ServerSystemdServicesCatalog
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function allowedUnitsForServer(Server $server): array
     {
         $defaults = $this->defaultUnitsResolved($server);
@@ -27,7 +23,7 @@ final class ServerSystemdServicesCatalog
         $merged = array_unique($merged);
         sort($merged);
 
-        return array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values(array_values($merged))))))))))))))))))))))))))))))));
+        return $merged;
     }
 
     /**
@@ -155,10 +151,6 @@ final class ServerSystemdServicesCatalog
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     protected function defaultUnitsResolved(Server $server): array
     {
         $out = [];
@@ -178,10 +170,6 @@ final class ServerSystemdServicesCatalog
         return $out;
     }
 
-    /**
-     * @return list<string>
-     */
-    /** @return array<string, mixed> */
     /**
      * @return list<string>
      */
@@ -265,10 +253,6 @@ final class ServerSystemdServicesCatalog
     /**
      * Unit basenames (no .service) that cannot be started/stopped/restarted from Services for this server.
      *
-     * @return list<string>
-     */
-    /** @return array<string, mixed> */
-    /**
      * @return list<string>
      */
     public function statusOnlyUnitBasenamesForServer(Server $server): array

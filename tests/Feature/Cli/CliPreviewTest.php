@@ -96,8 +96,24 @@ test('cli preview page renders coming soon panel', function (): void {
         ->assertSee(__('dply CLI'));
 });
 
-test('cli preview page is hidden when full cli is enabled', function (): void {
+test('cli preview page redirects to the live cli page when full cli is enabled', function (): void {
     Feature::define('workspace.cli', fn (): bool => true);
+    Feature::flushCache();
+
+    $user = ownerWithOrg();
+    $server = readyServer($user);
+
+    $this->actingAs($user)
+        ->get(route('servers.cli-preview', $server))
+        ->assertRedirect(route('servers.cli', $server));
+});
+
+test('cli preview page 404s on the initial request when both flags are off', function (): void {
+    // Regression: the gate used to live in the #[Lazy] component's mount(), so
+    // the abort landed on the hydrate POST — the GET returned 200 and the page
+    // sat on its skeleton forever. It has to fail on the document request.
+    Feature::define('workspace.cli', fn (): bool => false);
+    Feature::define('workspace.cli_preview', fn (): bool => false);
     Feature::flushCache();
 
     $user = ownerWithOrg();

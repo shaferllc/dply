@@ -32,18 +32,34 @@
     >
         <div class="fixed inset-0 z-0 bg-brand-ink/50 backdrop-blur-sm" x-on:click="close()"></div>
         <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
-            <x-dialog-shell :title="$confirmActionModalTitle" title-id="confirm-action-modal-title" max-width="md">
+            {{-- Details need room: at `md` the label column eats half the width and
+                 every path/host value breaks mid-word. --}}
+            <x-dialog-shell
+                :title="$confirmActionModalTitle"
+                title-id="confirm-action-modal-title"
+                :max-width="! empty($confirmActionModalDetails) ? 'lg' : 'md'"
+            >
                 <div class="space-y-4">
                     <p class="text-sm leading-relaxed text-brand-moss">{{ $confirmActionModalMessage }}</p>
                     @if (! empty($confirmActionModalDetails))
-                        <dl class="divide-y divide-brand-ink/8 rounded-xl border border-brand-ink/10 bg-brand-sand/15 text-sm">
+                        <dl class="divide-y divide-brand-ink/8 overflow-hidden rounded-xl border border-brand-ink/10 bg-brand-sand/15 text-sm">
                             @foreach ($confirmActionModalDetails as $row)
-                                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-2.5" wire:key="confirm-detail-{{ $loop->index }}">
-                                    <dt class="w-36 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $row['label'] }}</dt>
+                                {{-- Label and value share a baseline on one row; only a `multiline`
+                                     value stacks under its label, where prose has the full width
+                                     instead of a ~9rem column. --}}
+                                <div @class([
+                                    'px-4 py-2.5',
+                                    'flex items-baseline gap-x-3' => empty($row['multiline']),
+                                ]) wire:key="confirm-detail-{{ $loop->index }}">
+                                    <dt class="w-28 shrink-0 text-2xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $row['label'] }}</dt>
                                     <dd @class([
-                                        'min-w-0 flex-1 break-all text-brand-ink',
-                                        'font-mono text-xs' => ! empty($row['mono']),
-                                        'whitespace-pre-wrap text-sm leading-relaxed' => ! empty($row['multiline']),
+                                        'min-w-0 text-brand-ink',
+                                        'flex-1' => empty($row['multiline']),
+                                        // Paths/keys have no spaces to wrap at, so they get the
+                                        // harder break; prose wraps on word boundaries.
+                                        'break-all font-mono text-xs' => ! empty($row['mono']),
+                                        'break-words' => empty($row['mono']),
+                                        'mt-1 whitespace-pre-wrap leading-relaxed' => ! empty($row['multiline']),
                                     ])>
                                         @if (! empty($row['link']))
                                             <a href="{{ $row['value'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-forest underline-offset-2 hover:underline">{{ $row['value'] }}</a>
@@ -54,6 +70,13 @@
                                 </div>
                             @endforeach
                         </dl>
+                    @endif
+
+                    @if (filled($confirmActionModalWarning ?? null))
+                        <p class="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-xs leading-relaxed text-amber-900">
+                            <x-heroicon-o-exclamation-triangle class="mt-px h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                            <span class="min-w-0">{{ $confirmActionModalWarning }}</span>
+                        </p>
                     @endif
 
                     @if (! empty($confirmActionModalToggleLabel))
@@ -75,7 +98,16 @@
                         {{ __('Cancel') }}
                     </x-secondary-button>
 
-                    @if ($confirmActionModalDestructive ?? false)
+                    @if (! empty($confirmActionModalToggleLabel))
+                        <x-secondary-button type="button" wire:click="confirmActionModal(false)" wire:loading.attr="disabled" wire:target="confirmActionModal">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-secondary-button>
+                        <x-danger-button type="button" wire:click="confirmActionModal(true)" wire:loading.attr="disabled" wire:target="confirmActionModal">
+                            <span wire:loading.remove wire:target="confirmActionModal">{{ __('Detach & delete') }}</span>
+                            <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>
+                        </x-danger-button>
+                    @elseif ($confirmActionModalDestructive ?? false)
                         <x-danger-button type="button" wire:click="confirmActionModal" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="confirmActionModal">{{ $confirmActionModalConfirmLabel }}</span>
                             <span wire:loading wire:target="confirmActionModal">{{ __('Working…') }}</span>

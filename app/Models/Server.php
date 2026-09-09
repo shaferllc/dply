@@ -3,15 +3,16 @@
 namespace App\Models;
 
 use App\Enums\ServerProvider;
-use App\Enums\ServerTier;
 use App\Enums\SiteType;
-use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
-use App\Modules\Billing\Services\ServerTierClassifier;
+use App\Livewire\Servers\WorkspaceOverview;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
+use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerInstalledServices;
 use App\Support\Servers\ServerTags;
 use Database\Factories\ServerFactory;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -29,33 +31,33 @@ use phpseclib3\Crypt\PublicKeyLoader;
 /**
  * @property string $id
  * @property ?Carbon $comped_until
- * @property string $health_status
+ * @property ?string $health_status
  * @property ?string $hetzner_network_id
- * @property string $hosting_backend
- * @property string $ip_address
+ * @property string|null $hosting_backend
+ * @property ?string $ip_address
  * @property ?Carbon $last_health_check_at
- * @property string $logo_path
+ * @property string|null $logo_path
  * @property ?array<string, mixed> $meta
  * @property string $name
  * @property ?string $organization_id
  * @property ?string $pool_role
- * @property string $private_ip_address
+ * @property string|null $private_ip_address
  * @property ?string $private_network_id
  * @property ServerProvider $provider
  * @property ?string $provider_credential_id
  * @property ?string $provider_id
- * @property string $region
+ * @property ?string $region
  * @property ?Carbon $scheduled_deletion_at
- * @property string $setup_script_key
- * @property string $setup_status
- * @property string $size
+ * @property ?string $setup_script_key
+ * @property ?string $setup_status
+ * @property ?string $size
  * @property ?string $ssh_operational_private_key
  * @property string $ssh_port
  * @property ?string $ssh_private_key
  * @property ?string $ssh_recovery_private_key
  * @property string $ssh_user
  * @property string $status
- * @property string $supervisor_package_status
+ * @property ?string $supervisor_package_status
  * @property ?string $team_id
  * @property ?string $user_id
  * @property ?string $worker_pool_id
@@ -87,8 +89,8 @@ use phpseclib3\Crypt\PublicKeyLoader;
  * @property-read Collection<int, ServerProvisionRun> $provisionRuns
  * @property-read Collection<int, NotificationSubscription> $notificationSubscriptions
  * @property-read ?PrivateNetwork $privateNetwork
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class Server extends Model
 {
@@ -104,6 +106,17 @@ class Server extends Model
     public const STATUS_ERROR = 'error';
 
     public const STATUS_DISCONNECTED = 'disconnected';
+
+    /**
+     * Mid-resize at the provider. Transient and self-clearing: {@see \App\Jobs\ResizeServerJob}
+     * stashes the prior status in meta['resize']['previous_status'] and restores
+     * it when the sequence ends, however it ends.
+     *
+     * Deliberately NOT "ready" — the machine is powered off for most of a
+     * resize, so anything gated on isReady() (deploys, SSH work) must stay off
+     * it until it is back.
+     */
+    public const STATUS_RESIZING = 'resizing';
 
     public const HOST_KIND_VM = 'vm';
 
@@ -259,6 +272,20 @@ class Server extends Model
     }
 
     /**
+     * Dedicated Redis/Valkey box (role or redis_server profile) — including
+     * dply-hosted managed cache VMs. Broader than {@see isRedisServer()}:
+     * valkey-role hosts and profile-only rows count too.
+     */
+    public function isDedicatedCacheHost(): bool
+    {
+        $meta = $this->meta ?? [];
+        $role = $meta['server_role'] ?? null;
+
+        return in_array($role, ['redis', 'valkey'], true)
+            || ($meta['install_profile'] ?? null) === 'redis_server';
+    }
+
+    /**
      * A worker host is provisioned for background/queue-style workloads and
      * always runs Caddy (it attaches testing URLs but isn't a public web
      * front). Caching + CDN/edge tabs don't apply to these sites.
@@ -268,6 +295,15 @@ class Server extends Model
         $meta = $this->meta ?? [];
 
         return ($meta['server_role'] ?? null) === 'worker';
+    }
+
+    /**
+     * Provisioned from a site’s Worker Servers page (not a standalone worker
+     * host). Scale/teardown belong on the origin site, not this workspace.
+     */
+    public function isSiteSourcedFleet(): bool
+    {
+        return (bool) data_get($this->meta, 'site_sourced_fleet');
     }
 
     /**
@@ -436,6 +472,9 @@ class Server extends Model
     /** Memoized request-lifetime cache for {@see cachedSitesCount()}. */
     private ?int $cachedSitesCount = null;
 
+    /** How long {@see cachedSitesCount()} may serve a stale count. */
+    private const SITES_COUNT_CACHE_TTL_SECONDS = 60;
+
     /**
      * Request-level cache for sites().count() — both the sidebar nav helper
      * and the shared-host report widget call this on the same Server
@@ -455,12 +494,27 @@ class Server extends Model
             return $this->cachedSitesCount = (int) $preloaded;
         }
 
-        return $this->cachedSitesCount = $this->sites()->count();
+        // Cross-request cache on top of the per-instance memo: the sidebar nav
+        // filter asks for this on every workspace page, and the answer only
+        // moves when a site is created or deleted. Short TTL because the nav's
+        // requires_min_sites gate reads it — a stale zero would briefly hide a
+        // row on a server that just got its first site.
+        return $this->cachedSitesCount = (int) Cache::remember(
+            $this->sitesCountCacheKey(),
+            self::SITES_COUNT_CACHE_TTL_SECONDS,
+            fn (): int => $this->sites()->count(),
+        );
     }
 
     public function flushCachedSitesCount(): void
     {
         $this->cachedSitesCount = null;
+        Cache::forget($this->sitesCountCacheKey());
+    }
+
+    private function sitesCountCacheKey(): string
+    {
+        return 'server:'.$this->id.':sites-count';
     }
 
     /** @return HasMany<ServerDatabase, $this> */
@@ -525,7 +579,7 @@ class Server extends Model
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
-     * `App\Modules\Edge\Jobs\AddEdgeProxyJob` for the install flow.
+     * `App\Jobs\AddEdgeProxyJob` for the install flow.
      */
     public function edgeProxy(): ?string
     {
@@ -562,6 +616,98 @@ class Server extends Model
     public function hasRuntimeInstalled(string $runtime): bool
     {
         return in_array($runtime, $this->installedRuntimeKeys(), true);
+    }
+
+    /**
+     * Runtimes this server can actually run a site on, keyed by runtime with
+     * the version to offer — the option list behind the site Runtime picker.
+     *
+     * Source order matters. `meta.manage_mise_runtimes` is the real inventory
+     * the probe read off the box (installed versions + the active default), so
+     * it wins. `meta.runtime_defaults` is only operator *intent* — a pin the
+     * wizard wrote, which can name a runtime the probe never confirmed — so it
+     * fills gaps rather than overriding. PHP never comes from mise (it's
+     * ondrej/php apt), so it's resolved from the stack summary instead.
+     *
+     * @return array<string, string|null> runtime key => version (null when unknown)
+     */
+    public function availableSiteRuntimes(): array
+    {
+        $meta = $this->meta ?? [];
+        $available = [];
+
+        $mise = is_array($meta['manage_mise_runtimes'] ?? null) ? $meta['manage_mise_runtimes'] : [];
+        foreach ($mise as $runtime => $data) {
+            if (! is_string($runtime) || $runtime === '' || ! is_array($data)) {
+                continue;
+            }
+            $active = trim((string) ($data['active'] ?? ''));
+            if ($active === '') {
+                $versions = is_array($data['versions'] ?? null) ? $data['versions'] : [];
+                $active = trim((string) (end($versions) ?: ''));
+            }
+            $available[$runtime] = $active !== '' ? $active : null;
+        }
+
+        // Fallback for servers that predate the probe fix that writes
+        // manage_mise_runtimes — never an override, only a gap-filler.
+        foreach ($this->installedRuntimeKeys() as $runtime) {
+            if (array_key_exists($runtime, $available)) {
+                continue;
+            }
+            $version = trim((string) (($meta['runtime_defaults'][$runtime] ?? '')));
+            $available[$runtime] = $version !== '' ? $version : null;
+        }
+
+        // Strict, deliberately unlike the fail-open gate used for the installer
+        // list: selecting php writes a `fastcgi_pass` vhost, so offering it on a
+        // host we cannot confirm has PHP risks pointing nginx at a socket that
+        // never opens. No evidence means not offered.
+        if (ServerInstalledServices::has($this, 'php')) {
+            $available['php'] = ServerInstalledServices::phpVersionFor($this);
+        }
+
+        // Static needs no interpreter, so every web-serving host can offer it.
+        $available['static'] = null;
+
+        return $available;
+    }
+
+    /**
+     * Site type a NEW site on this server should default to when nothing else
+     * has picked one — a bare create, or "start blank" in the app picker.
+     *
+     * Was hardcoded to PHP at every such call site, which on a php_version=none
+     * box (e.g. the Node/Next.js preset) produced a site whose workspace offered
+     * PHP-FPM controls for an interpreter the server does not have.
+     *
+     * Order: PHP while the box has one, else the first mise-pinned runtime that
+     * maps to a SiteType, else static — a blank site only serves a splash page,
+     * so static is the honest fallback for a python/ruby/go host.
+     *
+     * Fails open to PHP when the stack summary hasn't landed yet, so servers we
+     * can't yet read keep exactly the behaviour they have today.
+     *
+     * ponytail: node is the only non-PHP runtime with its own SiteType; add a
+     * case here if python/ruby/go ever grow one.
+     *
+     * @return array{0: string, 1: string|null} [site type, runtime version]
+     */
+    public function defaultSiteRuntime(): array
+    {
+        if (ServerInstalledServices::hasAny($this, ['php', 'unknown'])) {
+            return ['php', null];
+        }
+
+        $meta = $this->meta ?? [];
+        $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
+
+        $node = trim((string) ($defaults['node'] ?? ''));
+        if ($node !== '') {
+            return ['node', $node];
+        }
+
+        return ['static', null];
     }
 
     /** @return HasOne<ServerDatabaseAdminCredential, $this> */
@@ -656,28 +802,6 @@ class Server extends Model
         return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
     }
 
-    /**
-     * Billing tier derived from the most recent metric snapshot's cpu_count
-     * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
-     * freshly-connected server isn't accidentally billed at XL during the
-     * gap between provision and first agent report.
-     */
-    public function billingTier(): ServerTier
-    {
-        $snapshot = $this->latestMetricSnapshot;
-        $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
-
-        $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
-            ? (int) $payload['cpu_count']
-            : null;
-
-        $memMb = isset($payload['mem_total_kb']) && is_numeric($payload['mem_total_kb'])
-            ? (int) round((float) $payload['mem_total_kb'] / 1024)
-            : null;
-
-        return app(ServerTierClassifier::class)->classify($cpuCount, $memMb);
-    }
-
     /** @return HasMany<ServerSystemdServiceState, $this> */
     public function systemdServiceStates(): HasMany
     {
@@ -716,11 +840,14 @@ class Server extends Model
 
     /**
      * Free-form operator notes (runbooks, customer IDs, context). Pinned first,
-     * then most-recently-touched. Pinned notes surface on the server overview. *
+     * then most-recently-touched. Pinned notes surface on the server overview.
+     *
+     * Includes archived notes — the relation is the whole notebook, so exports
+     * and the manifest keep the history. Callers that render the live list
+     * scope with ->active() / ->archived().
      *
      * @return HasMany<ServerNote, $this>
      */
-    /** @return HasMany<ServerNote, $this> */
     public function notes(): HasMany
     {
         return $this->hasMany(ServerNote::class)
@@ -851,6 +978,37 @@ class Server extends Model
     }
 
     /**
+     * Real machines only — every surface that says "servers" wants this.
+     *
+     * Edge apps, leftover function namespaces, and Cloud containers are all
+     * backed by placeholder host rows so their Sites can share the workspace
+     * URL shape. They aren't machines: you don't provision, SSH into, or
+     * spec-tier them. Listing them made "8 servers" count two Edge apps,
+     * each with a "Provisioning…" label and an empty metrics row.
+     *
+     * Allowlisted rather than subtractive on purpose. This replaced a pair of
+     * scopes (withoutEdgeHosts / withoutServerlessHosts) that each excluded
+     * their own kinds by name and so both missed the three Cloud kinds
+     * entirely. A new managed-product host kind added tomorrow is excluded
+     * here by default instead of leaking into the fleet until someone notices.
+     *
+     * The `meta->>'host_kind' is null` leg matters: a plain IN comparison
+     * yields NULL for rows with no host_kind (every BYO VM), which would filter
+     * out the entire real fleet.
+     */
+    public function scopeOnlyMachineHosts(EloquentBuilder $query): EloquentBuilder
+    {
+        return $query->where(function (EloquentBuilder $q): void {
+            $q->whereNull('meta->host_kind')
+                ->orWhereIn('meta->host_kind', [
+                    self::HOST_KIND_VM,
+                    self::HOST_KIND_DOCKER,
+                    self::HOST_KIND_KUBERNETES,
+                ]);
+        });
+    }
+
+    /**
      * Logical hosts for dply-managed products — never spec-tiered as BYO VMs.
      */
     public function isManagedProductHost(): bool
@@ -871,7 +1029,7 @@ class Server extends Model
 
     /**
      * A real dply-managed VM (the free-CX22 grant counter), as opposed to a
-     * managed-product logical host (Cloud/Edge/serverless).
+     * managed-product logical host (Cloud/Edge).
      */
     public function isManagedVm(): bool
     {
@@ -959,7 +1117,7 @@ class Server extends Model
         $counts = [];
 
         foreach ($sites as $site) {
-            $type = $site->type instanceof SiteType ? $site->type->value : (string) $site->type;
+            $type = $site->type->value;
             $counts[$type] = ($counts[$type] ?? 0) + 1;
         }
 
@@ -976,7 +1134,7 @@ class Server extends Model
     public function providerDisplayLabel(): string
     {
         if ($this->isDigitalOceanFunctionsHost()) {
-            return 'DigitalOcean Functions';
+            return 'Functions';
         }
 
         if ($this->isAwsLambdaHost()) {
@@ -1094,12 +1252,37 @@ class Server extends Model
         return trim((string) $key) !== '';
     }
 
+    /**
+     * Derived OpenSSH public keys, memoized per request.
+     *
+     * phpseclib has to parse the private key and derive the public half, which
+     * is CPU-heavy. The Keys settings panel asks for the operational key twice
+     * (openSshPublicKeyFromPrivate and openSshPublicKeyFromOperationalPrivate
+     * are the same key by two names) and the SSH-keys preview does the same, so
+     * without this the same derivation ran repeatedly in one render.
+     *
+     * Keyed by a hash of the key material, never the material itself.
+     *
+     * @var array<string, string|null>
+     */
+    private array $openSshPublicKeyMemo = [];
+
     protected function openSshPublicKeyFromKey(?string $priv): ?string
     {
         if ($priv === null || trim($priv) === '') {
             return null;
         }
 
+        $memoKey = hash('xxh128', $priv);
+        if (array_key_exists($memoKey, $this->openSshPublicKeyMemo)) {
+            return $this->openSshPublicKeyMemo[$memoKey];
+        }
+
+        return $this->openSshPublicKeyMemo[$memoKey] = $this->deriveOpenSshPublicKey($priv);
+    }
+
+    private function deriveOpenSshPublicKey(string $priv): ?string
+    {
         try {
             $key = PublicKeyLoader::load($priv);
             if (! $key instanceof PrivateKey) {

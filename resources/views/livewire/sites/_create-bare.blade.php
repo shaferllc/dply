@@ -34,7 +34,7 @@
     <div class="mx-auto mt-10 grid max-w-5xl gap-6 lg:grid-cols-12 lg:items-start">
         {{-- Form card --}}
         <form wire:submit="storeBare" class="lg:col-span-7">
-            <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
+            <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                 <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                     <x-icon-badge>
                         <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
@@ -84,7 +84,7 @@
                             <p class="font-semibold text-brand-ink">{{ $server->name }}</p>
                             <p class="text-brand-moss">{{ __('This site will be created on the selected server.') }}</p>
                         </div>
-                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-[11px] font-semibold text-brand-forest ring-1 ring-brand-sage/20">
+                        <span class="ml-auto inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2.5 py-1 text-xs font-semibold text-brand-forest ring-1 ring-brand-sage/20">
                             <span class="inline-flex h-1.5 w-1.5 rounded-full bg-brand-sage"></span>
                             {{ __('Ready') }}
                         </span>

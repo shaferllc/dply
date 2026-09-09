@@ -67,3 +67,28 @@ test('site daemons route renders and sets site context', function () {
         ->assertSet('programs_list_scope', 'site')
         ->assertSet('new_sv_site_id', $site->id);
 });
+
+test('import from another site renders the dense panel head', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+
+    // The import section only appears when there is another site on the server
+    // to import programs from.
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+    ]);
+    Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Import from another site')
+        // The dense head drops the icon-badge + eyebrow the block used to
+        // hand-roll; "Reuse" coming back means the tall header returned.
+        ->assertDontSee('Reuse');
+});

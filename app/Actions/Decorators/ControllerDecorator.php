@@ -205,7 +205,10 @@ class ControllerDecorator
             foreach ($reflectionParameters as $reflectionParameter) {
                 if ($reflectionParameter->getName() === $key) {
                     $type = $reflectionParameter->getType();
-                    if ($type && ! $type->isBuiltin() && class_exists($type->getName())) {
+                    // ReflectionNamedType, not ReflectionType: only the named
+                    // subclass has isBuiltin()/getName(); a union or intersection
+                    // type would fatal here.
+                    if ($type instanceof \ReflectionNamedType && ! $type->isBuiltin() && class_exists($type->getName())) {
                         $modelClass = $type->getName();
                         if (is_subclass_of($modelClass, Model::class)) {
                             $parameters[$key] = $modelClass::findOrFail($value);

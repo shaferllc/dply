@@ -72,3 +72,21 @@ test('a nonexistent repository fails fast with git\'s own error', function () {
     expect($error)->not->toBeNull();
     expect($error)->toContain('Repository preflight failed');
 });
+
+test('owner/repo shorthand is expanded instead of treated as a local path', function () {
+    // Without normalization, git ls-remote would interpret "owner/repo" as a
+    // filesystem path and fail with "does not appear to be a git repository".
+    $site = new Site([
+        'git_repository_url' => 'shaferllc/dply-preflight-missing-'.uniqid(),
+        'git_branch' => 'main',
+    ]);
+
+    $error = app(DeployRepoPreflight::class)->check($site);
+
+    // Network-shaped failures skip the preflight (null). A definitive host
+    // rejection still blocks — either way we must not see the local-path error.
+    if ($error !== null) {
+        expect($error)->not->toContain('does not appear to be a git repository');
+        expect($error)->toContain('github.com');
+    }
+});

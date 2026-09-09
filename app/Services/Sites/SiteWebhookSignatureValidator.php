@@ -23,7 +23,6 @@ class SiteWebhookSignatureValidator
      *     gitlab_event?: string
      * }
      */
-    /** @return array<string, mixed> */
     public function validateForWebhook(Request $request, Site $site): array
     {
         $secret = $site->webhook_secret;
@@ -38,7 +37,7 @@ class SiteWebhookSignatureValidator
         }
 
         $allowed = $site->webhook_allowed_ips;
-        if (($allowed) && $allowed !== []) {
+        if ($allowed) {
             $ip = (string) $request->ip();
             if (! IpUtils::checkIp($ip, $allowed)) {
                 return [

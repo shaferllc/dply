@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\ObjectStorageCredential;
-use App\Modules\Realtime\Models\RealtimeApp;
 use App\Modules\Deploy\Services\DeploymentSecretInventory;
+use App\Modules\Realtime\Models\RealtimeApp;
+use App\Support\Servers\DatabaseNameGenerator;
+use App\Support\Sites\SiteBindingCatalog;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -15,21 +17,35 @@ use App\Modules\Deploy\Services\DeploymentSecretInventory;
  */
 trait BuildsSiteBindingFormDefaults
 {
-
-
     /**
      * @return array<string, mixed>
      */
     private function defaultBindingForm(string $type, string $mode): array
     {
         return match (true) {
-            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
+            // name: seeded from the site so the field is never blank (the
+            // Regenerate button next to it swaps in a random adjective_noun).
+            $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => DatabaseNameGenerator::suggest($this->site->name), 'host' => '127.0.0.1', 'placement' => 'on_box', 'size' => 'small', 'region' => '', 'vm_size' => '', 'vendor_api_key' => '', 'vendor_account' => '', 'vendor_region' => ''],
             $type === 'database' => $this->defaultDatabaseAttachBindingForm(),
             // use_for_drivers: also wire cache/sessions/queue at this Redis in one
             // step (default on — it's why you attach Redis). Existing driver
             // bindings are preserved by the manager.
+            $type === 'redis' && $mode === 'provision' => [
+                'engine' => 'redis',
+                'name' => DatabaseNameGenerator::suggest($this->site->name).'_redis',
+                // Empty until the operator picks a card — size / vendor fields
+                // must not appear before that choice.
+                'placement' => '',
+                'size' => 'small',
+                'region' => '',
+                'vm_size' => '',
+                'use_for_drivers' => true,
+                'vendor_api_key' => '',
+                'vendor_account' => '',
+                'vendor_region' => '',
+            ],
             $type === 'redis' => ['target_id' => '', 'use_for_drivers' => true],
-            $type === 'queue' => ['driver' => 'database'],
+            $type === 'queue' => ['driver' => $this->defaultQueueBindingDriver()],
             $type === 'cache' => $this->defaultCacheBindingForm(),
             $type === 'session' => $this->defaultSessionBindingForm(),
             $type === 'storage' => $this->defaultStorageBindingForm($mode),
@@ -43,6 +59,7 @@ trait BuildsSiteBindingFormDefaults
             $type === 'search' => $this->defaultSearchBindingForm(),
             $type === 'payments' => $this->defaultPaymentsBindingForm(),
             $type === 'oauth' => $this->defaultOauthBindingForm(),
+            $type === 'connected_app' => $this->defaultConnectedAppBindingForm(),
             default => [],
         };
     }
@@ -201,7 +218,7 @@ trait BuildsSiteBindingFormDefaults
             // Cloudflare (account_id + sending key); cf_domain drives the
             // guided "email on your domain" panel, defaulting to the primary.
             'account_id' => '',
-            'cf_domain' => (string) ($this->site->primaryDomain()?->hostname ?? ''),
+            'cf_domain' => (string) ($this->site->primaryDomain()->hostname ?? ''),
             // Saved-credential reuse + save-for-reuse.
             'credential_id' => '',
             'save_credential' => false,
@@ -243,9 +260,31 @@ trait BuildsSiteBindingFormDefaults
         }
 
         return [
-            'driver' => $driver,
+            'driver' => $this->coalesceDriverToAvailable($driver, 'file'),
             'prefix' => $prefix,
         ];
+    }
+
+    private function defaultQueueBindingDriver(): string
+    {
+        if (SiteBindingCatalog::hasAttachedType($this->site->bindings, 'database')) {
+            return 'database';
+        }
+        if (SiteBindingCatalog::hasAttachedType($this->site->bindings, 'redis')) {
+            return 'redis';
+        }
+
+        return 'database';
+    }
+
+    /** If the preferred driver needs a missing Redis/database binding, use $fallback. */
+    private function coalesceDriverToAvailable(string $driver, string $fallback): string
+    {
+        if (SiteBindingCatalog::driverStoreAvailable($this->site->bindings, $driver)) {
+            return $driver;
+        }
+
+        return $fallback;
     }
 
     private function defaultSessionBindingForm(): array
@@ -256,7 +295,7 @@ trait BuildsSiteBindingFormDefaults
         return [
             // Every field is optional — blank means "use the framework default",
             // which attach materializes into the injected config.
-            'driver' => (string) ($cfg['driver'] ?? ''),
+            'driver' => $this->coalesceDriverToAvailable((string) ($cfg['driver'] ?? ''), ''),
             'lifetime' => (string) ($cfg['lifetime'] ?? ''),
             'encrypt' => (string) ($cfg['encrypt'] ?? ''),
             'path' => (string) ($cfg['path'] ?? ''),
@@ -543,6 +582,37 @@ trait BuildsSiteBindingFormDefaults
             'credential_id' => '',
             'save_credential' => false,
             'credential_name' => '',
+        ];
+    }
+
+    /**
+     * Default Slack / Discord / Drive form. Prefills provider from an existing
+     * binding; secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultConnectedAppBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'connected_app');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'slack'),
+            'bot_token' => '',
+            'webhook_url' => '',
+            'channel' => '',
+            'chat_id' => '',
+            'client_id' => '',
+            'client_secret' => '',
+            'refresh_token' => '',
+            'folder_id' => '',
+            'access_token' => '',
+            'app_key' => '',
+            'app_secret' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+            'env_paste' => '',
         ];
     }
 }

@@ -43,8 +43,8 @@ class EnvoyEdgeConfigBuilder
             EnvoyConfigParser::defaultOperatorSettings(),
             $operatorSettings,
         );
-        $adminPort = max(1, min(65535, (int) ($settings['admin_port'] ?? 9901)));
-        $statPrefix = trim((string) ($settings['stat_prefix'] ?? 'dply_ingress')) ?: 'dply_ingress';
+        $adminPort = max(1, min(65535, (int) $settings['admin_port']));
+        $statPrefix = trim((string) $settings['stat_prefix']) ?: 'dply_ingress';
 
         $virtualHosts = [];
         $clusters = [];
@@ -70,10 +70,7 @@ class EnvoyEdgeConfigBuilder
         }
 
         foreach ($customClusters as $custom) {
-            if (! is_array($custom)) {
-                continue;
-            }
-            $name = trim((string) ($custom['name'] ?? ''));
+            $name = trim((string) $custom['name']);
             $endpoints = array_values(array_filter(
                 array_map('trim', (array) ($custom['endpoints'] ?? [])),
                 fn (string $e): bool => $e !== '',
@@ -90,10 +87,7 @@ class EnvoyEdgeConfigBuilder
         }
 
         foreach ($customVirtualHosts as $customVhost) {
-            if (! is_array($customVhost)) {
-                continue;
-            }
-            $name = trim((string) ($customVhost['name'] ?? ''));
+            $name = trim((string) $customVhost['name']);
             $cluster = trim((string) ($customVhost['cluster'] ?? ''));
             $domains = array_values(array_filter(
                 array_map('trim', (array) ($customVhost['domains'] ?? [])),
@@ -148,10 +142,7 @@ class EnvoyEdgeConfigBuilder
             } else {
                 $altVirtualHosts = $this->buildSiteVirtualHosts($sites, $port, $backendPortFor);
                 foreach ($customVirtualHosts as $customVhost) {
-                    if (! is_array($customVhost)) {
-                        continue;
-                    }
-                    $vhostName = trim((string) ($customVhost['name'] ?? ''));
+                    $vhostName = trim((string) $customVhost['name']);
                     $cluster = trim((string) ($customVhost['cluster'] ?? ''));
                     $domains = array_values(array_filter(
                         array_map('trim', (array) ($customVhost['domains'] ?? [])),
@@ -224,7 +215,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $domains
+     * @param  list<string> $domains
      * @return list<string>
      */
     private function domainsForPort(array $domains, int $listenPort): array
@@ -243,7 +234,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $virtualHosts
+     * @param  list<string> $virtualHosts
      */
     private function renderHttpListener(
         string $name,
@@ -278,7 +269,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $blocks
+     * @param  list<string> $blocks
      */
     private function indentListenerBlocks(array $blocks): string
     {
@@ -286,7 +277,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $domains
+     * @param  list<string> $domains
      */
     private function renderVirtualHost(string $name, array $domains, string $clusterName): string
     {
@@ -329,7 +320,7 @@ YAML;
     }
 
     /**
-     * @param  array<string, mixed> $endpoints
+     * @param  list<string> $endpoints
      */
     private function renderCustomCluster(string $clusterName, array $endpoints, string $connectTimeout, string $lbPolicy): string
     {
@@ -401,9 +392,7 @@ YAML;
 
     private function basenameFor(Site $site): string
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        return (string) $site->webserverConfigBasename();
     }
 
     /**

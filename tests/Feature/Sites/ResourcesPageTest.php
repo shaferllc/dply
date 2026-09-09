@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\ResourcesPageTest;
 
 use App\Enums\SiteType;
-use App\Modules\Cloud\Jobs\AttachCloudDatabaseJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Sites\Resources;
 use App\Models\CloudDatabase;

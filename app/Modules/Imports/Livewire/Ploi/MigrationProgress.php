@@ -10,8 +10,8 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Modules\Imports\Services\MigrationPlanner;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Log;
@@ -240,7 +240,7 @@ class MigrationProgress extends Component
             return;
         }
         $items[$index]['dismissed_at'] = now()->toIso8601String();
-        $this->migration->manual_review_items = array_values($items);
+        $this->migration->manual_review_items = $items;
         $this->migration->save();
         $this->toastSuccess(__('Marked reviewed.'));
     }

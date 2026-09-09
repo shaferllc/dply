@@ -3,8 +3,11 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
+use App\Support\Redis\RedisConnectionTls;
+use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Support\Str;
 
 class SiteEnvPusher
@@ -14,18 +17,23 @@ class SiteEnvPusher
         protected DotEnvFileWriter $writer,
         protected SiteEnvWriteGuard $guard,
         protected SecretResidencyResolver $residency,
-        protected OnBoxSecretManifestBuilder $onBox,
     ) {}
 
     /**
      * Writes the site's `.env` to the server, composed from the editable env
      * cache PLUS the connection variables of any attached resource bindings
-     * (database, redis, …). The bindings inject under the cache: a real .env
-     * key the operator set still wins (that's the per-key override), but keys a
-     * binding owns and the cache doesn't carry (because "adopt" moved them out
-     * of the editable list) are written here so the deployed app actually
-     * receives DB_HOST/REDIS_HOST/… — otherwise the binding would only ever
-     * live in the deploy contract and never reach a VM's on-disk .env.
+     * (database, redis, …).
+     *
+     * Bindings compose OVER the cache — for a key a binding owns, the binding
+     * wins and a same-named .env key does not. That is deliberate: it is what
+     * stops a scaffold's leftover DB_USERNAME=root from beating a real attached
+     * database. The per-key escape hatch is therefore NOT a .env key of the same
+     * name; it is the binding's own override map, applied inside
+     * {@see SiteBinding::connectionEnv()}.
+     *
+     * (This docblock used to claim the opposite — that an operator .env key
+     * wins. It never did. If you are here to "fix" the merge order below to
+     * match some other comment, read this paragraph first.)
      *
      * Validates the blob via DotEnvFileParser before SSHing. Rejecting
      * malformed input here keeps the operator from pushing a file that
@@ -38,8 +46,11 @@ class SiteEnvPusher
      *                                     deployer to seed a fresh release directory's `.env` (the git checkout
      *                                     has none) BEFORE build/release steps run — otherwise artisan reads
      *                                     Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
+     * @param  bool  $includeSharedSecrets  Deploy path only. Standalone env push
+     *                                      must leave org vault secrets off the box
+     *                                      until the next deploy.
      */
-    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null): string
+    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null, bool $includeSharedSecrets = false): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -67,9 +78,11 @@ class SiteEnvPusher
         // written AND what we validate — a binding-supplied DB_HOST/REDIS_HOST
         // shouldn't read as "missing".
         $bindingEnv = $this->bindingEnv($site);
-        $mergedVars = $bindingEnv !== []
-            ? array_merge($parsed['variables'], $bindingEnv)
-            : $parsed['variables'];
+        $secretEnv = $includeSharedSecrets
+            ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
+            : [];
+        $mergedVars = RedisConnectionTls::ensureEnv(array_merge($secretEnv, $parsed['variables'], $bindingEnv));
+        $this->persistInferredRedisTls($site, $parsed['variables'], $mergedVars);
 
         // Resolve any non-resident secrets (escrowed / external references) to
         // their real values just-in-time. The loose blob only carries
@@ -107,10 +120,7 @@ class SiteEnvPusher
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
 
         try {
-            $written = $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
-            $this->resolveOnBoxSecrets($ssh, $site, $written, $mergedVars);
-
-            return $written;
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
         } finally {
             // Defence-in-depth: the success path rm's $tmp inside the sudo
             // script below, but any throw before that point would otherwise
@@ -123,6 +133,66 @@ class SiteEnvPusher
                 // ignore — cleanup is best-effort
             }
         }
+    }
+
+    /**
+     * Layers used when writing .env: optional org vault secrets, then the
+     * site cache, then binding connection vars (bindings still win, matching
+     * the historic pusher). Used by tests; {@see push()} applies the same merge.
+     *
+     * @return array<string, string>
+     */
+    public function composeVariables(Site $site, bool $includeSharedSecrets = false): array
+    {
+        $content = $site->effectiveEnvFileContent();
+        $parsed = $this->parser->parse($content);
+        if ($parsed['errors'] !== []) {
+            throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
+        }
+
+        $secretEnv = $includeSharedSecrets
+            ? app(LinkedOrganizationSecrets::class)->valuesForSite($site)
+            : [];
+
+        return RedisConnectionTls::ensureEnv(array_merge($secretEnv, $parsed['variables'], $this->bindingEnv($site)));
+    }
+
+    /**
+     * A BYO/atomic deploy writes the release `.env` from `env_file_content`.
+     * If that cache still has REDIS_HOST on DigitalOcean :25061 but no
+     * REDIS_SCHEME, the next deploy would ship plaintext tcp:// and 500.
+     * Persist the inferred tls/rediss keys so the cache matches the box.
+     *
+     * @param  array<string, string>  $original
+     * @param  array<string, string>  $merged
+     */
+    private function persistInferredRedisTls(Site $site, array $original, array $merged): void
+    {
+        $patch = [];
+
+        $originalScheme = strtolower(trim((string) ($original['REDIS_SCHEME'] ?? '')));
+        if (($merged['REDIS_SCHEME'] ?? '') === 'tls' && ! in_array($originalScheme, ['tls', 'rediss', 'ssl'], true)) {
+            $patch['REDIS_SCHEME'] = 'tls';
+        }
+
+        $originalUrl = (string) ($original['REDIS_URL'] ?? '');
+        $mergedUrl = (string) ($merged['REDIS_URL'] ?? '');
+        if ($originalUrl !== '' && $mergedUrl !== '' && $mergedUrl !== $originalUrl) {
+            $patch['REDIS_URL'] = $mergedUrl;
+        }
+
+        if ($patch === []) {
+            return;
+        }
+
+        $parsed = $this->parser->parse((string) ($site->env_file_content ?? ''));
+        if ($parsed['errors'] !== []) {
+            return;
+        }
+
+        $site->forceFill([
+            'env_file_content' => $this->writer->render(array_merge($parsed['variables'], $patch), $parsed['comments']),
+        ])->save();
     }
 
     /**
@@ -153,7 +223,7 @@ class SiteEnvPusher
         // there's no built app to boot. Operator pushes only — the deploy
         // seeding path has no built release to test against yet.
         if ($operatorPush && $activeDir !== '') {
-            $this->guard->assertBootsOnServer($ssh, $activeDir, $tmp);
+            $this->guard->assertBootsOnServer($ssh, $activeDir, $tmp, $site);
         }
 
         // Unified flow: ALWAYS sudo. Whether the destination is inside the
@@ -210,63 +280,6 @@ class SiteEnvPusher
         }
 
         return $path;
-    }
-
-    /**
-     * Tier 3+ on-box resolution: when the rendered env carries on-box directives
-     * (left by {@see SecretResidencyResolver} only when onbox is enabled — so
-     * this is inert by default), stage the manifest + shim and run the shim to
-     * fetch each value ON THE BOX and rewrite the .env in place. dply never sees
-     * those values.
-     *
-     * GUARDED + UNVALIDATED-ON-LIVE-BOX: directives never appear unless
-     * secret_vault.residency.onbox_enabled is true, so default deploys never
-     * reach this. Enabling on-box is a deliberate step that must be validated on
-     * a real server (the shim needs jq + curl / the AWS CLI present).
-     *
-     * @param  array<string, mixed> $mergedVars
-     */
-    private function resolveOnBoxSecrets(SshConnection $ssh, Site $site, string $envPath, array $mergedVars): void
-    {
-        $hasDirective = false;
-        foreach ($mergedVars as $value) {
-            if (($value) && str_contains($value, OnBoxSecretManifestBuilder::DIRECTIVE_PREFIX)) {
-                $hasDirective = true;
-                break;
-            }
-        }
-        if (! $hasDirective) {
-            return;
-        }
-
-        $manifestJson = json_encode($this->onBox->buildFor($site), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-        $manifestTmp = '/tmp/dply-onbox-'.Str::lower(Str::random(20)).'.json';
-        $shimTmp = '/tmp/dply-resolve-secrets-'.Str::lower(Str::random(12)).'.sh';
-        $shim = (string) file_get_contents(resource_path('secrets/dply-resolve-secrets.sh'));
-
-        try {
-            $ssh->putFile($manifestTmp, $manifestJson);
-            $ssh->putFile($shimTmp, $shim);
-
-            // The shim rewrites $envPath in place and deletes the manifest itself.
-            $script = sprintf(
-                'set -e; chmod 600 %s; chmod +x %s; sudo -n bash %s %s %s',
-                escapeshellarg($manifestTmp),
-                escapeshellarg($shimTmp),
-                escapeshellarg($shimTmp),
-                escapeshellarg($manifestTmp),
-                escapeshellarg($envPath),
-            );
-            $out = $ssh->exec($script, 120);
-            $this->assertExitOk($ssh, $out, 'resolving on-box secrets');
-        } finally {
-            // Best-effort cleanup of the shim + any manifest the shim didn't remove.
-            try {
-                $ssh->exec('rm -f '.escapeshellarg($shimTmp).' '.escapeshellarg($manifestTmp));
-            } catch (\Throwable) {
-                // ignore — cleanup is best-effort
-            }
-        }
     }
 
     /**

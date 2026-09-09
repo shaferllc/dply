@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Create;
 
+use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\ResolveKubernetesClusters;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
@@ -14,7 +16,7 @@ use App\Models\Server;
 use App\Models\ServerBlueprint;
 use App\Models\ServerCacheService;
 use App\Models\ServerCreateDraft;
-use App\Modules\Cloud\Services\AwsEksService;
+use App\Modules\Providers\Services\AwsEksService;
 use App\Services\Servers\Blueprint\ServerBlueprintApplier;
 use App\Services\Servers\Blueprint\ServerBlueprintSummary;
 use App\Services\Servers\ServerCreatePresetCatalog;
@@ -38,10 +40,25 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class StepWhat extends Component
 {
+    use DispatchesToastNotifications;
     use InteractsWithServerCreateDraft;
     use ServerCreateActions;
 
     public ServerCreateForm $form;
+
+    /**
+     * Explicit setter for the cluster-source toggle. It used to call
+     * `$set('form.do_kubernetes_source', …)`; `wire:target` can't match a magic
+     * $set, so the tab showed no loading state while the round-trip ran.
+     */
+    public function setKubernetesSource(string $value): void
+    {
+        if (! in_array($value, ['existing', 'new'], true) || $value === $this->form->do_kubernetes_source) {
+            return;
+        }
+
+        $this->form->do_kubernetes_source = $value;
+    }
 
     /**
      * Slug of the preset that drove the current form values, when one
@@ -84,10 +101,7 @@ class StepWhat extends Component
         $this->autoSelectSingletonKubernetesCluster();
         $this->ensureDefaultNewClusterName();
         $this->ensureDefaultOsImage();
-
-        if (! $skipsStack) {
-            $this->syncInstallProfileForServerRole();
-        }
+        $this->syncInstallProfileForServerRole();
 
         return null;
     }
@@ -505,6 +519,15 @@ class StepWhat extends Component
             return;
         }
 
+        // Coming-soon templates render as disabled tiles, but the wire:click is
+        // still a public entry point — refuse them here too rather than trusting
+        // the markup.
+        if (! $catalog->isAvailable($presetId)) {
+            $this->toastError(__(':name is coming soon.', ['name' => $preset['name']]));
+
+            return;
+        }
+
         $this->selectedPreset = $presetId;
         $this->selectedBlueprintId = '';
         $this->form->server_blueprint_id = '';
@@ -582,7 +605,7 @@ class StepWhat extends Component
         $this->notifySizeRoleGuidance();
     }
 
-    public function updated($name): void
+    public function updated(string $name): void
     {
         foreach ([
             'form.webserver',
@@ -612,9 +635,7 @@ class StepWhat extends Component
                     && $this->form->webserver === 'none'
                 ) {
                     $this->form->webserver = 'caddy';
-                    if (method_exists($this, 'toastInfo')) {
-                        $this->toastInfo(__('Worker hosts always run Caddy so sites can attach testing URLs. The webserver was reset to Caddy.'));
-                    }
+                    $this->toastInfo(__('Worker hosts always run Caddy so sites can attach testing URLs. The webserver was reset to Caddy.'));
                 }
 
                 break;
@@ -656,9 +677,9 @@ class StepWhat extends Component
 
         return view('livewire.servers.create.step-what', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'reachedStep' => $this->currentDraft()?->step ?? 3,
+            'reachedStep' => ($draft = $this->currentDraft()) !== null ? $draft->step : 3,
             'provisionOptions' => $context['provisionOptions'],
-            'installProfiles' => config('server_provision_options.install_profiles', []),
+            'installProfiles' => FilterServerProvisionOptionsForCreateForm::offeredInstallProfiles(),
             'serverPresets' => app(ServerCreatePresetCatalog::class)->all(),
             'selectedPreset' => $this->selectedPreset,
             'orgBlueprints' => $orgBlueprints,
@@ -682,7 +703,7 @@ class StepWhat extends Component
             'sizeRoleMismatch' => $isKubernetes ? null : $this->sizeRoleMismatchForForm($catalog),
             'stepWhereRoute' => route(self::routeNameForStep(2)),
             'isDedicatedServerPurpose' => ! $isKubernetes && $this->isDedicatedServerPurposeRole(),
-            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+            'selectedServerRole' => collect($this->provisionOptionList($context['provisionOptions'], 'server_roles'))
                 ->firstWhere('id', $this->form->server_role),
             'dedicatedCacheEngineOptions' => $this->dedicatedCacheEngineOptions($context['provisionOptions']),
             ...$this->dedicatedAllowFromSuggestions(),
@@ -704,12 +725,21 @@ class StepWhat extends Component
 
         if ($this->form->type === 'digitalocean' && $this->form->do_vpc_uuid !== '') {
             $vpc = collect($this->form->do_vpcs)->firstWhere('id', $this->form->do_vpc_uuid);
-            $networkCidr = is_array($vpc) ? ($vpc['ip_range'] ?? null) : null;
+            $networkCidr = is_array($vpc) ? $vpc['ip_range'] : null;
         } elseif ($this->form->type === 'hetzner' && $this->form->hetzner_network_id !== '') {
             $networkCidr = PrivateNetwork::query()
                 ->where('provider', PrivateNetwork::PROVIDER_HETZNER)
                 ->where('provider_id', $this->form->hetzner_network_id)
                 ->value('ip_range');
+        } elseif ($this->form->type === 'vultr' && $this->form->vultr_vpc_id !== '') {
+            $vpc = collect($this->form->vultr_vpcs)->firstWhere('id', $this->form->vultr_vpc_id);
+            $networkCidr = is_array($vpc) ? $vpc['ip_range'] : null;
+            if ($networkCidr === null || $networkCidr === '') {
+                $networkCidr = PrivateNetwork::query()
+                    ->where('provider', PrivateNetwork::PROVIDER_VULTR)
+                    ->where('provider_id', $this->form->vultr_vpc_id)
+                    ->value('ip_range');
+            }
         }
 
         // request()->ip() resolves the real client IP behind trusted proxies

@@ -29,7 +29,11 @@ class ListServers extends AbstractDplyTool
 
     protected function run(Request $request, Organization $organization): Response
     {
+        // Machines only, matching /servers and the REST fleet index — Edge
+        // apps, function namespaces and Cloud containers are placeholder host
+        // rows, not servers.
         $servers = Server::query()
+            ->onlyMachineHosts()
             ->where('organization_id', $organization->id)
             ->orderBy('name')
             ->get(['id', 'name', 'status', 'ip_address', 'provider', 'created_at']);

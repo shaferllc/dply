@@ -3,7 +3,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "keywords": [
+        "laravel",
+        "framework"
+    ],
     "license": "MIT",
     "repositories": [
         {
@@ -37,6 +40,7 @@
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
         "laravel/mcp": "^0.8.0",
+        "laravel/octane": "^2.18",
         "laravel/passkeys": "^0.2.1",
         "laravel/pennant": "^1.23",
         "laravel/pulse": "^1.7",
@@ -61,14 +65,16 @@
         "barryvdh/laravel-debugbar": "^4.2",
         "beyondcode/expose": "^3.2",
         "brianium/paratest": "^7.0",
-        "deptrac/deptrac": "^3.0",
         "doctrine/dbal": "^4.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
+        "laravel/boost": "^2.6",
         "laravel/breeze": "^2.4",
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
+        "mrpunyapal/laravel-auditor": "^0.1.5",
+        "nikic/php-parser": "^5.0",
         "nunomaduro/collision": "^8.6",
         "pestphp/pest": "^5",
         "pestphp/pest-plugin-drift": "^5",
@@ -82,6 +88,11 @@
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },
+        "exclude-from-classmap": [
+            "app/Actions/Attributes/tests/",
+            "app/Actions/Concerns/tests/",
+            "app/Actions/Decorators/tests/"
+        ],
         "files": [
             "app/helpers.php"
         ]
@@ -106,7 +117,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" --names=queue,logs,reverb --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399,#f0abfc\" \"php artisan serve\" \"php artisan queue:listen --queue=dply,dply-provision --tries=1 --timeout=0\" \"php artisan queue:listen --queue=dply-background,default,mail --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" \"php artisan schedule:work\" --names=server,queue,queue-bg,logs,reverb,schedule --kill-others"
         ],
         "dev:horizon:all": [
             "Composer\\Config::disableProcessTimeout",
@@ -118,19 +129,53 @@
         ],
         "test": [
             "@php artisan config:clear --ansi",
-            "@php artisan test"
+            "@php artisan test --exclude-group=arch"
+        ],
+        "test:unit": [
+            "@php artisan test --testsuite=Unit"
+        ],
+        "test:feature": [
+            "@php artisan test --testsuite=Feature"
+        ],
+        "test:modules": [
+            "@php artisan test --testsuite=Modules"
+        ],
+        "test:app": [
+            "@php artisan test --testsuite=App"
+        ],
+        "test:arch": [
+            "@php artisan test --testsuite=Arch"
+        ],
+        "test:all": [
+            "@php artisan test --testsuite=Unit,Feature,Modules,App,Arch"
+        ],
+        "test:parallel": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel"
+        ],
+        "test:tia": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --tia"
+        ],
+        "test:tia:fresh": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --tia --fresh"
+        ],
+        "test:coverage": [
+            "@php artisan test --coverage"
+        ],
+        "test:coverage:clover": [
+            "@php artisan config:clear --ansi",
+            "@php vendor/bin/pest --parallel --no-tia --exclude-group=arch --coverage-clover=coverage.xml"
+        ],
+        "test:profile": [
+            "@php artisan test --profile"
         ],
         "analyse": [
-            "@php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress"
+            "@php -d memory_limit=2G vendor/bin/phpstan analyse --no-progress"
         ],
         "analyse:baseline": [
-            "@php -d memory_limit=1G vendor/bin/phpstan analyse --no-progress --generate-baseline=phpstan-baseline.neon"
-        ],
-        "deptrac": [
-            "@php vendor/bin/deptrac analyse --no-progress"
-        ],
-        "deptrac:baseline": [
-            "@php vendor/bin/deptrac analyse --formatter=baseline --output=deptrac-baseline.yaml --no-progress"
+            "@php -d memory_limit=2G vendor/bin/phpstan analyse --no-progress --generate-baseline=phpstan-baseline.neon"
         ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",

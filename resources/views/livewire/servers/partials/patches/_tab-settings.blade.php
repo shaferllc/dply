@@ -48,7 +48,7 @@
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Scan') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Scan') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scan settings') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Basic: OS + apt list. Extended: also captures disk, memory, uptime, and fail2ban.') }}
@@ -104,8 +104,8 @@
                 <div class="mt-4 grid gap-3 sm:grid-cols-2">
                     @foreach ($extSections as $section)
                         <div class="rounded-xl border border-brand-ink/10 bg-white p-3 shadow-sm">
-                            <div class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
-                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $section['label'] }}</div>
+                            <pre class="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $section['body'] }}</pre>
                         </div>
                     @endforeach
                 </div>
@@ -119,12 +119,12 @@
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Automatic') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Automatic') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-side automatic security updates (Debian/Ubuntu).') }}</p>
             </div>
         </div>
-        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $statusPill['classes'] }}">
+        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusPill['classes'] }}">
             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
             {{ $statusPill['label'] }}
         </span>
@@ -159,8 +159,8 @@
 
         @if (! empty($report['unattended']['snippet'] ?? null))
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('/etc/apt/apt.conf.d/20auto-upgrades') }}</p>
-                <pre class="mt-2 max-h-32 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.03] p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $report['unattended']['snippet'] }}</pre>
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('/etc/apt/apt.conf.d/20auto-upgrades') }}</p>
+                <pre class="mt-2 max-h-32 overflow-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.03] p-3 font-mono text-xs leading-relaxed text-brand-ink">{{ $report['unattended']['snippet'] }}</pre>
             </div>
         @endif
 

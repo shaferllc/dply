@@ -11,7 +11,7 @@
         <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
             <x-dynamic-component :component="$icon" class="h-7 w-7" aria-hidden="true" />
         </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss" aria-label="{{ __('Coming soon') }}">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss" aria-label="{{ __('Coming soon') }}">
             <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
             <span class="inline-flex items-center gap-[0.45em]">
                 <span>{{ __('Coming') }}</span>

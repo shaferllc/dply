@@ -37,6 +37,11 @@ class RealtimeServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // The pages moved to the Services row at /realtime, but the aliases keep
+        // their original auto-derived names: they are Livewire's component
+        // identity, they appear in rendered snapshots, and renaming them buys
+        // nothing while breaking any in-flight page mid-deploy. Guarded by
+        // tests/Feature/LivewireAliasGuardTest.php.
         Livewire::component('organizations.realtime', Realtime::class);
         Livewire::component('organizations.realtime-app-show', RealtimeAppShow::class);
     }

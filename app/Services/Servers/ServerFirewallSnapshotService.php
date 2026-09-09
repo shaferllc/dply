@@ -2,6 +2,7 @@
 
 namespace App\Services\Servers;
 
+use App\Livewire\Forms\FirewallRuleForm;
 use App\Models\ApiToken;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
@@ -59,13 +60,13 @@ class ServerFirewallSnapshotService
         }
 
         $rules = $snapshot->rules;
-        if (! is_array($rules)) {
-            throw new \InvalidArgumentException('Invalid snapshot payload.');
-        }
 
         DB::transaction(function () use ($server, $rules, $snapshot, $user, $apiToken): void {
             ServerFirewallRule::query()->where('server_id', $server->id)->delete();
-            foreach ($rules as $i => $row) {
+            // array_values(): the snapshot payload is a JSON list, but the model
+            // types `rules` as array<string, mixed>, so $i was a string key and
+            // `$i + 1` (the sort_order below) was a string-plus-int.
+            foreach (array_values($rules) as $i => $row) {
                 if (! is_array($row)) {
                     continue;
                 }

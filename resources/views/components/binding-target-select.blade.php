@@ -1,9 +1,12 @@
 {{--
     Attach-existing resource picker shared by the database / redis / broadcasting
-    binding modals. Splits options into "This server" vs "Private-network peers"
-    optgroups (when the targets carry a local/peer group), shows a per-option
-    "used by N apps" suffix baked into the label, and surfaces a shared-use
-    caution when the selected resource is already bound by other sites.
+    binding modals. Splits options into "This server", "Private-network peers",
+    "Elsewhere in this organization", "Dedicated cache servers", and
+    "Managed Redis" optgroups when present.
+
+    The org group is reached over a public endpoint rather than a private IP,
+    so its options carry that in their label — the grouping tells you where a
+    resource lives, the label tells you what it will cost you to use it.
 
     Props:
       targets     list<array{id,label,group?,consumers?}> from SiteBindingManager::attachableTargets()
@@ -26,8 +29,11 @@
     $targets = collect($targets);
     $local = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'local')->values();
     $peers = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'peer')->values();
-    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer'], true))->values();
-    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty();
+    $org = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'org')->values();
+    $dedicated = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'dedicated')->values();
+    $managed = $targets->filter(fn ($t) => ($t['group'] ?? '') === 'managed')->values();
+    $rest = $targets->reject(fn ($t) => in_array($t['group'] ?? '', ['local', 'peer', 'org', 'dedicated', 'managed'], true))->values();
+    $hasGroups = $local->isNotEmpty() || $peers->isNotEmpty() || $org->isNotEmpty() || $dedicated->isNotEmpty() || $managed->isNotEmpty();
     $consumerMap = $targets->mapWithKeys(fn ($t) => [(string) $t['id'] => (int) ($t['consumers'] ?? 0)])->all();
     $placeholder ??= __('Choose a service…');
 @endphp
@@ -50,6 +56,27 @@
                     @endforeach
                 </optgroup>
             @endif
+            @if ($org->isNotEmpty())
+                <optgroup label="{{ __('Elsewhere in this organization') }}">
+                    @foreach ($org as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
+            @if ($dedicated->isNotEmpty())
+                <optgroup label="{{ __('Dedicated cache servers') }}">
+                    @foreach ($dedicated as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
+            @if ($managed->isNotEmpty())
+                <optgroup label="{{ __('Managed Redis') }}">
+                    @foreach ($managed as $t)
+                        <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
+                    @endforeach
+                </optgroup>
+            @endif
             @foreach ($rest as $t)
                 <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
             @endforeach
@@ -63,7 +90,7 @@
     <div
         x-show="(consumers[sel] || 0) > 0"
         style="display: none"
-        class="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] leading-snug text-amber-900"
+        class="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs leading-snug text-amber-900"
     >
         <x-heroicon-m-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span x-text="`${consumers[sel]} other app${consumers[sel] == 1 ? '' : 's'} already use this resource — they share its data/keyspace. Set a prefix or a separate database/channel namespace to keep them isolated.`"></span>

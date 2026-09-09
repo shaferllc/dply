@@ -280,7 +280,7 @@ trait BuildsCommandPaletteGroups
             $groups[] = ['label' => __('Projects'), 'items' => $projects];
         }
 
-        if (Feature::active('surface.cloud')) {
+        if (Feature::active('surface.databases')) {
             $databases = CloudDatabase::query()
                 ->where('organization_id', $org->id)
                 ->where('name', 'like', $like)
@@ -548,13 +548,11 @@ trait BuildsCommandPaletteGroups
         // [label, route, icon, keywords]
         $pages = [
             ['Overview', 'sites.show', 'globe-alt', 'overview summary'],
-            ['Routing & domains', 'sites.routing', 'share', 'domains dns routing ssl'],
             ['Deployments', 'sites.deployments.index', 'arrows-right-left', 'deploy releases'],
             ['Repository', 'sites.repository', 'code-bracket', 'git repo source branch'],
             ['Monitoring', 'sites.monitor', 'heart', 'monitor uptime metrics'],
             ['Errors', 'sites.errors', 'document-text', 'errors logs exceptions'],
             ['Scheduler', 'sites.schedule', 'command-line', 'cron schedule tasks'],
-            ['Queue workers', 'sites.workers', 'bolt', 'workers queue horizon'],
             ['Daemons', 'sites.daemons', 'command-line', 'daemons processes'],
             ['Backups', 'sites.backups', 'circle-stack', 'backups restore'],
             ['Settings', 'sites.settings', 'wrench-screwdriver', 'settings config'],
@@ -634,7 +632,7 @@ trait BuildsCommandPaletteGroups
         $needle = mb_strtolower(trim($query));
         $rows = [];
         foreach ($peers as $peer) {
-            if ($needle !== '' && ! str_contains(mb_strtolower($peer->name.' '.($peer->server?->name ?? '')), $needle)) {
+            if ($needle !== '' && ! str_contains(mb_strtolower($peer->name.' '.$peer->server->name), $needle)) {
                 continue;
             }
             $isSelf = (string) $peer->id === (string) $site->id;

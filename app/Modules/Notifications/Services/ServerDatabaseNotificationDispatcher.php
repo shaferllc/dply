@@ -74,8 +74,8 @@ final class ServerDatabaseNotificationDispatcher
      * ServerDatabase row — engine install/remove and database-user create/remove.
      * The title comes from the config label so it stays in sync with the registry.
      *
-     * @param  array<string, mixed> $detailLines
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string|array<mixed>>  $detailLines
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

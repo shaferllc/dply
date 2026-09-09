@@ -149,10 +149,10 @@ final class ContextualDocResolver
 
         return [
             'key' => $groupKey,
-            'label' => (string) ($group['label'] ?? $groupKey),
+            'label' => (string) $group['label'],
             'slugs' => array_values(array_filter(
-                $group['slugs'] ?? [],
-                static fn (mixed $value): bool => is_string($value) && $value !== '',
+                $group['slugs'],
+                static fn (mixed $value): bool => $value !== '',
             )),
         ];
     }
@@ -263,12 +263,8 @@ final class ContextualDocResolver
         $entries = [];
 
         foreach ($this->manifest()->groups() as $group) {
-            if (! is_array($group)) {
-                continue;
-            }
-
-            foreach ($group['slugs'] ?? [] as $slug) {
-                if (! is_string($slug) || $slug === '' || isset($entries[$slug])) {
+            foreach ($group['slugs'] as $slug) {
+                if ($slug === '' || isset($entries[$slug])) {
                     continue;
                 }
 

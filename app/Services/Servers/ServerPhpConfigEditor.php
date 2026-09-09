@@ -61,7 +61,6 @@ class ServerPhpConfigEditor
      *     reload_guidance: string
      * }
      */
-    /** @return array<string, mixed> */
     public function resolveEditableTarget(Server $server, string $version, string $target): array
     {
         $server = $server->fresh() ?? $server;
@@ -113,7 +112,6 @@ class ServerPhpConfigEditor
     /**
      * @return array{version: string, target: string, label: string, path: string, content: string, reload_guidance: string}
      */
-    /** @return array<string, mixed> */
     public function openTarget(Server $server, string $version, string $target): array
     {
         $resolved = $this->resolveEditableTarget($server, $version, $target);
@@ -139,7 +137,7 @@ class ServerPhpConfigEditor
         string $content,
         ?User $user = null,
         ?string $summary = null,
-        ?callable $afterLockAcquired = null,
+        ?\Closure $afterLockAcquired = null,
     ): array {
         $version = $this->normalizeVersionId($version);
         $target = trim($target);
@@ -279,7 +277,6 @@ class ServerPhpConfigEditor
      * @param  array{label: string, path: string, version: string, target: string, validator: string}  $target
      * @return array{output: ?string}
      */
-    /** @return array<string, mixed> */
     protected function verifyProposedContent(Server $server, array $target, string $content): array
     {
         try {
@@ -346,10 +343,6 @@ class ServerPhpConfigEditor
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     protected function installedVersionIds(Server $server): array
     {
         $inventory = app(ServerPhpManager::class)->cachedInventory($server);
@@ -390,7 +383,7 @@ class ServerPhpConfigEditor
     }
 
     /**
-     * @param  array{path: string, target: string, version: string, validator: string}  $target
+     * @param  array{path: string, target: string, version: string, validator: string, label: string}  $target
      */
     protected function buildValidationScript(Server $server, array $target, string $content): string
     {

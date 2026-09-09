@@ -11,19 +11,19 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $duration_ms
+ * @property ?string $duration_ms
  * @property ?string $error_message
- * @property string $exit_code
+ * @property ?string $exit_code
  * @property ?Carbon $finished_at
- * @property string $output
+ * @property ?string $output
  * @property string $run_ulid
  * @property ?string $server_cron_job_id
  * @property ?Carbon $started_at
  * @property string $status
  * @property string $trigger
  * @property-read ?ServerCronJob $cronJob
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ServerCronJobRun extends Model
 {

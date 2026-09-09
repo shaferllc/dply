@@ -101,7 +101,7 @@
 
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-5 py-4 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4 sm:px-6">
             <div class="min-w-[12rem] flex-1">
-                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Search') }}</label>
+                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Search') }}</label>
                 <input
                     type="search"
                     wire:model.live.debounce.300ms="systemdFilterSearch"
@@ -110,7 +110,7 @@
                 />
             </div>
             <div>
-                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Activity') }}</label>
+                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Activity') }}</label>
                 <select wire:model.live="systemdFilterActive" class="mt-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30">
                     <option value="all">{{ __('All') }}</option>
                     <option value="active">{{ __('Active') }}</option>
@@ -119,7 +119,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Source') }}</label>
+                <label class="block text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Source') }}</label>
                 <select wire:model.live="systemdFilterCustom" class="mt-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30">
                     <option value="all">{{ __('All') }}</option>
                     <option value="custom">{{ __('Custom only') }}</option>
@@ -239,13 +239,13 @@
                                 <p class="font-medium text-brand-ink">{{ $nameLine }}</p>
                                 <div class="mt-1 flex flex-wrap items-center gap-1.5">
                                     @if ($isFailed)
-                                        <span class="inline-flex rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-200">{{ __('Failed') }}</span>
+                                        <span class="inline-flex rounded-md bg-red-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-red-900 ring-1 ring-red-200">{{ __('Failed') }}</span>
                                     @endif
                                     @if (! empty($row['main_pid']) && ($row['main_pid'] ?? '') !== '0')
-                                        <span class="text-[10px] font-mono text-brand-moss" title="{{ __('Main PID') }}">PID {{ $row['main_pid'] }}</span>
+                                        <span class="text-2xs font-mono text-brand-moss" title="{{ __('Main PID') }}">PID {{ $row['main_pid'] }}</span>
                                     @endif
                                     @if (! $bootUnk)
-                                        <span class="text-[10px] font-medium uppercase tracking-wide text-brand-moss">{{ __('Boot') }}: {{ $row['boot_state'] }}</span>
+                                        <span class="text-2xs font-medium uppercase tracking-wide text-brand-moss">{{ __('Boot') }}: {{ $row['boot_state'] }}</span>
                                     @endif
                                 </div>
                                 @if (! empty($row['standby_reason']))
@@ -305,7 +305,7 @@
                                             wire:click="{{ $startWireClick }}"
                                             wire:loading.attr="disabled"
                                             :disabled="! $opsReady || $otherBusy || $rowPending"
-                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-xs"
                                             title="{{ $startUsesConfirm ? $row['standby_reason'] : '' }}"
                                         >
                                             <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
@@ -319,7 +319,7 @@
                                             wire:loading.attr="disabled"
                                             wire:target="openSystemdActionConfirm('restart', {{ $rowUnitJs }})"
                                             :disabled="! $opsReady || $otherBusy || $rowPending"
-                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-xs"
                                         >
                                             <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Restart') }}
@@ -331,7 +331,7 @@
                                             wire:click="openSystemdStatusModalForService({{ $rowUnitJs }})"
                                             wire:loading.attr="disabled"
                                             :disabled="! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy"
-                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-xs"
                                         >
                                             <x-heroicon-o-eye class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Status') }}
@@ -343,7 +343,7 @@
                                                 <x-secondary-button
                                                     size="sm"
                                                     type="button"
-                                                    class="!inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-[11px]"
+                                                    class="!inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-xs"
                                                     aria-label="{{ __('More actions') }}"
                                                     aria-haspopup="true"
                                                     :disabled="$otherBusy || $rowBusy || $rowPending"
@@ -439,7 +439,7 @@
                                                             <x-heroicon-o-bell class="{{ $iconClasses }}" aria-hidden="true" />
                                                             {{ __('Notify') }}
                                                             @if (($row['alert_subscription_count'] ?? 0) > 0)
-                                                                <span class="ml-auto rounded-full bg-brand-sand px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-ink">{{ (int) ($row['alert_subscription_count'] ?? 0) }}</span>
+                                                                <span class="ml-auto rounded-full bg-brand-sand px-1.5 py-0.5 text-2xs font-semibold tabular-nums text-brand-ink">{{ (int) ($row['alert_subscription_count'] ?? 0) }}</span>
                                                             @endif
                                                         </button>
                                                     @endif

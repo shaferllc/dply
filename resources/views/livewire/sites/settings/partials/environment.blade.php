@@ -1,9 +1,10 @@
 @php
     use App\Models\ConsoleAction;
+    use App\Modules\Deploy\Services\SiteBindingManager;
     use App\Services\Sites\DotEnvFileParser;
 
-    // Nested inside Deployments / standalone Environment chrome → hairline strips.
-    // Standalone cards only when this partial is the page's only surface (setup).
+    // Nested inside Deployments / Environment / Setup chrome → hairline strips.
+    // Standalone cards only when this partial is rendered without host chrome.
     $envMergedChrome = (bool) ($envMergedChrome ?? false);
     $card = $envMergedChrome ? 'border-b border-brand-ink/10' : 'dply-card overflow-hidden';
 
@@ -79,13 +80,23 @@
     }
     // Resource bindings inject their connection variables at deploy (DB_*,
     // REDIS_*, …), so a key a binding supplies with a value is NOT missing even
-    // though it isn't in the editable .env. Count those as present. (The full
-    // binding maps for the UI are built further down.)
+    // though it isn't in the editable .env. Keys the binding OWNS (mail's
+    // MAIL_USERNAME / MAIL_SCHEME even when the provider is Resend/SES) also
+    // count as present — the scanner still sees them in config/mail.php.
+    $bindingManager = app(SiteBindingManager::class);
     foreach ($site->bindings as $presentBinding) {
         foreach ($presentBinding->connectionEnv() as $bindingKey => $bindingValue) {
             if (trim((string) $bindingValue) !== '') {
                 $envPresentKeys[] = (string) $bindingKey;
             }
+        }
+        foreach ($bindingManager->ownedEnvKeys($presentBinding) as $ownedKey) {
+            $envPresentKeys[] = $ownedKey;
+        }
+    }
+    if (method_exists($this, 'linkedOrganizationSecretRows')) {
+        foreach ($this->linkedOrganizationSecretRows() as $linkedSecretRow) {
+            $envPresentKeys[] = (string) $linkedSecretRow['key'];
         }
     }
     $envPresentKeys = array_values(array_unique($envPresentKeys));
@@ -112,7 +123,17 @@
             }
         }
     }
-    $allEnvWarnings = app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation);
+    // Only judge an env we actually have. On a brand-new site — nothing
+    // deployed, no .env synced or written yet — every check reads its key as
+    // absent, so the panel greets you with "APP_KEY is empty / APP_URL is
+    // empty" about an app that doesn't exist. There's nothing to fix and no
+    // way to tell a missing value from an unwritten one, so stay quiet until
+    // there's an .env on record or a deployment to judge it against.
+    // ($envMap first: the cheap check short-circuits the deployments query.)
+    $hasEnvToJudge = $envMap !== [] || $site->deployments()->exists();
+    $allEnvWarnings = $hasEnvToJudge
+        ? app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation)
+        : [];
     $canIgnoreEnvWarnings = method_exists($this, 'ignoreEnvWarning');
     $suppressedEnvWarningKeys = $canIgnoreEnvWarnings ? $this->suppressedEnvWarningKeys() : [];
     $envWarnings = $suppressedEnvWarningKeys !== []
@@ -172,7 +193,7 @@
     unset($grp);
     $bindingTypeLabelsInline = [
         'database' => __('Database'),
-        'redis' => __('Redis'),
+        'redis' => __('Redis / Valkey'),
         'queue' => __('Queue'),
         'cache' => __('Cache'),
         'session' => __('Sessions'),
@@ -269,11 +290,14 @@
 
     @if ($showAttention)
         <section @class([$card, 'overflow-hidden'])>
-            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
-                <x-heroicon-o-bell-alert class="h-4 w-4 text-brand-sage" aria-hidden="true" />
-                <h2 class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Needs attention') }}</h2>
-            </div>
-            <div class="divide-y divide-brand-ink/10">
+            <x-workspace-panel-head
+                class="border-b border-brand-ink/10"
+                icon="heroicon-o-bell-alert"
+                :title="__('Needs attention')"
+                :note="__('Configuration dply flagged before the first deploy. Fixing these here writes straight to the site\'s .env.')"
+                tone="amber"
+            />
+            <div>
                 @if ($attentionConsoleRun)
                     <div
                         id="site-console-action-banner"
@@ -309,15 +333,19 @@
 
     @include('livewire.sites.settings.partials.environment.add-missing-env-modal')
 
-    @include('livewire.sites.settings.partials.environment.inherited')
-
     @include('livewire.sites.settings.partials.environment.variables-list')
+
+    @include('livewire.sites.partials.linked-organization-secrets', ['secretsCard' => $card])
+
+    @include('livewire.sites.settings.partials.environment.inherited')
 
     @include('livewire.sites.settings.partials.environment.view-all-modal')
 
     @include('livewire.sites.settings.partials.environment.advanced-modals')
 
     @include('livewire.sites.settings.partials.environment.fix-binding-modal')
+
+    @include('livewire.sites.settings.partials.environment.binding-env-mapping-modal')
 
     @include('livewire.sites.settings.partials.environment.ignored-vars')
 
@@ -346,13 +374,17 @@
     <div @class([
         'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => $envMergedChrome,
     ])>
+        @php
+            $envCli = 'dply site env '.$site->slug;
+        @endphp
         <x-cli-snippet
             :intro="__('Manage env via CLI when you have many keys at once:')"
             :commands="[
-                ['label' => __('Set one'), 'command' => 'dply sites:env:set '.$site->slug.' KEY=value'],
-                ['label' => __('Bulk import from .env'), 'command' => 'dply sites:env:import '.$site->slug.' --file=.env'],
-                ['label' => __('Export current as .env'), 'command' => 'dply sites:env:export '.$site->slug.' --to=.env'],
-                ['label' => __('Diff cache vs server'), 'command' => 'dply sites:env:diff '.$site->slug],
+                ['label' => __('List the keys'), 'command' => $envCli.' list'],
+                ['label' => __('Set one (or several)'), 'command' => $envCli.' set KEY=value'],
+                ['label' => __('Remove one'), 'command' => $envCli.' rm KEY'],
+                ['label' => __('Bulk import from .env'), 'command' => $envCli.' push --file .env'],
+                ['label' => __('Export current as .env'), 'command' => $envCli.' pull --values > .env'],
             ]"
         />
     </div>

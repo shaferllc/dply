@@ -6,6 +6,9 @@ use App\Modules\TaskRunner\ProcessRunner;
 use App\Modules\TaskRunner\Utilities\Formatter;
 use Illuminate\Support\Facades\Process;
 use Spatie\TemporaryDirectory\TemporaryDirectory;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 describe('Formatter utility', function () {
     beforeEach(function () {

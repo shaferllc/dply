@@ -16,19 +16,19 @@ use App\Support\Servers\ServerPhpMutationLock;
  */
 trait RunsPhpPackageActions
 {
-
-
     /**
-     * @param  callable(string $step, string $action, string $version): void|null  $onProgress
+     * @param  \Closure(string $step, string $action, string $version): void|null  $onProgress
+     * @param  \Closure(string $line): void|null  $onOutput
      * @return array{status: 'succeeded'|'stale', message: string, output?: ?string}
      */
     public function applyPackageAction(
         Server $server,
         string $action,
         string $version,
-        ?callable $onProgress = null,
+        ?\Closure $onProgress = null,
         bool $migrateSitesBeforeUninstall = false,
         ?string $actingUserId = null,
+        ?\Closure $onOutput = null,
     ): array {
         $version = $this->normalizeVersionId($version) ?? '';
         $action = trim($action);
@@ -63,16 +63,9 @@ trait RunsPhpPackageActions
                 $server = $server->fresh() ?? $server;
             }
 
-            if ($action === 'install' && $this->isVersionInstalledInInventory($version, $preflightInventory)) {
-                return $this->completePackageActionWithInventory(
-                    $server,
-                    $action,
-                    $version,
-                    $preflightInventory,
-                    null,
-                    __('PHP :version is already installed.', ['version' => $version]),
-                );
-            }
+            // A version can be "installed" as cli/fpm only (the pre-redis
+            // upgrade path). Re-run the install script so required extensions
+            // (phpredis) and FPM restart still happen — apt-get is idempotent.
 
             if ($action === 'set_cli_default' && $this->isCliDefaultInInventory($version, $preflightInventory)) {
                 return $this->completePackageActionWithInventory(
@@ -127,7 +120,7 @@ trait RunsPhpPackageActions
 
             $onProgress?->__invoke('execute', $action, $version);
 
-            $commandOutput = $this->executePackageAction($server, $action, $version);
+            $commandOutput = $this->executePackageAction($server, $action, $version, $onOutput);
 
             $freshInventory = $this->fetchRemoteInventory($server->fresh());
 
@@ -192,7 +185,7 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
         ?string $actingUserId,
     ): void {
         $migrator = app(ServerPhpSiteRuntimeMigrator::class);
@@ -202,7 +195,7 @@ trait RunsPhpPackageActions
             return;
         }
 
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($target === null) {
@@ -221,11 +214,11 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
         ?string $actingUserId,
     ): array {
         $migrator = app(ServerPhpSiteRuntimeMigrator::class);
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $target = $migrator->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($target === null) {
@@ -296,7 +289,6 @@ trait RunsPhpPackageActions
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     public function normalizeVersionList(mixed $value): array
     {
         if (! is_array($value)) {
@@ -326,9 +318,9 @@ trait RunsPhpPackageActions
         Server $server,
         string $version,
         array $preflightInventory,
-        ?callable $onProgress,
+        ?\Closure $onProgress,
     ): array {
-        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions'] ?? []);
+        $installedIds = $this->normalizeVersionList($preflightInventory['installed_versions']);
         $fallback = app(ServerPhpSiteRuntimeMigrator::class)->resolveMigrationTargetVersion($installedIds, $version);
 
         if ($fallback === null) {
@@ -347,7 +339,7 @@ trait RunsPhpPackageActions
                 $installedIds,
             ),
             'detected_default_version' => $detectedCli,
-            'is_supported_environment' => (bool) ($preflightInventory['supported'] ?? true),
+            'is_supported_environment' => (bool) $preflightInventory['supported'],
         ]);
 
         $needsCliReassign = ($defaults['cli_default'] ?? null) === $version || $detectedCli === $version;
@@ -372,27 +364,28 @@ trait RunsPhpPackageActions
             $newSitePersist = $fallback;
         }
 
-        if ($cliPersist !== null || $newSitePersist !== null) {
-            $this->persistRefreshedInventoryMeta(
+        $this->persistRefreshedInventoryMeta(
+            $server->fresh() ?? $server,
+            $this->refreshedInventoryMeta(
                 $server->fresh() ?? $server,
-                $this->refreshedInventoryMeta(
-                    $server->fresh() ?? $server,
-                    $preflightInventory,
-                    $cliPersist,
-                    $newSitePersist,
-                ),
-            );
-        }
+                $preflightInventory,
+                $cliPersist,
+                $newSitePersist,
+            ),
+        );
 
         return $preflightInventory;
     }
 
-    protected function executePackageAction(Server $server, string $action, string $version): string
+    protected function executePackageAction(Server $server, string $action, string $version, ?\Closure $onOutput = null): string
     {
         return app(ServerSshConnectionRunner::class)->run(
             $server,
-            function ($ssh) use ($server, $action, $version): string {
-                $output = $ssh->exec($this->packageActionScript($server, $action, $version), 600);
+            function ($ssh) use ($server, $action, $version, $onOutput): string {
+                $script = $this->packageActionScript($server, $action, $version);
+                $output = $onOutput !== null
+                    ? $ssh->execWithCallback($script, $onOutput, 600)
+                    : $ssh->exec($script, 600);
                 $exitCode = $ssh->lastExecExitCode();
 
                 if ($exitCode !== null && $exitCode !== 0) {

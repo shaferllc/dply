@@ -191,9 +191,7 @@ final class AdminFeatureFlags
         return match ($slug) {
             'vm-servers' => 'admin.flags.vm.servers',
             'vm-sites' => 'admin.flags.vm.sites',
-            'cloud' => 'admin.flags.cloud',
-            'edge' => 'admin.flags.edge',
-            'serverless' => 'admin.flags.serverless',
+            'databases' => 'admin.flags.databases',
             'platform' => 'admin.flags.platform',
             default => null,
         };

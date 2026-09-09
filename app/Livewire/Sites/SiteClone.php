@@ -47,7 +47,7 @@ class SiteClone extends Component
         $this->site = $site;
         $this->site->load('domains');
 
-        $this->clone_hostname = (string) ($this->site->primaryDomain()?->hostname ?? '');
+        $this->clone_hostname = (string) ($this->site->primaryDomain()->hostname ?? '');
         $this->clone_site_name = $this->site->name.' (clone)';
 
         $this->destinationServers = SiteCloneDestinationValidator::destinationServersForUser($org);

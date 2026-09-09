@@ -30,7 +30,6 @@ final class ServerSshAccessTimeline
      *     you_active_now: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function forServer(Server $server, ?User $viewer, string $range = '30d', ?ServerSshAccessContext $context = null): array
     {
         $context ??= ServerSshAccessContext::load($server);
@@ -132,8 +131,8 @@ final class ServerSshAccessTimeline
                 'label' => $nameByKeyId[$keyId] ?? __('Removed key'),
                 'source' => 'historical',
                 'is_you' => false,
-                'start' => true ? $startedAt : Carbon::parse($startedAt),
-                'end' => true ? $endedAt : Carbon::parse($endedAt),
+                'start' => $startedAt,
+                'end' => $endedAt,
             ];
         }
 
@@ -208,7 +207,7 @@ final class ServerSshAccessTimeline
     }
 
     /**
-     * @param  array<string, mixed> $intervals
+     * @param  list<array<string, bool|\Illuminate\Support\Carbon|string>> $intervals
      * @return list<array{at: int, total: float, you: float}>
      */
     private function buildSeries(array $intervals, Carbon $from, Carbon $to): array
@@ -248,7 +247,7 @@ final class ServerSshAccessTimeline
     }
 
     /**
-     * @param  array<string, mixed> $intervals
+     * @param  list<array<string, bool|\Illuminate\Support\Carbon|string>> $intervals
      * @return list<array{key: string, label: string, source: string, is_you: bool, start: Carbon, end: Carbon, left_pct: float, width_pct: float}>
      */
     private function buildLanes(array $intervals, Carbon $from, Carbon $to): array

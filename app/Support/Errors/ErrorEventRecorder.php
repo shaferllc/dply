@@ -17,9 +17,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * Normalizes a failed source (ConsoleAction / SiteDeployment) into a single
- * {@see ErrorEvent} row. Shared by the model listeners and the backfill command
- * so live capture and historical seeding produce identical rows.
+ * Normalizes a failed source (ConsoleAction / SiteDeployment)
+ * into a single {@see ErrorEvent} row. Shared by the model listeners and the
+ * backfill command so live capture and historical seeding produce identical rows.
  *
  * Capture is idempotent: keyed on (source_type, source_id), so a listener
  * firing twice — or a backfill re-running — updates in place rather than
@@ -150,6 +150,16 @@ class ErrorEventRecorder
         );
     }
 
+    /** Prefix the failing route/task so the row is actionable without opening it. */
+    private function invocationDetail(string $detail, ?string $target): string
+    {
+        $target = trim((string) $target);
+        $prefix = $target === '' ? '' : $target.' — ';
+        $body = $prefix.($detail !== '' ? $detail : __('No output captured.'));
+
+        return Str::limit($body, 2000, '');
+    }
+
     /**
      * Resolve [organization_id, server_id, site_id, link_url] from a
      * ConsoleAction subject. Site-owned subjects carry both site_id and the
@@ -198,7 +208,7 @@ class ErrorEventRecorder
     }
 
     /**
-     * @param  array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      */
     private function upsert(Model $source, array $attributes): ErrorEvent
     {
@@ -240,7 +250,7 @@ class ErrorEventRecorder
     {
         $lines = $action->lines();
         foreach (array_reverse($lines) as $line) {
-            if (($line['level']) === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
+            if ($line['level'] === ConsoleAction::LEVEL_ERROR && trim($line['line']) !== '') {
                 return trim($line['line']);
             }
         }

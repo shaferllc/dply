@@ -10,18 +10,18 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $body
- * @property array<string, mixed> $metadata
+ * @property ?string $body
+ * @property ?array<string, mixed> $metadata
  * @property ?string $notification_event_id
  * @property ?Carbon $read_at
  * @property ?Carbon $saved_at
  * @property string $title
- * @property string $url
+ * @property ?string $url
  * @property ?string $user_id
  * @property-read ?NotificationEvent $event
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class NotificationInboxItem extends Model
 {

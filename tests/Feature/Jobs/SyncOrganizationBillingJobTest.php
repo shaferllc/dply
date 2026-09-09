@@ -26,12 +26,7 @@ beforeEach(function () {
 test('handle is a no op when organization does not exist', function () {
     $fake = bindFakeSyncer();
 
-    (new SyncOrganizationBillingJob('01nonexistentorganizationid'))->handle(
-        app(OrganizationBillingStateComputer::class),
-        $fake,
-        app(BillingSubscriptionSyncEventRecorder::class),
-        app(BundleEntitlementSynchronizer::class),
-    );
+    app()->call([new SyncOrganizationBillingJob('01nonexistentorganizationid'), 'handle'], [StripeSubscriptionSyncer::class => $fake]);
 
     expect($fake->calls)->toBeEmpty();
 });
@@ -40,12 +35,7 @@ test('handle is a no op when organization has no standard subscription', functio
     $org = Organization::factory()->create();
     $fake = bindFakeSyncer();
 
-    (new SyncOrganizationBillingJob($org->id))->handle(
-        app(OrganizationBillingStateComputer::class),
-        $fake,
-        app(BillingSubscriptionSyncEventRecorder::class),
-        app(BundleEntitlementSynchronizer::class),
-    );
+    app()->call([new SyncOrganizationBillingJob($org->id), 'handle'], [StripeSubscriptionSyncer::class => $fake]);
 
     expect($fake->calls)->toBeEmpty();
 });
@@ -59,12 +49,7 @@ test('invokes syncer when organization has active standard subscription', functi
 
     $fake = bindFakeSyncer();
 
-    (new SyncOrganizationBillingJob($org->id))->handle(
-        app(OrganizationBillingStateComputer::class),
-        $fake,
-        app(BillingSubscriptionSyncEventRecorder::class),
-        app(BundleEntitlementSynchronizer::class),
-    );
+    app()->call([new SyncOrganizationBillingJob($org->id), 'handle'], [StripeSubscriptionSyncer::class => $fake]);
 
     expect($fake->calls)->toHaveCount(1);
     expect($fake->calls[0]['organization']->id)->toBe($org->id);
@@ -80,12 +65,7 @@ test('skips when subscription is canceled', function () {
 
     $fake = bindFakeSyncer();
 
-    (new SyncOrganizationBillingJob($org->id))->handle(
-        app(OrganizationBillingStateComputer::class),
-        $fake,
-        app(BillingSubscriptionSyncEventRecorder::class),
-        app(BundleEntitlementSynchronizer::class),
-    );
+    app()->call([new SyncOrganizationBillingJob($org->id), 'handle'], [StripeSubscriptionSyncer::class => $fake]);
 
     expect($fake->calls)->toBeEmpty();
 });

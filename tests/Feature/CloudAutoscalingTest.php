@@ -15,7 +15,7 @@ use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
-use App\Modules\Cloud\Services\AwsAppRunnerService;
+use App\Modules\Providers\Services\AwsAppRunnerService;
 use App\Modules\Cloud\Backends\AwsAppRunnerBackend;
 use App\Modules\Cloud\Backends\CloudRouter;
 use App\Modules\Cloud\Backends\CloudScalingConfig;

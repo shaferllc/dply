@@ -21,7 +21,6 @@ class ServerConfigFileCatalog
     /**
      * @return array<string, array{label: string, files: list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}>}>
      */
-    /** @return array<string, mixed> */
     public function groupedFiles(Server $server, ?string $scope = null, ?string $search = null): array
     {
         $catalog = (array) config('server_manage.config_file_catalog', []);
@@ -51,15 +50,15 @@ class ServerConfigFileCatalog
                     }
 
                     foreach ($this->formatEngineProbeFiles($probeResults[$index] ?? [], $engine) as $row) {
-                        $path = (string) ($row['path'] ?? '');
+                        $path = (string) $row['path'];
                         if ($path === '' || isset($seen[$path])) {
                             continue;
                         }
                         $seen[$path] = true;
                         $files[] = $this->fileRow(
                             $path,
-                            (string) ($row['label'] ?? basename($path)),
-                            (int) ($row['size'] ?? 0),
+                            (string) $row['label'],
+                            (int) $row['size'],
                             $row['mtime'] ?? null,
                             $groupKey,
                             $engine,
@@ -95,7 +94,7 @@ class ServerConfigFileCatalog
                     }
 
                     foreach ($probeResults[$index] ?? [] as $row) {
-                        $path = (string) ($row['path'] ?? '');
+                        $path = (string) $row['path'];
                         if ($path === '' || isset($seen[$path])) {
                             continue;
                         }
@@ -103,7 +102,7 @@ class ServerConfigFileCatalog
                         $files[] = $this->fileRow(
                             $path,
                             basename($path),
-                            (int) ($row['size'] ?? 0),
+                            (int) $row['size'],
                             $row['mtime'] ?? null,
                             $groupKey,
                         );
@@ -136,10 +135,6 @@ class ServerConfigFileCatalog
 
     /**
      * @return list<array{path: string, label: string, size: int, mtime: int|null, group: string, engine?: string, hint?: string, role?: string, role_label?: string}>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<mixed>
      */
     public function flatFiles(Server $server, ?string $scope = null, ?string $search = null): array
     {
@@ -205,10 +200,6 @@ class ServerConfigFileCatalog
     /**
      * @return list<mixed>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string|null>>
-     */
     public function autocompleteForPath(string $path): array
     {
         $type = $this->fileTypeForPath($path);
@@ -240,9 +231,6 @@ class ServerConfigFileCatalog
         return $out;
     }
 
-    /**
-     * @return list<array<string, string|null>>
-     */
     private function collectDiscoveryProbes(Server $server, ?string $scope): array
     {
         $catalog = (array) config('server_manage.config_file_catalog', []);
@@ -400,7 +388,7 @@ class ServerConfigFileCatalog
     }
 
     /**
-     * @param  array<string, mixed> $rows
+     * @param  list<array<string, int|string|null>> $rows
      * @return list<array{path: string, label: string, size: int, mtime: int|null}>
      */
     private function formatEngineProbeFiles(array $rows, string $engine): array
@@ -484,7 +472,6 @@ class ServerConfigFileCatalog
      * When the stack is unknown (fresh import / still provisioning), fail open
      * and probe every supported engine so the picker isn't empty.
      *
-     * @return array<string, mixed>
      */
     private function enginesForDiscovery(Server $server, ?string $scope = null): array
     {

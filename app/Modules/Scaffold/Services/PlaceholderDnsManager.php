@@ -37,7 +37,6 @@ class PlaceholderDnsManager
      *
      * @return array{hostname: string, zone: ?string, record_id: ?string, source: string}
      */
-    /** @return array<string, mixed> */
     public function assign(Site $site): array
     {
         if ($this->alreadyAssigned($site)) {
@@ -246,7 +245,7 @@ class PlaceholderDnsManager
     }
 
     /**
-     * @param  array<string, mixed> $assignment
+     * @param  array<string, mixed>  $assignment
      */
     private function persistAssignment(Site $site, array $assignment): void
     {

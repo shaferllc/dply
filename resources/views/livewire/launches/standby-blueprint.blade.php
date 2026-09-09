@@ -9,7 +9,7 @@
                 flush
             >
                 <x-slot name="actions">
-                    <a href="{{ route('launches.create') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Launchpad') }}</a>
+                    <a href="{{ route('servers.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Servers') }}</a>
                 </x-slot>
             </x-page-header>
         </div>
@@ -40,9 +40,9 @@
                                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $item['summary'] }}</p>
                                         </div>
                                         @if ($item['available'])
-                                            <span class="rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Ready') }}</span>
+                                            <span class="rounded-full bg-brand-sage/15 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Ready') }}</span>
                                         @else
-                                            <span class="rounded-full bg-brand-ink/5 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Needs setup') }}</span>
+                                            <span class="rounded-full bg-brand-ink/5 px-2.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Needs setup') }}</span>
                                         @endif
                                     </div>
                                     @if (! $item['available'] && $item['unavailable_reason'])

@@ -215,7 +215,6 @@ abstract class Task implements HasAnalytics, HasCallbacks, HasRollback
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getPerformanceMetrics(): array
     {
         if (! $this->taskModel) {

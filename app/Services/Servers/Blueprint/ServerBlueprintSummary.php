@@ -12,7 +12,7 @@ use App\Support\Servers\InstalledStack;
 final class ServerBlueprintSummary
 {
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      */
     public function tagline(array $snapshot): string
     {
@@ -33,7 +33,7 @@ final class ServerBlueprintSummary
     }
 
     /**
-     * @param  array<string, mixed> $snapshot
+     * @param  array<string, mixed>  $snapshot
      * @return array{firewall_rules: int, supervisor_programs: int, runtimes: list<string>}
      */
     public function extras(array $snapshot): array
@@ -56,6 +56,26 @@ final class ServerBlueprintSummary
             'supervisor_programs' => $programs,
             'runtimes' => $runtimes,
         ];
+    }
+
+    /**
+     * The stack as display labels, keyed by field — the same names the tagline
+     * uses, so a details view never shows `mysql84` next to a heading that says
+     * "MySQL 8.4".
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @return array<string, string>
+     */
+    public function stackLabels(array $snapshot): array
+    {
+        $stack = InstalledStack::fromArray(is_array($snapshot['stack'] ?? null) ? $snapshot['stack'] : []);
+
+        return array_filter([
+            __('Web server') => $this->labelWebserver($stack->webserver) ?? $stack->webserver,
+            __('PHP') => $stack->phpVersion !== null ? 'PHP '.$stack->phpVersion : null,
+            __('Database') => $this->labelDatabase($stack->database),
+            __('Cache') => $this->labelCache($stack->cacheService) ?? $stack->cacheService,
+        ], fn (?string $value): bool => $value !== null && $value !== '');
     }
 
     private function labelWebserver(?string $webserver): ?string

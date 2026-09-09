@@ -12,7 +12,7 @@ use InvalidArgumentException;
 /**
  * Selects the {@see DatabaseBackend} for a backend key or a server's provider.
  *
- * Mirrors the Cloud module's {@see \App\Modules\Cloud\Backends\CloudRouter}:
+ * Routes a managed database to its provider backend:
  * a static map of backend key → implementation, plus a "what can co-locate
  * with this server" lookup the modal uses to decide whether to surface a
  * managed-cluster card next to the on-box option.

@@ -14,6 +14,22 @@ use Illuminate\Http\JsonResponse;
  *
  * Actions encapsulate single-purpose business logic and can be executed
  * in multiple contexts (controller, job, listener, command, object).
+ *
+ * Every concrete action defines handle() with its own domain signature
+ * (e.g. `handle(Team $team, array $formData): Tag`), which is why this cannot
+ * be an `abstract function` — those signatures are not contravariant with a
+ * variadic parent and PHP would reject them. The @method tag states the
+ * contract the As* traits rely on; a subclass's real handle() still overrides
+ * it and is type-checked normally.
+ *
+ * @method mixed handle(mixed ...$arguments)
+ *
+ * @phpstan-consistent-constructor
+ *   The As* traits construct actions late-bound — AsEvent does
+ *   `new static(...$arguments)`, AsResource `new static($item)`. The
+ *   constructor comes from AsDependent and is variadic, so every subclass
+ *   shares it; declaring that makes the late-bound construction safe
+ *   instead of unchecked, and PHPStan now enforces the consistency.
  */
 abstract class Actions
 {

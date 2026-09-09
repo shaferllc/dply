@@ -11,8 +11,8 @@
                 <div class="mt-4 divide-y divide-brand-ink/5">
                     @forelse ($keySources as $s)
                         <div class="flex items-center justify-between gap-2 py-2">
-                            <span class="min-w-0 truncate text-sm text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-[10px] text-brand-mist">{{ $s['masked'] }}</span></span>
-                            <button type="button" wire:click="importEnvKeyFromSite(@js($env_import_key), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Use') }}</button>
+                            <span class="min-w-0 truncate text-sm text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-2xs text-brand-mist">{{ $s['masked'] }}</span></span>
+                            <button type="button" wire:click="importEnvKeyFromSite(@js($env_import_key), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md bg-brand-ink px-2.5 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Use') }}</button>
                         </div>
                     @empty
                         <p class="py-3 text-sm text-brand-moss">{{ __('No other site has :key set.', ['key' => $env_import_key]) }}</p>
@@ -25,11 +25,11 @@
                 <div class="mt-4 divide-y divide-brand-ink/5">
                     @if (! empty($importGroups['workers']))
                         <div class="py-3">
-                            <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-sage">{{ __('Pool workers — same app') }}</p>
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-sage">{{ __('Pool workers — same app') }}</p>
                             @foreach ($importGroups['workers'] as $c)
                                 <div class="flex items-center justify-between gap-2 py-1.5">
                                     <span class="text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
-                                    <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', true)" x-on:click="$dispatch('close')" class="rounded-md bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Import verbatim') }}</button>
+                                    <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', true)" x-on:click="$dispatch('close')" class="rounded-md bg-brand-ink px-2.5 py-1 text-xs font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Import verbatim') }}</button>
                                 </div>
                             @endforeach
                         </div>
@@ -38,11 +38,11 @@
                         @php $rows = collect($importGroups[$group] ?? [])->reject(fn ($c) => collect($importGroups['workers'])->pluck('id')->contains($c['id']))->values(); @endphp
                         @if ($rows->isNotEmpty())
                             <div class="py-3">
-                                <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $heading }}</p>
+                                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ $heading }}</p>
                                 @foreach ($rows as $c)
                                     <div class="flex items-center justify-between gap-2 py-1.5">
                                         <span class="text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
-                                        <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', false)" x-on:click="$dispatch('close')" class="rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Import sanitized') }}</button>
+                                        <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', false)" x-on:click="$dispatch('close')" class="rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Import sanitized') }}</button>
                                     </div>
                                 @endforeach
                             </div>

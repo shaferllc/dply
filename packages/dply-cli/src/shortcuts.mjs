@@ -36,8 +36,26 @@ const SERVER_SUBCOMMANDS = new Set([
   '-h',
 ]);
 
+/** @type {Set<string>} */
+const SITE_SUBCOMMANDS = new Set([
+  'list',
+  'ls',
+  'show',
+  'deploy',
+  'status',
+  'logs',
+  'deployments',
+  'deploys',
+  'deployment',
+  'env',
+  'errors',
+  'help',
+  '--help',
+  '-h',
+]);
+
 /** Single-token shortcuts → argv prefix (rest appended when present). */
-const SINGLE_TOKEN = {
+export const SINGLE_TOKEN_SHORTCUTS = {
   r: ['refresh'],
   refresh: ['refresh'],
   projects: ['project', 'list'],
@@ -82,6 +100,13 @@ export function shortcutCommandLines() {
     'new',
     'site',
     'deploy',
+    'sites:errors',
+    'sites:uptime',
+    'sites:notifications',
+    'sites:uptime:history',
+    'site:errors',
+    'site:logs',
+    'site:deploy',
   ];
 }
 
@@ -97,10 +122,17 @@ export function expandArgv(argv) {
   }
 
   const [first, ...rest] = argv;
+
+  // `dply sites:errors acme` — a colon is just a space. One rule here means
+  // every route that already exists gets a `ns:sub` form for free.
+  if (first.includes(':') && ! first.startsWith('-')) {
+    return expandArgv([...first.split(':').filter(Boolean), ...rest]);
+  }
+
   const key = first.toLowerCase();
 
-  if (rest.length === 0 && SINGLE_TOKEN[key]) {
-    return [...SINGLE_TOKEN[key]];
+  if (rest.length === 0 && SINGLE_TOKEN_SHORTCUTS[key]) {
+    return [...SINGLE_TOKEN_SHORTCUTS[key]];
   }
 
   if (key === 'billing' && rest.length > 0) {
@@ -137,6 +169,25 @@ export function expandArgv(argv) {
 
   if (key === 'project' && rest.length === 1 && !PROJECT_SUBCOMMANDS.has(rest[0].toLowerCase()) && !rest[0].startsWith('-')) {
     return ['project', 'show', rest[0]];
+  }
+
+  if ((key === 'site' || key === 'sites') && rest.length > 0) {
+    const [sub, ...tail] = rest;
+
+    // `errors` and `uptime` are top-level (they serve every kind of site), so
+    // `site errors` / `sites:uptime` route there rather than dying in the site
+    // switch. `sites:uptime:history` arrives here as `sites uptime history`.
+    const subKey = sub.toLowerCase();
+
+    if (subKey === 'errors' || subKey === 'uptime' || subKey === 'monitor' || subKey === 'notifications') {
+      return [subKey === 'monitor' ? 'uptime' : subKey, ...tail];
+    }
+
+    // `sites` is the universal list; only a real verb means the BYO namespace.
+    // `dply sites checkout` stays on `sites` and filters the list by name.
+    if (key === 'sites' && SITE_SUBCOMMANDS.has(subKey)) {
+      return ['site', ...rest];
+    }
   }
 
   if (key === 'account' && rest.length === 0) {

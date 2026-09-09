@@ -21,10 +21,6 @@ class EnvoyCustomListenersConfig
     /**
      * @return list<array{name: string, address: string, port: int, mode: string, default_cluster: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, int|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -40,7 +36,7 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @param  array<string, mixed> $listeners
+     * @param  list<array<string, mixed>> $listeners
      */
     public function save(Server $server, array $listeners, ?ConsoleEmitter $emitter = null): void
     {
@@ -73,10 +69,10 @@ class EnvoyCustomListenersConfig
 
         $rows = $this->read($server);
         foreach ($rows as $existing) {
-            if (($existing['name'] ?? '') === $row['name']) {
+            if ($existing['name'] === $row['name']) {
                 throw new \RuntimeException("A listener named `{$row['name']}` already exists.");
             }
-            if ((int) ($existing['port'] ?? 0) === $row['port']) {
+            if ((int) $existing['port'] === $row['port']) {
                 throw new \RuntimeException("Port {$row['port']} is already used by listener `{$existing['name']}`.");
             }
         }
@@ -90,7 +86,7 @@ class EnvoyCustomListenersConfig
         $name = $this->normalizeName($name);
         $rows = array_values(array_filter(
             $this->read($server),
-            fn (array $row): bool => ($row['name'] ?? '') !== $name,
+            fn (array $row): bool => $row['name'] !== $name,
         ));
 
         if (count($rows) === count($this->read($server))) {
@@ -100,9 +96,6 @@ class EnvoyCustomListenersConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public static function listenersFromServer(Server $server): array
     {
         return app(self::class)->read($server);
@@ -158,7 +151,7 @@ class EnvoyCustomListenersConfig
     }
 
     /**
-     * @param  array<string, mixed> $listeners
+     * @param  list<array<string, mixed>> $listeners
      */
     private function assertValid(array $listeners): void
     {

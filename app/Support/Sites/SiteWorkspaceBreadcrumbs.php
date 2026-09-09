@@ -7,10 +7,9 @@ namespace App\Support\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Support\SiteSettingsHeader;
-use Laravel\Pennant\Feature;
 
 /**
- * Breadcrumb items for BYO / Edge site workspace sub-pages.
+ * Breadcrumb items for site workspace sub-pages.
  */
 final class SiteWorkspaceBreadcrumbs
 {
@@ -23,22 +22,16 @@ final class SiteWorkspaceBreadcrumbs
         string $currentLabel,
         ?string $currentIcon = null,
     ): array {
-        if ($site->usesEdgeRuntime()) {
-            return self::edgeItems($server, $site, $currentLabel, $currentIcon);
-        }
-
         $items = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
 
-        if ($server->workspace && Feature::active('surface.projects')) {
-            $items[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
+        // The project deliberately isn't a crumb here. This trail is already
+        // Dashboard → Servers → server → Sites → site → page; the project isn't
+        // a step on that path (you don't reach the site through it), and it made
+        // an eight-crumb bar that wrapped. The project is still reachable from
+        // the server overview and the Projects surface.
 
         $items[] = [
             'label' => $server->name,
@@ -70,31 +63,9 @@ final class SiteWorkspaceBreadcrumbs
     /**
      * @return list<array{label: string, href?: string|null, icon?: string|null}>
      */
-    private static function edgeItems(
-        Server $server,
-        Site $site,
-        string $currentLabel,
-        ?string $currentIcon,
-    ): array {
-        $items = [
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
-            [
-                'label' => $site->name,
-                'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
-                'icon' => 'globe-alt',
-                'avatar' => $site->name ?: (string) $site->id,
-                'avatar_image' => $site->logoUrl(),
-            ],
-            [
-                'label' => $currentLabel,
-                'icon' => $currentIcon ?? 'map-pin',
-            ],
-        ];
-
-        return $items;
-    }
-
+    /**
+     * @return list<array{label: string, href?: string|null, icon?: string|null}>
+     */
     public static function iconKeyFromSection(string $section, Site $site, Server $server): string
     {
         $header = SiteSettingsHeader::for($site, $server, $section);

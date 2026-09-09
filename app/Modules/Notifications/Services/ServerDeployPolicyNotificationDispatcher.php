@@ -2,10 +2,10 @@
 
 namespace App\Modules\Notifications\Services;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Servers\Deploys;
 use App\Models\Server;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Support\ServerDeployPolicyNotificationKeys;
 
 /**
@@ -23,8 +23,8 @@ final class ServerDeployPolicyNotificationDispatcher
     ) {}
 
     /**
-     * @param  array<string, mixed> $detailLines
-     * @param  array<string, mixed> $extraMetadata
+     * @param  list<string|array<mixed>>  $detailLines
+     * @param  array<string, mixed>  $extraMetadata
      */
     public function notify(
         Server $server,

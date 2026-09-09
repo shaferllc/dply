@@ -31,15 +31,15 @@ trait ManagesTraefikRoutesMiddlewares
             $result = app(TraefikCustomRoutesConfig::class)->read($this->server);
             $form = [];
             foreach ($result['routes'] as $route) {
-                $slug = (string) ($route['slug'] ?? '');
+                $slug = (string) $route['slug'];
                 if ($slug === '') {
                     continue;
                 }
                 $form[$slug] = [
-                    'hosts' => implode(' ', $route['hosts'] ?? []),
-                    'upstream' => (string) ($route['upstream'] ?? ''),
-                    'rule' => (string) ($route['rule'] ?? ''),
-                    'middlewares' => implode(' ', $route['middlewares'] ?? []),
+                    'hosts' => implode(' ', $route['hosts']),
+                    'upstream' => (string) $route['upstream'],
+                    'rule' => (string) $route['rule'],
+                    'middlewares' => implode(' ', $route['middlewares']),
                 ];
             }
             $this->traefik_custom_routes_form = $form;
@@ -70,7 +70,7 @@ trait ManagesTraefikRoutesMiddlewares
 
             return;
         }
-        $slug = (string) ($this->traefik_custom_routes_new['slug'] ?? '');
+        $slug = (string) $this->traefik_custom_routes_new['slug'];
         $fields = $this->traefikCustomRouteFieldsFromRow($this->traefik_custom_routes_new);
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik custom route: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
@@ -137,12 +137,12 @@ trait ManagesTraefikRoutesMiddlewares
             $result = app(TraefikCustomMiddlewaresConfig::class)->read($this->server);
             $form = [];
             foreach ($result['middlewares'] as $row) {
-                $slug = (string) ($row['slug'] ?? '');
+                $slug = (string) $row['slug'];
                 if ($slug === '') {
                     continue;
                 }
                 $form[$slug] = [
-                    'type' => (string) ($row['type'] ?? 'stripPrefix'),
+                    'type' => (string) $row['type'],
                     'prefix' => '/',
                     'scheme' => 'https',
                     'header_key' => '',
@@ -179,7 +179,7 @@ trait ManagesTraefikRoutesMiddlewares
         if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
             return;
         }
-        $slug = (string) ($this->traefik_custom_middlewares_new['slug'] ?? '');
+        $slug = (string) $this->traefik_custom_middlewares_new['slug'];
         $fields = $this->traefikCustomMiddlewareFieldsFromRow($this->traefik_custom_middlewares_new);
         $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik middleware: :slug', ['slug' => $slug]));
         DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);

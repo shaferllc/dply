@@ -10,7 +10,7 @@
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Terminal') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Terminal') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply CLI') }}</h2>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Manage these accounts from your terminal after a one-time `dply login`. Revoke CLI sessions under Profile → CLI.') }}
@@ -38,7 +38,7 @@
         ]" />
     </div>
     <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3 sm:px-7">
-        <p class="text-[11px] leading-relaxed text-brand-moss">
+        <p class="text-xs leading-relaxed text-brand-moss">
             {{ __('Package served from this server at /cli/dply-cli.tgz. Mutations queue over SSH — same as this page.') }}
         </p>
     </div>

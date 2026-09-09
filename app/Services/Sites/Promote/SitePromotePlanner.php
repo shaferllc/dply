@@ -14,10 +14,6 @@ final class SitePromotePlanner
     /**
      * @return list<array{text: string, href: string|null, link_label: string|null}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<string, mixed>
-     */
     public function previewSteps(Site $source): array
     {
         $productionHostname = (string) ($source->primaryDomain()->hostname ?? '');
@@ -45,10 +41,6 @@ final class SitePromotePlanner
 
     /**
      * @return array<int, array<string, array|string|null>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return array<string, mixed>
      */
     public function cutoverSteps(Site $destination, ?Site $source = null): array
     {
@@ -126,10 +118,6 @@ final class SitePromotePlanner
         return $steps;
     }
 
-    /**
-     * @return array<int, array<string, array|string|null>>
-     */
-    /** @return array<string, mixed> */
     public function summary(Site $destination, ?Site $source = null): array
     {
         $promote = is_array($destination->meta['promote'] ?? null) ? $destination->meta['promote'] : [];
@@ -147,7 +135,7 @@ final class SitePromotePlanner
             'production_hostname' => is_string($promote['source_production_hostname'] ?? null)
                 ? (string) $promote['source_production_hostname']
                 : null,
-            'preview_hostname' => ($preview) && $preview !== '' ? $preview : null,
+            'preview_hostname' => $preview ? $preview : null,
             'destination_server_name' => $destination->server !== null ? (string) $destination->server->name : null,
         ];
     }

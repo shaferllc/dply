@@ -6,7 +6,6 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\Ai\Services\LlmSynthesizer;
-use App\Modules\OpsCopilot\Services\OpsCopilotContextBuilder;
 use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
@@ -49,7 +48,7 @@ if (! function_exists('reverb_health_check_url')) {
 
 if (! function_exists('server_workspace_nav_item_url')) {
     /**
-     * URL for a server workspace sidebar item (handles settings default tab segment).
+     * URL for a server workspace sidebar item.
      *
      * @param  array<string, mixed>  $item
      */
@@ -59,10 +58,6 @@ if (! function_exists('server_workspace_nav_item_url')) {
 
         if (! empty($item['preview_only']) && is_string($item['preview_route'] ?? null) && $item['preview_route'] !== '') {
             $routeName = $item['preview_route'];
-        }
-
-        if ($routeName === 'servers.settings') {
-            return route('servers.settings', ['server' => $server, 'section' => 'connection']);
         }
 
         return route($routeName, $server);
@@ -194,6 +189,11 @@ if (! function_exists('server_workspace_nav_for_server')) {
             // role_nav_keys entry) still honour this and hide the row.
             $onlyServerRoles = $item['only_server_roles'] ?? null;
             if (is_array($onlyServerRoles) && $onlyServerRoles !== [] && ! in_array($serverRole, $onlyServerRoles, true)) {
+                continue;
+            }
+
+            // Site-sourced fleets are managed on the origin site, not this box.
+            if (($item['key'] ?? null) === 'worker-pool' && (bool) data_get($server->meta, 'site_sourced_fleet')) {
                 continue;
             }
 
@@ -751,59 +751,6 @@ if (! function_exists('workspace_shared_host_active')) {
     }
 }
 
-if (! function_exists('multi_surface_active')) {
-    /**
-     * True when the current org has at least one non-VM product surface
-     * enabled (Cloud / Edge / Serverless). Used to gate the Infrastructure
-     * dashboard and the Launchpad — those screens are designed to triage
-     * across multiple surfaces and become noise when only Servers exist.
-     *
-     * Optional $organization scopes the check to a specific org (admin
-     * tooling); omit to use Pennant's default scope (current org).
-     */
-    function multi_surface_active(?Organization $organization = null): bool
-    {
-        foreach (['surface.cloud', 'surface.edge', 'surface.serverless'] as $flag) {
-            $active = $organization === null
-                ? Feature::active($flag)
-                : Feature::for($organization)->active($flag);
-            if ($active) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-}
-
-if (! function_exists('full_stack_wizard_active')) {
-    /**
-     * True when the Tier B full-stack launch wizard should be available:
-     * flag on, launchpad surfaces active, and both Cloud + Edge enabled.
-     */
-    function full_stack_wizard_active(?Organization $organization = null): bool
-    {
-        $flagActive = $organization === null
-            ? Feature::active('launch.full_stack_wizard')
-            : Feature::for($organization)->active('launch.full_stack_wizard');
-
-        if (! $flagActive || ! multi_surface_active($organization)) {
-            return false;
-        }
-
-        foreach (['surface.cloud', 'surface.edge'] as $required) {
-            $active = $organization === null
-                ? Feature::active($required)
-                : Feature::for($organization)->active($required);
-            if (! $active) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-}
-
 if (! function_exists('standby_blueprint_active')) {
     /**
      * True when the Tier C standby failover blueprint wizard is available.
@@ -838,28 +785,6 @@ if (! function_exists('cost_observatory_active')) {
         return $organization === null
             ? Feature::active('global.billing_enabled')
             : Feature::for($organization)->active('global.billing_enabled');
-    }
-}
-
-if (! function_exists('ops_copilot_active')) {
-    /**
-     * True when Fleet Ops Copilot deploy triage should be available.
-     */
-    function ops_copilot_active(?Organization $organization = null): bool
-    {
-        return $organization === null
-            ? Feature::active('global.ops_copilot')
-            : Feature::for($organization)->active('global.ops_copilot');
-    }
-}
-
-if (! function_exists('ops_copilot_site_has_failure')) {
-    /**
-     * True when the site has a recent failed BYO or Edge deploy Copilot can triage.
-     */
-    function ops_copilot_site_has_failure(Site $site): bool
-    {
-        return app(OpsCopilotContextBuilder::class)->siteHasRecentFailure($site);
     }
 }
 
@@ -898,34 +823,3 @@ if (! function_exists('audit_log')) {
     }
 }
 
-if (! function_exists('production_data_mirror_available')) {
-    /**
-     * Local-only Production data mirror (`/live/*`) is allowed on this host.
-     */
-    function production_data_mirror_available(): bool
-    {
-        return \App\Services\ProductionData\ProductionDataMirror::available();
-    }
-}
-
-if (! function_exists('production_data_mirror_connected')) {
-    function production_data_mirror_connected(?User $user = null): bool
-    {
-        $user ??= auth()->user();
-
-        return app(\App\Services\ProductionData\ProductionDataMirror::class)
-            ->connectionFor($user) !== null;
-    }
-}
-
-if (! function_exists('production_data_mirror_entry_url')) {
-    /**
-     * Browse entry for Production data: Connect when unbound, Sites when connected.
-     */
-    function production_data_mirror_entry_url(): string
-    {
-        return production_data_mirror_connected()
-            ? route('live.sites.index')
-            : route('live.connect');
-    }
-}

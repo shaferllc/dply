@@ -131,15 +131,13 @@ class Sidebar extends Component
 
         $context = $this->decodeJson($this->pageContext);
 
+        // Hard server-side caps regardless of what the client sent.
         $console = $this->decodeJson($this->consoleBuffer);
-        if (is_array($console)) {
-            // Hard server-side caps regardless of what the client sent.
-            $console = array_slice($console, -1 * (int) $limits['console_max_entries']);
-            if (strlen((string) json_encode($console)) > (int) $limits['console_max_bytes']) {
-                $console = array_slice($console, -10);
-            }
-            $context['console'] = $console;
+        $console = array_slice($console, -1 * (int) $limits['console_max_entries']);
+        if (strlen((string) json_encode($console)) > (int) $limits['console_max_bytes']) {
+            $console = array_slice($console, -10);
         }
+        $context['console'] = $console;
 
         $context['server'] = [
             'app_version' => config('app.version'),

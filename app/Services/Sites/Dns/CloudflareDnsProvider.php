@@ -2,7 +2,7 @@
 
 namespace App\Services\Sites\Dns;
 
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
 
 class CloudflareDnsProvider implements DnsProvider
 {
@@ -10,7 +10,6 @@ class CloudflareDnsProvider implements DnsProvider
         private readonly CloudflareDnsService $service,
     ) {}
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function upsertRecord(string $zone, string $type, string $name, string $value): array
     {

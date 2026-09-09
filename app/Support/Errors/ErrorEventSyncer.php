@@ -33,8 +33,9 @@ class ErrorEventSyncer
     ) {}
 
     /**
-     * Record every failed ConsoleAction / SiteDeployment finalized at or after
-     * $since that isn't already captured. Returns the number of new events.
+     * Record every failed ConsoleAction / SiteDeployment
+     * finalized at or after $since that isn't already captured. Returns the
+     * number of new events.
      */
     /**
      * @param  bool  $refresh  Re-record sources that already have an event too
@@ -48,7 +49,8 @@ class ErrorEventSyncer
     public function sync(CarbonInterface $since, bool $refresh = false, bool $notify = true): int
     {
         return $this->syncConsoleActions($since, $refresh, $notify)
-            + $this->syncDeployments($since, $refresh, $notify);
+            + $this->syncDeployments($since, $refresh, $notify)
+;
     }
 
     private function syncConsoleActions(CarbonInterface $since, bool $refresh = false, bool $notify = true): int

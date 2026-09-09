@@ -18,8 +18,16 @@ use App\Modules\Database\Jobs\ProvisionDockerDatabaseJob;
 use App\Modules\Database\Jobs\ProvisionManagedDatabaseJob;
 use App\Modules\Database\Support\DockerDatabase;
 use App\Modules\Database\Support\ServerlessDatabaseVendors;
+use App\Modules\Providers\Services\DigitalOceanService;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\SiteEnvPusher;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\ManagedDatabaseCatalogAuth;
+use App\Support\Servers\ManagedDatabaseRegionCatalog;
+use App\Support\Servers\ManagedDatabaseSizeCatalog;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -32,10 +40,15 @@ use RuntimeException;
 trait ManagesDatabaseBindings
 {
     /**
-     * Databases the site can actually reach: those on its own server (over
-     * loopback) plus those on peer servers sharing the same private network
-     * (over the peer's private IP). Each label notes where the DB lives and
-     * flags peers whose remote access isn't open yet.
+     * Databases the site can attach: its own server's (over loopback), a
+     * private-network peer's (over the peer's private IP), and any other
+     * database in the organization (over the endpoint stored on the row).
+     *
+     * The label carries the difference, because the operator is the one who
+     * has to act on it: an org server that is not a network peer says so and
+     * flags remote access when it is still closed. Offering it with a warning
+     * beats hiding it — a database that simply is not in the list gives no
+     * clue that a firewall rule is all that stands between you and it.
      *
      * @return list<array{id: string, label: string}>
      */
@@ -47,7 +60,7 @@ trait ManagesDatabaseBindings
         }
 
         $databases = ServerDatabase::query()
-            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->whereIn('server_id', $this->attachableDatabaseServerIds($server))
             ->with('server:id,name,organization_id,private_ip_address,private_network_id')
             ->orderBy('name')
             ->get();
@@ -61,10 +74,15 @@ trait ManagesDatabaseBindings
         return $databases
             ->map(function (ServerDatabase $db) use ($server, $consumers): array {
                 $sameBox = (string) $db->server_id === (string) $server->id;
+                $isPeer = ! $sameBox
+                    && $db->server !== null
+                    && $this->sharePrivateNetwork($server, $db->server);
+
                 if ($sameBox) {
                     $where = __('this server');
                 } else {
-                    $where = ($db->server?->name ?: __('network peer'))
+                    $where = ($db->server?->name ?: __('another server'))
+                        .($isPeer ? '' : ' — '.__('over public IP'))
                         .($db->remote_access ? '' : ' — '.__('remote access off'));
                 }
                 $used = $consumers[(string) $db->id] ?? 0;
@@ -73,7 +91,11 @@ trait ManagesDatabaseBindings
                     'id' => (string) $db->id,
                     'label' => $db->name.' ('.$db->engine.') · '.$where.$this->usageSuffix($used),
                     'engine' => (string) $db->engine,
-                    'group' => $sameBox ? 'local' : 'peer',
+                    'group' => match (true) {
+                        $sameBox => 'local',
+                        $isPeer => 'peer',
+                        default => 'org',
+                    },
                     'consumers' => $used,
                 ];
             })
@@ -95,13 +117,15 @@ trait ManagesDatabaseBindings
             throw new RuntimeException(__('This site has no server.'));
         }
 
+        // Same set the picker built from — the two must not disagree, or the
+        // modal offers options that saving then rejects.
         $db = ServerDatabase::query()
-            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->whereIn('server_id', $this->attachableDatabaseServerIds($server))
             ->whereKey($databaseId)
             ->first();
 
         if (! $db instanceof ServerDatabase) {
-            throw new InvalidArgumentException(__('That database is not reachable from this site\'s server.'));
+            throw new InvalidArgumentException(__('That database is not in this organization.'));
         }
 
         $crossServer = (string) $db->server_id !== (string) $server->id;
@@ -206,6 +230,10 @@ trait ManagesDatabaseBindings
 
         $binding = $this->persistDatabaseBinding($site, $attributes, $primary, $editingId);
 
+        if ($primary) {
+            $this->seedDetectedEnvAliases($binding, $site);
+        }
+
         // The app server may have been provisioned for a different DB engine
         // than the one just attached (e.g. MySQL server, Postgres attached).
         // Install the matching PHP client driver so the app doesn't deploy into
@@ -213,6 +241,107 @@ trait ManagesDatabaseBindings
         EnsureSitePhpDatabaseDriverJob::dispatch((string) $site->id, (string) $db->engine);
 
         return $binding;
+    }
+
+    /**
+     * Give a site-scoped ServerDatabase a `database` binding, so the resource
+     * map and the Environment tab see it — not just the Database tab.
+     *
+     * Databases created from the Database tab (or at site create) only ever set
+     * `server_databases.site_id`; the connection vars were written straight into
+     * the editable .env cache and no binding existed. The two surfaces therefore
+     * disagreed in the opposite direction from an Environment-tab attach, which
+     * sets a binding but no site_id.
+     *
+     * Returns the binding, or NULL when the site already has a primary database
+     * binding pointing somewhere else. That case is deliberately left alone:
+     * only one primary can exist, and quietly re-pointing it at a
+     * just-created second database would repoint the running app. The second
+     * database keeps today's behaviour (site_id + a loose .env write).
+     *
+     * When a binding IS adopted it becomes the single source for DB_*, so the
+     * caller must NOT also write those keys into the editable cache — see
+     * {@see stripAdoptedEnvKeys()} for the ones already sitting there.
+     */
+    public function adoptServerDatabase(Site $site, ServerDatabase $db): ?SiteBinding
+    {
+        // A binding OWNS DB_* and injects it at deploy. For a database dply
+        // adopted from the server it holds no password, so a binding would
+        // write DB_PASSWORD='' into a live app's .env — worse than injecting
+        // nothing. The site link (site_id) still records the association; the
+        // binding is offered once the operator supplies or rotates a password.
+        if (! $db->hasUsableCredentials()) {
+            return null;
+        }
+
+        $site->loadMissing('bindings');
+
+        $existingPrimary = $site->bindings->first(
+            fn (SiteBinding $b): bool => $b->type === 'database'
+                && $this->databaseConnectionIsPrimary((string) (is_array($b->config) ? ($b->config['connection'] ?? '') : '')),
+        );
+
+        if ($existingPrimary instanceof SiteBinding
+            && (string) $existingPrimary->target_id !== (string) $db->id) {
+            return null;
+        }
+
+        $binding = $this->persistDatabaseBinding($site, [
+            'mode' => 'provision_new',
+            // The CREATE DATABASE is still queued; CreateSiteDatabaseJob flips
+            // this to configured (or error) via its $siteBindingId.
+            'status' => SiteBinding::STATUS_PROVISIONING,
+            'name' => 'primary',
+            'target_type' => 'server_database',
+            'target_id' => (string) $db->id,
+            'injected_env' => $this->databaseEnv($db, $site),
+            'config' => array_filter([
+                'engine' => $db->engine,
+                'connection' => '',
+                'database_name' => (string) $db->name,
+            ], fn ($v): bool => $v !== null),
+        ], true, (string) ($existingPrimary?->id ?? ''));
+
+        $this->seedDetectedEnvAliases($binding, $site);
+
+        $site->load('bindings');
+
+        return $binding;
+    }
+
+    /**
+     * Remove keys a freshly adopted binding now owns from the site's editable
+     * .env cache.
+     *
+     * Without this they linger as loose variables that the binding silently
+     * beats at push time ({@see SiteEnvPusher}), and the
+     * Environment tab renders every one of them as a phantom "override" that
+     * does nothing. Same adopt-and-strip the FILESYSTEM_DISK / BROADCAST_CONNECTION
+     * migration performed when those keys moved under a binding.
+     *
+     * Non-destructive in substance: the values live on in the binding's
+     * encrypted injected_env, and the pushed .env still carries them.
+     */
+    public function stripAdoptedEnvKeys(Site $site, SiteBinding $binding): void
+    {
+        $content = (string) ($site->env_file_content ?? '');
+        if ($content === '') {
+            return;
+        }
+
+        $parser = app(DotEnvFileParser::class);
+        $parsed = $parser->parse($content);
+
+        $owned = array_keys($binding->connectionEnv());
+        $remaining = array_diff_key($parsed['variables'], array_flip($owned));
+
+        if (count($remaining) === count($parsed['variables'])) {
+            return;
+        }
+
+        $site->forceFill([
+            'env_file_content' => app(DotEnvFileWriter::class)->render($remaining, $parsed['comments']),
+        ])->save();
     }
 
     /**
@@ -309,6 +438,13 @@ trait ManagesDatabaseBindings
 
         $db = ServerDatabase::query()->create([
             'server_id' => $server->id,
+            // Stamp the owning site. This flow used to leave it null, which is
+            // how a database provisioned here showed as CONFIGURED on the
+            // resource map while the Database tab said "no databases are linked
+            // to this site yet" — that tab reads ownership, not bindings.
+            // (It reads both now, but the row should still be owned: it was
+            // created for this site and nothing else can claim it.)
+            'site_id' => $site->id,
             'name' => $name,
             'engine' => $engine,
             'username' => $username,
@@ -367,7 +503,7 @@ trait ManagesDatabaseBindings
     private function provisionDockerDatabase(Site $site, Server $server, array $params): SiteBinding
     {
         if (! $server->dockerEnginePresent()) {
-            throw new RuntimeException(__('Docker is not installed on this server — install it from Server → Manage → Tools first.'));
+            throw new RuntimeException(__('Docker is not installed on this server — install it from this modal first.'));
         }
 
         $engine = strtolower(trim((string) ($params['engine'] ?? 'mysql')));
@@ -447,6 +583,10 @@ trait ManagesDatabaseBindings
         // BYO serverless vendors (Neon …) aren't co-located with the server —
         // they take their own credential + region rather than the server's.
         if (ServerlessDatabaseVendors::isServerless($placement)) {
+            if (! ServerlessDatabaseVendors::isEnabled($placement)) {
+                throw new InvalidArgumentException(__('That serverless database vendor is not available yet.'));
+            }
+
             return $this->provisionServerlessDatabase($site, $placement, $params);
         }
 
@@ -466,11 +606,6 @@ trait ManagesDatabaseBindings
             throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
         }
 
-        $region = $backend->regionForServer($server);
-        if ($region === null) {
-            throw new RuntimeException(__('Could not determine a managed database region for this server.'));
-        }
-
         $credential = $this->resolveManagedDatabaseCredential($site, $server);
         if ($credential === null) {
             throw new RuntimeException(__('No :provider credential is connected for this server.', [
@@ -478,16 +613,37 @@ trait ManagesDatabaseBindings
             ]));
         }
 
-        $size = strtolower(trim((string) ($params['size'] ?? 'small')));
-        if (! array_key_exists($size, CloudDatabase::SIZE_TIERS)) {
-            $size = 'small';
+        $rejected = is_array($params['rejected_regions'] ?? null) ? $params['rejected_regions'] : [];
+        $available = ManagedDatabaseRegionCatalog::slugs($server, $engine, $credential, $rejected);
+        $region = ProviderManagedDatabaseRegion::resolve(
+            $server->provider->value,
+            isset($params['region']) ? (string) $params['region'] : null,
+            $backend->regionForServer($server),
+            $available,
+        );
+        if ($region === null || ($available !== [] && ! in_array($region, $available, true))) {
+            throw new RuntimeException(__('Pick a region DigitalOcean offers for this managed database.'));
+        }
+
+        $size = ManagedDatabaseSizeCatalog::resolve($server, $engine, isset($params['size']) ? (string) $params['size'] : null, $credential);
+        if ($size === null) {
+            throw new RuntimeException(__('Could not load managed-database plans from the provider.'));
+        }
+
+        $version = trim((string) ($params['version'] ?? ''));
+        if ($version === '') {
+            try {
+                $version = (new DigitalOceanService($credential))->getDatabaseEngineDefaultVersion($engine) ?? '';
+            } catch (\Throwable) {
+                $version = '';
+            }
         }
 
         $database = CloudDatabase::query()->create([
             'organization_id' => $site->organization_id,
             'name' => $name,
             'engine' => $engine,
-            'version' => trim((string) ($params['version'] ?? '')),
+            'version' => $version,
             'size' => $size,
             'region' => $region,
             'backend' => $backend->key(),
@@ -500,6 +656,9 @@ trait ManagesDatabaseBindings
         // binding starts with an empty injected_env; the job fills it in. A
         // managed cluster is provisioned as the PRIMARY database (the modal
         // offers no connection name), superseding any existing primary.
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+        $previousTargetId = $this->previousCloudDatabaseTargetId($site, $editingId);
+
         $binding = $this->persistDatabaseBinding($site, [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_PROVISIONING,
@@ -507,7 +666,7 @@ trait ManagesDatabaseBindings
             'target_type' => 'cloud_database',
             'target_id' => (string) $database->id,
             'injected_env' => [],
-            'config' => array_filter([
+            'config' => [
                 'engine' => $engine,
                 'connection' => '',
                 'database_name' => $name,
@@ -515,15 +674,17 @@ trait ManagesDatabaseBindings
                 'managed' => true,
                 'region' => $region,
                 'size' => $size,
-            ], fn ($v) => $v !== null),
+            ],
             'last_error' => null,
-        ], true, '');
+        ], true, $editingId);
 
         ProvisionManagedDatabaseJob::dispatch(
             (string) $database->id,
             (string) $binding->id,
             (string) $server->id,
         );
+
+        $this->forgetReplacedCloudDatabase($previousTargetId, (string) $database->id);
 
         return $binding;
     }
@@ -536,9 +697,9 @@ trait ManagesDatabaseBindings
      */
     private function resolveManagedDatabaseCredential(Site $site, Server $server): ?ProviderCredential
     {
-        $server->loadMissing('providerCredential');
-        if ($server->providerCredential !== null) {
-            return $server->providerCredential;
+        $resolved = ManagedDatabaseCatalogAuth::resolveCredential($server);
+        if ($resolved instanceof ProviderCredential) {
+            return $resolved;
         }
 
         $provider = $server->provider->value;
@@ -590,7 +751,7 @@ trait ManagesDatabaseBindings
             $region = (string) ($vendor['regions'][0]['value'] ?? '');
         }
 
-        if (($vendor['account_required'] ?? false) && trim((string) ($params['vendor_account'] ?? '')) === '') {
+        if ($vendor['account_required'] && trim((string) ($params['vendor_account'] ?? '')) === '') {
             throw new InvalidArgumentException(__('Enter the :label for :vendor.', [
                 'label' => $vendor['account_label'] ?? __('account'),
                 'vendor' => $vendor['label'],
@@ -714,6 +875,90 @@ trait ManagesDatabaseBindings
     }
 
     /**
+     * Seed the binding's editable alias map from stack detection, once.
+     *
+     * Only when the map has never been written: {@see SiteBinding::hasEnvAliasMap()}
+     * distinguishes "never seeded" from "seeded, then cleared by the operator".
+     * Without that distinction, re-pointing the resource would resurrect an
+     * alias someone deliberately deleted.
+     *
+     * Existing bindings from before this column predate the map entirely, so
+     * their next attach/refresh seeds them — and until then the alias is still
+     * baked into their stored injected_env, so nothing breaks in the gap.
+     */
+    private function seedDetectedEnvAliases(SiteBinding $binding, Site $site): void
+    {
+        if ($binding->hasEnvAliasMap()) {
+            return;
+        }
+
+        $aliases = self::databaseUrlAliasesFor($site);
+        if ($aliases === []) {
+            return;
+        }
+
+        $customization = is_array($binding->env_customization) ? $binding->env_customization : [];
+        $customization['aliases'] = ['DATABASE_URL' => $aliases];
+
+        $binding->forceFill(['env_customization' => $customization])->save();
+    }
+
+    /**
+     * Env key NAMES a database binding injects, without needing a provisioned
+     * database to read them off. Lets the environment-mapping editor render
+     * rows for a binding that is still coming up (a dedicated DB VM takes
+     * minutes) so the mapping is in place before the first deploy.
+     *
+     * Lives beside {@see databaseEnv()} on purpose: adding a key there without
+     * adding it here is visible in the same diff.
+     *
+     * @return list<string>
+     */
+    public function databaseEnvKeys(string $engine, string $connection = ''): array
+    {
+        $slug = $this->databaseConnectionSlug($connection);
+        $primary = $this->databaseConnectionIsPrimary($slug);
+        $p = $primary ? 'DB_' : 'DB_'.strtoupper($slug).'_';
+
+        if (DatabaseWorkspaceEngines::family($engine) === 'sqlite') {
+            return $primary
+                ? ['DB_CONNECTION', $p.'DATABASE', 'DATABASE_URL']
+                : [$p.'DATABASE', $p.'URL'];
+        }
+
+        $keys = [$p.'HOST', $p.'PORT', $p.'DATABASE', $p.'USERNAME', $p.'PASSWORD'];
+
+        return $primary
+            ? array_merge(['DB_CONNECTION'], $keys, ['DATABASE_URL'])
+            : array_merge($keys, [$p.'URL']);
+    }
+
+    /**
+     * Extra env names that should carry the primary connection URL, chosen from
+     * the stack detected in the repository.
+     *
+     * Detected, never guessed: an unrecognised stack gets no aliases. Inventing
+     * env names an app does not read is harmless noise at best, and at worst
+     * shadows something the operator set deliberately — which is why the caller
+     * also refuses to overwrite a key that already exists.
+     *
+     * @return list<string>
+     */
+    private static function databaseUrlAliasesFor(Site $site): array
+    {
+        $detected = $site->resolvedRuntimeAppDetection() ?? [];
+
+        return match (strtolower((string) ($detected['migration_tool'] ?? ''))) {
+            // Payload reads DATABASE_URI; @payloadcms/db-postgres will not fall
+            // back to DATABASE_URL.
+            'payload' => ['DATABASE_URI'],
+            // Prisma and Drizzle both read DATABASE_URL, which is already set.
+            'prisma', 'drizzle' => [],
+            default => [],
+        };
+    }
+
+    /**
      * Connection variables for a database as seen by $site. The host is
      * resolved relative to where the site runs: loopback when the DB is on the
      * site's own box, the source server's private IP when it's a peer in the
@@ -758,7 +1003,7 @@ trait ManagesDatabaseBindings
                 $env[$p.'TIMEZONE'] = (string) $options['timezone'];
             }
 
-            return array_filter($env, fn ($v) => $v !== null && $v !== '');
+            return array_filter($env, fn ($v) => $v !== '');
         }
 
         $host = $this->effectiveDatabaseHost($db, $site);
@@ -780,6 +1025,11 @@ trait ManagesDatabaseBindings
             // primary owns it; a named instance is registered separately.
             $env = ['DB_CONNECTION' => $driver] + $env;
             $env['DATABASE_URL'] = (string) $db->connectionUrl($host);
+
+            // Stack-specific aliases (Payload's DATABASE_URI, …) are NOT baked
+            // in here any more. They seed SiteBinding::envAliases() on attach
+            // instead — see seedDetectedEnvAliases() — so the operator can see
+            // what dply decided and change it. connectionEnv() expands them.
         } elseif (($url = (string) $db->connectionUrl($host)) !== '') {
             $env[$p.'URL'] = $url;
         }

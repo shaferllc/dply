@@ -44,6 +44,10 @@ class ProviderCredentialPolicy
 
     public function delete(User $user, ProviderCredential $providerCredential): bool
     {
-        return $this->view($user, $providerCredential);
+        if ($providerCredential->organization_id) {
+            return $providerCredential->organization?->hasAdminAccess($user) ?? false;
+        }
+
+        return $providerCredential->user_id === $user->id;
     }
 }

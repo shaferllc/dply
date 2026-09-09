@@ -34,7 +34,7 @@
                 >
                     <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Edit .env') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Edit .env') }}</p>
                             <p class="truncate text-sm font-semibold text-brand-ink">{{ $site->name ?? $site->domain }}</p>
                         </div>
                         <div class="flex items-center gap-2">
@@ -43,13 +43,13 @@
                                 wire:click="save"
                                 wire:loading.attr="disabled"
                                 wire:target="save"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest disabled:opacity-60"
                             >
                                 <x-heroicon-o-check class="h-4 w-4" wire:loading.remove wire:target="save" />
                                 <span wire:loading wire:target="save" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                                 {{ __('Save & push') }}
                             </button>
-                            <button type="button" x-on:click="open = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <button aria-label="{{ __('Close') }}" type="button" x-on:click="open = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                                 <x-heroicon-o-x-mark class="h-5 w-5" />
                             </button>
                         </div>
@@ -77,7 +77,7 @@
                             <a
                                 href="{{ route('sites.environment', ['server' => $server, 'site' => $site]) }}"
                                 wire:navigate
-                                class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline"
+                                class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline"
                             >
                                 {{ __('Full environment editor') }}
                                 <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />

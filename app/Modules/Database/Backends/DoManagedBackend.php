@@ -7,7 +7,9 @@ namespace App\Modules\Database\Backends;
 use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Support\Servers\ProviderManagedDatabaseRegion;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -17,7 +19,7 @@ use RuntimeException;
  *
  * Wraps the existing {@see DigitalOceanService} Managed Databases endpoints
  * (the same ones the Cloud-site flow uses) so a VM site can co-locate a
- * managed Postgres / MySQL / Redis cluster in its own DigitalOcean region.
+ * managed Postgres / MySQL / Valkey cluster in its own DigitalOcean region.
  * Adds the network lockdown step (trusted sources) that the seamless
  * "just works, but not publicly exposed" placement requires.
  */
@@ -35,6 +37,16 @@ class DoManagedBackend implements DatabaseBackend
         return CloudDatabase::BACKEND_DIGITALOCEAN;
     }
 
+    public function supports(string $capability): bool
+    {
+        return in_array($capability, [
+            self::CAP_USERS,
+            self::CAP_RESIZE,
+            self::CAP_METRICS,
+            self::CAP_BACKUPS,
+        ], true);
+    }
+
     public function supportedEngines(): array
     {
         return [
@@ -50,7 +62,7 @@ class DoManagedBackend implements DatabaseBackend
             return null;
         }
 
-        $region = $this->normalizeRegion((string) $server->region);
+        $region = ProviderManagedDatabaseRegion::normalize('digitalocean', (string) $server->region);
 
         return $region !== '' ? $region : null;
     }
@@ -69,6 +81,8 @@ class DoManagedBackend implements DatabaseBackend
             $database->region !== '' ? $database->region : 'nyc3',
             $database->backendSizeSlug(),
             $this->clusterName($database),
+            $database->backendEngineVersion(),
+            ProviderResourceTags::forCloudDatabase($database),
         );
 
         $database->forceFill(['backend_id' => (string) $cluster['id']])->save();
@@ -83,10 +97,11 @@ class DoManagedBackend implements DatabaseBackend
         }
 
         $cluster = $service->getDatabaseCluster((string) $database->backend_id);
-        $connection = is_array($cluster['connection'] ?? null) ? $cluster['connection'] : [];
+        $this->ensureProviderTags($service, $database, $cluster);
+        $connection = $cluster['connection'];
 
         return [
-            'status' => (string) ($cluster['status'] ?? ''),
+            'status' => (string) $cluster['status'],
             'connection' => $connection,
         ];
     }
@@ -107,12 +122,15 @@ class DoManagedBackend implements DatabaseBackend
             $rules[] = ['type' => 'ip_addr', 'value' => (string) $server->ip_address];
         }
 
+        $service = $this->service($database);
+        $this->ensureProviderTags($service, $database, []);
+
         if ($rules === []) {
             return;
         }
 
         try {
-            $this->service($database)->setDatabaseTrustedSources((string) $database->backend_id, $rules);
+            $service->setDatabaseTrustedSources((string) $database->backend_id, $rules);
         } catch (\Throwable $e) {
             // Lockdown is best-effort: a failure here must not strand an
             // otherwise-online database. Log and leave it on the provider
@@ -120,6 +138,118 @@ class DoManagedBackend implements DatabaseBackend
             Log::warning('database.do_managed.lockdown_failed', [
                 'cloud_database_id' => $database->id,
                 'server_id' => $server->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    public function resize(CloudDatabase $database, string $size): void
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            throw new RuntimeException(__('This cluster has no DigitalOcean id yet.'));
+        }
+
+        $size = CloudDatabase::resolveSizeSlug($size);
+        $service = $this->service($database);
+
+        try {
+            $available = $service->getDatabaseEngineSizes($database->backendEngineSlug());
+            if ($available !== [] && ! in_array($size, $available, true)) {
+                throw new RuntimeException(__('DigitalOcean does not offer that plan for this cluster.'));
+            }
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Throwable) {
+            // Catalog is best-effort — still send the requested slug.
+        }
+
+        $service->resizeDatabaseCluster((string) $database->backend_id, $size);
+    }
+
+    public function metricCatalog(CloudDatabase $database): array
+    {
+        $catalog = [
+            ['key' => 'cpu', 'label' => __('CPU'), 'format' => 'percent'],
+            ['key' => 'memory_utilization', 'label' => __('Memory'), 'format' => 'percent'],
+            ['key' => 'load_1', 'label' => __('Load (1m)'), 'format' => 'load'],
+        ];
+
+        // Valkey holds its dataset in memory; DigitalOcean reports no disk
+        // series for it, and an always-empty chart reads as a broken one.
+        if ($database->engine !== CloudDatabase::ENGINE_REDIS) {
+            array_splice($catalog, 2, 0, [
+                ['key' => 'disk_utilization', 'label' => __('Disk'), 'format' => 'percent'],
+            ]);
+        }
+
+        return $catalog;
+    }
+
+    public function metric(CloudDatabase $database, string $metric, int $start, int $end): array
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            return [];
+        }
+
+        return $this->service($database)->getDatabaseMetric($database->backend_id, $metric, $start, $end);
+    }
+
+    public function backups(CloudDatabase $database): array
+    {
+        if (! is_string($database->backend_id) || $database->backend_id === '') {
+            return [];
+        }
+
+        return $this->service($database)->listDatabaseBackups($database->backend_id);
+    }
+
+    public function provisionFromBackup(CloudDatabase $target, CloudDatabase $source, string $backupCreatedAt): void
+    {
+        if (! is_string($source->backend_id) || $source->backend_id === '') {
+            throw new RuntimeException(__('The source cluster has no DigitalOcean id.'));
+        }
+
+        $service = $this->service($target);
+
+        // `backup_restore` keys off the provider's cluster *name*, which dply
+        // generates at create and never stores — so it has to be read back.
+        // Null-coalesced before trim(): DigitalOcean can return a cluster
+        // without a `name`, and trim(null) is a TypeError on PHP 8 — which
+        // would throw past the empty-name guard immediately below instead of
+        // reporting it. Recovered from stash/0-queue-fleet-panel-wip.
+        $sourceName = trim((string) ($service->getDatabaseCluster($source->backend_id)['name'] ?? ''));
+        if ($sourceName === '') {
+            throw new RuntimeException(__('DigitalOcean did not report a name for the source cluster.'));
+        }
+
+        $cluster = $service->createDatabaseClusterFromBackup(
+            $target->backendEngineSlug(),
+            $target->region !== '' ? $target->region : 'nyc3',
+            $target->backendSizeSlug(),
+            $this->clusterName($target),
+            $sourceName,
+            $backupCreatedAt,
+            $target->backendEngineVersion(),
+            ProviderResourceTags::forCloudDatabase($target),
+        );
+
+        $target->forceFill(['backend_id' => (string) $cluster['id']])->save();
+    }
+
+    /**
+     * @param  array{tags?: list<string>}  $cluster
+     */
+    private function ensureProviderTags(DigitalOceanService $service, CloudDatabase $database, array $cluster): void
+    {
+        try {
+            $service->ensureDatabaseClusterTags(
+                (string) $database->backend_id,
+                ProviderResourceTags::forCloudDatabase($database),
+                $cluster['tags'] ?? [],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('database.do_managed.tags_failed', [
+                'cloud_database_id' => $database->id,
                 'error' => $e->getMessage(),
             ]);
         }
@@ -141,32 +271,5 @@ class DoManagedBackend implements DatabaseBackend
         $slug = Str::slug($database->name) ?: 'db';
 
         return 'dply-'.$slug.'-'.Str::lower(Str::random(6));
-    }
-
-    /**
-     * Droplet regions (e.g. `nyc3`, `ams3`) are already valid Managed Database
-     * slugs; older short codes (`nyc`, `ams`) are mapped to the numbered slug
-     * DO's database API accepts. Mirrors CreateCloudDatabase's normalization.
-     */
-    private function normalizeRegion(string $region): string
-    {
-        $region = strtolower(trim($region));
-
-        if (preg_match('/^[a-z]{3}[0-9]$/', $region) === 1) {
-            return $region;
-        }
-
-        return match ($region) {
-            'ams' => 'ams3',
-            'nyc' => 'nyc3',
-            'fra' => 'fra1',
-            'sfo' => 'sfo3',
-            'sgp' => 'sgp1',
-            'lon' => 'lon1',
-            'tor' => 'tor1',
-            'blr' => 'blr1',
-            'syd' => 'syd1',
-            default => $region,
-        };
     }
 }

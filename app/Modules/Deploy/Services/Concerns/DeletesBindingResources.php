@@ -9,7 +9,7 @@ use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use App\Services\Servers\DockerDatabaseProvisioner;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Facades\Auth;
@@ -29,9 +29,37 @@ trait DeletesBindingResources
 
         match ($binding->type) {
             'database' => $this->deleteDatabaseBindingResource($binding),
+            'redis' => $this->deleteRedisBindingResource($binding),
             'storage' => $this->deleteStorageBindingResource($binding),
             default => null,
         };
+    }
+
+    private function deleteRedisBindingResource(SiteBinding $binding): void
+    {
+        if ($binding->target_type === 'cloud_database' && filled($binding->target_id)) {
+            TeardownCloudDatabaseJob::dispatch((string) $binding->target_id);
+
+            return;
+        }
+
+        if (($binding->config['placement'] ?? '') !== 'cache_vm') {
+            return;
+        }
+
+        $serverId = $binding->provisionServerId();
+        if ($serverId === null) {
+            return;
+        }
+
+        $vmServer = Server::query()->find($serverId);
+        if ($vmServer instanceof Server) {
+            app(DeleteServerAction::class)->execute(
+                $vmServer,
+                Auth::user(),
+                ['reason' => 'binding_detach'],
+            );
+        }
     }
 
     private function deleteDatabaseBindingResource(SiteBinding $binding): void
@@ -64,7 +92,7 @@ trait DeletesBindingResources
             }
             $db?->delete();
 
-            if (($cfg['placement'] ?? '') === 'docker_vm' && $dbVmServerId !== '') {
+            if ($cfg['placement'] === 'docker_vm' && $dbVmServerId !== '') {
                 $vmServer = Server::query()->find($dbVmServerId);
                 if ($vmServer instanceof Server) {
                     app(DeleteServerAction::class)->execute(

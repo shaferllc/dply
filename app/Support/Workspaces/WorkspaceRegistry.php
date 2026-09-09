@@ -42,6 +42,28 @@ final class WorkspaceRegistry
             return $this->cache[$id] = $site->workspace;
         }
 
+        return $this->find($id);
+    }
+
+    /**
+     * The same memo, keyed straight off an id, for callers holding something
+     * other than a Site.
+     *
+     * The workspace sidebar prints the project name from `$server->workspace` —
+     * a second belongsTo, on a different model instance, for the row the
+     * SitePolicy had just fetched — so it re-SELECTed `workspaces` on every
+     * workspace page. Going through here makes it a memo hit.
+     */
+    public function find(?string $id): ?Workspace
+    {
+        if ($id === null || $id === '') {
+            return null;
+        }
+
+        if (isset($this->cache[$id])) {
+            return $this->cache[$id];
+        }
+
         $workspace = Workspace::find($id);
 
         return $workspace !== null ? $this->cache[$id] = $workspace : null;

@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\RunSupervisorOperationJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\DismissesDaemonSuggestions;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
@@ -17,7 +17,6 @@ use App\Livewire\Servers\Concerns\ManagesDaemonTemplates;
 use App\Livewire\Servers\Concerns\ManagesSupervisorPrograms;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerSupervisorHealthScan;
-use App\Models\OrganizationSupervisorProgramTemplate;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
@@ -25,15 +24,11 @@ use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerRemovalAdvisor;
-use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Support\Servers\DaemonWorkspaceViewData;
-use App\Support\SupervisorEnvFormatter;
+use App\Support\Sites\QueueWorkerClassifier;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -47,6 +42,7 @@ class WorkspaceDaemons extends Component
 {
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
+    use DismissesDaemonSuggestions;
     use EmitsPanelEvent;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
@@ -58,6 +54,15 @@ class WorkspaceDaemons extends Component
     use ManagesDaemonTemplates;
     use ManagesSupervisorPrograms;
     use RendersWorkspacePlaceholder;
+
+    /** Suggestions here are scoped to the currently selected context site. */
+    protected function daemonSuggestionSite(): ?Site
+    {
+        return $this->context_site_id !== null
+            ? Site::find($this->context_site_id)
+            : null;
+    }
+
     use RunsServerSupervisorHealthScan;
     use WithPagination;
 
@@ -217,9 +222,7 @@ class WorkspaceDaemons extends Component
         return $this->context_site_id !== null;
     }
 
-
     public string $log_tail_slug = '';
-
 
     /**
      * Merged Workers card skeleton (hide-hero) so lazy load matches the page
@@ -284,6 +287,17 @@ class WorkspaceDaemons extends Component
             ? $allPrograms->where('site_id', $this->context_site_id)->values()
             : $allPrograms;
 
+        // Queue workers are owned by the site Queue page. Excluding them HERE
+        // rather than at each render keeps the header stats honest: a count that
+        // included processes the list does not show was the confusing part.
+        // Server-scope keeps everything — there is no per-site Queue page to
+        // send someone to when you are looking at the whole box.
+        if ($this->context_site_id !== null) {
+            $filteredSupervisorPrograms = $filteredSupervisorPrograms
+                ->reject(fn (SupervisorProgram $program): bool => QueueWorkerClassifier::isQueueWorker($program->command))
+                ->values();
+        }
+
         $contextSiteModel = $this->context_site_id !== null
             ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
             : null;
@@ -312,7 +326,7 @@ class WorkspaceDaemons extends Component
             ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB)])
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'server_id'])
-            ->flatMap(fn (Site $site) => $site->processes->map(fn ($p) => [
+            ->flatMap(fn (Site $site) => $site->processes->map(fn (SiteProcess $p): array => [
                 'site_id' => (string) $site->id,
                 'site_name' => $site->name,
                 'name' => $p->name,

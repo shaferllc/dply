@@ -8,10 +8,9 @@ use App\Jobs\ExportRedisSnapshotJob;
 use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Models\BackupConfiguration;
 use App\Models\RedisSnapshot;
-use App\Models\RedisSnapshotSchedule;
+use App\Models\BackupSchedule;
 use App\Models\Server;
 use App\Models\ServerCacheService;
-use App\Models\ServerCronJob;
 use Illuminate\Support\Collection;
 
 /**
@@ -19,7 +18,7 @@ use Illuminate\Support\Collection;
  *
  * Extracted verbatim from the former WorkspaceRedisSnapshots component so the
  * hub's "Cache" tab keeps full parity: run-now triggers, recurring schedule CRUD,
- * and the history list, all backed by {@see RedisSnapshot} / {@see RedisSnapshotSchedule}
+ * and the history list, all backed by {@see RedisSnapshot} / {@see BackupSchedule}
  * and the {@see ExportRedisSnapshotJob} pipeline.
  *
  * Method names are prefixed `redis*` so they don't collide with the site-database
@@ -105,7 +104,10 @@ trait ManagesRedisSnapshots
             return;
         }
 
-        if (RedisSnapshotSchedule::query()->where('server_cache_service_id', $row->id)->exists()) {
+        if (BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_CACHE)
+            ->where('target_id', $row->id)
+            ->exists()) {
             $this->toastError(__('A schedule already exists for this cache service. Delete it first to change cadence.'));
 
             return;
@@ -121,27 +123,18 @@ trait ManagesRedisSnapshots
             return;
         }
 
-        $schedule = RedisSnapshotSchedule::create([
+        $schedule = BackupSchedule::create([
             'server_id' => $this->server->id,
-            'server_cache_service_id' => $row->id,
+            'target_type' => BackupSchedule::TARGET_CACHE,
+            'target_id' => $row->id,
             'backup_configuration_id' => $configuration->id,
             'cron_expression' => $this->new_cron_expression,
             'is_active' => true,
         ]);
 
-        // Control-plane cron entry — fires on this dply install's cron, not the
-        // remote box. user/host are nominal because nothing SSHes for us here.
-        $cronJob = ServerCronJob::create([
-            'server_id' => $this->server->id,
-            'cron_expression' => $this->new_cron_expression,
-            'command' => 'php '.base_path('artisan').' dply:run-redis-snapshot-schedule '.$schedule->id,
-            'user' => 'root',
-            'enabled' => true,
-            'description' => 'Redis snapshot schedule '.$schedule->id,
-            'system_managed' => true,
-        ]);
-
-        $schedule->update(['server_cron_job_id' => $cronJob->id]);
+        // No cron row — see the note in ManagesServerBackupSchedules. The
+        // schedule row is the source of truth and
+        // DispatchDueBackupSchedulesCommand ticks it from the control plane.
 
         if ($org = $this->server->organization) {
             audit_log($org, auth()->user(), 'redis_snapshot.schedule.created', $schedule, null, [
@@ -160,7 +153,8 @@ trait ManagesRedisSnapshots
     {
         $this->authorize('update', $this->server);
 
-        $schedule = RedisSnapshotSchedule::query()
+        $schedule = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_CACHE)
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -170,9 +164,6 @@ trait ManagesRedisSnapshots
 
         $next = ! $schedule->is_active;
         $schedule->update(['is_active' => $next]);
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->update(['enabled' => $next]);
-        }
         $this->toastSuccess($next ? __('Schedule resumed.') : __('Schedule paused.'));
     }
 
@@ -180,7 +171,8 @@ trait ManagesRedisSnapshots
     {
         $this->authorize('update', $this->server);
 
-        $schedule = RedisSnapshotSchedule::query()
+        $schedule = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_CACHE)
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -188,9 +180,6 @@ trait ManagesRedisSnapshots
             return;
         }
 
-        if ($schedule->server_cron_job_id) {
-            ServerCronJob::query()->whereKey($schedule->server_cron_job_id)->delete();
-        }
         $schedule->delete();
         $this->toastSuccess(__('Schedule deleted.'));
     }
@@ -239,7 +228,8 @@ trait ManagesRedisSnapshots
             ->orderBy('name')
             ->get();
 
-        $schedules = RedisSnapshotSchedule::query()
+        $schedules = BackupSchedule::query()
+            ->where('target_type', BackupSchedule::TARGET_CACHE)
             ->where('server_id', $this->server->id)
             ->with(['cacheService', 'backupConfiguration'])
             ->orderByDesc('created_at')

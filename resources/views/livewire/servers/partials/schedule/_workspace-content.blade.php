@@ -3,7 +3,7 @@
 
     // Nested sections inside the merged Schedule card — not second page cards.
     $card = 'border-b border-brand-ink/10';
-    $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
+    $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-1.5 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
 
     $chipForHealth = static function (?string $health): array {
         return match ($health) {
@@ -37,8 +37,8 @@
     $hasStale = ($scheduleStats['attention'] ?? 0) > 0;
     $siteDedicatedContext = $siteDedicatedContext ?? ($contextSiteModel !== null && ($scheduleSiteRouteLocked ?? false));
     $scheduleDescription = $siteDedicatedContext
-        ? __('Framework schedulers for this site (schedule:run tick health, cadence, run-now).')
-        : __('Framework schedulers running on this server. Tracks tick health for each scheduler; nudges you when one stops firing.');
+        ? __('Framework schedulers for this site — tick health, cadence, and run-now.')
+        : __('Framework schedulers on this server — tick health per site; nudges when one stops firing.');
     $scheduleTabContext = compact(
         'server',
         'cards',
@@ -71,131 +71,103 @@
 @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
 <section class="dply-card min-w-0 overflow-hidden p-0">
-    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Schedule') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $scheduleDescription }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    {{-- Dense head, matching the rest of the workspace (and the lazy
+         placeholder, which has always painted this shape). --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-calendar-days"
+        :title="__('Schedule')"
+        :note="$scheduleDescription"
+        class="border-b border-brand-ink/10"
+    />
 
-    <div class="border-b border-brand-ink/10">
-        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-            <div class="flex items-start gap-3">
-                <x-icon-badge>
-                    <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scheduler') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Schedulers at a glance') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        @if ($contextSiteModel && $schedulers_list_scope === 'site')
-                            {{ __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name]) }}
-                        @else
-                            {{ __('Counts across every monitored framework scheduler on this server.') }}
-                        @endif
-                    </p>
-                </div>
-            </div>
-        </div>
-        <dl class="grid grid-cols-2 gap-2 px-5 py-5 sm:grid-cols-4 sm:px-6">
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-brand-sage/30 bg-brand-sage/8' => $scheduleStats['total'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['total'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Schedulers') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['total'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $scheduleStats['total']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Monitored entries') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-emerald-200 bg-emerald-50/60' => $scheduleStats['healthy'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['healthy'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Healthy') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['healthy'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('ticking|ticking', $scheduleStats['healthy']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Recent heartbeat') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-amber-200 bg-amber-50/60' => $scheduleStats['attention'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['attention'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Attention') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['attention'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('item|items', $scheduleStats['attention']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Waiting, stale, or missing') }}</p>
-            </div>
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-brand-sand/80 bg-brand-sand/30' => $scheduleStats['paused'] > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => $scheduleStats['paused'] === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Paused') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $scheduleStats['paused'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('stopped|stopped', $scheduleStats['paused']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Cron disabled in Dply') }}</p>
-            </div>
-        </dl>
-    </div>
+    @php
+        $glanceNote = match (true) {
+            $siteDedicatedContext && $contextSiteModel => __('Counts for this site’s framework schedulers.'),
+            $contextSiteModel && $schedulers_list_scope === 'site' => __('Counts for :site\'s framework schedulers. Switch the list scope to “All schedulers on server” to see the whole block.', ['site' => $contextSiteModel->name]),
+            default => __('Counts across every monitored framework scheduler on this server.'),
+        };
+    @endphp
+
+    {{-- Dense head + stat strip, same treatment as the Workers snapshot and the
+         Cron crontab-at-a-glance. The per-tile captions ("Monitored entries",
+         "Recent heartbeat"…) become hover hints — they were a third line of
+         prose on every tile. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__('Schedulers at a glance')"
+        :note="$glanceNote"
+        class="border-b border-brand-ink/10"
+    />
+
+    <x-workspace-stat-strip class="border-b border-brand-ink/10" :stats="[
+        ['label' => __('Schedulers'), 'value' => $scheduleStats['total'], 'hint' => __('Monitored entries')],
+        [
+            'label' => __('Healthy'),
+            'value' => $scheduleStats['healthy'],
+            'tone' => $scheduleStats['healthy'] > 0 ? 'ok' : null,
+            'hint' => __('Recent heartbeat'),
+        ],
+        [
+            'label' => __('Attention'),
+            'value' => $scheduleStats['attention'],
+            'tone' => $scheduleStats['attention'] > 0 ? 'warn' : null,
+            'hint' => __('Waiting, stale, or missing'),
+        ],
+        [
+            'label' => __('Paused'),
+            'value' => $scheduleStats['paused'],
+            'hint' => __('Cron disabled in Dply'),
+        ],
+    ]" />
 
     @if ($opsReady)
-        {{-- Console banner for scheduler actions (enable, pause, run-now, cadence save) --}}
-        <div wire:loading wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-            <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
+        {{-- Console banner: hidden until there's something to show (avoids an empty ~30px band). --}}
+        @php
+            $scheduleBannerVisible = $scheduler_run_busy || $panel_event_message !== '';
+        @endphp
+        <div
+            @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4', 'hidden' => ! $scheduleBannerVisible])
+            wire:loading.class.remove="hidden"
+            wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow"
+        >
+            <div wire:loading.block wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow">
+                <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
+            </div>
+            @if ($scheduler_run_busy)
+                <div wire:poll.1s="pollSchedulerRun">
+                    <x-workspace-console-banner
+                        :status="$panel_event_status"
+                        :message="$panel_event_message ?: __('Run now queued…')"
+                        :output="$panel_event_lines"
+                        :busy="true"
+                    />
+                </div>
+            @elseif ($panel_event_message !== '')
+                <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun">
+                    <x-workspace-console-banner
+                        :status="$panel_event_status"
+                        :message="$panel_event_message"
+                        :output="$panel_event_lines"
+                        dismiss-action="dismissPanelBanner"
+                    />
+                </div>
+            @endif
         </div>
-        @if ($panel_event_message !== '')
-            <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun" class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
-                <x-workspace-console-banner
-                    :status="$panel_event_status"
-                    :message="$panel_event_message"
-                    :output="$panel_event_lines"
-                    dismiss-action="dismissPanelBanner"
-                />
-            </div>
-        @endif
 
-        {{-- Run-now live streaming — poll the job's cached output until it finishes --}}
-        @if ($scheduler_run_busy)
-            <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6" wire:poll.1s="pollSchedulerRun">
-                <x-workspace-console-banner
-                    :status="$panel_event_status"
-                    :message="$panel_event_message ?: __('Run now queued…')"
-                    :output="$panel_event_lines"
-                    :busy="true"
-                />
-            </div>
-        @endif
-
-        <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
-            <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none">
+        <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+            <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab id="schedule-tab-schedulers" icon="heroicon-o-clock" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
                     {{ __('Schedulers') }}
                     @if ($scheduleStats['total'] > 0)
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ number_format($scheduleStats['total']) }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-brand-moss">{{ number_format($scheduleStats['total']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="schedule-tab-overview" icon="heroicon-o-heart" :active="$schedule_workspace_tab === 'overview'" wire:click="setScheduleWorkspaceTab('overview')">
                     {{ __('Overview') }}
                     @if ($scheduleStats['attention'] > 0)
-                        <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
+                        <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-2xs font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
                     @endif
                 </x-server-workspace-tab>
                 <x-server-workspace-tab id="schedule-tab-logs" icon="heroicon-o-document-text" :active="$schedule_workspace_tab === 'logs'" wire:click="setScheduleWorkspaceTab('logs')">
@@ -207,7 +179,26 @@
             </x-server-workspace-tablist>
         </div>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setScheduleWorkspaceTab">
+        {{-- Skeleton swap, not a dim-and-lock: fading the outgoing tab to
+             opacity-60 left the previous tab's rows legible while a different
+             tab loaded, which reads as "this is your data".
+
+             One wrapper per tab, each targeting the call WITH its argument —
+             Livewire matches wire:target params, so only the tab actually being
+             opened paints. The shared sites `_panel-skeleton` this replaced drew
+             the same generic list for all four, so Logs and Overview resized on
+             arrival. --}}
+        @foreach (['schedulers', 'overview', 'logs', 'activity'] as $skeletonTab)
+            <div class="hidden" wire:loading.class.remove="hidden" wire:target="setScheduleWorkspaceTab('{{ $skeletonTab }}')" aria-busy="true" aria-live="polite">
+                <span class="sr-only">{{ __('Loading section…') }}</span>
+                @include('livewire.servers.partials.schedule._tab-skeleton', [
+                    'tab' => $skeletonTab,
+                    'rows' => $scheduleStats['total'],
+                ])
+            </div>
+        @endforeach
+
+        <div class="relative" wire:loading.class="hidden" wire:target="setScheduleWorkspaceTab">
             @if ($schedule_workspace_tab === 'overview')
                 <x-server-workspace-tab-panel id="schedule-panel-overview" labelled-by="schedule-tab-overview" panel-class="min-w-0">
                     @include('livewire.servers.partials.schedule._tab-overview', $scheduleTabContext)
@@ -238,17 +229,35 @@
             @include('livewire.servers.partials.schedule._enable-modal-body', $scheduleTabContext)
         </x-modal>
     @else
-        <div class="px-5 py-6 sm:px-6">
+        <div class="px-3 py-4 sm:px-4">
             @include('livewire.servers.partials.workspace-ops-not-ready')
         </div>
     @endif
 
     @if ($contextSiteModel)
-        <div class="border-t border-brand-ink/10 px-5 py-5 sm:px-6">
-            <x-cli-snippet :commands="[
+        @php
+            $scheduleCliCommands = [
                 ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
-                ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\''],
-            ]" />
+            ];
+            if ($enableTargetSite?->isLaravelFrameworkDetected()) {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a schedule:run cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\'',
+                ];
+            } elseif ($enableTargetSite?->isRailsFrameworkDetected()) {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a whenever cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'bundle exec whenever --update-crontab\'',
+                ];
+            } else {
+                $scheduleCliCommands[] = [
+                    'label' => __('Add a scheduler cron entry for this site'),
+                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'<command>\'',
+                ];
+            }
+        @endphp
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2 sm:px-4">
+            <x-cli-snippet :commands="$scheduleCliCommands" />
         </div>
     @endif
 </section>

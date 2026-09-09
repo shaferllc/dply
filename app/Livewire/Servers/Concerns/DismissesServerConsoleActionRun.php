@@ -26,7 +26,7 @@ trait DismissesServerConsoleActionRun
 {
     public function dismissConsoleActionRun(string $runId): void
     {
-        $server = $this->server ?? null;
+        $server = $this->server;
         if (! $server instanceof Server) {
             return;
         }
@@ -37,9 +37,6 @@ trait DismissesServerConsoleActionRun
         }
 
         $subject = $row->subject;
-        if ($subject === null) {
-            return;
-        }
 
         $belongs = $subject instanceof Server
             ? $subject->id === $server->id

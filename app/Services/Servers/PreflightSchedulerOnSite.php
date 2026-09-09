@@ -60,10 +60,6 @@ class PreflightSchedulerOnSite
     /**
      * @return list<string>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<string>
-     */
     public function structuralChecksForKind(string $kind): array
     {
         return $kind === ServerSchedulerHeartbeat::KIND_LARAVEL
@@ -195,10 +191,6 @@ BASH;
     /**
      * @return list<array{key: string, status: string, message: string}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, string>>
-     */
     public function parseResult(string $output): array
     {
         $results = [];
@@ -227,9 +219,7 @@ BASH;
      * @param  array<string, mixed> $results
      * @return list<array<string, string>>
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      * @param  array<string, mixed> $results
      */
     public function structuralFailures(array $results, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL): array
@@ -246,9 +236,7 @@ BASH;
      * @param  array<string, mixed> $results
      * @return list
      */
-    /** @return array<string, mixed> */
     /**
-     * @return array<string, mixed>
      * @param  array<string, mixed> $results
      */
     public function advisoryWarnings(array $results): array
@@ -259,10 +247,6 @@ BASH;
         ));
     }
 
-    /**
-     * @param  array<string, mixed> $results
-     * @return array<string, mixed>
-     */
     public function run(
         Server $server,
         Site $site,

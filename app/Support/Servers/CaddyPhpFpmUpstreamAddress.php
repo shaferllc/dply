@@ -78,7 +78,7 @@ final class CaddyPhpFpmUpstreamAddress
     }
 
     /**
-     * @param  array<string, mixed> $installedVersionIds
+     * @param  list<string> $installedVersionIds
      * @return array{
      *     primary: string,
      *     fallback: ?string,

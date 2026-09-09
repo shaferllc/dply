@@ -62,9 +62,6 @@ $specific = [
         'public function mergeEdgeMeta(array $patch): void' => '/** @param array<string, mixed> $patch */'."\n    ".'public function mergeEdgeMeta(array $patch): void',
         'if ($this->container_backend === null)' => 'if ($this->container_backend === null || $this->container_backend === \'\')',
     ],
-    'FunctionInvocation.php' => [
-        'public function logLines(): array' => '/** @return list<string> */'."\n    ".'public function logLines(): array',
-    ],
     'RealtimeApp.php' => [
         'public function generateCredentials(): array' => '/** @return array{app_id: string, app_key: string, app_secret: string} */'."\n    ".'public function generateCredentials(): array',
     ],

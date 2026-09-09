@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Feature\SiteDeploymentsListPageTest;
 
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Sites\DeploymentsList;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -107,36 +107,126 @@ test('redeploy action queues a deployment', function () {
 
     Queue::assertPushed(RunSiteDeploymentJob::class, fn ($job): bool => $job->site->is($site));
 });
-test('serverless deployments tab embeds the journey with a redeploy control', function () {
-    [$user, $server, $site] = makeFunctionsSite();
+
+test('vm site gets the recurring Schedule tab', function () {
+    [$user, $server, $site] = makeUserSite();
 
     Livewire::actingAs($user)
         ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
-        // The embedded journey panel is the redeploy surface.
-        ->assertSeeLivewire('serverless.journey')
-        ->assertSee('Redeploy');
+        ->assertSet('tab', DeploymentsList::TAB_DEPLOY)
+        ->call('setTab', DeploymentsList::TAB_SCHEDULE)
+        ->assertSet('tab', DeploymentsList::TAB_SCHEDULE)
+        ->assertSee(__('Recurring deploys'));
 });
-function makeFunctionsSite(): array
-{
-    $user = User::factory()->create();
-    $org = Organization::factory()->create();
-    $org->users()->attach($user->id, ['role' => 'owner']);
-    session(['current_organization_id' => $org->id]);
 
-    $server = Server::factory()->ready()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
-    ]);
-    $site = Site::factory()->create([
+test('deploy tab labels the one-off delay "Deploy later", not Schedule', function () {
+    // Two different features used to both read "Schedule" on this tab.
+    [$user, $server, $site] = makeUserSite();
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->assertSee(__('Deploy later'))
+        ->assertDontSee(__('Scheduled deploys'));
+});
+
+test('vm atomic site keeps pipeline and releases in both rows', function () {
+    [$user, $server, $site] = makeUserSite();
+    $site->update(['deploy_strategy' => 'atomic']);
+
+    $component = Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site->fresh()])
+        ->instance();
+
+    $visible = $component->tabVisibility();
+
+    expect($visible[DeploymentsList::TAB_PIPELINE])->toBeTrue();
+    expect($visible[DeploymentsList::TAB_SCHEDULE])->toBeTrue();
+    expect($visible[DeploymentsList::TAB_RELEASES])->toBeTrue();
+});
+
+test('deletes a single finished deployment', function () {
+    [$user, $server, $site] = makeUserSite();
+    $failed = seedDeploy($site, SiteDeployment::STATUS_FAILED, now(), 'manual');
+    $kept = seedDeploy($site, SiteDeployment::STATUS_SUCCESS, now()->subHour(), 'manual');
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('confirmDeleteDeployment', $failed->id)
+        ->assertSet('showConfirmActionModal', true)
+        ->assertSet('confirmActionModalMethod', 'deleteDeployment')
+        ->call('confirmActionModal');
+
+    expect(SiteDeployment::query()->find($failed->id))->toBeNull();
+    expect(SiteDeployment::query()->find($kept->id))->not->toBeNull();
+});
+
+test('refuses to delete a running deployment', function () {
+    [$user, $server, $site] = makeUserSite();
+    $running = seedDeploy($site, SiteDeployment::STATUS_RUNNING, now(), 'manual');
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('deleteDeployment', $running->id);
+
+    expect(SiteDeployment::query()->find($running->id))->not->toBeNull();
+});
+
+test('refuses to delete a deployment belonging to another site', function () {
+    [$user, $server, $site] = makeUserSite();
+    // A sibling site on the same host — same org, so the component still
+    // mounts; the guard being tested is the site_id scope, not authorization.
+    $otherSite = Site::factory()->create([
         'server_id' => $server->id,
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'status' => Site::STATUS_FUNCTIONS_ACTIVE,
+        'user_id' => $site->user_id,
+        'organization_id' => $site->organization_id,
     ]);
+    $foreign = seedDeploy($otherSite, SiteDeployment::STATUS_FAILED, now(), 'manual');
 
-    return [$user, $server, $site];
-}
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('deleteDeployment', $foreign->id);
+
+    expect(SiteDeployment::query()->find($foreign->id))->not->toBeNull();
+});
+
+test('bulk delete clears failed runs and leaves the rest', function () {
+    [$user, $server, $site] = makeUserSite();
+    $failedOne = seedDeploy($site, SiteDeployment::STATUS_FAILED, now(), 'manual');
+    $failedTwo = seedDeploy($site, SiteDeployment::STATUS_FAILED, now()->subMinutes(5), 'webhook');
+    $success = seedDeploy($site, SiteDeployment::STATUS_SUCCESS, now()->subHour(), 'manual');
+    $skipped = seedDeploy($site, SiteDeployment::STATUS_SKIPPED, now()->subHours(2), 'manual');
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('confirmDeleteFailedDeployments')
+        ->assertSet('confirmActionModalMethod', 'deleteFailedDeployments')
+        ->call('confirmActionModal');
+
+    expect(SiteDeployment::query()->find($failedOne->id))->toBeNull();
+    expect(SiteDeployment::query()->find($failedTwo->id))->toBeNull();
+    expect(SiteDeployment::query()->find($success->id))->not->toBeNull();
+    // A skipped run records a billing/window decision, not a failure — it stays.
+    expect(SiteDeployment::query()->find($skipped->id))->not->toBeNull();
+});
+
+test('bulk delete does not reach across sites', function () {
+    [$user, $server, $site] = makeUserSite();
+    $otherSite = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $site->user_id,
+        'organization_id' => $site->organization_id,
+    ]);
+    seedDeploy($site, SiteDeployment::STATUS_FAILED, now(), 'manual');
+    $foreign = seedDeploy($otherSite, SiteDeployment::STATUS_FAILED, now(), 'manual');
+
+    Livewire::actingAs($user)
+        ->test(DeploymentsList::class, ['server' => $server, 'site' => $site])
+        ->call('deleteFailedDeployments');
+
+    expect(SiteDeployment::query()->where('site_id', $site->id)->count())->toBe(0);
+    expect(SiteDeployment::query()->find($foreign->id))->not->toBeNull();
+});
+
 function makeUserSite(): array
 {
     $user = User::factory()->create();

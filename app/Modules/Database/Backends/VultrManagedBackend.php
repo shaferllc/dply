@@ -7,7 +7,9 @@ namespace App\Modules\Database\Backends;
 use App\Enums\ServerProvider;
 use App\Models\CloudDatabase;
 use App\Models\Server;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
+use App\Modules\Database\Backends\Concerns\CannotResizeManagedDatabase;
+use App\Modules\Database\Backends\Concerns\SupportsNoManagedOperations;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -24,6 +26,9 @@ use RuntimeException;
  */
 class VultrManagedBackend implements DatabaseBackend
 {
+    use CannotResizeManagedDatabase;
+    use SupportsNoManagedOperations;
+
     /** dply engine → Vultr `database_engine` slug (Valkey is Redis-compatible). */
     private const ENGINE_SLUGS = [
         CloudDatabase::ENGINE_POSTGRES => 'pg',
@@ -90,7 +95,7 @@ class VultrManagedBackend implements DatabaseBackend
         $engineSlug = self::ENGINE_SLUGS[$database->engine] ?? 'pg';
         $version = $database->version !== ''
             ? $database->version
-            : (self::DEFAULT_VERSION[$engineSlug] ?? '16');
+            : self::DEFAULT_VERSION[$engineSlug];
 
         $cluster = $this->service($database)->createDatabaseCluster(
             $engineSlug,
@@ -112,11 +117,11 @@ class VultrManagedBackend implements DatabaseBackend
         }
 
         $cluster = $service->getDatabaseCluster((string) $database->backend_id);
-        $connection = is_array($cluster['connection'] ?? null) ? $cluster['connection'] : [];
+        $connection = $cluster['connection'];
 
         // Normalize Vultr's `running` to the shared `online` ready-state so the
         // provisioning job's status check stays backend-agnostic.
-        $status = (string) ($cluster['status'] ?? '');
+        $status = (string) $cluster['status'];
 
         return [
             'status' => $status === 'running' ? 'online' : $status,

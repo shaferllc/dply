@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\RemoteCli\ArtisanClassificationTest;
 
+use App\Models\Site;
 use App\Modules\RemoteCli\Services\Artisan;
 use App\Modules\RemoteCli\Services\Kind;
 use App\Modules\RemoteCli\Services\RemoteCliPermissions;
@@ -88,4 +89,30 @@ dataset('instantCommandProvider', function () {
         ['migrate:rollback', false],
         ['totally-made-up', false],
     ];
+});
+
+test('the shell command invokes the site PHP, not the box default', function () {
+    // Site console on a site pinned above the distro default: bare `php` would
+    // fatal on Composer's platform check before artisan ever ran.
+    $site = new Site([
+        'runtime' => 'php',
+        'runtime_version' => '8.5',
+        'repository_path' => '/home/dply/databio',
+    ]);
+
+    $shell = artisan()->buildShellForRun($site, 'route:list', []);
+
+    expect($shell)
+        ->toContain("cd '/home/dply/databio' &&")
+        ->toContain('/usr/bin/php8.5')
+        ->toContain('"$DPLY_PHP" artisan route:list')
+        ->not->toContain('&& php artisan');
+});
+
+test('the shell command falls back to bare php when the site pins no version', function () {
+    $site = new Site(['repository_path' => '/home/dply/legacy']);
+
+    expect(artisan()->buildShellForRun($site, 'route:list', []))
+        ->toContain('php artisan route:list')
+        ->not->toContain('DPLY_PHP');
 });

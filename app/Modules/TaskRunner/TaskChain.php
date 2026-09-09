@@ -242,7 +242,6 @@ class TaskChain
      * Run the task chain.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function run(): array
     {
         $this->startedAt = now()->toISOString();
@@ -285,7 +284,6 @@ class TaskChain
      * Run tasks sequentially.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runSequential(): array
     {
         $totalTasks = $this->tasks->count();
@@ -386,7 +384,6 @@ class TaskChain
      * Run tasks in parallel.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runParallel(): array
     {
         $parallelExecutor = ParallelTaskExecutor::make($this->dispatcher, $this->streamingLogger);
@@ -418,7 +415,6 @@ class TaskChain
      * Process the chain results.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function processChainResults(): array
     {
         $totalTasks = $this->tasks->count();

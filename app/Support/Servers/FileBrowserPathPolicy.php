@@ -12,8 +12,9 @@ namespace App\Support\Servers;
  *  - matchesSensitiveGlob() classifies a resolved path against the
  *    sensitive-glob list from config so opens of secret-bearing files
  *    can be logged.
- *  - isInsideReleases() detects when an edit target resolves under a
- *    site's atomic `releases/<id>/` tree (the next deploy will wipe it).
+ *  - isInsideReleases() / willBeOverwrittenOnDeploy() detect edit targets
+ *    the next deploy will replace (atomic `releases/`/`current/`, or the
+ *    simple checkout — not `shared/`).
  */
 class FileBrowserPathPolicy
 {
@@ -95,6 +96,59 @@ class FileBrowserPathPolicy
         $prefix = ($siteRoot === '/' ? '' : $siteRoot).'/releases/';
 
         return str_starts_with($path, $prefix);
+    }
+
+    /**
+     * True when path is the atomic `current` symlink (or anything under it)
+     * before the browser has resolved the link into `releases/<id>/`.
+     */
+    public static function isInsideCurrent(string $path, string $siteRoot): bool
+    {
+        $path = self::normalize($path);
+        $siteRoot = self::normalize($siteRoot);
+        $current = ($siteRoot === '/' ? '' : $siteRoot).'/current';
+
+        return $path === $current || str_starts_with($path, $current.'/');
+    }
+
+    /**
+     * True when path lives in the atomic `shared/` tree (survives deploys).
+     */
+    public static function isInsideShared(string $path, string $siteRoot): bool
+    {
+        $path = self::normalize($path);
+        $siteRoot = self::normalize($siteRoot);
+        $shared = ($siteRoot === '/' ? '' : $siteRoot).'/shared';
+
+        return $path === $shared || str_starts_with($path, $shared.'/');
+    }
+
+    /**
+     * True when the next site deploy will replace this path on disk.
+     *
+     * Atomic: `releases/` and `current/` are swapped; `shared/` is durable.
+     * Simple: the live checkout is the deploy tree, so anything under the
+     * site root except `shared/` is overwritten.
+     */
+    public static function willBeOverwrittenOnDeploy(string $path, string $siteRoot, bool $atomic): bool
+    {
+        $path = self::normalize($path);
+        $siteRoot = self::normalize($siteRoot);
+
+        if (! self::isInside($path, $siteRoot)) {
+            return false;
+        }
+
+        if (self::isInsideShared($path, $siteRoot)) {
+            return false;
+        }
+
+        if (! $atomic) {
+            return true;
+        }
+
+        return self::isInsideReleases($path, $siteRoot)
+            || self::isInsideCurrent($path, $siteRoot);
     }
 
     /**

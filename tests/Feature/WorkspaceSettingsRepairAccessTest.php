@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\WorkspaceSettingsRepairAccessTest;
 
-use App\Livewire\Servers\WorkspaceSettings;
+use App\Livewire\Servers\SettingsCard;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -44,7 +44,7 @@ test('connection settings can repair ssh access', function () {
     });
 
     Livewire::actingAs($user)
-        ->test(WorkspaceSettings::class, ['server' => $server, 'section' => 'connection'])
+        ->test(SettingsCard::class, ['server' => $server, 'section' => 'connection'])
         ->call('repairSshAccess')
         ->assertDispatched('notify', message: 'SSH access repaired. Dply reinstalled the operational key for this server.', type: 'success');
 });

@@ -75,7 +75,7 @@ test('settings inventory section redirects to patches when patch advisor is enab
     [$user, $server] = patchAdvisorUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.settings', ['server' => $server, 'section' => 'inventory']))
+        ->get(route('servers.settings', ['server' => $server, 'tab' => 'inventory']))
         ->assertRedirect(route('servers.patches', $server));
 });
 

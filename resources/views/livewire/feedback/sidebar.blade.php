@@ -8,7 +8,7 @@
 
     {{-- Backdrop --}}
     <div
-        x-show="open"
+        x-show="drawerOpen"
         x-cloak
         x-transition.opacity
         class="fixed inset-0 z-40 bg-brand-ink/30 backdrop-blur-sm"
@@ -18,7 +18,7 @@
 
     {{-- Slide-over panel (right edge) --}}
     <div
-        x-show="open"
+        x-show="drawerOpen"
         x-cloak
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="translate-x-full opacity-0"
@@ -40,7 +40,7 @@
                 </span>
                 <div class="min-w-0">
                     <p id="feedback-sidebar-title" class="truncate text-sm font-semibold text-brand-ink">{{ __('Send feedback') }}</p>
-                    <p class="truncate text-[11px] text-brand-moss">{{ __('Found a bug or have an idea? Tell us.') }}</p>
+                    <p class="truncate text-xs text-brand-moss">{{ __('Found a bug or have an idea? Tell us.') }}</p>
                 </div>
             </div>
             <button

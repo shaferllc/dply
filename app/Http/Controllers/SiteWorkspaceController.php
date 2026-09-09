@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Livewire\Sites\EdgeSettings;
 use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Livewire\RendersLivewirePage;
 use Illuminate\Support\Facades\Gate;
-use Livewire\Features\SupportPageComponents\PageComponentConfig;
-use Livewire\Features\SupportPageComponents\SupportPageComponents;
-use Livewire\Livewire;
 
 class SiteWorkspaceController
 {
@@ -33,7 +30,6 @@ class SiteWorkspaceController
         if (
             $section === 'deploy'
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
         ) {
             return redirect()->route('sites.deployments.index', [
@@ -53,7 +49,6 @@ class SiteWorkspaceController
         if (
             $section === 'environment'
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
         ) {
             return redirect()->route('sites.environment', [
@@ -81,32 +76,13 @@ class SiteWorkspaceController
             ]);
         }
 
-        $component = $site->usesEdgeRuntime() ? EdgeSettings::class : Settings::class;
-
-        $params = [
+        // Edge sites rendered Livewire\Sites\EdgeSettings here; that component
+        // went with the surface (remove-cloud-edge), so every site
+        // gets the standard settings workspace.
+        return RendersLivewirePage::render(Settings::class, [
             'server' => $server,
             'site' => $site,
             'section' => $section,
-        ];
-
-        $html = null;
-
-        $layoutConfig = SupportPageComponents::interceptTheRenderOfTheComponentAndRetreiveTheLayoutConfiguration(
-            function () use (&$html, $component, $params): void {
-                $html = Livewire::mount($component, $params);
-            },
-        );
-
-        $layoutConfig = $layoutConfig ?: new PageComponentConfig;
-
-        $layoutConfig->normalizeViewNameAndParamsForBladeComponents();
-
-        $response = response(SupportPageComponents::renderContentsIntoLayout($html, $layoutConfig));
-
-        if (is_callable($layoutConfig->response)) {
-            call_user_func($layoutConfig->response, $response);
-        }
-
-        return $response;
+        ]);
     }
 }

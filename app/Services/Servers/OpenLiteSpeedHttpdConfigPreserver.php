@@ -14,7 +14,6 @@ class OpenLiteSpeedHttpdConfigPreserver
     /**
      * @return array<string, string> module name => full block text
      */
-    /** @return array<string, mixed> */
     public function extractModuleBlocks(string $config): array
     {
         if ($config === '') {
@@ -24,11 +23,8 @@ class OpenLiteSpeedHttpdConfigPreserver
         $blocks = [];
         if (preg_match_all('/^[\t ]*module\s+([A-Za-z0-9_]+)\s*\{.*?^[\t ]*\}/sm', $config, $matches, PREG_SET_ORDER) !== false) {
             foreach ($matches as $match) {
-                $name = (string) ($match[1] ?? '');
-                if ($name === '') {
-                    continue;
-                }
-                $blocks[$name] = rtrim((string) ($match[0] ?? ''), "\n")."\n";
+                $name = (string) $match[1];
+                $blocks[$name] = rtrim((string) $match[0], "\n")."\n";
             }
         }
 

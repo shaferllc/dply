@@ -41,7 +41,7 @@ class MiseInstallScriptBuilder
     {
         $catalog = config('server_manage.mise_runtimes');
         if (is_array($catalog) && $catalog !== []) {
-            return array_values(array_map('strval', array_keys($catalog)));
+            return array_map('strval', array_keys($catalog));
         }
 
         return self::SUPPORTED_RUNTIMES;
@@ -60,7 +60,6 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function installLines(bool $forceReinstall = false): array
     {
@@ -77,7 +76,13 @@ class MiseInstallScriptBuilder
             'chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
             'echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
             'dply_wait_for_apt_locks',
-            'apt-get update -y',
+            // dply_apt_update, not a bare `apt-get update`: under the
+            // provisioner's `set -e` any unusable third-party repo already on
+            // the box (an expired signing key, say) makes apt exit non-zero and
+            // kills the whole provision at this step. The helper retries, then
+            // continues — the install below still fails loudly if mise's own
+            // repo is the broken one.
+            'dply_apt_update',
             'dply_wait_for_apt_locks',
             'apt-get install -y --no-install-recommends mise',
         ];
@@ -107,7 +112,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function activateForUserLines(string $deployUser): array
     {
@@ -137,7 +141,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function installRuntimeForUserLines(string $deployUser, string $runtime, string $version): array
     {
@@ -191,7 +194,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     public function installRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
@@ -204,7 +206,6 @@ class MiseInstallScriptBuilder
      *
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     /** @return array<int, string> */
     public function uninstallRuntimeVersionForUserLines(string $deployUser, string $runtime, string $version): array
     {
@@ -235,7 +236,6 @@ class MiseInstallScriptBuilder
      *
      * @return array<int, string>
      */
-    /** @return array<string, mixed> */
     public function setRuntimeDefaultForUserLines(string $deployUser, string $runtime, string $version): array
     {
         return $this->installRuntimeForUserLines($deployUser, $runtime, $version);
@@ -258,23 +258,5 @@ class MiseInstallScriptBuilder
             'java' => 'java',
             default => $runtime,
         };
-    }
-
-    /**
-     * Force mise to fetch prebuilt release binaries instead of compiling from
-     * source. Extracted so installRuntimeForUserLines and its install-only
-     * sibling agree without duplication.
-     */
-    private function preferBinaryEnv(): string
-    {
-        try {
-            $preferBinary = (bool) config('server_provision.mise_prefer_binary', true);
-        } catch (\Throwable) {
-            $preferBinary = true;
-        }
-
-        return $preferBinary
-            ? 'MISE_NODE_COMPILE=0 MISE_PYTHON_COMPILE=0 MISE_RUBY_COMPILE=0 PYTHON_BUILD_USE_PREBUILT=1 '
-            : '';
     }
 }

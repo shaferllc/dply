@@ -16,7 +16,7 @@ namespace App\Modules\Ai\Services;
 final class LlmSynthesisResult
 {
     /**
-     * @param  array<string, mixed> $suggestions
+     * @param  list<array<string, list<array<string, string>>|string|null>> $suggestions
      * @param  array<string, mixed> $metadata
      */
     public function __construct(
@@ -29,10 +29,6 @@ final class LlmSynthesisResult
         public readonly array $metadata = [],
     ) {}
 
-    /**
-     * @return array{narrative: string, suggestions: list<ParsedSuggestion>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int|null}
-     */
-    /** @return array<string, mixed> */
     public function toArray(): array
     {
         return [

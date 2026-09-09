@@ -7,7 +7,7 @@
             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
         </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pail (live tail)') }}</h3>
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Streams `storage/logs/laravel.log`. Live mode polls every 2s and only ships bytes appended since the last poll, so a chatty log doesn\'t flood the panel.') }}</p>
         </div>
@@ -61,7 +61,7 @@
     @elseif (trim($laravelPailBuffer) === '')
         <p class="mt-5 text-center text-sm text-brand-mist">{{ __('Log file is empty.') }}</p>
     @else
-        <pre class="mt-5 max-h-[36rem] overflow-auto rounded-lg bg-brand-ink p-4 font-mono text-[11px] leading-relaxed text-brand-cream">{{ $laravelPailBuffer }}</pre>
+        <pre class="mt-5 max-h-[36rem] overflow-auto rounded-lg bg-brand-ink p-4 font-mono text-xs leading-relaxed text-brand-cream">{{ $laravelPailBuffer }}</pre>
     @endif
     </div>
 </section>

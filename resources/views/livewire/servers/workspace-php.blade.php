@@ -37,125 +37,119 @@
     ])
 
     <section class="dply-card min-w-0 overflow-hidden p-0">
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Runtime') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('PHP inventory, CLI default, and new-site default for this server.') }}
-                        </p>
-                    </div>
-                </div>
-                @can('update', $server)
-                    @if ($opsReady)
-                        <div class="flex shrink-0 flex-wrap items-center gap-2">
-                            <button
-                                type="button"
-                                wire:click="refreshPhpInventory"
-                                wire:loading.attr="disabled"
-                                wire:target="refreshPhpInventory"
-                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.remove wire:target="refreshPhpInventory" aria-hidden="true" />
-                                <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-4 w-4 items-center justify-center">
-                                    <x-spinner variant="forest" size="sm" />
-                                </span>
-                                <span wire:loading.remove wire:target="refreshPhpInventory">{{ __('Refresh inventory') }}</span>
-                                <span wire:loading wire:target="refreshPhpInventory">{{ __('Refreshing…') }}</span>
-                            </button>
-                        </div>
-                    @endif
-                @endcan
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-command-line"
+            :title="__('Runtime')"
+            :note="__('PHP inventory, CLI default, and new-site default for this server.')"
+            class="border-b border-brand-ink/10"
+        >
+            @can('update', $server)
+                @if ($opsReady)
+                    <x-slot:actions>
+                        <button
+                            type="button"
+                            wire:click="refreshPhpInventory"
+                            wire:loading.attr="disabled"
+                            wire:target="refreshPhpInventory"
+                            title="{{ __('Refresh inventory') }}"
+                            class="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs font-semibold text-brand-moss transition hover:bg-white hover:text-brand-ink hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="refreshPhpInventory" aria-hidden="true" />
+                            <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-spinner variant="forest" size="sm" />
+                            </span>
+                            <span class="hidden sm:inline">{{ __('Refresh inventory') }}</span>
+                        </button>
+                    </x-slot:actions>
+                @endif
+            @endcan
+        </x-workspace-panel-head>
 
-        <dl class="grid grid-cols-1 gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-3 sm:px-6">
-            <div @class([
-                'rounded-xl border px-4 py-3',
-                'border-brand-sage/30 bg-brand-sage/8' => (int) ($phpSummary['installed_count'] ?? 0) > 0,
-                'border-brand-ink/10 bg-brand-sand/15' => (int) ($phpSummary['installed_count'] ?? 0) === 0,
-            ])>
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Installed versions') }}</dt>
-                <dd class="mt-1 flex items-baseline gap-1.5">
-                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ (int) $phpSummary['installed_count'] }}</span>
-                    <span class="text-[11px] text-brand-moss">{{ trans_choice('version|versions', (int) $phpSummary['installed_count']) }}</span>
-                </dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Detected on host') }}</p>
-            </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CLI default') }}</dt>
-                <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['cli_default'] ? 'PHP '.$phpSummary['cli_default'] : __('not set') }}</dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('update-alternatives') }}</p>
-            </div>
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('New-site default') }}</dt>
-                <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['new_site_default'] ? 'PHP '.$phpSummary['new_site_default'] : __('not set') }}</dd>
-                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Applied to new sites') }}</p>
-            </div>
-        </dl>
+        {{-- The three figures the page exists to answer: what's installed, what
+             the CLI resolves to, and what new sites will get. --}}
+        <x-workspace-stat-strip class="border-b border-brand-ink/10" :columns="3" :stats="[
+            [
+                'label' => __('Installed versions'),
+                'value' => (int) $phpSummary['installed_count'],
+                'tone' => (int) ($phpSummary['installed_count'] ?? 0) > 0 ? 'ok' : null,
+                'hint' => __('PHP versions detected on the host'),
+            ],
+            [
+                'label' => __('CLI default'),
+                'value' => $phpSummary['cli_default'] ? 'PHP '.$phpSummary['cli_default'] : __('not set'),
+                'hint' => __('Resolved through update-alternatives'),
+            ],
+            [
+                'label' => __('New-site default'),
+                'value' => $phpSummary['new_site_default'] ? 'PHP '.$phpSummary['new_site_default'] : __('not set'),
+                'hint' => __('Applied to sites created on this server'),
+            ],
+        ]" />
 
         @if ($sshUnavailable)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
+                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('SSH unavailable.') }}</span>
                 {{ __('Add or restore this server\'s SSH access before Dply can inspect or manage PHP.') }}
-            </div>
+            </p>
         @elseif (! $opsReady)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
+                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Once provisioning finishes, this page will show installed PHP versions, defaults, and shared configuration entry points.') }}
-            </div>
+            </p>
         @endif
 
         @if ($phpInventoryRefreshRunning)
-            <div class="border-b border-sky-200/80 bg-sky-50/60 px-5 py-3.5 text-sm text-sky-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-sky-200/80 bg-sky-50/60 px-4 py-2 text-xs text-sky-900 sm:px-5">
+                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
                 <span class="font-semibold">{{ __('PHP inventory refresh running') }}.</span>
                 {{ __('Dply is collecting the latest installed versions and CLI default from the server.') }}
-            </div>
+            </p>
         @endif
 
         @if ($phpInventoryRefreshFailed)
-            <div class="border-b border-rose-200/80 bg-rose-50/60 px-5 py-3.5 text-sm text-rose-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-rose-200/80 bg-rose-50/60 px-4 py-2 text-xs text-rose-900 sm:px-5">
+                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('PHP inventory refresh failed') }}.</span>
                 {{ $phpInventoryRefreshError ?: __('The last PHP inspection attempt did not complete successfully.') }}
-            </div>
+            </p>
         @endif
 
         @if ($phpInventoryStale)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
+                <x-heroicon-m-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('PHP inventory may be stale') }}.</span>
                 {{ $phpInventoryRefreshError ?: __('Remote PHP state changed, but Dply could not save the refreshed snapshot.') }}
-            </div>
+            </p>
         @endif
 
         @if ($phpEnvironmentUnsupported)
-            <div class="border-b border-amber-200/80 bg-amber-50/60 px-5 py-3.5 text-sm text-amber-900 sm:px-6">
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-amber-200/80 bg-amber-50/60 px-4 py-2 text-xs text-amber-900 sm:px-5">
+                <x-heroicon-m-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span class="font-semibold">{{ __('Unsupported environment') }}.</span>
                 {{ __('This server does not currently report a PHP environment that the management workspace can support.') }}
-            </div>
+            </p>
         @endif
 
         @if ($phpInventoryNeverRun)
-            <div class="border-b border-brand-ink/10 px-5 py-3.5 text-sm text-brand-ink sm:px-6">
-                <span class="font-semibold">{{ __('No PHP inventory yet') }}.</span>
+            <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 border-b border-brand-ink/10 px-4 py-2 text-xs text-brand-moss sm:px-5">
+                <x-heroicon-m-information-circle class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                <span class="font-semibold text-brand-ink">{{ __('No PHP inventory yet') }}.</span>
                 {{ __('PHP inventory will appear here after the first refresh runs.') }}
-            </div>
+            </p>
         @endif
 
         @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-5 py-4 sm:px-6">
-                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Library') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
-                </div>
-                <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ count($phpVersionRows) }}</span>
-            </div>
+            <x-workspace-panel-head
+                dense
+                icon="heroicon-o-rectangle-stack"
+                :title="__('Versions on this server')"
+                :count="(string) count($phpVersionRows)"
+                :note="__('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.')"
+                class="border-b border-brand-ink/10"
+            />
 
             <ul class="divide-y divide-brand-ink/10">
                     @foreach ($phpVersionRows as $row)
@@ -190,12 +184,13 @@
                             $rowHasEditorError = $phpConfigEditorOpen
                                 && $phpConfigEditorVersion === $row['id']
                                 && ! empty($phpConfigEditorErrorLines);
+                            $extensionsExpanded = $expandedExtensionsVersion === $row['id'];
                         @endphp
 
                         <x-workspace-table-row
                             wire:key="php-{{ $row['id'] }}"
                             :wire-target="$rowTargets"
-                            class="px-6 py-4 sm:px-8"
+                            class="px-4 py-3 sm:px-5"
                         >
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
                                 <span class="mt-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
@@ -206,44 +201,60 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="text-sm font-semibold text-brand-ink">{{ $row['label'] }}</p>
                                         @if ($isInstalled)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
                                                 <x-heroicon-m-check class="h-3 w-3" />
                                                 {{ __('Installed') }}
                                             </span>
                                         @else
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/40 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                 {{ __('Available') }}
                                             </span>
                                         @endif
                                         @if ($isCliDefault)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                                 <x-heroicon-m-check class="h-3 w-3" />
                                                 {{ __('CLI default') }}
                                             </span>
                                         @endif
                                         @if ($isNewSiteDefault)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">
                                                 <x-heroicon-m-sparkles class="h-3 w-3" />
                                                 {{ __('Default for new sites') }}
                                             </span>
                                         @endif
                                         @if (! ($row['is_supported'] ?? true))
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-200">
                                                 {{ __('Unsupported') }}
                                             </span>
                                         @endif
                                         @if ($rowHasEditorError)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200" title="{{ __('Validation failed on line :lines — fix or discard in the editor.', ['lines' => implode(', ', $phpConfigEditorErrorLines)]) }}">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200" title="{{ __('Validation failed on line :lines — fix or discard in the editor.', ['lines' => implode(', ', $phpConfigEditorErrorLines)]) }}">
                                                 <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                                                 {{ __('Config error') }}
                                             </span>
                                         @endif
                                     </div>
-                                    <p class="mt-0.5 text-[11px] text-brand-mist">
+                                    <p class="mt-0.5 text-xs text-brand-mist">
                                         <span class="inline-flex items-center gap-1">
                                             <x-heroicon-m-globe-alt class="h-3 w-3" />
                                             {{ trans_choice('Used by :count site|Used by :count sites', $siteCount, ['count' => $siteCount]) }}
                                         </span>
+                                        @if ($isInstalled)
+                                            <span class="text-brand-mist/60">·</span>
+                                            <button
+                                                type="button"
+                                                wire:click="toggleExtensionsPanel('{{ $row['id'] }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="toggleExtensionsPanel('{{ $row['id'] }}')"
+                                                class="inline-flex items-center gap-1 rounded font-semibold text-brand-forest underline-offset-2 transition hover:underline disabled:opacity-50"
+                                                aria-expanded="{{ $extensionsExpanded ? 'true' : 'false' }}"
+                                                aria-controls="php-extensions-{{ $row['id'] }}"
+                                            >
+                                                <x-heroicon-m-puzzle-piece class="h-3 w-3 shrink-0" />
+                                                {{ trans_choice('Extension (:count)|Extensions (:count)', (int) ($row['extension_count'] ?? 0), ['count' => (int) ($row['extension_count'] ?? 0)]) }}
+                                                <x-heroicon-m-chevron-down @class(['h-3 w-3 shrink-0 transition-transform', 'rotate-180' => $extensionsExpanded]) />
+                                            </button>
+                                        @endif
                                         @if ($disableUninstall && $isInstalled)
                                             <span class="text-brand-mist/60">·</span>
                                             <span class="italic">
@@ -270,9 +281,9 @@
                                                 wire:click="runPhpPackageAction('install', '{{ $row['id'] }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="{{ $actionTarget('install') }}"
-                                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
+                                                <x-heroicon-m-arrow-down-tray class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
                                                 <span wire:loading wire:target="{{ $actionTarget('install') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="cream" size="sm" />
                                                 </span>
@@ -285,9 +296,9 @@
                                                 wire:click="runPhpPackageAction('patch', '{{ $row['id'] }}')"
                                                 wire:loading.attr="disabled"
                                                 wire:target="{{ $actionTarget('patch') }}"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                                                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
-                                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
+                                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
                                                 <span wire:loading wire:target="{{ $actionTarget('patch') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="forest" size="sm" />
                                                 </span>
@@ -299,7 +310,7 @@
                                                 <x-slot name="trigger">
                                                     <button
                                                         type="button"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                                         aria-label="{{ __('Version actions') }}"
                                                         aria-haspopup="true"
                                                     >
@@ -379,7 +390,7 @@
                                                 <x-slot name="trigger">
                                                     <button
                                                         type="button"
-                                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                        class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                                         aria-label="{{ __('Edit config') }}"
                                                         aria-haspopup="true"
                                                     >
@@ -428,6 +439,13 @@
                                     </div>
                                 @endcan
                             </div>
+
+                            @if ($extensionsExpanded && $phpExtensionPanel !== null)
+                                @include('livewire.servers.partials.php.extensions-panel', [
+                                    'version' => $row['id'],
+                                    'panel' => $phpExtensionPanel,
+                                ])
+                            @endif
                         </x-workspace-table-row>
                     @endforeach
                 </ul>
@@ -453,22 +471,22 @@
                         @click.stop
                         x-data="{ sidebarCollapsed: (localStorage.getItem('php-config-sidebar-collapsed') === '1') }"
                     >
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-7">
+                        <div class="border-b border-brand-ink/10 px-4 py-3 sm:px-5">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <x-icon-badge>
                                         <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
                                     </x-icon-badge>
                                     <div class="min-w-0">
-                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('PHP') }} {{ $phpConfigEditorVersion }}</p>
-                                        <h2 id="php-config-editor-title" class="mt-1 text-lg font-semibold text-brand-ink">
+                                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP') }} {{ $phpConfigEditorVersion }}</p>
+                                        <h2 id="php-config-editor-title" class="mt-0.5 text-sm font-semibold text-brand-ink">
                                             {{ __('Editing :target', ['target' => $phpConfigEditorTargetLabel]) }}
                                         </h2>
-                                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                        <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
                                             {{ __('Edit the config, then save to validate it before Dply replaces the live file.') }}
                                         </p>
                                         @if ($phpConfigEditorPath)
-                                            <p class="mt-2 break-all font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
+                                            <p class="mt-1 break-all font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
                                         @endif
                                     </div>
                                 </div>
@@ -516,7 +534,7 @@
                                             wire:click="captureLiveAsRevision"
                                             wire:loading.attr="disabled"
                                             wire:target="captureLiveAsRevision"
-                                            class="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                                            class="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100"
                                         >
                                             <x-heroicon-o-camera class="h-3 w-3" />
                                             <span wire:loading.remove wire:target="captureLiveAsRevision">{{ __('Capture as revision') }}</span>
@@ -525,13 +543,13 @@
                                     </div>
                                 @endif
 
-                                <div class="flex items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2 text-[11px] text-brand-moss">
+                                <div class="flex items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2 text-xs text-brand-moss">
                                     <span class="font-semibold uppercase tracking-wide">{{ __('Revisions') }}</span>
                                     @if ($phpConfigRevisions->isNotEmpty())
                                         <button
                                             type="button"
                                             wire:click="toggleCompareMode"
-                                            class="text-[11px] underline {{ $phpConfigEditorCompareMode ? 'text-brand-ink' : '' }}"
+                                            class="text-xs underline {{ $phpConfigEditorCompareMode ? 'text-brand-ink' : '' }}"
                                         >
                                             {{ $phpConfigEditorCompareMode ? __('Cancel compare') : __('Compare two') }}
                                         </button>
@@ -551,21 +569,21 @@
                                                     {{ optional($rev->created_at)->timezone(config('app.timezone'))->format('Y-m-d H:i') }}
                                                 </p>
                                                 @if ($isCurrent)
-                                                    <span class="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('Current') }}</span>
+                                                    <span class="rounded-full bg-emerald-50 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('Current') }}</span>
                                                 @endif
                                                 @if ($compareA)
-                                                    <span class="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">A</span>
+                                                    <span class="rounded-full bg-sky-50 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">A</span>
                                                 @elseif ($compareB)
-                                                    <span class="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">B</span>
+                                                    <span class="rounded-full bg-sky-50 px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-wide text-sky-800 ring-1 ring-sky-200">B</span>
                                                 @endif
                                             </div>
                                             @if ($rev->user)
-                                                <p class="text-[11px] text-brand-moss">{{ $rev->user->name }}</p>
+                                                <p class="text-xs text-brand-moss">{{ $rev->user->name }}</p>
                                             @endif
                                             @if ($rev->summary)
-                                                <p class="mt-1 text-[11px] italic text-brand-ink/75">{{ $rev->summary }}</p>
+                                                <p class="mt-1 text-xs italic text-brand-ink/75">{{ $rev->summary }}</p>
                                             @endif
-                                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                                                 @if ($phpConfigEditorCompareMode)
                                                     <button
                                                         type="button"
@@ -629,7 +647,7 @@
                                 <pre class="max-h-[65vh] overflow-auto rounded-2xl bg-brand-ink p-4 font-mono text-xs leading-5 text-emerald-200">{{ $phpConfigDiffText !== '' ? $phpConfigDiffText : __('(no differences)') }}</pre>
                             @else
                             @if ($phpConfigEditorReloadGuidance)
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-xs text-brand-ink">
                                     {{ $phpConfigEditorReloadGuidance }}
                                 </div>
                             @endif
@@ -668,7 +686,7 @@
                                         @php $previousLine = null; @endphp
                                         @foreach ($windowLines as $lineNum)
                                             @if ($previousLine !== null && $lineNum > $previousLine + 1)
-                                                <div class="select-none border-y border-brand-ink/5 bg-brand-sand/20 px-3 py-0.5 text-center text-[10px] tracking-wide text-brand-mist">···</div>
+                                                <div class="select-none border-y border-brand-ink/5 bg-brand-sand/20 px-3 py-0.5 text-center text-2xs tracking-wide text-brand-mist">···</div>
                                             @endif
                                             @php $isError = isset($errorSet[$lineNum]); @endphp
                                             <div class="flex {{ $isError ? 'bg-rose-50' : '' }}">
@@ -683,7 +701,7 @@
 
                             @if ($phpConfigEditorValidationOutput)
                                 <div class="{{ $card }}">
-                                    <div class="border-b border-brand-ink/10 px-5 py-3 text-sm font-medium text-brand-ink">
+                                    <div class="border-b border-brand-ink/10 px-4 py-2 text-xs font-semibold text-brand-ink">
                                         {{ __('Verification output') }}
                                     </div>
                                     <pre class="max-h-80 overflow-auto whitespace-pre-wrap break-words bg-brand-ink/95 p-4 font-mono text-xs leading-relaxed text-emerald-100">{{ $phpConfigEditorValidationOutput }}</pre>

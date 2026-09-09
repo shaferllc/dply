@@ -56,8 +56,8 @@ class EnableSiteQuickDeployCommand extends Command
             return self::FAILURE;
         }
 
-        // Sync provider kind + backing account into meta before the provisioner
-        // reloads via ->fresh() (mergeRepositoryMeta only sets the attribute).
+        // Sync provider kind + backing account into meta before enabling
+        // (mergeRepositoryMeta only sets the attribute until save).
         $patch = ['git_provider_kind' => $provider];
         if ((string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '') === '') {
             $patch['git_source_control_account_id'] = $account->id();
@@ -67,7 +67,7 @@ class EnableSiteQuickDeployCommand extends Command
 
         $this->line("Registering {$provider} webhook for <fg=white;options=bold>{$site->name}</> using identity <fg=gray>{$account->id()}</> ({$account->kind()})…");
 
-        $result = $provisioner->enable($site->fresh(), $account);
+        $result = $provisioner->enable($site, $account);
         if (! $result['ok']) {
             $this->error($result['message']);
 

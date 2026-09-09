@@ -6,6 +6,9 @@ use App\Models\NotificationChannel;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -19,11 +22,18 @@ use Livewire\Component;
  * @phpstan-require-extends Component
  *
  * @property-read Collection<int, NotificationChannel> $channels Livewire computed (access as $this->channels; do not invoke $this->channels()).
+ * @property-read Collection<int, NotificationChannel> $pagedChannels Livewire computed — the current page of $channels.
+ * @property-read int $channelPages Livewire computed — page count for $channels.
  */
 trait ManagesNotificationChannels
 {
+    use BuildsIntercomChannelInput;
+    use BuildsPagerDutyChannelInput;
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ResolvesDiscordGuilds;
+    use ResolvesSlackWorkspaces;
+    use ResolvesTelegramChats;
 
     public string $new_type = NotificationChannel::TYPE_SLACK;
 
@@ -55,9 +65,42 @@ trait ManagesNotificationChannels
 
     public string $new_mobile_platform = 'ios';
 
+    public string $new_intercom_access_token = '';
+
+    public string $new_intercom_region = 'us';
+
+    public string $new_intercom_admin_id = '';
+
+    public string $new_intercom_recipient = '';
+
+    public string $new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $new_intercom_subject = '';
+
+    public string $new_pagerduty_routing_key = '';
+
+    public string $new_pagerduty_region = 'us';
+
+    public string $new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $new_pagerduty_source = '';
+
+    public string $new_pagerduty_component = '';
+
+    public string $new_pagerduty_group = '';
+
     public string $new_webhook_url = '';
 
     public string $search = '';
+
+    /** Rows per page in the channel list. */
+    public const CHANNELS_PER_PAGE = 25;
+
+    public int $channelPage = 1;
 
     public ?string $editing_id = null;
 
@@ -91,6 +134,34 @@ trait ManagesNotificationChannels
 
     public string $edit_mobile_platform = 'ios';
 
+    public string $edit_intercom_access_token = '';
+
+    public string $edit_intercom_region = 'us';
+
+    public string $edit_intercom_admin_id = '';
+
+    public string $edit_intercom_recipient = '';
+
+    public string $edit_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+
+    public string $edit_intercom_message_type = IntercomMessage::TYPE_INAPP;
+
+    public string $edit_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+
+    public string $edit_intercom_subject = '';
+
+    public string $edit_pagerduty_routing_key = '';
+
+    public string $edit_pagerduty_region = 'us';
+
+    public string $edit_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+
+    public string $edit_pagerduty_source = '';
+
+    public string $edit_pagerduty_component = '';
+
+    public string $edit_pagerduty_group = '';
+
     public string $edit_webhook_url = '';
 
     public ?string $testing_id = null;
@@ -100,7 +171,19 @@ trait ManagesNotificationChannels
      */
     abstract protected function owner(): Model;
 
+    /**
+     * @return array<string, mixed>
+     */
     abstract protected function notificationChannelsViewData(): array;
+
+    /** {@see ResolvesSlackWorkspaces} — Slack installs hang off the same owner as the channels. */
+    protected function channelIntegrationOwner(): User|Organization|Team
+    {
+        // No @var here: owner() is already typed, and each host component
+        // narrows it further (Organization / Team / User), so re-declaring the
+        // union widened it against the native type.
+        return $this->owner();
+    }
 
     /**
      * Call from each component's mount() so the default type matches config-enabled types.
@@ -115,11 +198,35 @@ trait ManagesNotificationChannels
         if (! in_array($this->new_type, $allowed, true)) {
             $this->new_type = $allowed[0];
         }
+
+        $this->syncSlackModeDefault();
+        $this->syncDiscordModeDefault();
+        $this->syncTelegramModeDefault();
     }
 
     public function updatedSearch(): void
     {
         unset($this->channels);
+        $this->channelPage = 1;
+    }
+
+    /**
+     * @return Collection<int, NotificationChannel>
+     */
+    #[Computed]
+    public function pagedChannels(): Collection
+    {
+        // Clamp: deleting the last row of the last page must not strand you on
+        // an empty one.
+        $this->channelPage = min(max(1, $this->channelPage), $this->channelPages);
+
+        return $this->channels->forPage($this->channelPage, self::CHANNELS_PER_PAGE)->values();
+    }
+
+    #[Computed]
+    public function channelPages(): int
+    {
+        return max(1, (int) ceil($this->channels->count() / self::CHANNELS_PER_PAGE));
     }
 
     /**
@@ -128,7 +235,12 @@ trait ManagesNotificationChannels
     #[Computed]
     public function channels(): Collection
     {
-        $q = $this->owner()->notificationChannels()->withCount('subscriptions')->orderBy('label');
+        $q = $this->owner()->notificationChannels()
+            ->withCount('subscriptions')
+            // Event keys, not just the count: "2 usages" doesn't tell you whether
+            // the thing that pages you is wired up.
+            ->with('subscriptions:id,notification_channel_id,event_key,subscribable_type')
+            ->orderBy('label');
         $s = trim($this->search);
         if ($s !== '') {
             $q->where('label', 'like', '%'.$s.'%');
@@ -179,6 +291,9 @@ trait ManagesNotificationChannels
         Gate::authorize('manageNotificationChannels', $this->owner());
         $this->resetErrorBag();
         $this->resetNewChannelFields();
+        $this->syncSlackModeDefault();
+        $this->syncDiscordModeDefault();
+        $this->syncTelegramModeDefault();
         $this->dispatch('open-modal', 'settings-create-channel-modal');
     }
 
@@ -194,7 +309,9 @@ trait ManagesNotificationChannels
         $this->new_label = '';
         $this->new_slack_webhook_url = '';
         $this->new_slack_channel = '';
+        $this->new_slack_channel_id = '';
         $this->new_discord_webhook_url = '';
+        $this->new_discord_channel_id = '';
         $this->new_email_address = '';
         $this->new_telegram_bot_token = '';
         $this->new_telegram_chat_id = '';
@@ -205,6 +322,20 @@ trait ManagesNotificationChannels
         $this->new_google_chat_webhook_url = '';
         $this->new_mobile_device_token = '';
         $this->new_mobile_platform = 'ios';
+        $this->new_intercom_access_token = '';
+        $this->new_intercom_region = 'us';
+        $this->new_intercom_admin_id = '';
+        $this->new_intercom_recipient = '';
+        $this->new_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->new_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->new_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->new_intercom_subject = '';
+        $this->new_pagerduty_routing_key = '';
+        $this->new_pagerduty_region = 'us';
+        $this->new_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->new_pagerduty_source = '';
+        $this->new_pagerduty_component = '';
+        $this->new_pagerduty_group = '';
         $this->new_webhook_url = '';
     }
 
@@ -218,15 +349,35 @@ trait ManagesNotificationChannels
         $cfg = $channel->config;
         $this->clearEditChannelFields();
         if ($channel->type === NotificationChannel::TYPE_SLACK) {
-            $this->edit_slack_webhook_url = (string) ($cfg['webhook_url'] ?? '');
-            $this->edit_slack_channel = (string) ($cfg['channel'] ?? '');
+            if ($channel->usesSlackOauth()) {
+                $this->edit_slack_mode = 'oauth';
+                $this->edit_slack_installation_id = (string) ($cfg['installation_id'] ?? '');
+                $this->edit_slack_channel_id = (string) ($cfg['channel_id'] ?? '');
+            } else {
+                $this->edit_slack_mode = 'webhook';
+                $this->edit_slack_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+                $this->edit_slack_channel = (string) ($cfg['channel'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_DISCORD) {
-            $this->edit_discord_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+            if ($channel->usesDiscordOauth()) {
+                $this->edit_discord_mode = 'oauth';
+                $this->edit_discord_installation_id = (string) ($cfg['installation_id'] ?? '');
+                $this->edit_discord_channel_id = (string) ($cfg['channel_id'] ?? '');
+            } else {
+                $this->edit_discord_mode = 'webhook';
+                $this->edit_discord_webhook_url = (string) ($cfg['webhook_url'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_EMAIL) {
             $this->edit_email_address = (string) ($cfg['email'] ?? '');
         } elseif ($channel->type === NotificationChannel::TYPE_TELEGRAM) {
-            $this->edit_telegram_bot_token = (string) ($cfg['bot_token'] ?? '');
-            $this->edit_telegram_chat_id = (string) ($cfg['chat_id'] ?? '');
+            if ($channel->usesTelegramConnected()) {
+                $this->edit_telegram_mode = 'connected';
+                $this->edit_telegram_installation_id = (string) ($cfg['installation_id'] ?? '');
+            } else {
+                $this->edit_telegram_mode = 'manual';
+                $this->edit_telegram_bot_token = (string) ($cfg['bot_token'] ?? '');
+                $this->edit_telegram_chat_id = (string) ($cfg['chat_id'] ?? '');
+            }
         } elseif ($channel->type === NotificationChannel::TYPE_PUSHOVER) {
             $this->edit_pushover_app_token = (string) ($cfg['app_token'] ?? '');
             $this->edit_pushover_user_key = (string) ($cfg['user_key'] ?? '');
@@ -239,16 +390,37 @@ trait ManagesNotificationChannels
         } elseif ($channel->type === NotificationChannel::TYPE_MOBILE_APP) {
             $this->edit_mobile_device_token = (string) ($cfg['device_token'] ?? '');
             $this->edit_mobile_platform = (string) ($cfg['platform'] ?? 'ios');
+        } elseif ($channel->type === NotificationChannel::TYPE_INTERCOM) {
+            $this->edit_intercom_access_token = (string) ($cfg['access_token'] ?? '');
+            $this->edit_intercom_region = (string) ($cfg['region'] ?? 'us');
+            $this->edit_intercom_admin_id = (string) ($cfg['admin_id'] ?? '');
+            $this->edit_intercom_recipient = (string) ($cfg['recipient'] ?? '');
+            $this->edit_intercom_recipient_type = (string) ($cfg['recipient_type'] ?? NotificationChannel::INTERCOM_TO_USER_EMAIL);
+            $this->edit_intercom_message_type = (string) ($cfg['message_type'] ?? IntercomMessage::TYPE_INAPP);
+            $this->edit_intercom_template = (string) ($cfg['template'] ?? IntercomMessage::TEMPLATE_PLAIN);
+            $this->edit_intercom_subject = (string) ($cfg['subject'] ?? '');
+        } elseif ($channel->type === NotificationChannel::TYPE_PAGERDUTY) {
+            $this->edit_pagerduty_routing_key = (string) ($cfg['routing_key'] ?? '');
+            $this->edit_pagerduty_region = (string) ($cfg['region'] ?? 'us');
+            $this->edit_pagerduty_default_severity = (string) ($cfg['default_severity'] ?? PagerDutyMessage::SEVERITY_ERROR);
+            $this->edit_pagerduty_source = (string) ($cfg['source'] ?? '');
+            $this->edit_pagerduty_component = (string) ($cfg['component'] ?? '');
+            $this->edit_pagerduty_group = (string) ($cfg['group'] ?? '');
         } elseif ($channel->type === NotificationChannel::TYPE_WEBHOOK) {
             $this->edit_webhook_url = (string) ($cfg['url'] ?? '');
         }
+
+        $this->resetErrorBag();
+        $this->dispatch('open-modal', 'settings-edit-channel-modal');
     }
 
     protected function clearEditChannelFields(): void
     {
         $this->edit_slack_webhook_url = '';
         $this->edit_slack_channel = '';
+        $this->edit_slack_channel_id = '';
         $this->edit_discord_webhook_url = '';
+        $this->edit_discord_channel_id = '';
         $this->edit_email_address = '';
         $this->edit_telegram_bot_token = '';
         $this->edit_telegram_chat_id = '';
@@ -259,6 +431,20 @@ trait ManagesNotificationChannels
         $this->edit_google_chat_webhook_url = '';
         $this->edit_mobile_device_token = '';
         $this->edit_mobile_platform = 'ios';
+        $this->edit_intercom_access_token = '';
+        $this->edit_intercom_region = 'us';
+        $this->edit_intercom_admin_id = '';
+        $this->edit_intercom_recipient = '';
+        $this->edit_intercom_recipient_type = NotificationChannel::INTERCOM_TO_USER_EMAIL;
+        $this->edit_intercom_message_type = IntercomMessage::TYPE_INAPP;
+        $this->edit_intercom_template = IntercomMessage::TEMPLATE_PLAIN;
+        $this->edit_intercom_subject = '';
+        $this->edit_pagerduty_routing_key = '';
+        $this->edit_pagerduty_region = 'us';
+        $this->edit_pagerduty_default_severity = PagerDutyMessage::SEVERITY_ERROR;
+        $this->edit_pagerduty_source = '';
+        $this->edit_pagerduty_component = '';
+        $this->edit_pagerduty_group = '';
         $this->edit_webhook_url = '';
     }
 
@@ -266,6 +452,7 @@ trait ManagesNotificationChannels
     {
         $this->editing_id = null;
         $this->resetErrorBag();
+        $this->dispatch('close-modal', 'settings-edit-channel-modal');
     }
 
     public function saveEdit(): void
@@ -372,14 +559,19 @@ trait ManagesNotificationChannels
     {
         $p = $prefix;
 
-        return [
+        return $this->intercomValidationAttributes($p) + $this->pagerDutyValidationAttributes($p) + [
             $p.'label' => __('label'),
             $p.'slack_webhook_url' => __('webhook URL'),
             $p.'slack_channel' => __('channel'),
+            $p.'slack_installation_id' => __('Slack workspace'),
+            $p.'slack_channel_id' => __('Slack channel'),
             $p.'discord_webhook_url' => __('webhook URL'),
+            $p.'discord_installation_id' => __('Discord server'),
+            $p.'discord_channel_id' => __('Discord channel'),
             $p.'email_address' => __('email address'),
             $p.'telegram_bot_token' => __('bot token'),
             $p.'telegram_chat_id' => __('chat ID'),
+            $p.'telegram_installation_id' => __('Telegram chat'),
             $p.'pushover_app_token' => __('application token'),
             $p.'pushover_user_key' => __('user key'),
             $p.'teams_webhook_url' => __('webhook URL'),
@@ -403,26 +595,40 @@ trait ManagesNotificationChannels
         ];
 
         return match ($type) {
-            NotificationChannel::TYPE_SLACK => $base + [
-                $prefix.'slack_webhook_url' => ['required', 'string', 'url', 'max:2048'],
-                $prefix.'slack_channel' => ['nullable', 'string', 'max:120'],
-            ],
-            NotificationChannel::TYPE_DISCORD => $base + [
-                $prefix.'discord_webhook_url' => ['required', 'string', 'url', 'max:2048'],
-            ],
+            NotificationChannel::TYPE_SLACK => $base + ($this->slackMode($prefix) === 'oauth'
+                ? [
+                    $prefix.'slack_installation_id' => ['required', 'string', 'max:26'],
+                    $prefix.'slack_channel_id' => ['required', 'string', 'max:64'],
+                ]
+                : [
+                    $prefix.'slack_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                    $prefix.'slack_channel' => ['nullable', 'string', 'max:120'],
+                ]),
+            NotificationChannel::TYPE_DISCORD => $base + ($this->discordMode($prefix) === 'oauth'
+                ? [
+                    $prefix.'discord_installation_id' => ['required', 'string', 'max:26'],
+                    $prefix.'discord_channel_id' => ['required', 'string', 'max:64'],
+                ]
+                : [
+                    $prefix.'discord_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                ]),
             NotificationChannel::TYPE_EMAIL => $base + [
                 $prefix.'email_address' => ['required', 'string', 'email', 'max:254'],
             ],
-            NotificationChannel::TYPE_TELEGRAM => $base + [
-                $prefix.'telegram_bot_token' => ['required', 'string', 'max:512'],
-                $prefix.'telegram_chat_id' => ['required', 'string', 'max:64'],
-            ],
+            NotificationChannel::TYPE_TELEGRAM => $base + ($this->telegramMode($prefix) === 'connected'
+                ? [
+                    $prefix.'telegram_installation_id' => ['required', 'string', 'max:26'],
+                ]
+                : [
+                    $prefix.'telegram_bot_token' => ['required', 'string', 'max:512'],
+                    $prefix.'telegram_chat_id' => ['required', 'string', 'max:64'],
+                ]),
             NotificationChannel::TYPE_PUSHOVER => $base + [
                 $prefix.'pushover_app_token' => ['required', 'string', 'max:64'],
                 $prefix.'pushover_user_key' => ['required', 'string', 'max:64'],
             ],
             NotificationChannel::TYPE_MICROSOFT_TEAMS => $base + [
-                $prefix.'teams_webhook_url' => ['required', 'string', 'url', 'max:2048'],
+                $prefix.'teams_webhook_url' => ['required', 'string', 'url', 'max:2048', MicrosoftTeamsClient::urlRule()],
             ],
             NotificationChannel::TYPE_ROCKETCHAT => $base + [
                 $prefix.'rocketchat_webhook_url' => ['required', 'string', 'url', 'max:2048'],
@@ -434,6 +640,8 @@ trait ManagesNotificationChannels
                 $prefix.'mobile_device_token' => ['required', 'string', 'max:4096'],
                 $prefix.'mobile_platform' => ['required', 'string', 'in:ios,android'],
             ],
+            NotificationChannel::TYPE_INTERCOM => $base + $this->intercomValidationRules($prefix),
+            NotificationChannel::TYPE_PAGERDUTY => $base + $this->pagerDutyValidationRules($prefix),
             NotificationChannel::TYPE_WEBHOOK => $base + [
                 $prefix.'webhook_url' => ['required', 'string', 'url', 'max:2048'],
             ],
@@ -447,20 +655,26 @@ trait ManagesNotificationChannels
     protected function configFromInput(string $type, string $prefix): array
     {
         return match ($type) {
-            NotificationChannel::TYPE_SLACK => [
-                'webhook_url' => $this->{$prefix.'slack_webhook_url'},
-                'channel' => $this->{$prefix.'slack_channel'} ?: null,
-            ],
-            NotificationChannel::TYPE_DISCORD => [
-                'webhook_url' => $this->{$prefix.'discord_webhook_url'},
-            ],
+            NotificationChannel::TYPE_SLACK => $this->slackMode($prefix) === 'oauth'
+                ? $this->slackOauthConfigFromInput($prefix)
+                : [
+                    'webhook_url' => $this->{$prefix.'slack_webhook_url'},
+                    'channel' => $this->{$prefix.'slack_channel'} ?: null,
+                ],
+            NotificationChannel::TYPE_DISCORD => $this->discordMode($prefix) === 'oauth'
+                ? $this->discordOauthConfigFromInput($prefix)
+                : [
+                    'webhook_url' => $this->{$prefix.'discord_webhook_url'},
+                ],
             NotificationChannel::TYPE_EMAIL => [
                 'email' => $this->{$prefix.'email_address'},
             ],
-            NotificationChannel::TYPE_TELEGRAM => [
-                'bot_token' => $this->{$prefix.'telegram_bot_token'},
-                'chat_id' => $this->{$prefix.'telegram_chat_id'},
-            ],
+            NotificationChannel::TYPE_TELEGRAM => $this->telegramMode($prefix) === 'connected'
+                ? $this->telegramConnectedConfigFromInput($prefix)
+                : [
+                    'bot_token' => $this->{$prefix.'telegram_bot_token'},
+                    'chat_id' => $this->{$prefix.'telegram_chat_id'},
+                ],
             NotificationChannel::TYPE_PUSHOVER => [
                 'app_token' => $this->{$prefix.'pushover_app_token'},
                 'user_key' => $this->{$prefix.'pushover_user_key'},
@@ -478,6 +692,8 @@ trait ManagesNotificationChannels
                 'device_token' => $this->{$prefix.'mobile_device_token'},
                 'platform' => $this->{$prefix.'mobile_platform'},
             ],
+            NotificationChannel::TYPE_INTERCOM => $this->intercomConfigFromInput($prefix),
+            NotificationChannel::TYPE_PAGERDUTY => $this->pagerDutyConfigFromInput($prefix),
             NotificationChannel::TYPE_WEBHOOK => [
                 'url' => $this->{$prefix.'webhook_url'},
             ],
@@ -485,19 +701,38 @@ trait ManagesNotificationChannels
         };
     }
 
-    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels'): View
+    /**
+     * The ONE payload for the shared channels view and its content partial.
+     *
+     * Every surface (profile, organization, team) must come through here.
+     * Settings\NotificationChannels used to hand-roll the same array and drifted:
+     * when the partial started paginating it kept passing `channels` but not
+     * `pagedChannels`/`channelPages`, so /profile/notification-channels 500'd
+     * while the other two surfaces were fine. Surface-specific keys go in
+     * $extra rather than into a second copy of this list.
+     *
+     * @param  array<string, mixed>  $extra
+     */
+    public function renderNotificationChannelsView(string $view = 'livewire.settings.notification-channels', array $extra = []): View
     {
         return view($view, array_merge([
             'backUrl' => null,
             'backLabel' => null,
             'useOrgShell' => false,
+            'useProfileShell' => false,
             'organization' => null,
             'orgShellSection' => 'notifications',
+            'contentPartial' => 'livewire.settings.partials.notification-channels-content',
+            'currentOrganization' => null,
+            'organizationChannels' => collect(),
+            'teamChannelGroups' => collect(),
         ], $this->notificationChannelsViewData(), [
             'channels' => $this->channels,
+            'pagedChannels' => $this->pagedChannels,
+            'channelPages' => $this->channelPages,
             'canManage' => $this->canManage(),
             'types' => NotificationChannel::typesForUi(),
             'typesForEdit' => NotificationChannel::typesForUi($this->editing_id ? $this->edit_type : null),
-        ]));
+        ], $extra));
     }
 }

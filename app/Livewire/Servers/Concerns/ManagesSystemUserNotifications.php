@@ -23,6 +23,20 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSystemUserNotifications
 {
+    use ManagesFeatureNotificationMatrix;
+
+    /**
+     * {@see ManagesFeatureNotificationMatrix} — the same key set the bespoke
+     * add-form validated against, so the converted tab manages exactly what it
+     * managed before.
+     *
+     * @return list<string>
+     */
+    protected function featureEventKeys(): array
+    {
+        return ServerSystemUserNotificationKeys::eventKeys();
+    }
+
     /** Channel selected in the add-subscription form on the Notifications tab. */
     public string $notif_channel_id = '';
 
@@ -36,6 +50,8 @@ trait ManagesSystemUserNotifications
 
     public function mountManagesSystemUserNotifications(): void
     {
+        $this->bootFeatureNotificationMatrix();
+
         $this->notif_event_keys = ServerSystemUserNotificationKeys::eventKeys();
     }
 
@@ -125,13 +141,11 @@ trait ManagesSystemUserNotifications
         // Mirror the settings tab: only let someone detach a channel they can manage,
         // so an org member can't remove a team-owned channel's routing.
         $channel = $sub->channel;
-        if ($channel !== null) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
+        Gate::authorize('manageNotificationChannels', $channel->owner);
 
         $snapshot = [
             'channel_id' => (string) $sub->notification_channel_id,
-            'channel_label' => $channel?->label,
+            'channel_label' => $channel->label,
             'event_key' => $sub->event_key,
             'scope' => 'system_user',
         ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\Site;
+use App\Support\Servers\ServerRegistry;
 use Illuminate\Support\Collection;
 
 /**
@@ -71,12 +72,16 @@ final class SiteSyncPeersResolver
                     $w->orWhere('server_id', $site->server_id);
                 }
             })
-            ->with('server')
             ->orderBy('name')
             ->get()
             ->filter(fn (Site $s): bool => $s->id === $site->id
                 || $canonical === ''
                 || SiteSyncPeers::canonicalRepo((string) $s->git_repository_url) === $canonical)
-            ->values();
+            ->values()
+            // After the filter, not `->with('server')` before it: the LIKE above
+            // deliberately over-includes, so eager loading paid for servers of
+            // rows canonicalRepo() then dropped. One shared SELECT for the
+            // survivors — see ServerRegistry.
+            ->pipe(fn ($peers) => app(ServerRegistry::class)->hydrate($peers));
     }
 }

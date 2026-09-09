@@ -8,8 +8,11 @@ use Livewire\Form;
 class ServerCreateForm extends Form
 {
     /**
-     * Wizard mode: 'provider' (Provision with a provider) or 'custom' (Custom/BYO).
+     * Wizard mode: 'provider' (Provision with a provider), 'custom' (Custom/BYO),
+     * or 'import' (adopt a machine that already exists on a provider account —
+     * like custom, except the details come from the provider API).
      * Set on Step 1 of the create wizard; drives branching on Step 2 and 3.
+     * Import mode leaves the build path at step 1 for servers/create/scan.
      */
     public string $mode = 'provider';
 
@@ -106,13 +109,29 @@ class ServerCreateForm extends Form
 
     public string $do_vpc_uuid = '';
 
-    /** Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs(). */
+    /**
+     * Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs().
+     *
+     * @var list<array{id: string, name: string, region: string, ip_range: string}>
+     */
     public array $do_vpcs = [];
 
     public bool $do_vpcs_loading = false;
 
     /** Hetzner private network ID to attach at creation (gives a private IP on that network). */
     public string $hetzner_network_id = '';
+
+    /** Vultr VPC network ID to attach at creation (gives a private IP on that VPC). */
+    public string $vultr_vpc_id = '';
+
+    /**
+     * Cached VPC list for the Vultr VPC dropdown — populated by loadVultrVpcs().
+     *
+     * @var list<array{id: string, name: string, ip_range: string}>
+     */
+    public array $vultr_vpcs = [];
+
+    public bool $vultr_vpcs_loading = false;
 
     public string $do_tags = '';
 

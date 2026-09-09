@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Modules\TaskRunner\Enums\CallbackType;
 use App\Modules\TaskRunner\Enums\TaskStatus;
+use App\Modules\TaskRunner\Http\Middleware\ValidateWebhookSignature;
 use App\Modules\TaskRunner\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,7 +38,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     });
 });
 
-Route::middleware(['web', 'signed'])->prefix('webhook')->name('webhook.')->group(function () {
+Route::middleware(['web', ValidateWebhookSignature::class])->prefix('webhook')->name('webhook.')->group(function () {
     $finalizeTask = function (Task $task, TaskStatus $status, int $defaultExitCode, Request $request): void {
         $task->refresh();
 

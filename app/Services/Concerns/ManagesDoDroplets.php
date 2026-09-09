@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Concerns;
 
-
-
 /**
  * Concern extracted from the host Livewire component to keep it under control.
  * Every public property/method name is unchanged, so Livewire snapshots and
@@ -13,14 +11,11 @@ namespace App\Services\Concerns;
  */
 trait ManagesDoDroplets
 {
-
-
     /**
      * List all droplets.
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getDroplets(?string $tag = null): array
     {
         $query = $tag !== null ? ['tag_name' => $tag] : [];
@@ -42,7 +37,6 @@ trait ManagesDoDroplets
      *
      * @return array{state: 'present'|'gone'|'unknown', detail?: string}
      */
-    /** @return array<string, mixed> */
     public function inspectDropletPresence(int $id): array
     {
         $response = $this->request('get', '/droplets/'.$id);
@@ -60,14 +54,13 @@ trait ManagesDoDroplets
         if (! is_string($detail) || $detail === '') {
             $detail = $response->body();
         }
-        if (! is_string($detail) || trim($detail) === '') {
+        if (trim($detail) === '') {
             $detail = 'HTTP '.$status;
         }
 
         return ['state' => 'unknown', 'detail' => $detail];
     }
 
-    /** @return array<string, mixed> */
     /** @return array<string, mixed> */
     public function getDroplet(int $id): array
     {
@@ -85,7 +78,7 @@ trait ManagesDoDroplets
     /**
      * Create a new droplet. Returns droplet array (IP may not be available immediately).
      *
-     * @param  array<string, mixed> $sshKeyIds  Optional DO SSH key IDs or fingerprints
+     * @param  list<int|string>  $sshKeyIds  Optional DO SSH key IDs or fingerprints
      * @param  array{
      *     ipv6?: bool,
      *     backups?: bool,
@@ -110,7 +103,7 @@ trait ManagesDoDroplets
         $rawVpc = $options['vpc_uuid'] ?? null;
         $vpcUuid = is_string($rawVpc) ? trim($rawVpc) : '';
         $tags = $options['tags'] ?? [];
-        $tags = (array_values(array_filter($tags, static fn ($t) => ($t) && $t !== '')) );
+        $tags = array_values(array_filter($tags));
 
         $body = [
             'name' => $name,
@@ -234,7 +227,6 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed> action payload
      */
-    /** @return array<string, mixed> */
     public function powerOffDroplet(int $id): array
     {
         $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_off']);
@@ -244,11 +236,60 @@ trait ManagesDoDroplets
     }
 
     /**
+     * Issue a power_on action against a droplet. Pairs with
+     * {@see self::powerOffDroplet()} — a resize leaves the droplet off, so the
+     * caller has to bring it back up itself.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function powerOnDroplet(int $id): array
+    {
+        $response = $this->request('post', '/droplets/'.$id.'/actions', ['type' => 'power_on']);
+        $this->assertSuccess($response, 'power on droplet');
+
+        return $this->extractAction($response->json(), 'power on droplet');
+    }
+
+    /**
+     * Resize a droplet to a new size slug.
+     *
+     * DigitalOcean requires the droplet to be POWERED OFF first — this method
+     * only issues the action, {@see \App\Jobs\ResizeServerJob} owns the
+     * off → resize → on sequence.
+     *
+     * $resizeDisk is the irreversible half of the API:
+     *   false — CPU and RAM only, disk untouched. Reversible: the droplet can
+     *           be moved back down to a smaller plan later.
+     *   true  — grows the disk too. PERMANENT. DigitalOcean will refuse every
+     *           later resize to a plan with a smaller disk, forever.
+     *
+     * A disk can never shrink, so a target whose disk is smaller than the
+     * current one is not resizable at all and must be filtered out upstream.
+     *
+     * @return array<string, mixed> action payload
+     */
+    public function resizeDroplet(int $id, string $size, bool $resizeDisk = false): array
+    {
+        $size = trim($size);
+        if ($size === '') {
+            throw new \InvalidArgumentException('Target size slug is required.');
+        }
+
+        $response = $this->request('post', '/droplets/'.$id.'/actions', [
+            'type' => 'resize',
+            'size' => $size,
+            'disk' => $resizeDisk,
+        ]);
+        $this->assertSuccess($response, 'resize droplet');
+
+        return $this->extractAction($response->json(), 'resize droplet');
+    }
+
+    /**
      * Trigger a snapshot of the droplet's disk into a custom image.
      *
      * @return array<string, mixed> action payload
      */
-    /** @return array<string, mixed> */
     public function snapshotDroplet(int $id, string $name): array
     {
         $name = trim($name);
@@ -270,7 +311,6 @@ trait ManagesDoDroplets
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getDropletAction(int $dropletId, int $actionId): array
     {
         $response = $this->request('get', '/droplets/'.$dropletId.'/actions/'.$actionId);
@@ -323,7 +363,6 @@ trait ManagesDoDroplets
      *
      * @return array<int, array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function getSnapshots(?string $resourceType = 'droplet'): array
     {
         $query = $resourceType !== null && $resourceType !== '' ? ['resource_type' => $resourceType] : [];

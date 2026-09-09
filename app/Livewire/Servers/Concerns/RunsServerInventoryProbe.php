@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  *     renders alongside install / restart actions. Lets every Manage caller
  *     share the same console surface without ripping out the legacy panel.
  *
- * Composed by both WorkspaceSettings (via ManagesWorkspaceSettingsForm) and
+ * Composed by both SettingsCard (via ManagesWorkspaceSettingsForm) and
  * WorkspaceManage. The ConsoleAction emit is best-effort — if the model write
  * fails (test environment, transient DB hiccup) the legacy panel still works.
  */
@@ -162,9 +162,7 @@ trait RunsServerInventoryProbe
             }
 
             if ($consoleRow !== null) {
-                if ($emitter !== null) {
-                    $emitter->success(__('Inventory parsed and persisted.'), 'dply');
-                }
+                $emitter->success(__('Inventory parsed and persisted.'), 'dply');
                 $this->finalizeInventoryProbeConsoleAction($consoleRow, success: true);
             }
 

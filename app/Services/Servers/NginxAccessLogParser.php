@@ -43,11 +43,6 @@ class NginxAccessLogParser
      * 'parsed' => true and the structured fields; unparseable rows carry
      * 'parsed' => false and the original line under 'raw'.
      *
-     * @return array<int, array<string, mixed>>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, mixed>>
      */
     public function parse(string $raw): array
     {
@@ -67,28 +62,26 @@ class NginxAccessLogParser
     /**
      * Parse a single line. Never throws — falls back to a raw row.
      *
-     * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function parseLine(string $line): array
     {
         if (! preg_match(self::COMBINED, trim($line), $m)) {
             return $this->rawRow($line);
         }
 
-        [$method, $path, $protocol] = $this->splitRequest($m['request'] ?? '');
+        [$method, $path, $protocol] = $this->splitRequest($m['request']);
 
         return [
             'parsed' => true,
             'raw' => $line,
             'ip' => $this->dashToNull($m['ip']),
             'user' => $this->dashToNull($m['user']),
-            'time' => $this->parseTime($m['time'] ?? ''),
+            'time' => $this->parseTime($m['time']),
             'time_raw' => $m['time'],
             'method' => $method,
             'path' => $path,
             'protocol' => $protocol,
-            'status' => isset($m['status']) ? (int) $m['status'] : null,
+            'status' => (int) $m['status'],
             'bytes' => $this->parseBytes($m['bytes']),
             'referer' => $this->dashToNull($m['referer'] ?? null),
             'user_agent' => $this->dashToNull($m['agent'] ?? null),
@@ -130,7 +123,6 @@ class NginxAccessLogParser
      * @param  array<int, array<string, mixed>>  $rows
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function summarize(array $rows): array
     {
         $parsed = array_filter($rows, fn ($r) => ($r['parsed'] ?? false) === true);
@@ -163,7 +155,6 @@ class NginxAccessLogParser
     }
 
     /**
-     * @param  array<string, mixed> $rows
      * Bucket an HTTP status into a class key used for colour-coding.
      */
     public function statusClass(?int $status): string

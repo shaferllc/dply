@@ -39,6 +39,7 @@ dataset('readCommandProvider', function () {
         ['db check'],
         ['user list --role=administrator'],
         ['config get DB_NAME'],
+        ['config list'],
     ];
 });
 test('known recoverable commands classify correctly', function (string $command) {
@@ -53,6 +54,10 @@ dataset('mutatingRecoverableProvider', function () {
         ['core update'],
         ['cron event run wp_version_check'],
         ['user create alice alice@example.com --role=author'],
+        ['user set-role alice administrator'],
+        ['plugin install woocommerce --activate'],
+        ['db query SELECT 1'],
+        ['export'],
         ['cache flush'],
         ['rewrite flush'],
     ];

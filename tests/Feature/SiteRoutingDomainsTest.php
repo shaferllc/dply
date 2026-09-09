@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\User;
+use App\Services\Sites\SiteReachabilityChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -134,6 +135,82 @@ test('bulk import aborts on invalid hostname', function () {
 /**
  * @return array{0: User, 1: Server, 2: Site}
  */
+// The record shown on each domain row. Registrar forms ask for the
+// zone-relative name, and an apex must not be offered a CNAME.
+test('dns record hint is zone relative and flags the apex', function () {
+    [$user, $server, $site] = makeUserSite();
+    $server->forceFill(['ip_address' => '203.0.113.10'])->save();
+    $site->forceFill(['dns_zone' => 'example.com'])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server->fresh(), 'site' => $site->fresh(), 'section' => 'routing']);
+
+    $apex = $component->instance()->dnsRecordHintFor('example.com');
+    expect($apex)->toMatchArray(['type' => 'A', 'name' => '@', 'value' => '203.0.113.10', 'zone' => 'example.com', 'apex' => true]);
+
+    $sub = $component->instance()->dnsRecordHintFor('www.example.com');
+    expect($sub)->toMatchArray(['name' => 'www', 'apex' => false]);
+
+    // Outside the zone dply knows about: fall back to the FQDN, and never
+    // claim a zone we have not confirmed.
+    $foreign = $component->instance()->dnsRecordHintFor('shop.other.test');
+    expect($foreign)->toMatchArray(['name' => 'shop.other.test', 'zone' => '', 'apex' => false]);
+});
+
+test('dns record hint is absent until the server has an ip', function () {
+    [$user, $server, $site] = makeUserSite();
+    $server->forceFill(['ip_address' => null])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server->fresh(), 'site' => $site->fresh(), 'section' => 'routing']);
+
+    expect($component->instance()->dnsRecordHintFor('example.com'))->toBeNull();
+});
+
+// A record that is already correct at the nameservers, with only a recursive
+// cache still holding the old address, must not be reported as a problem —
+// there is nothing for the operator to change.
+test('a propagating record outranks points-elsewhere in the dns rows', function () {
+    [$user, $server, $site] = makeUserSite();
+    $server->forceFill(['ip_address' => '203.0.113.10'])->save();
+    $site->forceFill(['dns_zone' => 'example.com'])->save();
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'app.example.com',
+        'is_primary' => true,
+    ]);
+
+    // Stand in for the reachability probe: DNS still answers with the old
+    // address, but the authoritative check has confirmed the new one.
+    app()->bind(SiteReachabilityChecker::class, fn () => new class extends SiteReachabilityChecker
+    {
+        public function checkHostname(\App\Models\Site $site, string $hostname): array
+        {
+            return [
+                'ok' => true,
+                'resolves' => true,
+                'points_here' => false,
+                'propagating' => true,
+                'behind_cloudflare' => false,
+                'http_ok' => true,
+                'resolved_ips' => ['198.51.100.7'],
+                'server_ip' => '203.0.113.10',
+                'error' => null,
+                'checked_at' => now()->toIso8601String(),
+            ];
+        }
+    });
+
+    $rows = Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server->fresh(), 'site' => $site->fresh(), 'section' => 'routing'])
+        ->call('loadDnsRecordStatuses')
+        ->get('dnsRecordStatuses');
+
+    expect($rows)->toHaveCount(1);
+    expect($rows[0]['status'])->toBe('propagating');
+    expect($rows[0]['resolved_ips'])->toBe(['198.51.100.7']);
+});
+
 function makeUserSite(): array
 {
     $user = User::factory()->create();

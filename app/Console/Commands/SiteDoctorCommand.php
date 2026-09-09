@@ -108,7 +108,7 @@ class SiteDoctorCommand extends Command
         // Surface "env file lives inside the docroot" as drift. The webserver
         // deny rule blocks /.env over HTTP, but defense-in-depth prefers the
         // file outside the docroot entirely. We only flag VM-style hosts —
-        // container/serverless runtimes don't have a host file and the cache
+        // container runtimes don't have a host file and the cache
         // is canonical.
         $envInDocroot = false;
         if ($server?->hostCapabilities()->supportsEnvPushToHost()) {

@@ -19,6 +19,8 @@ trait ValidateActions
     /** @var Redirector|null */
     protected $redirector;
 
+    private ?Validator $resolvedValidator = null;
+
     /**
      * @throws ValidationException
      */
@@ -40,8 +42,8 @@ trait ValidateActions
 
     protected function getValidatorInstance(): Validator
     {
-        if ($this->validator) {
-            return $this->validator;
+        if ($this->resolvedValidator instanceof Validator) {
+            return $this->resolvedValidator;
         }
 
         $factory = app(ValidationFactory::class);
@@ -62,7 +64,9 @@ trait ValidateActions
             });
         }
 
-        return $this->validator = $validator;
+        $this->validator = $validator;
+
+        return $this->resolvedValidator = $validator;
     }
 
     protected function createDefaultValidator(ValidationFactory $factory): Validator

@@ -20,6 +20,7 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell
+            dense
             :organization="$organization"
             :section="$orgShellSection ?? 'webserver'"
             :title="__('Webserver templates')"
@@ -33,20 +34,20 @@
         >
             <x-slot:stats>
                 <dl class="grid grid-cols-3 gap-3" aria-label="{{ __('Templates at a glance') }}">
-                    <x-fleet-stat :label="__('Templates')">
+                    <x-infrastructure-stat :label="__('Templates')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->count() }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ trans_choice('saved|saved', $templates->count()) }}</span>
+                            <span class="text-xs text-brand-moss">{{ trans_choice('saved|saved', $templates->count()) }}</span>
                         </p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Engines')">
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Engines')">
                         <p class="mt-2 flex items-baseline gap-1.5">
                             <span class="text-2xl font-semibold tabular-nums text-brand-ink">{{ $templates->pluck('engine')->unique()->count() }}</span>
-                            <span class="text-[11px] text-brand-moss">{{ __('in use') }}</span>
+                            <span class="text-xs text-brand-moss">{{ __('in use') }}</span>
                         </p>
-                        <p class="mt-1 text-[11px] text-brand-mist">{{ count($engines) }} {{ __('supported') }}</p>
-                    </x-fleet-stat>
-                    <x-fleet-stat :label="__('Editor')">
+                        <p class="mt-1 text-xs text-brand-mist">{{ count($engines) }} {{ __('supported') }}</p>
+                    </x-infrastructure-stat>
+                    <x-infrastructure-stat :label="__('Editor')">
                         <p class="mt-2 flex items-center gap-1.5">
                             @if ($editingId)
                                 <x-heroicon-m-pencil-square class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
@@ -56,8 +57,8 @@
                                 <span class="text-sm font-semibold text-brand-ink">{{ __('New') }}</span>
                             @endif
                         </p>
-                        <p class="mt-1 truncate text-[11px] text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
-                    </x-fleet-stat>
+                        <p class="mt-1 truncate text-xs text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
+                    </x-infrastructure-stat>
                 </dl>
             </x-slot:stats>
 
@@ -97,7 +98,7 @@
                             <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $editingId ? __('Edit') : __('New') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $editingId ? __('Edit') : __('New') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                 {{ $editingId ? __('Edit webserver template') : __('Create webserver template') }}
                             </h3>
@@ -107,26 +108,26 @@
                     <div class="grid gap-6 px-5 py-5 sm:px-6 lg:grid-cols-12 lg:gap-8">
                         <div class="lg:col-span-4">
                             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Placeholders') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Placeholders') }}</p>
                                 <ul class="mt-2 space-y-1.5 text-xs leading-relaxed text-brand-moss">
                                     @foreach ($placeholders as $key => $description)
                                         <li>
-                                            <code class="rounded bg-brand-sand/80 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink">{{ '{'.$key.'}' }}</code>
+                                            <code class="rounded bg-brand-sand/80 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ '{'.$key.'}' }}</code>
                                             <span class="ms-1">{{ __($description) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>
                                 @php $banner = config('webserver_templates.required_banner_line'); @endphp
                                 @if ($banner)
-                                    <p class="mt-3 border-t border-brand-ink/10 pt-3 text-[11px] text-brand-mist">
+                                    <p class="mt-3 border-t border-brand-ink/10 pt-3 text-xs text-brand-mist">
                                         <span class="font-semibold text-brand-moss">{{ __('Required nginx banner:') }}</span>
-                                        <code class="ms-1 rounded bg-brand-sand/60 px-1 py-0.5 font-mono text-[10px] text-brand-ink">{{ $banner }}</code>
+                                        <code class="ms-1 rounded bg-brand-sand/60 px-1 py-0.5 font-mono text-2xs text-brand-ink">{{ $banner }}</code>
                                     </p>
                                 @endif
                             </div>
 
                             <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Section slots') }}</p>
+                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Section slots') }}</p>
                                 <ul class="mt-2 space-y-2 text-xs leading-relaxed text-brand-moss">
                                     <li>
                                         <span class="inline-flex items-center gap-1 font-semibold text-brand-ink">
@@ -196,9 +197,9 @@
                                             <label for="tpl-before" class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true"></span>
                                                 {{ __('Before server block') }}
-                                                <span class="text-[11px] font-normal text-brand-mist">{{ __('optional') }}</span>
+                                                <span class="text-xs font-normal text-brand-mist">{{ __('optional') }}</span>
                                             </label>
-                                            <span class="text-[11px] text-brand-mist">{{ __('Upstreams, maps, rate-limit zones') }}</span>
+                                            <span class="text-xs text-brand-mist">{{ __('Upstreams, maps, rate-limit zones') }}</span>
                                         </div>
                                         <textarea
                                             id="tpl-before"
@@ -216,9 +217,9 @@
                                             <label for="tpl-content" class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
                                                 {{ __('Inside server block') }}
-                                                <span class="rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Required') }}</span>
+                                                <span class="rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest">{{ __('Required') }}</span>
                                             </label>
-                                            <span class="text-[11px] text-brand-mist">{{ __('The main server block body') }}</span>
+                                            <span class="text-xs text-brand-mist">{{ __('The main server block body') }}</span>
                                         </div>
                                         <textarea
                                             id="tpl-content"
@@ -235,9 +236,9 @@
                                             <label for="tpl-after" class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden="true"></span>
                                                 {{ __('After server block') }}
-                                                <span class="text-[11px] font-normal text-brand-mist">{{ __('optional') }}</span>
+                                                <span class="text-xs font-normal text-brand-mist">{{ __('optional') }}</span>
                                             </label>
-                                            <span class="text-[11px] text-brand-mist">{{ __('HTTP→HTTPS, healthchecks, sibling servers') }}</span>
+                                            <span class="text-xs text-brand-mist">{{ __('HTTP→HTTPS, healthchecks, sibling servers') }}</span>
                                         </div>
                                         <textarea
                                             id="tpl-after"
@@ -302,7 +303,7 @@
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Reuse these snippets when configuring sites in your organization.') }}</p>
                         </div>
@@ -317,7 +318,7 @@
                         </div>
                     @else
                         <ul class="divide-y divide-brand-ink/10">
-                            @foreach ($templates as $template)
+                            @foreach ($pagedTemplates as $template)
                                 @php
                                     $engineSlug = $template->engine ?: 'nginx';
                                     $engineClasses = $engineBadgeClasses[$engineSlug] ?? 'border-brand-ink/10 bg-brand-sand/40 text-brand-moss';
@@ -326,24 +327,24 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                             <span class="text-sm font-semibold text-brand-ink">{{ $template->label }}</span>
-                                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $engineClasses }}">
+                                            <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide {{ $engineClasses }}">
                                                 {{ $engines[$engineSlug] ?? ucfirst($engineSlug) }}
                                             </span>
                                             @if (! empty($template->content_before))
-                                                <span class="inline-flex items-center gap-1 text-[10px] font-medium text-brand-moss" title="{{ __('Has Before section') }}">
+                                                <span class="inline-flex items-center gap-1 text-2xs font-medium text-brand-moss" title="{{ __('Has Before section') }}">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-sky-500" aria-hidden="true"></span>
                                                 </span>
                                             @endif
-                                            <span class="inline-flex items-center gap-1 text-[10px] font-medium text-brand-moss" title="{{ __('Has Inside section') }}">
+                                            <span class="inline-flex items-center gap-1 text-2xs font-medium text-brand-moss" title="{{ __('Has Inside section') }}">
                                                 <span class="h-1.5 w-1.5 rounded-full bg-brand-sage" aria-hidden="true"></span>
                                             </span>
                                             @if (! empty($template->content_after))
-                                                <span class="inline-flex items-center gap-1 text-[10px] font-medium text-brand-moss" title="{{ __('Has After section') }}">
+                                                <span class="inline-flex items-center gap-1 text-2xs font-medium text-brand-moss" title="{{ __('Has After section') }}">
                                                     <span class="h-1.5 w-1.5 rounded-full bg-violet-500" aria-hidden="true"></span>
                                                 </span>
                                             @endif
                                         </div>
-                                        <p class="mt-0.5 text-[11px] text-brand-mist">
+                                        <p class="mt-0.5 text-xs text-brand-mist">
                                             {{ __('Created :time', ['time' => $template->created_at->diffForHumans()]) }}
                                         </p>
                                     </div>
@@ -387,11 +388,21 @@
                             @endforeach
                         </ul>
                     @endif
+
+                    <x-list-pager
+                        :page="$templatePageState['page']"
+                        :pages="$templatePageState['pages']"
+                        :total="$templatePageState['total']"
+                        property="template_page"
+                        :label="__('templates')"
+                    />
                 </section>
         </x-organization-shell>
     </div>
 
-    <x-slot name="modals">
-        @include('livewire.partials.confirm-action-modal')
-    </x-slot>
+    {{-- Included directly, not via a "modals" layout slot: this page's root is
+         a plain <div>, so Blade has no component to bind the slot to and drops
+         it — the confirm dialog never renders and the destructive action
+         silently does nothing. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

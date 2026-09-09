@@ -21,7 +21,12 @@ class ApacheSiteConfigBuilder
      */
     public function build(Site $site, ?int $listenPort = null): string
     {
-        if ($site->type === SiteType::Custom) {
+        // Container sites are served by their container backend (App Platform /
+        // App Runner / local Docker), never by this box's webserver — and the
+        // match below has no Container arm, so letting one through threw an
+        // UnhandledMatchError and aborted the whole webserver switch. The
+        // provision query fetches every site on the server, unfiltered.
+        if ($site->type === SiteType::Custom || $site->type === SiteType::Container) {
             return '';
         }
 
@@ -85,7 +90,7 @@ APACHE, $listenPort);
         $managedErrors = SiteManagedErrorPageSupport::apacheVirtualHostBlock($site);
         $proxyErrorOverride = SiteManagedErrorPageSupport::apacheProxyErrorOverride($site);
 
-        $config = match ($site->type) {
+        $config = match ($site->configSiteType()) {
             SiteType::Php => <<<APACHE
 # Managed by Dply — {$basename}
 <VirtualHost *:80>
@@ -136,7 +141,7 @@ APACHE,
     ProxyPassReverse / http://127.0.0.1:{$site->app_port}/
 </VirtualHost>
 APACHE,
-            SiteType::Custom => '',
+            SiteType::Custom, SiteType::Container => '',
         };
 
         if ($config === '') {
@@ -180,7 +185,6 @@ APACHE;
     /**
      * @return array{directory: string, locations: string, rewrite: string}
      */
-    /** @return array<string, mixed> */
     protected function apacheDirectoryAndPrefixLocations(Site $site, string $documentRoot): array
     {
         if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
@@ -332,7 +336,7 @@ APACHE;
                 continue;
             }
             $pattern = '^'.preg_quote($from, '#').'$';
-            $kind = $redirect->kind instanceof SiteRedirectKind ? $redirect->kind : SiteRedirectKind::Http;
+            $kind = $redirect->kind;
             if ($kind === SiteRedirectKind::InternalRewrite) {
                 $to = SiteRedirectConfigSupport::sanitizeInternalTarget((string) $redirect->to_url);
                 if ($to === '') {

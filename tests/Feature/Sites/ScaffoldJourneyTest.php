@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\ScaffoldJourneyTest;
 
-use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
-use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Scaffold\Jobs\RunLaravelScaffoldJob;
+use App\Modules\Scaffold\Jobs\RunWordPressScaffoldJob;
 use App\Modules\Scaffold\Services\PlaceholderDnsManager;
 use App\Modules\Scaffold\Services\ScaffoldStep;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\ViewErrorBag;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Mockery;
 
@@ -194,14 +196,18 @@ test('completed state renders password reveal', function () {
         ],
     ]);
 
-    Livewire::actingAs($user)
-        ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
+    $component = Livewire::actingAs($user)
+        ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site]);
+
+    $component
         ->assertSee('Install complete')
         ->assertSee('Reveal password')
         ->assertDontSee('hunter2')
         ->call('revealScaffoldPassword')
         ->assertSet('scaffoldPasswordRevealed', true)
         ->assertSee('hunter2');
+
+    expect(json_encode($component->instance()->all()))->not->toContain('hunter2!hunter2');
 });
 test('member role cannot reveal password', function () {
     [$user, $server, $site] = makeSite(Site::STATUS_PENDING, [
@@ -214,6 +220,47 @@ test('member role cannot reveal password', function () {
         ->call('revealScaffoldPassword')
         ->assertSet('scaffoldPasswordRevealed', false)
         ->assertHasErrors('reveal');
+});
+test('member cannot unlock password via livewire property assignment', function () {
+    [$user, $server, $site] = makeSite(Site::STATUS_PENDING, [
+        'admin_password' => encrypt('not-for-members'),
+        'steps' => [['key' => 'prereqs', 'state' => ScaffoldStep::STATE_COMPLETED]],
+    ], userRole: 'member');
+
+    $component = Livewire::actingAs($user)
+        ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site]);
+
+    expect(fn () => $component->set('scaffoldPasswordRevealed', true))
+        ->toThrow(CannotUpdateLockedPropertyException::class);
+
+    $component
+        ->assertSet('scaffoldPasswordRevealed', false)
+        ->assertDontSee('not-for-members');
+});
+test('member does not receive decrypted password when reveal flag is already true', function () {
+    [$user, $server, $site] = makeSite(Site::STATUS_PENDING, [
+        'admin_password' => encrypt('not-for-members'),
+        'steps' => [['key' => 'prereqs', 'state' => ScaffoldStep::STATE_COMPLETED]],
+    ], userRole: 'member');
+
+    $component = Livewire::actingAs($user)
+        ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site]);
+
+    $instance = $component->instance();
+    $instance->scaffoldPasswordRevealed = true;
+
+    $html = view('livewire.sites.partials.show.scaffold-install-journey', array_merge(
+        $instance->scaffoldJourneyData(),
+        [
+            'site' => $site->fresh(),
+            'server' => $server,
+            'scaffoldPasswordRevealed' => $instance->scaffoldPasswordRevealed,
+            'errors' => new ViewErrorBag,
+        ],
+    ))->render();
+
+    expect($html)->not->toContain('not-for-members');
+    expect($instance->scaffoldPasswordRevealed)->toBeFalse();
 });
 test('404s for non scaffolded site', function () {
     [$user, $server, $site] = makeSite(Site::STATUS_NGINX_ACTIVE);

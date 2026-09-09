@@ -21,6 +21,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\SiteRelease;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
 use App\Services\Sites\DotEnvFileParser;
@@ -31,6 +32,7 @@ use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSettingsViewData;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -123,6 +125,10 @@ class DeploymentsList extends Component
 
     public const TAB_HOOKS = 'hooks';
 
+    /** Recurring cron-cadence deploys. Distinct from the Deploy tab's
+     *  one-off "Deploy later" delay, which schedules a single run. */
+    public const TAB_SCHEDULE = 'schedule';
+
     public const TABS = [
         self::TAB_OVERVIEW,
         self::TAB_REPOSITORY,
@@ -131,6 +137,7 @@ class DeploymentsList extends Component
         self::TAB_ENVIRONMENT,
         self::TAB_WEBHOOK,
         self::TAB_HOOKS,
+        self::TAB_SCHEDULE,
         // TAB_COMMITS / TAB_FILES / TAB_BRANCHES intentionally absent — they
         // live as sub-tabs under Repository now. Any ?tab=commits / =files
         // / =branches URL resets to TAB_DEPLOY via the in_array() guard in
@@ -166,6 +173,23 @@ class DeploymentsList extends Component
     #[Url(as: 'trigger', except: '')]
     public string $triggerFilter = '';
 
+    /**
+     * Release selected in the Releases tab info modal (folder path, SHA, linked deploy).
+     *
+     * @var array{
+     *   id: string,
+     *   folder: string,
+     *   path: string,
+     *   current_symlink: string,
+     *   git_sha: ?string,
+     *   is_active: bool,
+     *   created_at: ?string,
+     *   created_at_human: ?string,
+     *   deployment_id: ?string,
+     * }|null
+     */
+    public ?array $releaseInfo = null;
+
     /** @var array<int, string> */
     public const ALLOWED_STATUSES = [
         SiteDeployment::STATUS_RUNNING,
@@ -180,24 +204,21 @@ class DeploymentsList extends Component
      */
     public function placeholder(): View
     {
-        if (! isset($this->server, $this->site)) {
-            return view('livewire.servers.partials.workspace-placeholder-empty');
-        }
-
-        $tabs = [
-            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
-            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
-            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
-            ['id' => self::TAB_WEBHOOK, 'label' => __('Webhook'), 'icon' => 'heroicon-o-bolt'],
-            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
-            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
-        ];
+        // Same definitions + gates the real render uses, so the tab row doesn't
+        // shift when the component finishes loading.
+        $visible = $this->tabVisibility();
+        $tabs = array_values(array_filter(
+            $this->tabDefinitions(),
+            fn (array $entry): bool => $visible[$entry['id']] ?? true,
+        ));
 
         return view('livewire.sites.partials.site-workspace-chrome-placeholder', [
             'server' => $this->server,
             'site' => $this->site,
             'title' => __('Deployments'),
-            'description' => __('Deploy, review history, and manage release settings.'),
+            'description' => $this->isFunctionsDeployHub()
+                ? __('Deploy, sync related functions, and review history.')
+                : __('Deploy, review history, and manage release settings.'),
             'icon' => 'heroicon-o-rocket-launch',
             'section' => 'deploy',
             'tabs' => $tabs,
@@ -243,14 +264,13 @@ class DeploymentsList extends Component
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = self::TAB_DEPLOY;
         }
-        if ($this->tab === self::TAB_RELEASES && $site->deploy_strategy !== 'atomic') {
+        if ($this->tab === self::TAB_RELEASES && ! $this->isFunctionsDeployHub($site) && $site->deploy_strategy !== 'atomic') {
             $this->tab = self::TAB_DEPLOY;
         }
-        if ($this->tab !== self::TAB_SETTINGS) {
-            $this->settingsSection = '';
-        } elseif (! in_array($this->settingsSection, self::SETTINGS_SECTIONS, true)) {
-            $this->settingsSection = '';
+        if ($this->tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys($site)) {
+            $this->tab = self::TAB_DEPLOY;
         }
+        $this->settingsSection = '';
 
         $coordinator = app(SiteDeployCoordinator::class);
 
@@ -258,12 +278,88 @@ class DeploymentsList extends Component
         $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
         $this->syncSelectionSeeded = true;
 
-        // Re-attach to an in-flight smart-fix so its state survives a reload.
-        $fixer = $coordinator->inFlightFixer($this->site);
+        // Re-attach to the current smart-fix (in-flight or just finished) so
+        // live output stays in the Fix card across a reload.
+        $fixer = $coordinator->latestFixer($this->site);
         if ($fixer !== null) {
             $this->fixerRunId = (string) $fixer->id;
             $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
         }
+    }
+
+    /**
+     * Recurring deploys only run for VM hosts: RunDueDeploymentSchedulesCommand
+     * skips functions + edge runtimes outright, so surfacing the tab for them
+     * would offer a schedule that silently never fires.
+     */
+    private function supportsRecurringDeploys(?Site $site = null): bool
+    {
+        $site ??= $this->site;
+
+        return $site->runtimeTargetMode() === 'vm'
+            && ! $site->usesEdgeRuntime();
+    }
+
+    /**
+     * Ordered tab definitions for the strip and the lazy-load skeleton.
+     * Single source of truth — the skeleton used to hand-maintain its own copy
+     * and drifted (it advertised Pipeline / hid Releases regardless of runtime,
+     * so the tab row visibly shifted the moment the real render landed).
+     *
+     * @return list<array{id: string, label: string, icon: string}>
+     */
+    public function tabDefinitions(): array
+    {
+        return [
+            ['id' => self::TAB_OVERVIEW, 'label' => __('Overview'), 'icon' => 'heroicon-o-chart-bar'],
+            ['id' => self::TAB_DEPLOY, 'label' => __('Deploy'), 'icon' => 'heroicon-o-rocket-launch'],
+            ['id' => self::TAB_SYNC, 'label' => __('Sync'), 'icon' => 'heroicon-o-arrows-right-left'],
+            ['id' => self::TAB_WEBHOOK, 'label' => __('Quick deploy'), 'icon' => 'heroicon-o-bolt'],
+            ['id' => self::TAB_HOOKS, 'label' => __('Hooks'), 'icon' => 'heroicon-o-link'],
+            ['id' => self::TAB_SCHEDULE, 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days'],
+            ['id' => self::TAB_PIPELINE, 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal'],
+            ['id' => self::TAB_RELEASES, 'label' => __('Releases'), 'icon' => 'heroicon-o-archive-box'],
+            ['id' => self::TAB_HISTORY, 'label' => __('History'), 'icon' => 'heroicon-o-clock'],
+        ];
+    }
+
+    /**
+     * Which tabs this site actually gets. Shared by placeholder() and render()
+     * so the skeleton and the loaded page always agree.
+     *
+     * @return array<string, bool>
+     */
+    public function tabVisibility(?Site $site = null): array
+    {
+        $site ??= $this->site;
+        $isVmDeployHub = $this->supportsRecurringDeploys($site);
+
+        return [
+            self::TAB_OVERVIEW => true,
+            self::TAB_REPOSITORY => true,
+            self::TAB_DEPLOY => true,
+            self::TAB_SYNC => true,
+            self::TAB_WEBHOOK => true,
+            // Hooks editor only applies to DigitalOcean Functions hosts.
+            self::TAB_HOOKS => (bool) $site->server?->isDigitalOceanFunctionsHost(),
+            self::TAB_SCHEDULE => $isVmDeployHub,
+            // Commits / Files / Branches live under Repository now.
+            self::TAB_COMMITS => false,
+            self::TAB_FILES => false,
+            self::TAB_BRANCHES => false,
+            self::TAB_PIPELINE => $isVmDeployHub,
+            // Rollout folded into Pipeline as a subtab.
+            self::TAB_ROLLOUT => false,
+            // On a VM these are atomic release folders; on a function they are
+            // the host's stored revisions. Both answer "roll back to what?", so
+            // they share the tab rather than the function panel living on
+            // Overview as a sixth stacked card.
+            self::TAB_RELEASES => ($isVmDeployHub && $site->deploy_strategy === 'atomic')
+                || $this->isFunctionsDeployHub($site),
+            self::TAB_HISTORY => true,
+            // Settings consolidated up into Webhook + Hooks tabs.
+            self::TAB_SETTINGS => false,
+        ];
     }
 
     public function setTab(string $tab): void
@@ -271,13 +367,70 @@ class DeploymentsList extends Component
         if (! in_array($tab, self::TABS, true)) {
             return;
         }
-        if ($tab === self::TAB_RELEASES && $this->site->deploy_strategy !== 'atomic') {
+        if ($tab === self::TAB_RELEASES && ! $this->isFunctionsDeployHub() && $this->site->deploy_strategy !== 'atomic') {
+            return;
+        }
+        if ($tab === self::TAB_SCHEDULE && ! $this->supportsRecurringDeploys()) {
             return;
         }
         $this->tab = $tab;
-        if ($tab !== self::TAB_SETTINGS) {
-            $this->settingsSection = '';
+        $this->settingsSection = '';
+        if ($tab === self::TAB_HISTORY) {
+            $this->resetPage();
         }
+        if ($tab === self::TAB_RELEASES) {
+            $this->resetPage(pageName: 'releasesPage');
+            $this->releaseInfo = null;
+        }
+    }
+
+    /** Open the Releases tab detail modal for a single on-disk release folder. */
+    public function openReleaseInfo(string $releaseId): void
+    {
+        Gate::authorize('view', $this->site);
+
+        $release = SiteRelease::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($releaseId)
+            ->first();
+
+        if (! $release instanceof SiteRelease) {
+            $this->toastError(__('Release not found.'));
+
+            return;
+        }
+
+        $base = rtrim($this->site->effectiveRepositoryPath(), '/');
+        $sha = filled($release->git_sha) ? (string) $release->git_sha : null;
+
+        $deploymentId = null;
+        if ($sha !== null) {
+            $deploymentId = SiteDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->where('git_sha', $sha)
+                ->orderByDesc('started_at')
+                ->value('id');
+            $deploymentId = $deploymentId !== null ? (string) $deploymentId : null;
+        }
+
+        $this->releaseInfo = [
+            'id' => (string) $release->id,
+            'folder' => (string) $release->folder,
+            'path' => $base.'/releases/'.$release->folder,
+            'current_symlink' => $base.'/current',
+            'git_sha' => $sha,
+            'is_active' => (bool) $release->is_active,
+            'created_at' => $release->created_at?->toDayDateTimeString(),
+            'created_at_human' => $release->created_at?->diffForHumans(),
+            'deployment_id' => $deploymentId,
+        ];
+
+        $this->dispatch('open-modal', 'release-info');
+    }
+
+    public function closeReleaseInfo(): void
+    {
+        $this->releaseInfo = null;
     }
 
     /**
@@ -288,7 +441,30 @@ class DeploymentsList extends Component
      */
     public function getSyncCandidatesProperty(): Collection
     {
-        return SiteSyncPeers::forSite($this->site);
+        $peers = SiteSyncPeers::forSite($this->site);
+
+        if (! $this->isFunctionsDeployHub()) {
+            return $peers;
+        }
+
+        // A function should only ship with other functions — pairing it with
+        // a VM peer on the same repo would queue a BYO deploy that cannot
+        // run on a Functions host (and vice versa).
+        return $peers
+            ->filter(fn (Site $peer): bool => $peer->id === $this->site->id)
+            ->values();
+    }
+
+    /**
+     * Functions get the same Deployments hub as BYO (tabs, history, sync,
+     * quick deploy) — they just skip VM-only surfaces (pipeline, releases,
+     * recurring schedule).
+     */
+    public function isFunctionsDeployHub(?Site $site = null): bool
+    {
+        $site ??= $this->site;
+
+        return (bool) $site->server?->isDigitalOceanFunctionsHost();
     }
 
     /** Persist (and mirror to the sidebar) the Sync selection as it changes. */
@@ -353,6 +529,162 @@ class DeploymentsList extends Component
         $this->statusFilter = '';
         $this->triggerFilter = '';
         $this->resetPage();
+    }
+
+    /**
+     * Ask before dropping a deploy record — history is the audit trail, so
+     * removal is deliberate rather than a stray click on a hover control.
+     */
+    public function confirmDeleteDeployment(string $deploymentId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $deployment = $this->deletableDeployment($deploymentId);
+        if ($deployment === null) {
+            return;
+        }
+
+        $details = [
+            ['label' => (string) __('Deployment'), 'value' => (string) $deployment->id, 'mono' => true],
+            ['label' => (string) __('Status'), 'value' => (string) $deployment->status],
+        ];
+        if ($deployment->started_at) {
+            $details[] = ['label' => (string) __('Started'), 'value' => $deployment->started_at->toDayDateTimeString()];
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteDeployment',
+            arguments: [$deployment->id],
+            title: __('Delete this deployment?'),
+            message: __('The run and its log are removed from history. Nothing that was deployed is touched — the live release stays exactly as it is.'),
+            confirmLabel: __('Delete run'),
+            destructive: true,
+            details: $details,
+        );
+    }
+
+    /**
+     * Delete a single finished deploy record. The ephemeral-credential row
+     * cascades with it; releases and the live deploy are untouched.
+     */
+    public function deleteDeployment(string $deploymentId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $deployment = $this->deletableDeployment($deploymentId);
+        if ($deployment === null) {
+            return;
+        }
+
+        $deployment->delete();
+
+        $this->resetPage();
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+        $this->toastSuccess(__('Deployment deleted.'));
+    }
+
+    /**
+     * Ask before clearing every failed run at once — the "history is all red
+     * and I've fixed the cause" broom.
+     */
+    public function confirmDeleteFailedDeployments(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $count = $this->failedDeploymentsQuery()->count();
+        if ($count === 0) {
+            $this->toastError(__('There are no failed deployments to delete.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteFailedDeployments',
+            title: __('Delete all failed deployments?'),
+            message: trans_choice(
+                '{1}:count failed run and its log are removed from history. Successful runs, releases, and anything currently live are untouched.'
+                .'|[2,*]:count failed runs and their logs are removed from history. Successful runs, releases, and anything currently live are untouched.',
+                $count,
+                ['count' => $count],
+            ),
+            confirmLabel: trans_choice('{1}Delete :count run|[2,*]Delete :count runs', $count, ['count' => $count]),
+            destructive: true,
+        );
+    }
+
+    public function deleteFailedDeployments(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        // Chunked per-model delete so cascades / model events fire per row,
+        // rather than one mass DELETE that skips them.
+        $deleted = 0;
+        $this->failedDeploymentsQuery()
+            ->orderBy('id')
+            ->chunkById(200, function (Collection $rows) use (&$deleted): void {
+                foreach ($rows as $row) {
+                    $row->delete();
+                    $deleted++;
+                }
+            });
+
+        $this->resetPage();
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+        $this->toastSuccess(trans_choice(
+            '{1}:count failed deployment deleted.|[2,*]:count failed deployments deleted.',
+            $deleted,
+            ['count' => $deleted],
+        ));
+    }
+
+    /**
+     * How many failed runs this site is carrying — drives the bulk-delete
+     * control's visibility and label.
+     */
+    #[Computed]
+    public function failedDeploymentCount(): int
+    {
+        return $this->failedDeploymentsQuery()->count();
+    }
+
+    /**
+     * Failed runs for this site — the bulk-delete target. `skipped` is left
+     * alone: a billing- or window-blocked run records a decision, not a
+     * failure, and operators go looking for those.
+     *
+     * @return Builder<SiteDeployment>
+     */
+    private function failedDeploymentsQuery(): Builder
+    {
+        return SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('status', SiteDeployment::STATUS_FAILED);
+    }
+
+    /**
+     * Resolve a deploy row that belongs to this site and is safe to remove.
+     * A running deploy is off-limits — deleting the row the pipeline is still
+     * writing to would strand the worker; cancel it first.
+     */
+    private function deletableDeployment(string $deploymentId): ?SiteDeployment
+    {
+        $deployment = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($deploymentId);
+
+        if ($deployment === null) {
+            $this->toastError(__('That deployment no longer exists.'));
+
+            return null;
+        }
+
+        if ($deployment->status === SiteDeployment::STATUS_RUNNING) {
+            $this->toastError(__('That deploy is still running. Cancel it first, then delete the run.'));
+
+            return null;
+        }
+
+        return $deployment;
     }
 
     /**
@@ -443,7 +775,7 @@ class DeploymentsList extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $keys = array_map(static fn ($e): string => (string) ($e['key'] ?? ''), $this->deployBlockedEnvKeys());
+        $keys = array_map(static fn ($e): string => (string) $e['key'], $this->deployBlockedEnvKeys());
         $derived = DomainDerivedEnvDefaults::resolve($this->site, $keys);
 
         if ($derived === []) {
@@ -699,7 +1031,7 @@ class DeploymentsList extends Component
         $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
 
         if ($this->fixerRunId === null) {
-            $fixer = $coordinator->inFlightFixer($this->site);
+            $fixer = $coordinator->latestFixer($this->site);
             if ($fixer !== null) {
                 $this->fixerRunId = (string) $fixer->id;
                 $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
@@ -711,6 +1043,8 @@ class DeploymentsList extends Component
 
     public function render(): View
     {
+        $this->resolveWatchedConsoleAction();
+
         // The paginated list + trigger facets feed ONLY the History panel; the
         // distinct/paginate queries are wasted on every other tab. Run them only
         // when History is active so switching to Environment / Webhook / etc.
@@ -744,59 +1078,48 @@ class DeploymentsList extends Component
 
         $runtimeMode = $this->site->runtimeTargetMode();
         $isVmDeployHub = $runtimeMode === 'vm'
-            && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime();
+        $isFunctionsDeployHub = $this->isFunctionsDeployHub();
+        $isDeployHub = $isVmDeployHub || $isFunctionsDeployHub;
 
         $atomicReleases = $isVmDeployHub && $this->site->deploy_strategy === 'atomic';
         $latestDeployment = null;
+        $recentDeployments = collect();
+        $releases = null;
+
+        // Paginated Releases tab list (named page so it doesn't collide with History).
+        if ($this->tab === self::TAB_RELEASES && $atomicReleases) {
+            $releases = SiteRelease::query()
+                ->where('site_id', $this->site->id)
+                ->orderByDesc('id')
+                ->paginate(15, pageName: 'releasesPage');
+        }
 
         // Eager-load only the relation the active panel actually reads: the
-        // releases list is Releases-only; the recent-deployments window (and the
-        // $latestDeployment it yields) is the Deploy panel only. The fallback
-        // tab also renders the Deploy panel, hence the in-array check. Other
-        // tabs (Environment, Webhook, Hooks, Pipeline…) load neither.
+        // recent-deployments window (and the $latestDeployment it yields) is the
+        // Deploy panel only. The fallback tab also renders the Deploy panel,
+        // hence the in-array check. Other tabs load neither.
         if ($isVmDeployHub) {
-            $load = [];
-            if ($this->tab === self::TAB_RELEASES) {
-                $load['releases'] = fn ($q) => $q->orderByDesc('id')->limit(30);
-            }
-
             $deployPanelTabs = [self::TAB_OVERVIEW, self::TAB_REPOSITORY, self::TAB_ENVIRONMENT, self::TAB_COMMITS,
                 self::TAB_FILES, self::TAB_BRANCHES, self::TAB_PIPELINE, self::TAB_ROLLOUT, self::TAB_RELEASES,
                 self::TAB_HISTORY, self::TAB_WEBHOOK, self::TAB_HOOKS, self::TAB_SETTINGS];
             $needsLatest = ! in_array($this->tab, $deployPanelTabs, true); // Deploy tab + unknown fallback
 
             if ($needsLatest) {
-                $load['deployments'] = fn ($q) => $q->orderByDesc('started_at')->limit(5);
-            }
-
-            if ($load !== []) {
-                $this->site->load($load);
-            }
-            if ($needsLatest) {
+                $this->site->load([
+                    'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
+                ]);
                 $latestDeployment = $this->site->deployments->first();
             }
+        } elseif ($isFunctionsDeployHub && $this->tab === self::TAB_OVERVIEW) {
+            $this->site->load([
+                'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
+            ]);
+            $recentDeployments = $this->site->deployments;
+            $latestDeployment = $recentDeployments->first();
         }
 
-        $tabsVisible = [
-            self::TAB_OVERVIEW => true,
-            self::TAB_REPOSITORY => true,
-            self::TAB_DEPLOY => true,
-            self::TAB_WEBHOOK => true,
-            // Hooks editor only applies to DigitalOcean Functions hosts.
-            self::TAB_HOOKS => (bool) $this->site->server?->isDigitalOceanFunctionsHost(),
-            // Commits / Files / Branches live under Repository now.
-            self::TAB_COMMITS => false,
-            self::TAB_FILES => false,
-            self::TAB_BRANCHES => false,
-            self::TAB_PIPELINE => $isVmDeployHub,
-            // Rollout folded into Pipeline as a subtab.
-            self::TAB_ROLLOUT => false,
-            self::TAB_RELEASES => $atomicReleases,
-            self::TAB_HISTORY => true,
-            // Settings consolidated up into Webhook + Hooks tabs.
-            self::TAB_SETTINGS => false,
-        ];
+        $tabsVisible = $this->tabVisibility();
 
         $overviewMetrics = $this->tab === self::TAB_OVERVIEW
             ? $this->computeOverviewMetrics()
@@ -810,8 +1133,9 @@ class DeploymentsList extends Component
         // (and the unknown-tab fallback, which renders the Deploy panel) and skip
         // the work entirely on History / Webhook / Hooks / Pipeline / Releases /
         // Overview switches.
-        $needsContract = in_array($this->tab, [self::TAB_DEPLOY, self::TAB_ENVIRONMENT], true)
-            || ! in_array($this->tab, self::TABS, true);
+        $needsContract = ! $isFunctionsDeployHub
+            && (in_array($this->tab, [self::TAB_DEPLOY, self::TAB_ENVIRONMENT], true)
+                || ! in_array($this->tab, self::TABS, true));
         $deploymentContract = $needsContract ? app(DeploymentContractBuilder::class)->build($this->site) : null;
         $deploymentPreflight = $needsContract ? app(DeploymentPreflightValidator::class)->validate($this->site) : [];
 
@@ -826,12 +1150,17 @@ class DeploymentsList extends Component
             ),
             [
                 'deployments' => $deployments,
+                'releases' => $releases,
                 'triggers' => $triggers,
                 'statuses' => self::ALLOWED_STATUSES,
                 'isVmDeployHub' => $isVmDeployHub,
+                'isFunctionsDeployHub' => $isFunctionsDeployHub,
+                'isDeployHub' => $isDeployHub,
                 'atomicReleases' => $atomicReleases,
                 'latestDeployment' => $latestDeployment,
+                'recentDeployments' => $recentDeployments,
                 'tabsVisible' => $tabsVisible,
+                'tabDefinitions' => $this->tabDefinitions(),
                 'overviewMetrics' => $overviewMetrics,
                 'section' => 'deploy',
                 'routingTab' => 'domains',
@@ -931,12 +1260,20 @@ class DeploymentsList extends Component
 
     public function activeConsoleRun(): ?ConsoleAction
     {
-        if ($this->watchedConsoleRunId === null) {
-            return null;
+        if ($this->watchedConsoleRunId !== null) {
+            $run = ConsoleAction::query()->find($this->watchedConsoleRunId);
+            if ($run !== null && ! $run->isDismissed()) {
+                return $run;
+            }
         }
 
-        $run = ConsoleAction::query()->find($this->watchedConsoleRunId);
+        $remediation = $this->deploymentRemediationRun;
+        if ($remediation instanceof ConsoleAction
+            && $remediation->isInFlight()
+            && ! $remediation->isStale()) {
+            return $remediation;
+        }
 
-        return ($run !== null && ! $run->isDismissed()) ? $run : null;
+        return null;
     }
 }

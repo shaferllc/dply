@@ -17,16 +17,16 @@ use Illuminate\Support\Carbon;
  *                      already-presignable durable S3 object (nothing to copy or delete).
  * @property ?string $backupable_id
  * @property string $backupable_type
- * @property string $bucket
+ * @property string|null $bucket
  * @property ?string $error_message
  * @property ?Carbon $expires_at
  * @property string $mode
- * @property string $object_key
+ * @property string|null $object_key
  * @property ?string $requested_by_user_id
  * @property string $status
  * @property-read ?User $requestedBy
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class BackupDownloadStaging extends Model
 {

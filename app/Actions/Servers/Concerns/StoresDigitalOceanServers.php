@@ -12,7 +12,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -24,8 +24,6 @@ use Illuminate\Validation\ValidationException;
  */
 trait StoresDigitalOceanServers
 {
-
-
     /**
      * @param  list<string>  $scriptKeys
      */
@@ -85,58 +83,6 @@ trait StoresDigitalOceanServers
         ]);
 
         ProvisionDigitalOceanDropletJob::dispatch($server);
-        audit_log($org, $user, 'server.created', $server);
-
-        return $server;
-    }
-
-    private function storeDigitalOceanFunctions(User $user, Organization $org, ServerCreateForm $form): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'do_functions_api_host' => $form->do_functions_api_host,
-                'do_functions_namespace' => $form->do_functions_namespace,
-                'do_functions_access_key' => $form->do_functions_access_key,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'do_functions_api_host' => 'required|url|max:255',
-                'do_functions_namespace' => 'required|string|max:255',
-                'do_functions_access_key' => ['required', 'string', 'max:500', 'regex:/^.+:.+$/'],
-            ],
-            [
-                'do_functions_access_key.regex' => __('Use the DigitalOcean Functions access key format `id:secret`.'),
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'digitalocean')
-            ->findOrFail($form->provider_credential_id);
-
-        $meta = [
-            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            'digitalocean_functions' => [
-                'api_host' => rtrim($form->do_functions_api_host, '/'),
-                'namespace' => trim($form->do_functions_namespace),
-                'access_key' => trim($form->do_functions_access_key),
-            ],
-        ];
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::DigitalOcean,
-            'provider_credential_id' => $credential->id,
-            'ssh_port' => 22,
-            'ssh_user' => 'functions',
-            'status' => Server::STATUS_READY,
-            'health_status' => Server::HEALTH_REACHABLE,
-            'meta' => $meta,
-        ]);
-
         audit_log($org, $user, 'server.created', $server);
 
         return $server;
@@ -213,7 +159,7 @@ trait StoresDigitalOceanServers
             // page surfaces the missing-id state and offers a "Try again".
             try {
                 foreach ((new DigitalOceanService($credential))->getKubernetesClusters() as $cluster) {
-                    if (is_array($cluster) && (string) ($cluster['name'] ?? '') === $clusterName) {
+                    if ((string) ($cluster['name'] ?? '') === $clusterName) {
                         $clusterId = (string) ($cluster['id'] ?? '');
                         $clusterRegion = (string) ($cluster['region'] ?? '');
                         break;

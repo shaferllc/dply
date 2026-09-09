@@ -48,9 +48,9 @@
 @endphp
 <div class="mb-3 flex items-center gap-2">
     <x-heroicon-o-chart-bar class="h-4 w-4 text-brand-mist" aria-hidden="true" />
-    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('System load') }}</p>
+    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('System load') }}</p>
     @if ($metricCapturedAt)
-        <span class="text-[11px] {{ $metricStale ? 'font-semibold text-amber-700' : 'text-brand-mist' }}">
+        <span class="text-xs {{ $metricStale ? 'font-semibold text-amber-700' : 'text-brand-mist' }}">
             · {{ __('Sampled :ago', ['ago' => $metricCapturedAt->diffForHumans()]) }}@if ($metricStale) · {{ __('STALE') }}@endif
         </span>
     @endif
@@ -85,7 +85,7 @@
          (+ a remediation hint each) when CPU is elevated. --}}
     @if ($cpuBusy)
         <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-            <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+            <p class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
                 <x-heroicon-m-fire class="h-3.5 w-3.5" aria-hidden="true" />
                 {{ __('Why CPU is busy') }}
             </p>
@@ -104,7 +104,7 @@
                                 <span class="min-w-0 truncate font-mono font-medium text-brand-ink">{{ $cmd }}</span>
                                 <span class="shrink-0 font-mono text-xs {{ $pcpu !== null && $pcpu >= 50 ? 'font-semibold text-rose-600' : 'text-brand-moss' }}">{{ $pcpu !== null ? number_format($pcpu, 0).'% CPU' : '—' }}</span>
                             </div>
-                            <div class="text-[11px] text-brand-mist">{{ $puser !== '' ? $puser : '—' }}@if ($ppid !== null) · pid {{ $ppid }}@endif</div>
+                            <div class="text-xs text-brand-mist">{{ $puser !== '' ? $puser : '—' }}@if ($ppid !== null) · pid {{ $ppid }}@endif</div>
                             @if ($hint)
                                 <p class="mt-0.5 text-xs leading-relaxed text-amber-900">{{ $hint }}</p>
                             @endif

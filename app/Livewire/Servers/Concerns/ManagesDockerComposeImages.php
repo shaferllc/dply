@@ -13,8 +13,6 @@ use App\Support\Servers\ServerDockerRemoteInspector;
  */
 trait ManagesDockerComposeImages
 {
-
-
     public function confirmDockerComposeAction(string $actionKey, string $project, string $config): void
     {
         $allowed = [
@@ -59,6 +57,8 @@ trait ManagesDockerComposeImages
 
     public function openComposeLogs(string $project, string $config): void
     {
+        $this->authorize('update', $this->server);
+
         $inspector = app(ServerDockerRemoteInspector::class);
         $config = $inspector->primaryComposeConfigFile($config);
 

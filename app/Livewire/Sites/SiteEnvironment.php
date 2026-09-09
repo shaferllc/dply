@@ -55,6 +55,10 @@ class SiteEnvironment extends Component
 
     public function render(): View
     {
+        if ($this->dockerInstallRunId !== null) {
+            $this->syncDockerInstallProgress();
+        }
+
         // The env editor's missing-var gate + suggested fixes read the
         // deployment contract/preflight (same as the Deploy hub did for its
         // Environment tab).

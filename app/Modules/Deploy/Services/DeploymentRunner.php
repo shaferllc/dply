@@ -42,7 +42,6 @@ class DeploymentRunner
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory  test seam
      * @return array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}
      */
-    /** @return array<string, mixed> */
     public function run(SiteDeployment $deployment, string $releaseDir, ?Closure $shellFactory = null): array
     {
         $site = $deployment->site;
@@ -80,21 +79,19 @@ class DeploymentRunner
             return $this->finalize($deployment, $aggregate, ok: false);
         }
 
-        // Restart phase: FPM reload / systemd restart.
+        // Restart phase: FPM reload / worker bounce. Post-cutover and
+        // best-effort — a horizon:terminate Redis blip must not fail a live release.
         $restart = $this->phaseRunner->runRestart($site, $shellFactory);
         $aggregate['phases'][SiteDeployStep::PHASE_RESTART] = $restart;
         if ($restart !== []) {
             $deployment->recordPhaseResults(SiteDeployStep::PHASE_RESTART, $restart);
-            if (! $this->phaseOk($restart)) {
-                return $this->finalize($deployment, $aggregate, ok: false);
-            }
         }
 
         return $this->finalize($deployment, $aggregate, ok: true);
     }
 
     /**
-     * @param  array<string, mixed> $steps
+     * @param  list<array<string, mixed>> $steps
      */
     private function phaseOk(array $steps): bool
     {

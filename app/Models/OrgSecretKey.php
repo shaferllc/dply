@@ -18,14 +18,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *                      exception that proves the rule: it is dply's OWN copy of the key, registered
  *                      in config/secret_vault.php so `secrets:reencrypt` rotates it like any other
  *                      platform secret. The SiteSecretResidency.ciphertext it opens is NOT.
- * @property string $dply_identity
- * @property string $fingerprint
+ * @property string|null $dply_identity
+ * @property string|null $fingerprint
  * @property string $identity_holder
  * @property ?string $organization_id
  * @property string $public_recipient
  * @property-read ?Organization $organization
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class OrgSecretKey extends Model
 {

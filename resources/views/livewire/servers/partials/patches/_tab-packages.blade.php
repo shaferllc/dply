@@ -5,14 +5,14 @@
                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Inventory') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Inventory') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Packages & OS detection') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Inventory probe snapshot — read-only package list, not an install plan.') }}
                 </p>
             </div>
         </div>
-        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+        <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
             <x-heroicon-o-eye class="h-4 w-4" aria-hidden="true" />
             {{ __('Read-only') }}
         </span>
@@ -25,13 +25,13 @@
             </span>
             <dl class="grid min-w-0 flex-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('OS label (in Dply)') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('OS label (in Dply)') }}</dt>
                     <dd class="mt-1 text-sm font-semibold text-brand-ink">
                         {{ $osVersions[$report['os']['label'] ?? ''] ?? ($report['os']['label'] ?? '—') }}
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Detected on server') }}</dt>
+                    <dt class="text-xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Detected on server') }}</dt>
                     <dd class="mt-1 text-sm text-brand-ink">
                         @if ($report['os']['pretty'] ?? null)
                             <span class="font-semibold">{{ $report['os']['pretty'] }}</span>
@@ -86,7 +86,7 @@
                 <div class="mt-4 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
                     <div class="max-h-[32rem] overflow-auto">
                         <table class="min-w-full text-left text-xs">
-                            <thead class="sticky top-0 z-10 bg-brand-cream/95 text-[11px] uppercase tracking-[0.12em] text-brand-mist backdrop-blur-sm">
+                            <thead class="sticky top-0 z-10 bg-brand-cream/95 text-xs uppercase tracking-[0.12em] text-brand-mist backdrop-blur-sm">
                                 <tr class="border-b border-brand-ink/10">
                                     <th class="px-4 py-3 font-semibold">{{ __('Package') }}</th>
                                     <th class="px-4 py-3 font-semibold">{{ __('Current') }}</th>
@@ -108,15 +108,15 @@
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <span class="font-mono text-sm font-medium text-brand-ink">{{ $row['name'] }}</span>
                                                 @if ($row['is_security'])
-                                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-800 ring-1 ring-red-200">{{ __('Security') }}</span>
+                                                    <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-2xs font-bold uppercase tracking-wide text-red-800 ring-1 ring-red-200">{{ __('Security') }}</span>
                                                 @endif
                                             </div>
                                         </td>
                                         <td class="max-w-[14rem] px-4 py-3 align-top">
-                                            <span class="block truncate font-mono text-[11px] leading-relaxed text-brand-moss" title="{{ $row['current_version'] ?? '—' }}">{{ $row['current_version'] ?? '—' }}</span>
+                                            <span class="block truncate font-mono text-xs leading-relaxed text-brand-moss" title="{{ $row['current_version'] ?? '—' }}">{{ $row['current_version'] ?? '—' }}</span>
                                         </td>
                                         <td class="max-w-[14rem] px-4 py-3 align-top">
-                                            <span class="block truncate font-mono text-[11px] font-medium leading-relaxed text-brand-ink" title="{{ $row['new_version'] ?? '—' }}">{{ $row['new_version'] ?? '—' }}</span>
+                                            <span class="block truncate font-mono text-xs font-medium leading-relaxed text-brand-ink" title="{{ $row['new_version'] ?? '—' }}">{{ $row['new_version'] ?? '—' }}</span>
                                         </td>
                                         <td class="px-4 py-3 align-top">
                                             <div class="flex flex-wrap gap-1">
@@ -124,7 +124,7 @@
                                                     @php $sourcePart = trim($sourcePart); @endphp
                                                     @if ($sourcePart !== '')
                                                         <span @class([
-                                                            'inline-flex rounded-md px-1.5 py-0.5 font-mono text-[10px] ring-1',
+                                                            'inline-flex rounded-md px-1.5 py-0.5 font-mono text-2xs ring-1',
                                                             'bg-red-50 text-red-800 ring-red-200' => str_contains($sourcePart, 'security'),
                                                             'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => ! str_contains($sourcePart, 'security'),
                                                         ])>{{ $sourcePart }}</span>

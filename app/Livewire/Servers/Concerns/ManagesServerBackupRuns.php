@@ -7,7 +7,7 @@ namespace App\Livewire\Servers\Concerns;
 use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Models\ConsoleAction;
-use App\Models\ServerBackupSchedule;
+use App\Models\BackupSchedule;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
@@ -244,7 +244,7 @@ trait ManagesServerBackupRuns
     {
         $this->authorize('update', $this->server);
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -268,7 +268,7 @@ trait ManagesServerBackupRuns
 
         Notification::send($admins, new BackupFailureNotification(
             schedule: $schedule,
-            errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()?->email ?? 'operator']),
+            errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()->email ?? 'operator']),
             serverName: (string) ($this->server->name ?? ''),
             isTest: true,
         ));
@@ -282,7 +282,7 @@ trait ManagesServerBackupRuns
     {
         $this->authorize('update', $this->server);
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -309,7 +309,7 @@ trait ManagesServerBackupRuns
     {
         $this->authorize('update', $this->server);
 
-        $schedule = ServerBackupSchedule::query()
+        $schedule = BackupSchedule::query()
             ->where('server_id', $this->server->id)
             ->whereKey($scheduleId)
             ->first();
@@ -318,8 +318,8 @@ trait ManagesServerBackupRuns
         }
 
         match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => $this->dispatchScheduleDatabase($schedule),
-            ServerBackupSchedule::TARGET_SITE_FILES => $this->dispatchScheduleSiteFiles($schedule),
+            BackupSchedule::TARGET_DATABASE => $this->dispatchScheduleDatabase($schedule),
+            BackupSchedule::TARGET_SITE_FILES => $this->dispatchScheduleSiteFiles($schedule),
             default => $this->toastError(__('Unknown target type.')),
         };
 

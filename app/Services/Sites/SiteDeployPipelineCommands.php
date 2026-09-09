@@ -23,8 +23,14 @@ final class SiteDeployPipelineCommands
             SiteDeployStep::TYPE_NPM_RUN => $custom !== ''
                 ? 'npm run '.escapeshellarg($custom).' --if-present'
                 : 'npm run build --if-present',
-            SiteDeployStep::TYPE_YARN_INSTALL => 'yarn install --frozen-lockfile',
-            SiteDeployStep::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
+            // pnpm and yarn are not installed alongside Node — mise installs the
+            // runtime, not the alternate package managers — so a bare `pnpm`
+            // exits 127 "command not found". Node ships corepack, which can
+            // fetch and run the pinned manager on demand, so fall back to it
+            // rather than requiring a separate server-side install step.
+            SiteDeployStep::TYPE_YARN_INSTALL => self::viaCorepack('yarn', 'yarn install --frozen-lockfile'),
+            SiteDeployStep::TYPE_PNPM_INSTALL => self::viaCorepack('pnpm', 'pnpm install --frozen-lockfile'),
+            // Bun is a runtime in its own right, not a corepack-managed manager.
             SiteDeployStep::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',
             SiteDeployStep::TYPE_ARTISAN_MIGRATE => 'php artisan migrate --force --no-interaction',
             SiteDeployStep::TYPE_ARTISAN_MIGRATE_PRETEND => 'php artisan migrate --pretend --force',
@@ -43,5 +49,25 @@ final class SiteDeployPipelineCommands
             SiteDeployStep::TYPE_CUSTOM => $custom !== '' ? $custom : null,
             default => null,
         };
+    }
+
+    /**
+     * Run a JS package manager, preferring the real binary and falling back to
+     * corepack (bundled with Node) when it is not installed.
+     *
+     * `corepack <manager>` downloads and runs the version pinned in
+     * package.json's packageManager field, or a recent default. Without this a
+     * pnpm/yarn repo fails at the install step with exit 127 on any box that
+     * only has Node.
+     */
+    private static function viaCorepack(string $manager, string $command): string
+    {
+        return sprintf(
+            'if command -v %1$s >/dev/null 2>&1; then %2$s; '
+            .'elif command -v corepack >/dev/null 2>&1; then corepack %2$s; '
+            .'else echo "%1$s is not installed and corepack is unavailable — install %1$s on this server." >&2; exit 127; fi',
+            $manager,
+            $command,
+        );
     }
 }

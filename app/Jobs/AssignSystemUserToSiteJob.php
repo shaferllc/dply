@@ -76,6 +76,14 @@ class AssignSystemUserToSiteJob implements ShouldBeUnique, ShouldQueue
 
             $emit->success('site files assigned to '.$this->username, 'system_user');
             $this->completeConsoleAction();
+
+            // The vhost hard-codes the FPM pool socket for the *previous* owner
+            // (NginxSiteConfigBuilder reads Site::effectiveSystemUser()), so
+            // without this re-apply the site — and every tenant hostname served
+            // from the same server block — 502s until something else happens to
+            // rewrite the config. RelocateSiteFilesJob chains the same job for
+            // the same reason.
+            ApplySiteWebserverConfigJob::dispatch((string) $site->id, $this->userId);
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'system_user');
             $this->failConsoleAction($e->getMessage());

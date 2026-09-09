@@ -83,9 +83,7 @@ trait HandlesSiteRemovalFlow
         }
 
         $this->site = $site->fresh();
-        if (method_exists($this, 'toastSuccess')) {
-            $this->toastSuccess(__('Scheduled site removal cancelled.'));
-        }
+        $this->toastSuccess(__('Scheduled site removal cancelled.'));
     }
 
     public function submitRemoveSite(): mixed
@@ -105,9 +103,7 @@ trait HandlesSiteRemovalFlow
             $this->persistScheduledSiteRemoval($site, $at, $reason !== '' ? $reason : null);
             $this->site = $site->fresh();
             $this->closeRemoveSiteModal();
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('This site will be removed in 30 minutes. Cancel from here anytime before that.'));
-            }
+            $this->toastSuccess(__('This site will be removed in 30 minutes. Cancel from here anytime before that.'));
 
             return null;
         }
@@ -128,11 +124,9 @@ trait HandlesSiteRemovalFlow
             $this->persistScheduledSiteRemoval($site, $at, $reason !== '' ? $reason : null);
             $this->site = $site->fresh();
             $this->closeRemoveSiteModal();
-            if (method_exists($this, 'toastSuccess')) {
-                $this->toastSuccess(__('This site is scheduled for removal at the end of :date.', [
-                    'date' => $at->toFormattedDateString(),
-                ]));
-            }
+            $this->toastSuccess(__('This site is scheduled for removal at the end of :date.', [
+                'date' => $at->toFormattedDateString(),
+            ]));
 
             return null;
         }

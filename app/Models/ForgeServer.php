@@ -13,21 +13,21 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
- * @property string $ip_address
+ * @property ?string $ip_address
  * @property ?Carbon $last_synced_at
  * @property string $name
  * @property array<string, mixed> $php_versions
  * @property ?string $provider_credential_id
- * @property string $provider_label
+ * @property ?string $provider_label
  * @property bool $removed_from_source
- * @property string $server_type
+ * @property ?string $server_type
  * @property int $source_id
- * @property array<string, mixed> $source_snapshot
- * @property string $status
+ * @property ?array<string, mixed> $source_snapshot
+ * @property ?string $status
  * @property-read ?ProviderCredential $providerCredential
  * @property-read Collection<int, ForgeSite> $sites
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class ForgeServer extends Model
 {

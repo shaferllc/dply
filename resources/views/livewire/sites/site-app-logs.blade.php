@@ -12,7 +12,7 @@
     <section class="border-b border-brand-ink/10">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App logs') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('App logs') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Application drain') }}</h3>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Application log records received from this site via the dply Logs drain.') }}</p>
             </div>
@@ -37,8 +37,8 @@
             <ul class="divide-y divide-brand-ink/5">
                 @foreach ($records as $rec)
                     <li wire:key="applog-{{ $rec->id }}" class="flex items-start gap-3 px-5 py-2.5 sm:px-6">
-                        <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase {{ $levelColors[$rec->level] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $rec->level ?? 'log' }}</span>
-                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ optional($rec->logged_at ?? $rec->created_at)->format('H:i:s') }}</span>
+                        <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase {{ $levelColors[$rec->level] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $rec->level ?? 'log' }}</span>
+                        <span class="shrink-0 font-mono text-2xs text-brand-mist">{{ optional($rec->logged_at ?? $rec->created_at)->format('H:i:s') }}</span>
                         <span class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-brand-ink">{{ $rec->message }}</span>
                     </li>
                 @endforeach
@@ -82,8 +82,8 @@
                 <ul class="divide-y divide-brand-ink/5">
                     @foreach ($records as $rec)
                         <li wire:key="applog-{{ $rec->id }}" class="flex items-start gap-3 px-6 py-2.5 sm:px-8">
-                            <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase {{ $levelColors[$rec->level] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $rec->level ?? 'log' }}</span>
-                            <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ optional($rec->logged_at ?? $rec->created_at)->format('H:i:s') }}</span>
+                            <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase {{ $levelColors[$rec->level] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $rec->level ?? 'log' }}</span>
+                            <span class="shrink-0 font-mono text-2xs text-brand-mist">{{ optional($rec->logged_at ?? $rec->created_at)->format('H:i:s') }}</span>
                             <span class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs text-brand-ink">{{ $rec->message }}</span>
                         </li>
                     @endforeach

@@ -236,7 +236,7 @@ trait ManagesFirewallImportExport
             return;
         }
 
-        if ($candidate && ! $candidate->enabled) {
+        if ($candidate) {
             $candidate->update(['enabled' => true]);
             $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_UPDATED, [
                 'rule_id' => $candidate->id,

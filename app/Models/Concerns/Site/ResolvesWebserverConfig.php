@@ -33,10 +33,6 @@ trait ResolvesWebserverConfig
 {
     public function webserver(): string
     {
-        if ($this->usesFunctionsRuntime()) {
-            return 'digitalocean_functions';
-        }
-
         if ($this->usesDockerRuntime()) {
             return 'docker';
         }
@@ -438,7 +434,7 @@ trait ResolvesWebserverConfig
             return false;
         }
 
-        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
             return false;
         }
 
@@ -509,7 +505,7 @@ trait ResolvesWebserverConfig
      */
     public function availableCachingMethods(): array
     {
-        if ($this->usesFunctionsRuntime() || $this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime()) {
             return [];
         }
 

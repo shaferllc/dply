@@ -34,7 +34,7 @@ final class SiteCloneAttributeMapper
             'slug' => $slug,
             'type' => $source->type,
             'document_root' => $documentRoot,
-            'repository_path' => $source->usesFunctionsRuntime() || $source->usesDockerRuntime() || $source->usesKubernetesRuntime()
+            'repository_path' => $source->usesDockerRuntime() || $source->usesKubernetesRuntime()
                 ? $source->repository_path
                 : $repositoryPath,
             'php_version' => $source->php_version,

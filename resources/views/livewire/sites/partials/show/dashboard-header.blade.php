@@ -54,7 +54,7 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-lg font-semibold text-brand-ink">{{ $primaryHostname ?? $site->name }}</h2>
-                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
+                                <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
                                     <span class="h-1.5 w-1.5 rounded-full {{ $toneDot }}"></span>
                                     {{ $statusLabel }}
                                 </span>
@@ -72,27 +72,27 @@
                             </p>
                             <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
                                 @if ($site->visitUrl())
-                                    <a href="{{ $site->visitUrl() }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-forest/25 bg-brand-forest/8 px-2.5 py-1 font-mono text-[11px] text-brand-forest hover:bg-brand-forest/15">
+                                    <a href="{{ $site->visitUrl() }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-forest/25 bg-brand-forest/8 px-2.5 py-1 font-mono text-xs text-brand-forest hover:bg-brand-forest/15">
                                         <x-heroicon-m-globe-alt class="h-3 w-3" />
                                         <span class="truncate">{{ $site->visitUrl() }}</span>
                                         <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 shrink-0 opacity-70" />
                                     </a>
                                 @endif
                                 @foreach ($aliasHostnames as $alias)
-                                    <span class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink">
+                                    <span class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 font-mono text-xs text-brand-ink">
                                         <x-heroicon-m-link class="h-3 w-3 text-brand-mist" />
                                         <span class="truncate">{{ $alias }}</span>
                                     </span>
                                 @endforeach
                                 @if ($testingHostname !== '')
-                                    <a href="http://{{ $testingHostname }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 font-mono text-[11px] text-sky-900 hover:bg-sky-100">
+                                    <a href="http://{{ $testingHostname }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 font-mono text-xs text-sky-900 hover:bg-sky-100">
                                         <x-heroicon-m-beaker class="h-3 w-3" />
                                         <span class="truncate">{{ $testingHostname }}</span>
                                         <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 shrink-0 opacity-70" />
                                     </a>
                                 @endif
                                 @if ($previewDomain?->hostname)
-                                    <a href="http://{{ $previewDomain->hostname }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink hover:bg-brand-sand/40">
+                                    <a href="http://{{ $previewDomain->hostname }}" target="_blank" rel="noopener" class="inline-flex max-w-full items-center gap-1 rounded-full border border-brand-ink/10 bg-white px-2.5 py-1 font-mono text-xs text-brand-ink hover:bg-brand-sand/40">
                                         <x-heroicon-m-eye class="h-3 w-3 text-brand-mist" />
                                         <span class="truncate">{{ $previewDomain->hostname }}</span>
                                     </a>
@@ -142,7 +142,7 @@
 
                 <div class="grid gap-4 px-6 py-4 text-xs sm:grid-cols-3 sm:gap-6 sm:px-8">
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Last deploy') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Last deploy') }}</p>
                         @if ($latestDeployment)
                             <p class="mt-1 font-medium text-brand-ink">
                                 <span class="capitalize">{{ str_replace('_', ' ', (string) $latestDeployment->status) }}</span>
@@ -150,14 +150,14 @@
                                 <span class="text-brand-moss">{{ optional($latestDeployment->started_at ?? $latestDeployment->created_at)->diffForHumans() ?? '—' }}</span>
                             </p>
                             @if ($latestDeployment->git_sha)
-                                <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ \Illuminate\Support\Str::limit($latestDeployment->git_sha, 14, '') }}</p>
+                                <p class="mt-0.5 font-mono text-xs text-brand-mist">{{ \Illuminate\Support\Str::limit($latestDeployment->git_sha, 14, '') }}</p>
                             @endif
                         @else
                             <p class="mt-1 text-brand-moss">{{ __('No deploys yet.') }}</p>
                         @endif
                     </div>
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('URL health') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('URL health') }}</p>
                         @if ($healthLastCheck)
                             <p class="mt-1 font-medium {{ $healthLastOk ? 'text-emerald-700' : 'text-red-700' }}">
                                 {{ $healthLastOk ? __('OK') : __('Failed') }}
@@ -169,7 +169,7 @@
                         @endif
                     </div>
                     <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('SSL') }}</p>
+                        <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('SSL') }}</p>
                         <p class="mt-1 font-medium capitalize text-brand-ink">{{ $site->currentSslSummary() ?: __('—') }}</p>
                     </div>
                 </div>
@@ -177,22 +177,22 @@
 
             {{-- Tablist ---------------------------------------------------------------------------- --}}
             <x-server-workspace-tablist :aria-label="__('Site dashboard sections')" class="mt-6">
-                <x-server-workspace-tab id="site-tab-overview" :active="$activeTab === 'overview'" wire:click="$set('dashboard_tab', 'overview')">
+                <x-server-workspace-tab id="site-tab-overview" :active="$activeTab === 'overview'" wire:click="setDashboardTab('overview')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-rectangle-stack class="h-4 w-4" />{{ __('Overview') }}</span>
                 </x-server-workspace-tab>
-                <x-server-workspace-tab id="site-tab-deploys" :active="$activeTab === 'deploys'" wire:click="$set('dashboard_tab', 'deploys')">
+                <x-server-workspace-tab id="site-tab-deploys" :active="$activeTab === 'deploys'" wire:click="setDashboardTab('deploys')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-code-bracket class="h-4 w-4" />{{ __('Deploys') }}</span>
                 </x-server-workspace-tab>
                 @if ($showRuntimeTab)
-                    <x-server-workspace-tab id="site-tab-runtime" :active="$activeTab === 'runtime'" wire:click="$set('dashboard_tab', 'runtime')">
+                    <x-server-workspace-tab id="site-tab-runtime" :active="$activeTab === 'runtime'" wire:click="setDashboardTab('runtime')">
                         <span class="inline-flex items-center gap-1.5"><x-heroicon-o-cube class="h-4 w-4" />{{ __('Runtime') }}</span>
                     </x-server-workspace-tab>
                 @endif
-                <x-server-workspace-tab id="site-tab-logs" :active="$activeTab === 'logs'" wire:click="$set('dashboard_tab', 'logs')">
+                <x-server-workspace-tab id="site-tab-logs" :active="$activeTab === 'logs'" wire:click="setDashboardTab('logs')">
                     <span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard-document-list class="h-4 w-4" />{{ __('Logs') }}</span>
                 </x-server-workspace-tab>
                 @if ($showSslTab)
-                    <x-server-workspace-tab id="site-tab-ssl" :active="$activeTab === 'ssl'" wire:click="$set('dashboard_tab', 'ssl')">
+                    <x-server-workspace-tab id="site-tab-ssl" :active="$activeTab === 'ssl'" wire:click="setDashboardTab('ssl')">
                         <span class="inline-flex items-center gap-1.5"><x-heroicon-o-lock-closed class="h-4 w-4" />{{ __('SSL') }}</span>
                     </x-server-workspace-tab>
                 @endif

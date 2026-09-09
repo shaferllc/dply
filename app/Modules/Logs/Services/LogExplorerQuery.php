@@ -192,12 +192,12 @@ class LogExplorerQuery
 
         $rows = $this->clickhouse->select($sql, $params);
 
-        return array_values(array_map(static fn (array $r): array => [
+        return array_map(static fn (array $r): array => [
             'bucket' => (string) ($r['bucket'] ?? ''),
             'total' => (int) ($r['total'] ?? 0),
             'errors' => (int) ($r['errors'] ?? 0),
             'warns' => (int) ($r['warns'] ?? 0),
-        ], $rows));
+        ], $rows);
     }
 
     /**

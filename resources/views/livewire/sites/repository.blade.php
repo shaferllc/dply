@@ -28,19 +28,12 @@
 
         <main class="min-w-0 lg:col-span-9">
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Repository') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Browse commits, switch branches, and manage the Git connection.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-folder-open"
+                    :title="__('Repository')"
+                    :note="__('Browse commits, switch branches, and manage the Git connection.')"
+                />
 @else
 <div>
 @endif
@@ -48,13 +41,13 @@
             @if ($currentRepositoryUrl === '')
                 @if (! $isEmbedded)
                 <section class="border-b border-brand-ink/10">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-5 py-3.5 sm:px-6">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
                                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('No repository connected') }}</h3>
                                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                                     @if ($site->canRechooseApp())
@@ -100,8 +93,8 @@
                 @endphp
 
                 @unless ($isLocked)
-                    <div @class(['border-b border-brand-ink/10 px-3 py-2.5 sm:px-4' => ! $isEmbedded])>
-                    <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll @class(['!mb-0 w-full border-0 bg-transparent p-0 shadow-none' => ! $isEmbedded])>
+                    <div @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4' => ! $isEmbedded])>
+                    <x-server-workspace-tablist :aria-label="__('Repository sections')" scroll :bare="! $isEmbedded" @class(['!mb-0 w-full' => ! $isEmbedded])>
                         @foreach ($tabs as $entry)
                             <x-server-workspace-tab
                                 id="repository-tab-{{ $entry['id'] }}"
@@ -143,15 +136,17 @@
                 </div>
             @endif
 
-            <div @class([
-                'border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6' => ! $isEmbedded,
-                'mt-6' => $isEmbedded,
-            ])>
-                <x-cli-snippet :commands="[
-                    ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-                    ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
-                ]" />
-            </div>
+            {{-- Host pages (embedded Repository, or the Set up tab which
+                 already includes the Environment CLI footer) must not emit
+                 a second "CLI commands" row. --}}
+            @unless ($isEmbedded || $activeTab === 'setup')
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                    ]" />
+                </div>
+            @endunless
 
 @if (! $isEmbedded)
             </section>
@@ -161,4 +156,6 @@
 @else
 </div>
 @endif
+
+    @include('livewire.partials.confirm-action-modal')
 </div>{{-- /single root --}}

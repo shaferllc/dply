@@ -10,9 +10,15 @@ use App\Enums\ServerProvider;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
+use App\Support\Providers\ProviderApiStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Cache::flush();
+});
 
 test('provider card lists installed server role labels', function () {
     $org = Organization::factory()->create();
@@ -108,4 +114,14 @@ test('provider card defaults missing server role to web server label', function 
     expect($hetzner['installed_roles'])->toBe([
         ['id' => 'application', 'label' => 'Web server', 'count' => 1],
     ]);
+});
+
+test('provider cards mark an unreachable api as unavailable', function () {
+    $org = Organization::factory()->create();
+    ProviderApiStatus::markUnreachable('hetzner', 'cURL error 28: Operation timed out');
+
+    $hetzner = collect(ListServerProviderCards::run($org))->firstWhere('id', 'hetzner');
+
+    expect($hetzner['available'])->toBeFalse()
+        ->and($hetzner['unavailable_reason'])->toContain('paused');
 });

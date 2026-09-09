@@ -156,7 +156,7 @@ async function loginWithDeviceFlow({ baseUrl, openBrowser, enterShell = true, mo
     const hint =
       baseUrl === defaultBaseUrl()
         ? ' Check APP_URL / reinstall the CLI from your instance if this host is wrong.'
-        : ' Check the URL is reachable and APP_URL matches your browser host.';
+        : ' Check the URL is reachable and APP_URL matches your browser host (local .test HTTPS needs Dply Local CA at ~/.dpl/certs/ca.pem).';
     throw fail(`Could not start device login at ${baseUrl}: ${err.message}.${hint}`, err.status ?? 1);
   }
 
@@ -519,21 +519,74 @@ async function detectSiteProduct(api, siteId) {
   }
 }
 
-export async function sites() {
+/**
+ * `dply sites [needle] [--kind vm|cloud|edge]`
+ *
+ * Every site the token can see, of every kind — one table, because the platform
+ * has one Site model. `--kind` narrows it; a positional filters by name.
+ *
+ * @param {string[]} [args]
+ * @param {Record<string, unknown>} [flags]
+ */
+export async function sites(args = [], flags = {}) {
   const ctx = await resolveContext();
   const api = new ApiClient(ctx);
-  const response = await api.get('/edge/sites');
+  const { fetchAllSites, matchSites } = await import('./site-index.mjs');
+
+  let rows = await fetchAllSites(api, { kind: flags.kind });
+  const needle = args[0];
+
+  if (needle) {
+    rows = matchSites(rows, needle);
+  }
+
+  if (flags.json) {
+    printJson(rows.map(({ raw, ...row }) => row));
+
+    return 0;
+  }
+
+  if (rows.length === 0) {
+    warn(needle ? `No site matched "${needle}".` : 'No sites visible to this token.');
+    info(c.dim('Missing permissions? Try `dply auth refresh`. Filter with --kind vm|cloud|edge.'));
+
+    return 0;
+  }
+
   printTable(
-    ['id', 'name', 'hostname', 'status', 'runtime_mode', 'is_preview'],
-    (response.data ?? []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      hostname: s.hostname,
-      status: s.status,
-      runtime_mode: s.runtime_mode,
-      is_preview: s.is_preview ? 'yes' : 'no',
+    ['kind', 'name', 'status', 'url', 'where'],
+    rows.map((row) => ({
+      kind: kindCell(row.kind),
+      name: row.name,
+      status: row.status,
+      url: truncateCell(row.url, 44),
+      where: row.hint || '—',
     })),
   );
+
+  info('');
+  info(c.dim('Errors: `dply sites:errors <name>` (any kind) · deploy: `dply site:deploy <name>` · filter: --kind vm|cloud|edge'));
+
+  return 0;
+}
+
+/**
+ * @param {'vm'|'cloud'|'edge'} kind
+ */
+function kindCell(kind) {
+  if (kind === 'edge') {
+    return c.magenta('edge');
+  }
+
+  return kind === 'cloud' ? c.green('cloud') : c.cyan('vm');
+}
+
+/**
+ * @param {string} text
+ * @param {number} max
+ */
+function truncateCell(text, max) {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 export async function deploy(args, flags) {
@@ -700,16 +753,40 @@ export async function previews(args, flags) {
   }
 
   if (sub === 'create') {
-    const commit = flags.commit;
-    if (!commit) throw usageError('edge previews create --commit <sha>', '--commit is required.');
+    let commit = flags.commit ? String(flags.commit).trim() : '';
+    let branch = flags.branch ? String(flags.branch).trim() : '';
+
+    if (!commit) {
+      const site = (await api.get(`/edge/sites/${encodeURIComponent(ctx.siteId)}`))?.data ?? {};
+      branch = branch || String(site.branch || 'main').trim() || 'main';
+      const repo = String(site.repository || '').trim();
+      if (!repo || !repo.includes('/')) {
+        throw usageError(
+          'edge previews create --commit <sha>',
+          'Pass --commit <sha>, or ensure the Edge site has a GitHub repository so --branch can resolve HEAD.',
+        );
+      }
+      commit = await resolveGithubCommitSha(repo, branch);
+      info(c.dim(`Resolved ${repo}@${branch} → ${commit.slice(0, 7)}`));
+    }
+
     const response = await api.post(
       `/edge/sites/${encodeURIComponent(ctx.siteId)}/previews`,
       {
         commit,
-        branch: flags.branch,
+        branch: branch || undefined,
       },
     );
-    ok(`Preview created: ${c.cyan(response.data.hostname)} (${response.data.id})`);
+    const hostname = response.data?.hostname ?? response.data?.live_url ?? '—';
+    const previewId = response.data?.id ?? '—';
+    ok(`Preview created: ${c.cyan(hostname)} (${previewId})`);
+
+    if (flags.wait || flags.follow) {
+      return waitForEdgePreview(api, ctx.siteId, previewId, flags);
+    }
+
+    info(c.dim(`Watch: dply edge previews create --site ${ctx.siteId} --commit ${commit.slice(0, 7)} --wait`));
+    info(c.dim(`Or:    dply edge status --site ${previewId} --wait`));
 
     return;
   }
@@ -1093,7 +1170,7 @@ async function findRepoConfigFile() {
   return null;
 }
 
-async function openInBrowser(url) {
+export async function openInBrowser(url) {
   const platform = process.platform;
   if (platform === 'darwin') {
     await execFileAsync('open', [url]);
@@ -1110,6 +1187,86 @@ async function openInBrowser(url) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Resolve branch tip SHA via the public GitHub API (works for public repos
+ * without a token). Private repos need an explicit --commit.
+ *
+ * @param {string} repo owner/name
+ * @param {string} branch
+ * @returns {Promise<string>}
+ */
+async function resolveGithubCommitSha(repo, branch) {
+  const url = `https://api.github.com/repos/${repo}/commits/${encodeURIComponent(branch)}`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'dply-cli',
+    },
+  });
+  if (!response.ok) {
+    throw fail(
+      `Could not resolve ${repo}@${branch} (${response.status}). Pass --commit <sha> explicitly.`,
+      1,
+    );
+  }
+  const body = await response.json();
+  const sha = typeof body?.sha === 'string' ? body.sha : '';
+  if (!/^[a-f0-9]{7,40}$/i.test(sha)) {
+    throw fail(`GitHub returned an unexpected commit payload for ${repo}@${branch}.`, 1);
+  }
+
+  return sha.toLowerCase();
+}
+
+/**
+ * Poll a preview site until its latest deployment is terminal.
+ *
+ * @param {ApiClient} api
+ * @param {string} parentSiteId
+ * @param {string} previewId
+ * @param {Record<string, unknown>} flags
+ */
+async function waitForEdgePreview(api, _parentSiteId, previewId, flags) {
+  const intervalMs = deployFollowIntervalMs(flags);
+  const deadline = Date.now() + Math.max(60_000, Number(flags.timeout_ms || flags.timeoutMs || 900_000));
+
+  info(c.dim(`Waiting for preview ${previewId}…`));
+
+  while (Date.now() < deadline) {
+    const latest = (await api.get(
+      `/edge/sites/${encodeURIComponent(previewId)}/deployments?limit=1`,
+    ))?.data?.[0];
+
+    if (latest?.id) {
+      if (!TERMINAL_EDGE_DEPLOY_STATUSES.has(latest.status)) {
+        await followEdgeDeployment(api, previewId, String(latest.id), { intervalMs });
+      }
+
+      const site = (await api.get(`/edge/sites/${encodeURIComponent(previewId)}`))?.data ?? {};
+      const again = (await api.get(
+        `/edge/sites/${encodeURIComponent(previewId)}/deployments?limit=1`,
+      ))?.data?.[0];
+      const status = again?.status ?? latest.status;
+
+      if (status === 'live') {
+        ok(`Preview live: ${c.cyan(site.live_url || site.hostname || previewId)}`);
+
+        return 0;
+      }
+
+      warn(again?.failure_reason || latest.failure_reason || `Preview ended with status ${status}`);
+
+      return 1;
+    }
+
+    await sleep(intervalMs);
+  }
+
+  warn('Timed out waiting for preview build.');
+
+  return 1;
 }
 
 async function requireSiteContext(flags) {

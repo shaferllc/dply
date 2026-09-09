@@ -11,14 +11,12 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 final class DocChunkExtractor
 {
     public function __construct(
-        private readonly MarkdownDocRenderer $renderer,
         private readonly DocsManifest $manifest,
     ) {}
 
     /**
      * @return array{title: string, excerpt: string, headings: list<string>}
      */
-    /** @return array<string, mixed> */
     public function excerptForSlug(string $slug, int $maxChars = 6000): array
     {
         $path = $this->resolvePath($slug);

@@ -58,14 +58,10 @@ trait WritesTraefikDynamicYaml
      * @param  list<string>|string  $csv
      * @return list<string>
      */
-    /** @return array<string, mixed> */
     protected function csvList(mixed $csv): array
     {
         if (is_string($csv)) {
             $csv = preg_split('/[\s,]+/', trim($csv)) ?: [];
-        }
-        if (! is_array($csv)) {
-            return [];
         }
 
         return array_values(array_filter(array_map(static fn ($v): string => trim((string) $v), $csv)));

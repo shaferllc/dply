@@ -27,7 +27,6 @@ class ServerMetricsCollector
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function collect(Server $server): array
     {
         return $this->runCollection($server)['payload'];
@@ -36,7 +35,6 @@ class ServerMetricsCollector
     /**
      * @return array{payload: array<string, mixed>, remote_script_sha: ?string}
      */
-    /** @return array<string, mixed> */
     protected function runCollection(Server $server): array
     {
         $out = $this->remote->runInlineBash(
@@ -128,7 +126,6 @@ class ServerMetricsCollector
      * @param  array<string, mixed> $raw
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function normalizePayload(array $raw): array
     {
         return [
@@ -221,7 +218,6 @@ class ServerMetricsCollector
     }
 
     /**
-     * @param  array<string, mixed> $raw
      * First line of output may be DPLY_SCRIPT_SHA=&lt;64 hex|MISSING&gt; when the guest file exists or not.
      */
     protected function parseRemoteScriptShaFromBuffer(string $buffer): ?string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Support\Edge;
 
+use App\Models\EdgeDeployment;
 use App\Models\Site;
 use App\Modules\Edge\Support\EdgeHostMapAddons;
 
@@ -76,6 +77,32 @@ test('managed edge site addons flatten into host map fields', function () {
         ->and($payload['jobs']['default_queue'])->toBe('JOBS');
 });
 
+test('tags consent helper publishes without script urls', function () {
+    $site = new Site([
+        'edge_backend' => 'dply_edge',
+        'meta' => [
+            'edge' => [
+                'tags' => [
+                    'enabled' => true,
+                    'consent_required' => true,
+                    'tools' => [
+                        ['name' => 'analytics', 'src' => '', 'async' => true],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+    $site->id = '22222222-2222-2222-2222-222222222222';
+
+    $payload = EdgeHostMapAddons::payload($site);
+
+    expect($payload['tags'] ?? null)->toMatchArray([
+        'enabled' => true,
+        'consent_required' => true,
+        'tools' => [],
+    ]);
+});
+
 test('byo cloudflare sites do not receive addon host map fields', function () {
     $site = new Site([
         'edge_backend' => 'org_cloudflare',
@@ -87,4 +114,78 @@ test('byo cloudflare sites do not receive addon host map fields', function () {
     ]);
 
     expect(EdgeHostMapAddons::payload($site))->toBe([]);
+});
+
+test('repo tags snippets and forms publish when dashboard has not saved them', function () {
+    config([
+        'edge.log_ingest.key' => 'test-ingest-key',
+        'edge.log_ingest.base_url' => 'https://app.example.test',
+    ]);
+
+    $site = new Site([
+        'edge_backend' => 'dply_edge',
+        'meta' => ['edge' => []],
+    ]);
+    $site->id = '33333333-3333-3333-3333-333333333333';
+
+    $deployment = new EdgeDeployment;
+    $deployment->repo_config = [
+        'tags' => [
+            'enabled' => true,
+            'consent_required' => false,
+            'tools' => [
+                ['name' => 'ga', 'src' => 'https://www.googletagmanager.com/gtag/js?id=G-REPO', 'async' => true],
+            ],
+        ],
+        'snippets' => [
+            'enabled' => true,
+            'items' => [
+                ['name' => 'meta', 'phase' => 'head', 'path' => '/*', 'html' => '<!-- repo -->'],
+            ],
+        ],
+        'forms' => [
+            'enabled' => true,
+            'endpoints' => [
+                ['path' => '/contact', 'to_email' => 'repo@example.com', 'honeypot' => 'company', 'require_turnstile' => true],
+            ],
+        ],
+    ];
+
+    $payload = EdgeHostMapAddons::payload($site, $deployment);
+
+    expect($payload['tags']['tools'][0]['src'])->toContain('G-REPO')
+        ->and($payload['snippets']['items'][0]['html'])->toBe('<!-- repo -->')
+        ->and($payload['forms']['endpoints'][0]['to_email'])->toBe('repo@example.com');
+});
+
+test('dashboard tags override repo tags when edgeMeta has the section', function () {
+    $site = new Site([
+        'edge_backend' => 'dply_edge',
+        'meta' => [
+            'edge' => [
+                'tags' => [
+                    'enabled' => true,
+                    'consent_required' => false,
+                    'tools' => [
+                        ['name' => 'dash', 'src' => 'https://example.com/dash.js', 'async' => true],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+    $site->id = '44444444-4444-4444-4444-444444444444';
+
+    $deployment = new EdgeDeployment;
+    $deployment->repo_config = [
+        'tags' => [
+            'enabled' => true,
+            'tools' => [
+                ['name' => 'repo', 'src' => 'https://example.com/repo.js', 'async' => true],
+            ],
+        ],
+    ];
+
+    $payload = EdgeHostMapAddons::payload($site, $deployment);
+
+    expect($payload['tags']['tools'][0]['src'])->toBe('https://example.com/dash.js');
 });

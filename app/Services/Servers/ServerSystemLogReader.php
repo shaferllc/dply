@@ -137,7 +137,6 @@ class ServerSystemLogReader
      *
      * @return array{output: string, error: ?string}
      */
-    /** @return array<string, mixed> */
     public function tailAllowlistedFile(Server $server, string $path, ?int $tailLineCount = null): array
     {
         $normalized = str_starts_with($path, '/') ? $path : '/'.$path;

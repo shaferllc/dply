@@ -72,6 +72,9 @@ class SecretVaultServiceProvider extends ServiceProvider
     {
         // Full-page org Secrets page, moved out of App\Livewire — register under
         // its original auto-derived name for route ::class resolution.
-        Livewire::component('organizations.secrets', Livewire\Secrets::class);
+        // Fully qualified: `Livewire\Secrets::class` resolved against the
+        // `use Livewire\Livewire` import above, yielding Livewire\Livewire\Secrets
+        // — a class that does not exist, so this alias pointed at nothing.
+        Livewire::component('organizations.secrets', \App\Modules\Secrets\Livewire\Secrets::class);
     }
 }

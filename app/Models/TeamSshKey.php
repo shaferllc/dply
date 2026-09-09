@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
  * @property string $id
- * @property string $created_by
+ * @property ?string $created_by
  * @property string $name
  * @property bool $provision_on_new_servers
  * @property string $public_key
@@ -19,8 +19,8 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * @property-read ?Team $team
  * @property-read ?User $creator
  * @property-read Collection<int, ServerAuthorizedKey> $serverAuthorizedKeys
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class TeamSshKey extends Model
 {

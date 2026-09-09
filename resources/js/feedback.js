@@ -273,19 +273,21 @@ function collectPageContext() {
 
 export function registerFeedbackSidebar(Alpine) {
     Alpine.data('dplyFeedbackSidebar', () => ({
-        open: false,
+        // Prefer drawerOpen over `open` — bare `open` can resolve to window.open
+        // if Alpine scope is briefly lost during Livewire morph.
+        drawerOpen: false,
         includeScreenshot: true,
         busy: false,
 
         toggle() {
-            this.open = !this.open;
-            window.dispatchEvent(new CustomEvent(this.open ? 'dply-feedback-opened' : 'dply-feedback-closed'));
+            this.drawerOpen = !this.drawerOpen;
+            window.dispatchEvent(new CustomEvent(this.drawerOpen ? 'dply-feedback-opened' : 'dply-feedback-closed'));
         },
         close() {
-            if (! this.open) {
+            if (! this.drawerOpen) {
                 return;
             }
-            this.open = false;
+            this.drawerOpen = false;
             window.dispatchEvent(new CustomEvent('dply-feedback-closed'));
         },
 
@@ -331,13 +333,13 @@ export function registerFeedbackSidebar(Alpine) {
         init() {
             // Livewire tells us when a report was filed OK so we can close + reset.
             this.$wire.on('feedback-submitted', () => {
-                this.open = false;
+                this.drawerOpen = false;
             });
 
             // Floating dock (and other chrome) opens the panel via this event.
             window.addEventListener('dply-open-feedback', () => {
-                if (! this.open) {
-                    this.open = true;
+                if (! this.drawerOpen) {
+                    this.drawerOpen = true;
                     window.dispatchEvent(new CustomEvent('dply-feedback-opened'));
                 }
             });

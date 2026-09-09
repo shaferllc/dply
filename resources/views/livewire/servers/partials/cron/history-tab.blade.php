@@ -1,14 +1,12 @@
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <x-icon-badge>
-            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent run history') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Recent manual and queued runs — retention :days days.', ['days' => config('cron_workspace.run_retention_days', 90)]) }}</p>
-        </div>
-    </div>
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-clock"
+        :title="__('Recent run history')"
+        :count="$recentCronRuns->isEmpty() ? null : trans_choice('{1} :count run|[2,*] :count runs', $recentCronRuns->count(), ['count' => $recentCronRuns->count()])"
+        :note="__('Recent manual and queued runs — retention :days days.', ['days' => config('cron_workspace.run_retention_days', 90)])"
+        class="border-b border-brand-ink/10"
+    />
     <div class="overflow-x-auto">
         @if ($recentCronRuns->isEmpty())
             <div class="flex flex-col items-center justify-center px-6 py-14 text-center sm:px-8">
@@ -34,7 +32,7 @@
                 <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
                     @foreach ($recentCronRuns as $run)
                         <tr>
-                            <td class="whitespace-nowrap px-4 py-2 font-mono text-[11px]">{{ $run->started_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</td>
+                            <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">{{ $run->started_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</td>
                             <td class="max-w-xs truncate px-4 py-2">{{ $run->cronJob?->description ?: \Illuminate\Support\Str::limit($run->cronJob?->command ?? '—', 48) }}</td>
                             <td class="px-4 py-2">{{ $run->status }}</td>
                             <td class="px-4 py-2 font-mono">{{ $run->exit_code ?? '—' }}</td>

@@ -4,7 +4,7 @@ namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
-use App\Livewire\Concerns\ManagesContainerSite;
+use App\Livewire\Concerns\DismissesDaemonSuggestions;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\ManagesSiteLogging;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
@@ -23,7 +23,6 @@ use App\Livewire\Sites\Concerns\ManagesSiteSystemUsers;
 use App\Livewire\Sites\Concerns\ManagesSiteTenantDomains;
 use App\Livewire\Sites\Concerns\ManagesSiteWorkerPool;
 use App\Models\ErrorEvent;
-use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
@@ -43,7 +42,7 @@ class Settings extends Show
 {
     use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
-    use ManagesContainerSite;
+    use DismissesDaemonSuggestions;
     use ManagesSiteAccessGate;
     use ManagesSiteAliases;
     use ManagesSiteBindings;
@@ -187,6 +186,18 @@ class Settings extends Show
                 'server' => $server,
                 'site' => $site,
                 'section' => 'notifications',
+            ]), navigate: true);
+
+            return;
+        }
+
+        // The environment partial reads methods from ManagesSiteEnvironment,
+        // which lives on the SiteEnvironment component, not here — this section
+        // router can never render it. Send the URL where it actually works.
+        if ($section === 'environment') {
+            $this->redirect(route('sites.environment', [
+                'server' => $server,
+                'site' => $site,
             ]), navigate: true);
 
             return;
@@ -347,11 +358,6 @@ class Settings extends Show
                     'events' => (array) config('notification_events.categories.site_errors.events', []),
                 ],
             ];
-            $viewData['siteIntegrationWebhookDestinations'] = NotificationWebhookDestination::query()
-                ->where('organization_id', $this->site->organization_id)
-                ->where('site_id', $this->site->id)
-                ->orderBy('name')
-                ->get();
         }
 
         if (in_array($section, ['settings', 'general'], true)) {

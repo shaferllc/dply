@@ -20,19 +20,21 @@
     ];
 @endphp
 
-<section class="dply-card overflow-hidden">
-    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-        <div class="flex items-center gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Events vs logs') }}</h3>
-                <p class="text-xs text-brand-moss">{{ __('Log volume over time with deploys, errors and incidents overlaid.') }}</p>
-            </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
+{{-- Flush section, not a dply-card. Sibling panels in the Logs workspace
+     (Shipped logs, dply Logs, the aggregator block) are plain
+     `border-b` sections; the card's radius + shadow made this one float
+     out of the stack. --}}
+<section class="overflow-hidden border-b border-brand-ink/10">
+    {{-- Dense head, matching the workspace panels elsewhere: title and note on one
+         line instead of a 5rem-tall icon-badge block above a two-line stack. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-chart-bar"
+        :title="__('Events vs logs')"
+        :note="__('Log volume over time with deploys, errors and incidents overlaid.')"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             @if ($focused)
                 <button type="button" wire:click="resetLogHistogram" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/30">
                     <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Zoom out') }}
@@ -51,18 +53,22 @@
             <button type="button" wire:click="toggleLogCorrelation" title="{{ __('Hide graph') }}" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/30">
                 <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Hide') }}
             </button>
-        </div>
-    </div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-    <div class="px-6 py-5 sm:px-7">
+    <div @class(['px-6 sm:px-7', 'py-3' => $available, 'py-2.5' => ! $available])>
         @unless ($available)
-            <div class="flex h-44 items-center justify-center rounded-xl bg-brand-sand/30 text-sm text-brand-mist">
-                {{ __('Log store unavailable — no histogram to show.') }}
+            {{-- Was an h-44 block reserving chart-sized space for a one-line
+                 message. Nothing is going to fill it while the store is
+                 unreachable, so collapse to a single row. --}}
+            <div class="flex items-center gap-2 rounded-lg bg-brand-sand/30 px-3 py-2 text-xs text-brand-moss">
+                <x-heroicon-o-signal-slash class="h-3.5 w-3.5 shrink-0 text-brand-ink/40" aria-hidden="true" />
+                <span>{{ __('Log store unavailable — no histogram to show.') }}</span>
             </div>
         @else
             <div x-data="{ tip: null }" class="relative">
                 {{-- Chart area --}}
-                <div class="relative h-48 rounded-xl bg-brand-sand/20 px-2 pt-3">
+                <div class="relative h-28 rounded-xl bg-brand-sand/20 px-2 pt-2">
                     {{-- Event markers (vertical guides + dots along the top) --}}
                     <div class="pointer-events-none absolute inset-x-2 top-3 bottom-6">
                         @foreach ($events as $event)
@@ -117,7 +123,7 @@
                         class="pointer-events-none absolute top-0 z-10 w-56 rounded-lg border border-brand-ink/10 bg-white/95 p-3 text-xs shadow-lg backdrop-blur"
                         :style="tip ? (tip.x > 60 ? `right: ${100 - tip.x}%;` : `left: ${tip.x}%;`) : ''">
                         <p class="font-semibold text-brand-ink" x-text="tip?.label"></p>
-                        <p class="mt-0.5 font-mono text-[11px] text-brand-moss" x-text="tip ? tip.time + ' (UTC)' : ''"></p>
+                        <p class="mt-0.5 font-mono text-xs text-brand-moss" x-text="tip ? tip.time + ' (UTC)' : ''"></p>
                     </div>
                 </div>
 
@@ -126,26 +132,28 @@
                     $n = count($buckets);
                     $ticks = $n > 0 ? array_values(array_unique([0, intdiv($n - 1, 2), $n - 1])) : [];
                 @endphp
-                <div class="relative mt-1 h-4 text-[10px] tabular-nums text-brand-mist">
+                <div class="relative mt-1 h-4 text-2xs tabular-nums text-brand-mist">
                     @foreach ($ticks as $i)
                         <span class="absolute -translate-x-1/2 whitespace-nowrap" style="left: {{ $buckets[$i]['x_pct'] }}%">{{ $buckets[$i]['label'] }}</span>
                     @endforeach
                 </div>
 
                 {{-- Legend + hint --}}
-                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] text-brand-moss">
+                {{-- Legend and the interaction hint share one row: the hint was a third
+                     stacked block under an already-tall chart. --}}
+                <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-brand-moss">
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-brand-sage/70"></span>{{ __('Logs') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-amber-400"></span>{{ __('Warnings') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2 w-3 rounded-sm bg-rose-500"></span>{{ __('Errors') }}</span>
                     <span class="ml-1 inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-brand-forest ring-2 ring-white"></span>{{ __('Deploy') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white"></span>{{ __('Error') }}</span>
                     <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white"></span>{{ __('Incident') }}</span>
+                    <span class="ml-auto text-brand-mist">
+                        {{ $isLeaf
+                            ? __('Click a minute to load its log lines below.')
+                            : __('Click a bar to zoom in (:grain → finer). Hover a dot for the event.', ['grain' => $grains[$gran] ?? $gran]) }}
+                    </span>
                 </div>
-                <p class="mt-2 text-[11px] text-brand-mist">
-                    {{ $isLeaf
-                        ? __('Click a minute to load its log lines below.')
-                        : __('Click a bar to zoom in (:grain → finer). Hover a dot for the event.', ['grain' => $grains[$gran] ?? $gran]) }}
-                </p>
             </div>
         @endunless
     </div>

@@ -4,26 +4,28 @@
     $hasAnyServer = $billable->isNotEmpty() || $excluded->isNotEmpty();
 @endphp
 
+@php
+    $minAgeDays = (int) config('subscription.standard.min_billable_age_days', 1);
+    // Built here rather than inline in the :note attribute — Blade's component
+    // attribute parser chokes on escaped apostrophes, so long prose with
+    // contractions belongs in a php block, not in the tag.
+    $fleetNote = __('Ready, mature servers count toward your bill — fresh or paused servers don\'t. ')
+        .trans_choice('{0} New servers count once they\'re past today.|{1} New servers count once they\'ve been up for :days day.|[2,*] New servers count once they\'ve been up for :days days.', $minAgeDays, ['days' => $minAgeDays]);
+@endphp
+
 <section class="border-b border-brand-ink/10">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-        <x-icon-badge>
-            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Fleet') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your fleet') }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Servers dply is tracking. Ready, mature servers count toward your bill — fresh or paused servers don\'t.') }}
-            </p>
-            <p class="mt-2 text-xs text-brand-moss/80">
-                {{ trans_choice('{0} New servers count once they\'re past today.|{1} New servers count once they\'ve been up for :days day.|[2,*] New servers count once they\'ve been up for :days days.', (int) config('subscription.standard.min_billable_age_days', 1), ['days' => (int) config('subscription.standard.min_billable_age_days', 1)]) }}
-            </p>
-        </div>
-    </div>
-    <div class="px-5 py-5 sm:px-6">
-        <div class="space-y-4">
+    {{-- The min-billable-age note moved into the panel-head note: it is the one
+         thing that explains why a server on the list isn't being charged for. --}}
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-server-stack"
+        :title="__('Your fleet')"
+        :note="$fleetNote"
+    />
+    <div class="px-3 py-2.5 sm:px-4">
+        <div class="space-y-2.5">
             @if (! $hasAnyServer)
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white/40 px-5 py-8 text-center">
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-white/40 px-3 py-6 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No servers yet.') }}</p>
                     <a href="{{ route('servers.create') }}" wire:navigate class="mt-2 inline-flex items-center text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Connect your first server →') }}</a>
                 </div>
@@ -33,22 +35,15 @@
                         <thead class="bg-brand-cream/60 text-brand-ink/70">
                             <tr>
                                 <th class="px-4 py-2.5 text-left font-semibold">{{ __('Server') }}</th>
-                                <th class="px-4 py-2.5 text-left font-semibold">{{ __('Size') }}</th>
                                 <th class="px-4 py-2.5 text-right font-semibold">{{ __('Plan fee') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/5">
                             @foreach ($billable as $server)
-                                @php
-                                    $tier = $server->billingTier();
-                                @endphp
                                 <tr class="bg-white/40">
                                     <td class="px-4 py-3">
                                         <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->name }}</a>
                                         <p class="text-xs text-brand-moss/80 mt-0.5">{{ $server->provider?->label() ?? __('Custom') }}</p>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <span class="inline-flex items-center rounded-md bg-brand-sand/40 px-2 py-0.5 text-xs font-semibold uppercase text-brand-ink">{{ $tier->label() }}</span>
                                     </td>
                                     <td class="px-4 py-3 text-right text-xs text-brand-moss">{{ __('Included in plan') }}</td>
                                 </tr>
@@ -59,7 +54,8 @@
                                         <a href="{{ route('servers.show', $row['server']) }}" wire:navigate class="font-medium hover:text-brand-ink">{{ $row['server']->name }}</a>
                                         <p class="text-xs mt-0.5">{{ $row['server']->provider?->label() ?? __('Custom') }}</p>
                                     </td>
-                                    <td class="px-4 py-3" colspan="2">
+                                    {{-- Two columns now the Size column is gone; no colspan needed. --}}
+                                    <td class="px-4 py-3">
                                         <span class="inline-flex items-center gap-1 text-xs">
                                             <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
                                             {{ __('Not billed') }} — {{ $row['reason'] }}

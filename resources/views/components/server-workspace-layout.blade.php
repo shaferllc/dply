@@ -11,6 +11,8 @@
     'docLabel' => null,
     /** Match fleet-style headers (Servers / Sites): icon + title left, docs + actions right on large screens. */
     'pageHeaderToolbar' => false,
+    /** Tighten the page header and the gaps between content sections. Applies
+        to the hero card and, for `hideHero` pages, to the content rhythm alone. */
     'pageHeaderCompact' => false,
     /** Suppress the generic hero-card header when the page renders its own identity card (e.g. the Overview identity-hero). */
     'hideHero' => false,
@@ -55,13 +57,15 @@
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
-        if ($server->workspace && \Laravel\Pennant\Feature::active('surface.projects')) {
-            $workspaceBreadcrumbs[] = [
-                'label' => $server->workspace->name,
-                'href' => route('projects.resources', $server->workspace),
-                'icon' => 'rectangle-group',
-            ];
-        }
+        // The project deliberately isn't a crumb, matching the site trail — see
+        // the same note in App\Support\Sites\SiteWorkspaceBreadcrumbs. It isn't a
+        // step on this path (you don't reach the server through the project), and
+        // including it pushed the bar toward wrapping. The sites trail dropped it
+        // and the server trail was simply never brought in line.
+        //
+        // Reachability is unaffected: the "Open project workspace" link still
+        // sits at the end of this same breadcrumb row (see the trailing slot
+        // below), plus the server overview and the Projects surface.
         if ($contextSite) {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->name,
@@ -123,6 +127,7 @@
         <x-hero-card
             :title="$contextSite ? $title.' — '.$contextSite->name : $title"
             :description="$description"
+            :compact="$pageHeaderCompact"
             icon="server-stack"
         >
             @isset($headerLeading)
@@ -152,7 +157,12 @@
         }
     @endphp
 
-    <div @class(['space-y-8', 'mt-6 sm:mt-8' => ! $hideHero])>
+    <div @class([
+        'space-y-8' => ! $pageHeaderCompact,
+        'space-y-5' => $pageHeaderCompact,
+        'mt-6 sm:mt-8' => ! $hideHero && ! $pageHeaderCompact,
+        'mt-4 sm:mt-5' => ! $hideHero && $pageHeaderCompact,
+    ])>
         @if ($clusterTabs && count($clusterTabs) > 1)
             <x-server-workspace-tablist :aria-label="__('Section tabs')" scroll>
                 @foreach ($clusterTabs as $tab)
@@ -165,7 +175,7 @@
                     >
                         {{ $tab['label'] }}
                         @if (! empty($tab['preview_only']) || ! empty($tab['soon_badge']))
-                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                            <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
                         @endif
                         @if (! empty($tab['needs_setup']))
                             <span class="h-1.5 w-1.5 rounded-full bg-amber-500" role="img" aria-label="{{ __('Setup required') }}"></span>
@@ -174,6 +184,10 @@
                 @endforeach
             </x-server-workspace-tablist>
         @endif
+
+        {{-- In-flight resize: visible from every tab, because the machine being
+             offline affects whatever the operator is currently looking at. --}}
+        <x-server-resize-journey :server="$server" />
 
         {{ $slot }}
     </div>

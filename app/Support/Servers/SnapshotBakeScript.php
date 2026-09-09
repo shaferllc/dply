@@ -39,6 +39,10 @@ for _ in $(seq 1 60); do
     sleep 3
 done
 
+# Deliberately NOT dply_apt_update. Day-two scripts prune a source that cannot
+# verify and carry on; a bake must not. Pruning here would silently drop
+# ondrej/php and bake a "successful" image with no PHP in it, which is worse
+# than no image at all. A failed bake is the correct outcome. (T-021)
 echo "[dply-bake] refreshing apt index (no upgrade — base image is fresh; recurring maintenance handles patches)"
 apt-get update -qq
 

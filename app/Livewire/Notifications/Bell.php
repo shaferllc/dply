@@ -5,6 +5,7 @@ namespace App\Livewire\Notifications;
 use App\Models\NotificationInboxItem;
 use App\Support\NotificationTablesReady;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 
 /**
@@ -21,11 +22,28 @@ class Bell extends Component
     /** Severities that count as "alerts" for the Alerts-only quick filter. */
     private const ALERT_SEVERITIES = ['warning', 'critical', 'error', 'danger'];
 
-    /** Selected event categories (multi-select; empty = all categories). @var array<int, string> */
+    /**
+     * Selected event categories (multi-select; empty = all categories).
+     *
+     * @var list<string>
+     */
     public array $categoryFilters = [];
 
     /** Filter the unread list to warning/critical/error/danger only. */
     public bool $alertsOnly = false;
+
+    /**
+     * Whether the dropdown's contents have been fetched. False until the bell
+     * is first opened — see {@see render()}. Every action below implies the
+     * panel is already open, so they all leave this true.
+     */
+    public bool $loaded = false;
+
+    /** Fetch the dropdown contents. Wired to the trigger. */
+    public function load(): void
+    {
+        $this->loaded = true;
+    }
 
     /** Toggle a category in/out of the active multi-select set. */
     public function toggleCategory(string $category): void
@@ -58,22 +76,24 @@ class Bell extends Component
     }
 
     /** Mark-read-on-click, then navigate to the item's deep link. */
-    public function openItem(string $itemId)
+    public function openItem(string $itemId): void
     {
         if (! $this->ready()) {
-            return null;
+            return;
         }
 
         $item = $this->base()->whereKey($itemId)->first();
         if ($item === null) {
-            return null;
+            return;
         }
 
         if ($item->read_at === null) {
             $item->forceFill(['read_at' => now()])->save();
         }
 
-        return redirect()->to($item->ctaUrl() ?: route('notifications.index'));
+        // Livewire's redirect() returns Redirector, not RedirectResponse — do
+        // not type the return as the HTTP class or PHP 8 fatals on click.
+        $this->redirect($item->ctaUrl() ?: route('notifications.index'));
     }
 
     /** Star toggle from the bell, so a passing alert can be kept before clearing. */
@@ -96,7 +116,10 @@ class Bell extends Component
         return auth()->check() && NotificationTablesReady::all();
     }
 
-    private function base()
+    /**
+     * @return Builder<NotificationInboxItem>
+     */
+    private function base(): Builder
     {
         return NotificationInboxItem::query()->where('user_id', auth()->id());
     }
@@ -109,6 +132,22 @@ class Bell extends Component
                 'unreadCount' => 0,
                 'items' => collect(),
                 'categories' => collect(),
+                'loaded' => true,
+            ]);
+        }
+
+        // Closed bell: the badge is the only visible part, so resolve the count
+        // and nothing else. The dropdown's contents — the category pluck, the
+        // filtered item page, and its event eager-load — cost three more
+        // queries on every authenticated page render, for a panel most of those
+        // renders never show. {@see load()} fills them in when it opens.
+        if (! $this->loaded) {
+            return view('livewire.notifications.bell', [
+                'ready' => true,
+                'unreadCount' => $this->base()->whereNull('read_at')->count(),
+                'items' => collect(),
+                'categories' => collect(),
+                'loaded' => false,
             ]);
         }
 

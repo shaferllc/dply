@@ -9,6 +9,7 @@ use App\Modules\TaskRunner\Models\Task;
 use App\Services\Servers\ProvisionStepEtaService;
 use App\Support\Servers\ProvisionStepDurations;
 use App\Support\Servers\ProvisionStepSnapshots;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 
@@ -19,7 +20,13 @@ use Illuminate\Support\Carbon;
  */
 trait BuildsProvisionStepView
 {
-
+    /**
+     * Map of cache key → label_hash → recorded duration_seconds for every
+     * step that has emitted an end marker so far in this task's output.
+     *
+     * @var array<string, array<string, int>>
+     */
+    private array $stepEndDurationsCache = [];
 
     /**
      * @return list<array{key:string,label:string,state:string,detail:?string,output:?string,duration:?string}>
@@ -49,6 +56,7 @@ trait BuildsProvisionStepView
         $activeKey = 'queued';
         $failedKey = null;
         $scriptStepKeys = array_column($scriptSteps, 'key');
+        $fallbackScriptKey = $scriptStepKeys === [] ? 'setup' : $scriptStepKeys[0];
         $lastSeenScriptKey = $this->lastSeenScriptStepKey($task, $scriptSteps);
 
         // A provision/setup task can reach a terminal *failed* state
@@ -83,7 +91,7 @@ trait BuildsProvisionStepView
 
         if ($server->status === Server::STATUS_ERROR || $failedDuringSetup) {
             $activeKey = $failedDuringSetup
-                ? ($lastSeenScriptKey ?? ($scriptStepKeys[0] ?? 'setup'))
+                ? ($lastSeenScriptKey ?? $fallbackScriptKey)
                 : 'provisioning';
             $failedKey = $activeKey;
         } elseif ($server->status === Server::STATUS_PENDING) {
@@ -93,7 +101,7 @@ trait BuildsProvisionStepView
         } elseif ($server->status === Server::STATUS_READY && $server->setup_status === Server::SETUP_STATUS_PENDING) {
             $activeKey = 'ssh';
         } elseif ($server->status === Server::STATUS_READY && $server->setup_status === Server::SETUP_STATUS_RUNNING) {
-            $activeKey = $lastSeenScriptKey ?? ($scriptStepKeys[0] ?? 'setup');
+            $activeKey = $lastSeenScriptKey ?? $fallbackScriptKey;
         } elseif ($server->status === Server::STATUS_READY) {
             // Only flip to the terminal 'ready' step once setup is *actually*
             // done. Previously this branch matched on status alone, which
@@ -203,7 +211,9 @@ trait BuildsProvisionStepView
             // use the elapsed-since-server-created proxy. We don't track
             // these steps in the duration table because their timing is
             // owned by the cloud provider, not the bash script.
-            return $server->created_at?->diffForHumans(now(), true);
+            return $server->created_at->diffForHumans(now(), [
+                'syntax' => CarbonInterface::DIFF_ABSOLUTE,
+            ]);
         }
 
         if (! $task) {
@@ -245,9 +255,12 @@ trait BuildsProvisionStepView
         return $task->getDurationForHumans();
     }
 
+    /**
+     * @return array<string, int>
+     */
     private function stepEndDurations(Task $task): array
     {
-        $cacheKey = (string) $task->id.'@'.(string) ($task->updated_at?->timestamp ?? 0);
+        $cacheKey = (string) $task->id.'@'.(string) $task->updated_at->timestamp;
         if (array_key_exists($cacheKey, $this->stepEndDurationsCache)) {
             return $this->stepEndDurationsCache[$cacheKey];
         }
@@ -353,6 +366,9 @@ trait BuildsProvisionStepView
         return ProvisionStepSnapshots::extractLabels($content);
     }
 
+    /**
+     * @param  list<array{key:string,label:string}>  $scriptSteps
+     */
     protected function lastSeenScriptStepKey(?Task $task, array $scriptSteps): ?string
     {
         if (! $task || ! is_string($task->output) || trim($task->output) === '' || $scriptSteps === []) {

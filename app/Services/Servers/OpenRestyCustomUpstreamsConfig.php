@@ -22,10 +22,6 @@ class OpenRestyCustomUpstreamsConfig
     /**
      * @return list<array{name: string, servers: list<string>}>
      */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, list<string>|string>>
-     */
     public function read(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -61,7 +57,7 @@ class OpenRestyCustomUpstreamsConfig
     }
 
     /**
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      */
     public function add(
         Server $server,
@@ -77,7 +73,7 @@ class OpenRestyCustomUpstreamsConfig
 
         $rows = $this->read($server);
         foreach ($rows as $row) {
-            if (($row['name'] ?? '') === $name) {
+            if ($row['name'] === $name) {
                 throw new \RuntimeException("An upstream named `{$name}` already exists.");
             }
         }
@@ -91,7 +87,7 @@ class OpenRestyCustomUpstreamsConfig
         $name = $this->normalizeName($name);
         $rows = array_values(array_filter(
             $this->read($server),
-            fn (array $row): bool => ($row['name'] ?? '') !== $name,
+            fn (array $row): bool => $row['name'] !== $name,
         ));
 
         if (count($rows) === count($this->read($server))) {
@@ -101,9 +97,6 @@ class OpenRestyCustomUpstreamsConfig
         $this->save($server, $rows, $emitter);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public static function upstreamsFromServer(Server $server): array
     {
         return app(self::class)->read($server);

@@ -1,7 +1,10 @@
 {{--
     Lazy-load skeleton for Runtime (PHP). Mirrors the merged page (hide-hero +
-    single card with identity, summary tiles, and version row stubs).
+    single card with identity, a hairline stat strip, and version row stubs), so
+    the geometry matches what replaces it instead of collapsing on resolve.
 --}}
+@php $bar = 'animate-pulse rounded bg-brand-ink/10'; @endphp
+
 <x-server-workspace-layout
     :server="$server"
     active="php"
@@ -11,52 +14,54 @@
     <section class="dply-card min-w-0 overflow-hidden p-0" aria-busy="true" aria-live="polite">
         <span class="sr-only">{{ __('Loading runtime…') }}</span>
 
-        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6" aria-hidden="true">
-            <div class="flex flex-wrap items-start justify-between gap-4">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Runtime') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('PHP inventory, CLI default, and new-site default for this server.') }}
-                        </p>
-                    </div>
-                </div>
-                <span class="h-8 w-32 animate-pulse rounded-lg bg-brand-ink/10"></span>
-            </div>
-        </div>
+        {{-- Dense head, matching the rest of the workspace. --}}
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-command-line"
+            :title="__('Runtime')"
+            :note="__('PHP inventory, CLI default, and new-site default for this server.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="grid grid-cols-1 gap-2 border-b border-brand-ink/10 px-5 py-5 sm:grid-cols-3 sm:px-6" aria-hidden="true">
-            @foreach (range(1, 3) as $tile)
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3">
-                    <div class="h-2.5 w-24 animate-pulse rounded bg-brand-ink/10"></div>
-                    <div class="mt-2 h-5 w-16 animate-pulse rounded bg-brand-ink/10"></div>
-                    <div class="mt-2 h-2 w-20 animate-pulse rounded bg-brand-ink/10"></div>
+        {{-- Three-cell stat strip: installed versions, CLI default, new-site default. --}}
+        <dl class="grid grid-cols-2 border-b border-brand-ink/10 sm:grid-cols-3" aria-hidden="true">
+            @foreach (range(0, 2) as $cell)
+                <div @class([
+                    'space-y-1.5 border-brand-ink/8 px-4 py-2 sm:px-5',
+                    'border-l' => $cell % 2 !== 0,
+                    'sm:border-l' => $cell % 3 !== 0,
+                    'sm:border-l-0' => $cell % 3 === 0,
+                    'border-t' => $cell >= 2,
+                    'sm:border-t-0' => true,
+                ])>
+                    <div class="h-2 w-24 {{ $bar }}"></div>
+                    <div class="h-3 w-16 {{ $bar }}"></div>
                 </div>
             @endforeach
-        </div>
+        </dl>
 
-        <div class="border-b border-brand-ink/10 px-5 py-4 sm:px-6" aria-hidden="true">
-            <div class="flex items-start gap-3">
-                <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                <div class="min-w-0 flex-1 space-y-2">
-                    <div class="h-3.5 w-40 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                    <div class="h-2.5 w-56 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                </div>
-            </div>
+        {{-- "Versions on this server" head stub. --}}
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2 sm:px-4" aria-hidden="true">
+            <span class="h-4 w-4 shrink-0 {{ $bar }}"></span>
+            <span class="h-3.5 w-40 shrink-0 {{ $bar }}"></span>
+            <span class="h-4 w-8 shrink-0 rounded-full {{ $bar }}"></span>
+            <span class="h-4 w-px shrink-0 bg-brand-ink/10"></span>
+            <span class="h-2.5 min-w-0 flex-1 {{ $bar }}"></span>
         </div>
 
         <ul class="divide-y divide-brand-ink/10" aria-hidden="true">
             @foreach (range(1, 4) as $row)
-                <li class="flex items-center gap-3 px-5 py-4 sm:px-6">
-                    <span class="h-9 w-9 shrink-0 animate-pulse rounded-xl bg-brand-ink/10"></span>
-                    <div class="min-w-0 flex-1 space-y-2">
-                        <div class="h-3.5 w-32 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
-                        <div class="h-2.5 w-44 max-w-full animate-pulse rounded bg-brand-ink/10"></div>
+                <li class="flex items-center gap-3 px-4 py-3 sm:px-5">
+                    <span class="hidden h-9 w-9 shrink-0 rounded-xl {{ $bar }} sm:block"></span>
+                    <div class="min-w-0 flex-1 space-y-1.5">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="h-3 w-24 max-w-full {{ $bar }}"></span>
+                            <span class="h-4 w-16 rounded-full {{ $bar }}"></span>
+                        </div>
+                        <div class="h-2.5 w-44 max-w-full {{ $bar }}"></div>
                     </div>
-                    <span class="h-8 w-20 animate-pulse rounded-lg bg-brand-ink/10"></span>
+                    <span class="h-6 w-16 shrink-0 rounded-md {{ $bar }}"></span>
+                    <span class="h-6 w-6 shrink-0 rounded-md {{ $bar }}"></span>
                 </li>
             @endforeach
         </ul>

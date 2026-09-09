@@ -26,7 +26,8 @@ trait ManagesSystemdActions
 
 
     /**
-     * @param  'start'|'stop'|'restart'|'reload'|'disable'|'enable'  $action
+     * $action comes straight from the browser, so it stays an unvalidated
+     * string until the $allowedActions check below narrows it.
      */
     public function runSystemdServiceAction(string $unit, string $action): void
     {
@@ -370,7 +371,7 @@ trait ManagesSystemdActions
                 $strings[] = $item;
             }
         }
-        $meta['custom_systemd_services'] = array_values($strings);
+        $meta['custom_systemd_services'] = $strings;
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         if ((bool) config('server_services.systemd_inventory_job_enabled', true)) {

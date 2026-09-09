@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\RemoteCli\Services;
 
-use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
+use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -21,10 +21,11 @@ use Throwable;
  *   1. Risk classification — {@see classifyRisk()} consults the
  *      subclass's static lookup table; unknown commands fall through
  *      to {@see RiskLevel::Destructive} as the failsafe (Q17).
- *   2. Permission gate — {@see RemoteCliPermissions} consults the
- *      site's org RBAC. Read + MutatingRecoverable allowed for any
- *      member; Destructive requires admin/owner. System-triggered
- *      runs ($queuedBy === null) bypass the gate.
+ *   2. Permission gate — {@see RemoteCliPermissions} consults
+ *      {@see \App\Policies\SitePolicy}. Read requires view;
+ *      MutatingRecoverable requires update; Destructive requires
+ *      update plus org admin/owner. System-triggered runs
+ *      ($queuedBy === null) bypass the gate.
  *   3. Sync vs async routing — commands listed by {@see instantCommands()}
  *      run synchronously over {@see ExecuteRemoteTaskOnServer} with a
  *      tight timeout (5s); everything else dispatches a queued job.
@@ -67,7 +68,7 @@ abstract class RemoteCli
      * server inside the site's working directory. Subclasses build
      * the right binary + path prefix.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      */
     abstract protected function buildShellCommand(Site $site, string $command, array $args): string;
 
@@ -75,7 +76,7 @@ abstract class RemoteCli
      * Public entry-point for the async worker, which doesn't have
      * direct access to the protected builder.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      */
     public function buildShellForRun(Site $site, string $command, array $args): string
     {
@@ -85,7 +86,7 @@ abstract class RemoteCli
     /**
      * Run a command against the given site.
      *
-     * @param  array<string, mixed> $args
+     * @param  list<string>  $args
      *
      * @throws RemoteCliPermissionDeniedException When $queuedBy lacks
      *                                            the role for the command's risk level.
@@ -141,7 +142,8 @@ abstract class RemoteCli
      * On exit code != 0 OR timeout the run is marked 'failed'. PR 3+
      * may add an "auto-fallback to async on timeout" path per Q15;
      * v2 of the gate. v1 just records the failure.
-     * @param  array<string, mixed> $args
+     *
+     * @param  list<string>  $args
      */
     protected function executeSync(Site $site, RemoteCliRun $run, array $args, ?User $queuedBy): RemoteCliResult
     {
@@ -174,7 +176,7 @@ abstract class RemoteCli
             $run->fill([
                 'status' => RemoteCliRun::STATUS_FAILED,
                 'stderr' => trim(($stderr !== '' ? $stderr."\n" : '').$e->getMessage()),
-                'stdout' => $stdout !== '' ? $stdout : null,
+                'stdout' => $this->nullablePersistedStdout($site, $queuedBy, $run, $stdout),
                 'finished_at' => now(),
             ])->save();
 
@@ -191,7 +193,7 @@ abstract class RemoteCli
                 ? RemoteCliRun::STATUS_FAILED
                 : RemoteCliRun::STATUS_COMPLETED,
             'exit_code' => $exitCode,
-            'stdout' => $stdout !== '' ? $stdout : null,
+            'stdout' => $this->nullablePersistedStdout($site, $queuedBy, $run, $stdout),
             'stderr' => $stderr !== '' ? $stderr : null,
             'finished_at' => now(),
         ])->save();
@@ -236,5 +238,39 @@ abstract class RemoteCli
         }
 
         return false;
+    }
+
+    /**
+     * Persist stdout after viewer redaction so secret-bearing Read
+     * commands never store wp-config / option values for a user who
+     * cannot update the site.
+     *
+     * @param  list<string>  $args
+     */
+    public function persistableStdout(Site $site, ?User $user, string $command, array $args, string $stdout): string
+    {
+        return $this->redactStdoutForViewer($site, $user, $command, $args, $stdout);
+    }
+
+    /**
+     * @param  list<string>  $args
+     */
+    public function redactStdoutForViewer(Site $site, ?User $user, string $command, array $args, string $stdout): string
+    {
+        return $stdout;
+    }
+
+    /**
+     * @return string|null
+     */
+    protected function nullablePersistedStdout(Site $site, ?User $user, RemoteCliRun $run, string $stdout): ?string
+    {
+        if ($stdout === '') {
+            return null;
+        }
+
+        $redacted = $this->persistableStdout($site, $user, $run->command, $run->args ?? [], $stdout);
+
+        return $redacted !== '' ? $redacted : null;
     }
 }

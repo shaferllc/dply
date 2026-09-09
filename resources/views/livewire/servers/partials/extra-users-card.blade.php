@@ -6,19 +6,17 @@
     $selectedExtraDb = $databases->firstWhere('id', $extra_db_id ?? null);
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Users') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine database users', ['engine' => $engineLabel]) }}</h2>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each tracked database has a primary user created alongside it. Use the Actions menu on the database to copy connection details.') }}</p>
-        </div>
-    </div>
-    <div class="px-6 py-6 sm:px-7">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-users"
+        :title="__(':engine database users', ['engine' => $engineLabel])"
+        :note="__('Each tracked database has a primary user created alongside it. Use the Actions menu on the database to copy connection details.')"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="px-4 py-3.5 sm:px-5">
     @if ($databases->isEmpty())
         <x-empty-state
+            compact
             borderless
             icon="heroicon-o-users"
             tone="sage"
@@ -71,7 +69,7 @@
         </div>
 
         <div class="mt-10 border-t border-brand-ink/10 pt-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Extra database users') }}</h3>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Extra database users') }}</h3>
             <p class="mt-2 text-sm text-brand-moss">{{ __('Create an additional user and grant access on the chosen database.') }}</p>
             <form wire:submit="addExtraMysqlUser" class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">

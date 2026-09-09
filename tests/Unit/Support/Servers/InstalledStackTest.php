@@ -181,3 +181,39 @@ test('diverges from request is false when no wizard request', function () {
     // Without a wizard request to compare against, there's no divergence.
     expect($stack->divergesFromRequest($server))->toBeFalse();
 });
+
+// The wizard records versioned engine ids; ServerInventoryProbeScript can only
+// observe a family plus a live version and rewrites the snapshot that way on
+// the first inventory run. Divergence has to read both shapes.
+test('divergence compares engine family, then version', function (string $requested, ?string $installed, ?string $version, bool $diverges) {
+    $server = new Server;
+    $server->meta = [
+        'database' => $requested,
+        'installed_stack' => [
+            'database' => $installed,
+            'database_version' => $version,
+        ],
+    ];
+
+    expect(InstalledStack::fromMeta($server)->divergesFromRequest($server))->toBe($diverges);
+})->with([
+    // Probe-coarsened snapshot of exactly what the wizard asked for: no banner.
+    'probed family, right series' => ['mysql84', 'mysql', '8.4.2', false],
+    'probed family, no version at all' => ['mysql84', 'mysql', null, false],
+    // The pin did not take — distro 8.0 answered a 8.4 request. This is the
+    // case the banner exists for, and the one it used to report as "mysql".
+    'probed family, wrong series' => ['mysql84', 'mysql', '8.0.46', true],
+    'marker recorded the fallback series' => ['mysql84', 'mysql80', '8.0.46', true],
+    // Verbatim marker straight off a successful provision.
+    'exact match' => ['mysql84', 'mysql84', '8.4.2', false],
+    // Low-memory substitution crosses a family boundary.
+    'sqlite substitution' => ['mysql84', 'sqlite3', '3.45.1', true],
+    // mariadb114 is 11.4 but mariadb1011 is 10.11 — no digit-splitting rule
+    // gets both, hence the explicit map.
+    'mariadb 11.4 satisfied' => ['mariadb114', 'mariadb', '11.4.2', false],
+    'mariadb 10.11 satisfied' => ['mariadb1011', 'mariadb', '10.11.6', false],
+    'mariadb 10.11 requested, 11.4 installed' => ['mariadb1011', 'mariadb', '11.4.2', true],
+    'mariadb 11 major satisfied by any minor' => ['mariadb11', 'mariadb', '11.4.2', false],
+    'postgres major satisfied' => ['postgres17', 'postgres', '17.2', false],
+    'postgres major wrong' => ['postgres17', 'postgres', '16.4', true],
+]);

@@ -42,7 +42,7 @@
         }
     }"
 >
-    <div x-show="!done" x-cloak x-ref="replaylog" class="max-h-48 overflow-y-auto px-6 py-6 font-mono text-[11px] leading-relaxed text-brand-ink/80 sm:px-7 {{ $logClass }}">
+    <div x-show="!done" x-cloak x-ref="replaylog" class="max-h-48 overflow-y-auto px-6 py-6 font-mono text-xs leading-relaxed text-brand-ink/80 sm:px-7 {{ $logClass }}">
         <template x-for="(line, i) in shown" :key="i">
             <div class="flex gap-2">
                 <span class="select-none text-brand-mist" aria-hidden="true">›</span>

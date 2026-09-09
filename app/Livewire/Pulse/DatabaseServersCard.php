@@ -20,6 +20,9 @@ class DatabaseServersCard extends ServiceServersCard
         return 'heroicon-o-circle-stack';
     }
 
+    /**
+     * @return Collection<int, int|string>
+     */
     protected function serverIds(): Collection
     {
         return DB::table('server_database_engines')->distinct()->pluck('server_id');

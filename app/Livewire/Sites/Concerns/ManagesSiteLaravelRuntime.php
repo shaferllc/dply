@@ -96,6 +96,23 @@ trait ManagesSiteLaravelRuntime
         $this->laravel_custom_commands_text = implode("\n", $executor->customCommands($this->site));
     }
 
+    /**
+     * Explicit tab setter so the tab strip has a concrete wire:target.
+     *
+     * The strip used to call `$set('laravel_tab', …)` directly; `wire:target`
+     * can't reliably match a magic action, so the tab's inline spinner never
+     * fired and switching tabs looked frozen for the whole round-trip.
+     */
+    public function setLaravelTab(string $tab): void
+    {
+        if ($tab === '' || $tab === $this->laravel_tab) {
+            return;
+        }
+
+        $this->laravel_tab = $tab;
+        $this->updatedLaravelTab($tab);
+    }
+
     public function updatedLaravelTab(string $value): void
     {
         if ($value === 'commands') {

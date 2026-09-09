@@ -18,7 +18,6 @@ class NginxConfigSyntaxTester
      *
      * @return array{ok: bool, message: string}
      */
-    /** @return array<string, mixed> */
     public function testServerBlock(string $serverBlock): array
     {
         $banner = (string) config('webserver_templates.required_banner_line', '');

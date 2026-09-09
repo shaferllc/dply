@@ -10,17 +10,17 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
-use App\Modules\Cloud\Services\AzureDnsService;
-use App\Modules\Cloud\Cloudflare\CloudflareDnsService;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\GcpDnsService;
-use App\Modules\Cloud\Services\HetznerService;
+use App\Modules\Providers\Services\AzureDnsService;
+use App\Modules\Providers\Cloudflare\CloudflareDnsService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\GcpDnsService;
+use App\Modules\Providers\Services\HetznerService;
 use App\Modules\Imports\Services\StepHandler;
 use App\Modules\Imports\Services\WaitForTargetServerException;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\Route53Service;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\Route53Service;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
-use App\Modules\Cloud\Services\VultrService;
+use App\Modules\Providers\Services\VultrService;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -210,7 +210,7 @@ class CutoverDnsSwapHandler implements StepHandler
         $token = $credential->getApiToken() ?? '';
         $service = new DigitalOceanService($token);
         $created = $service->createDomainRecord($zone, 'A', $relative, $newIp, ttl: 60);
-        $recordId = is_array($created) ? (int) ($created['id'] ?? 0) : 0;
+        $recordId = (int) ($created['id'] ?? 0);
 
         return [
             'zone' => $zone,
@@ -228,7 +228,7 @@ class CutoverDnsSwapHandler implements StepHandler
     {
         $service = new CloudflareDnsService($credential);
         $result = $service->upsertARecord($zone, $relative, $newIp);
-        $recordId = is_array($result) ? (string) ($result['id'] ?? '') : '';
+        $recordId = (string) ($result['id'] ?? '');
 
         return [
             'zone' => $zone,

@@ -7,12 +7,16 @@ namespace App\Modules\Logs\Jobs;
 use App\Jobs\InstallLogAgentJob;
 
 use App\Models\Server;
+use App\Models\ServerLogAgent;
 use App\Models\ServerLogAggregator;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Modules\Logs\Services\LogAggregatorAccess;
+use App\Services\Servers\ManagedFirewallPort;
 use App\Support\Servers\VectorLogAggregatorInstallScripts;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -27,6 +31,13 @@ use Illuminate\Support\Str;
 class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
+
+    /**
+     * Identity of the managed UFW rule for the aggregator's mTLS listener.
+     * {@see ManagedFirewallPort} reconciles on this, so keep it stable — changing
+     * it orphans the rule already on every installed box.
+     */
+    public const FIREWALL_TAG = 'dply-logs-aggregator';
 
     public int $timeout = 600;
 
@@ -51,6 +62,7 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         VectorLogAggregatorInstallScripts $scripts,
+        ManagedFirewallPort $ports,
     ): void {
         /** @var ServerLogAggregator|null $aggregator */
         $aggregator = ServerLogAggregator::query()->with('server')->find($this->serverLogAggregatorId);
@@ -130,6 +142,18 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
                 'edge_client_key_b64' => $parsed['key'] ?? $aggregator->edge_client_key_b64,
                 'error_message' => null,
             ]);
+
+            // Nothing here used to open the listener, so the aggregator came up
+            // healthy and unreachable — edges dialled resolveEndpoint() and hit a
+            // closed port. Open it now that the install actually succeeded.
+            $this->openListenerPort($aggregator, $ports);
+
+            // Edges bake their sink in at install time. An agent installed before
+            // this aggregator existed rendered `# no aggregator endpoint
+            // configured — edge ships to blackhole` and will keep discarding logs
+            // forever, while reporting status=running with no error. Nothing used
+            // to re-render them, so whoever enabled shipping first silently lost.
+            $this->resyncEdgeAgents($aggregator);
         } catch (\Throwable $e) {
             $aggregator->update([
                 'status' => ServerLogAggregator::STATUS_FAILED,
@@ -149,6 +173,56 @@ class InstallLogAggregatorJob implements ShouldBeUnique, ShouldQueue
         $port = $aggregator->listen_port > 0 ? $aggregator->listen_port : 6000;
 
         return $ip !== '' ? "{$ip}:{$port}" : '';
+    }
+
+    /**
+     * Re-render every running edge agent so it picks up this aggregator's
+     * endpoint and mTLS material.
+     *
+     * Only agents that are actually running are touched: a pending/installing row
+     * has its own job in flight which will resolve the (now present) aggregator
+     * itself, and re-queueing a failed one would retry an install the operator
+     * has not asked to retry.
+     *
+     * The aggregator's own box is skipped — it has no edge agent shipping to
+     * itself, and re-installing there mid-aggregator-install would race the
+     * Vector unit this job just wrote.
+     */
+    protected function resyncEdgeAgents(ServerLogAggregator $aggregator): void
+    {
+        $agents = ServerLogAgent::query()
+            ->where('status', ServerLogAgent::STATUS_RUNNING)
+            ->where('server_id', '!=', $aggregator->server_id)
+            ->get();
+
+        foreach ($agents as $agent) {
+            Log::info('InstallLogAggregatorJob: re-syncing edge agent for new aggregator endpoint', [
+                'aggregator_id' => $aggregator->id,
+                'agent_id' => $agent->id,
+                'server_id' => $agent->server_id,
+                'endpoint' => $aggregator->private_endpoint ?: $aggregator->endpoint,
+            ]);
+
+            InstallLogAgentJob::dispatch($agent->id);
+        }
+    }
+
+    /**
+     * Open the mTLS listener to every edge that ships here — one /32 per edge,
+     * private address when it shares this box's VPC and public otherwise.
+     *
+     * {@see LogAggregatorAccess} owns the rule; the VPC-range scoping this used
+     * to do broke customer edges on other VPCs, which are the normal case.
+     */
+    protected function openListenerPort(ServerLogAggregator $aggregator, ManagedFirewallPort $ports): void
+    {
+        $opened = LogAggregatorAccess::sync($aggregator, $ports);
+
+        Log::info('InstallLogAggregatorJob: aggregator listener firewall synced', [
+            'aggregator_id' => $aggregator->id,
+            'edges_allowed' => $opened,
+            'port' => $aggregator->listen_port > 0 ? $aggregator->listen_port : 6000,
+        ]);
     }
 
     /**

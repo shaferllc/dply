@@ -10,19 +10,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property string $id
- * @property string $access_token
+ * @property ?string $access_token
  * @property ?\Illuminate\Support\Carbon $expires_at
- * @property string $label
+ * @property ?string $label
  * @property ?\Illuminate\Support\Carbon $last_validated_at
- * @property string $nickname
+ * @property ?string $nickname
  * @property string $provider
  * @property ?string $provider_id
- * @property string $refresh_token
+ * @property ?string $refresh_token
  * @property ?string $user_id
  * @property ?string $validation_error
  * @property-read ?User $user
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SocialAccount extends Model implements GitIdentity
 {

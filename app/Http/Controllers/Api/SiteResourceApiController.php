@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\AuthorizesHostExecution;
 use App\Http\Controllers\Controller;
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\ErrorEvent;
+use App\Models\RemoteCliRun;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\Site;
@@ -15,12 +18,22 @@ use App\Models\SiteDeploymentSchedule;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteUptimeMonitor;
+use App\Modules\RemoteCli\Services\Artisan as ArtisanService;
+use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
+use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\SourceControl\Services\SiteGitCommitsFetcher;
+use App\Services\Sites\LaravelConsoleExecutor;
+use App\Services\Sites\SiteUptimeHistorySummary;
+use App\Support\Errors\ErrorEventActions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SiteResourceApiController extends Controller
 {
+    use AuthorizesHostExecution;
+
     public function show(Request $request, Site $site): JsonResponse
     {
         $this->checkOwnership($request, $site);
@@ -30,6 +43,7 @@ class SiteResourceApiController extends Controller
                 'id' => $site->id,
                 'slug' => $site->slug,
                 'name' => $site->name,
+                'kind' => $site->siteKind(),
                 'server_id' => $site->server_id,
                 'server_name' => $site->server?->name,
                 'type' => $site->type,
@@ -128,7 +142,7 @@ class SiteResourceApiController extends Controller
         ]);
     }
 
-    public function errors(Request $request, Site $site): JsonResponse
+    public function errors(Request $request, Site $site, ErrorEventActions $actions): JsonResponse
     {
         $this->checkOwnership($request, $site);
 
@@ -139,7 +153,7 @@ class SiteResourceApiController extends Controller
             ->whereNull('dismissed_at')
             ->orderByDesc('occurred_at')
             ->limit($limit)
-            ->get(['id', 'category', 'title', 'detail', 'link_url', 'occurred_at', 'remediation_code']);
+            ->get(['id', 'site_id', 'server_id', 'category', 'title', 'detail', 'link_url', 'occurred_at', 'remediation_code']);
 
         return response()->json([
             'data' => $events->map(fn (ErrorEvent $e) => [
@@ -149,9 +163,108 @@ class SiteResourceApiController extends Controller
                 'detail' => $e->detail,
                 'link_url' => $e->link_url,
                 'remediation_code' => $e->remediation_code,
+                // So a client can offer only the actions this event supports.
+                'retryable' => $actions->isRetryable($e),
                 'occurred_at' => $e->occurred_at->toIso8601String(),
             ]),
         ]);
+    }
+
+    /**
+     * Dismiss one error event, or every open one on the site (`?all=1`).
+     *
+     * Same verbs the workspace Errors view offers, through the same
+     * {@see ErrorEventActions} — the CLI is not a second implementation.
+     */
+    public function dismissErrors(Request $request, Site $site, ErrorEventActions $actions): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'id' => ['nullable', 'string', 'max:64'],
+            'all' => ['nullable', 'boolean'],
+        ]);
+
+        $userId = (string) $request->user()?->id ?: null;
+        $scope = $this->scopedErrors($site);
+
+        if (($data['all'] ?? false) && empty($data['id'])) {
+            return response()->json(['data' => ['dismissed' => $actions->dismissAll($scope, $userId)]]);
+        }
+
+        if (empty($data['id'])) {
+            return response()->json(['message' => 'Pass an error id, or all=1 to dismiss every open error.'], 422);
+        }
+
+        $dismissed = $actions->dismiss($scope, (string) $data['id'], $userId);
+
+        if ($dismissed === 0) {
+            return response()->json(['message' => 'No open error with that id on this site.'], 404);
+        }
+
+        return response()->json(['data' => ['dismissed' => $dismissed]]);
+    }
+
+    /** Re-dispatch the operation behind a failed error event, when its category is retryable. */
+    public function retryError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
+    {
+        // Runs work on the box, so the caller's own authorization is checked
+        // too, not just the token ability and org ownership.
+        $this->authorizeSiteExecution($request, $site);
+
+        $error = $this->scopedErrors($site)->whereKey($event)->first();
+
+        if (! $error instanceof ErrorEvent) {
+            return response()->json(['message' => 'No error with that id on this site.'], 404);
+        }
+
+        if (! $actions->retry($error, (string) $request->user()?->id ?: null)) {
+            return response()->json([
+                'message' => 'This error is not retryable — re-run it at the source.',
+            ], 422);
+        }
+
+        return response()->json(['data' => ['queued' => true, 'id' => $error->id]], 202);
+    }
+
+    /** Queue the catalogued fix for an error (defaults to the recommended action). */
+    public function remediateError(Request $request, Site $site, string $event, ErrorEventActions $actions): JsonResponse
+    {
+        // Runs work on the box, so the caller's own authorization is checked
+        // too, not just the token ability and org ownership.
+        $this->authorizeSiteExecution($request, $site);
+
+        $data = $request->validate(['action' => ['nullable', 'string', 'max:64']]);
+        $error = $this->scopedErrors($site)->whereKey($event)->first();
+
+        if (! $error instanceof ErrorEvent) {
+            return response()->json(['message' => 'No error with that id on this site.'], 404);
+        }
+
+        $result = $actions->applyRemediation($error, $data['action'] ?? null, (string) $request->user()?->id ?: null);
+
+        if ($result !== 'applied') {
+            return response()->json(['message' => match ($result) {
+                'no_fix' => 'No known fix for this error.',
+                'stale_action' => 'That fix is no longer available.',
+                'manual' => 'This fix is a manual one — open the error in the dashboard for the steps.',
+                'no_server' => 'This error is not tied to a server, so it cannot be fixed automatically.',
+            }], 422);
+        }
+
+        return response()->json(['data' => [
+            'queued' => true,
+            'id' => $error->id,
+            'remediation_code' => $error->remediation_code,
+        ]], 202);
+    }
+
+    /**
+     * @return Builder<ErrorEvent>
+     */
+    private function scopedErrors(Site $site): Builder
+    {
+        return ErrorEvent::query()->where('site_id', $site->id);
     }
 
     public function uptime(Request $request, Site $site): JsonResponse
@@ -161,12 +274,13 @@ class SiteResourceApiController extends Controller
         $monitors = SiteUptimeMonitor::query()
             ->where('site_id', $site->id)
             ->orderBy('sort_order')
-            ->get(['id', 'label', 'path', 'probe_region', 'last_checked_at', 'last_ok', 'last_http_status', 'last_latency_ms', 'last_error']);
+            ->get(['id', 'label', 'check_type', 'path', 'probe_region', 'last_checked_at', 'last_ok', 'last_http_status', 'last_latency_ms', 'last_error']);
 
         return response()->json([
             'data' => $monitors->map(fn (SiteUptimeMonitor $m) => [
                 'id' => $m->id,
                 'label' => $m->label,
+                'check_type' => $m->check_type,
                 'path' => $m->path,
                 'probe_region' => $m->probe_region,
                 'status' => $m->last_ok ? 'up' : ($m->last_checked_at ? 'down' : 'unchecked'),
@@ -176,6 +290,94 @@ class SiteResourceApiController extends Controller
                 'last_checked_at' => $m->last_checked_at?->toIso8601String(),
             ]),
         ]);
+    }
+
+    /**
+     * Uptime percentages and recent incidents per monitor — the numbers behind
+     * the workspace Monitor tab's history panel. `?monitor=<id>` narrows it.
+     *
+     * The latency series the browser charts is left out on purpose: it is ~150
+     * points per monitor and nothing on a terminal reads it.
+     */
+    public function uptimeHistory(Request $request, Site $site, SiteUptimeHistorySummary $history): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $only = trim((string) $request->query('monitor', ''));
+
+        $monitors = SiteUptimeMonitor::query()
+            ->where('site_id', $site->id)
+            ->when($only !== '', fn ($query) => $query->whereKey($only))
+            ->orderBy('sort_order')
+            ->get();
+
+        return response()->json([
+            'data' => $monitors->map(function (SiteUptimeMonitor $monitor) use ($history) {
+                $summary = $history->forMonitor($monitor);
+
+                return [
+                    'id' => $monitor->id,
+                    'label' => $monitor->label,
+                    'has_data' => $summary['has_data'],
+                    'uptime' => $summary['uptime'],
+                    // ->all(), not the Collection: a Collection<array{...}> is
+                    // invariant, so returning one here fails the closure's
+                    // inferred return type. The JSON is identical.
+                    'incidents' => $summary['incidents']->map(fn ($incident) => [
+                        'id' => $incident->id,
+                        'severity' => $incident->severity,
+                        'cause' => $incident->cause,
+                        'started_at' => $incident->started_at?->toIso8601String(),
+                        'resolved_at' => $incident->resolved_at?->toIso8601String(),
+                        'ongoing' => $incident->resolved_at === null,
+                    ])->values()->all(),
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
+     * Probe one monitor now (`{"id": "…"}`) or every monitor on the site
+     * (`{"all": true}`) — the API face of the tab's "Check now" button, through
+     * the same job and console-action plumbing.
+     */
+    public function uptimeCheck(Request $request, Site $site): JsonResponse
+    {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'id' => ['nullable', 'string', 'max:64'],
+            'all' => ['nullable', 'boolean'],
+        ]);
+
+        $all = (bool) ($data['all'] ?? false) && empty($data['id']);
+
+        if (! $all && empty($data['id'])) {
+            return response()->json(['message' => 'Pass a monitor id, or all=1 to check every monitor.'], 422);
+        }
+
+        $monitors = SiteUptimeMonitor::query()
+            ->where('site_id', $site->id)
+            ->when(! $all, fn ($query) => $query->whereKey((string) $data['id']))
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($monitors->isEmpty()) {
+            return response()->json([
+                'message' => $all ? 'This site has no uptime monitors.' : 'No monitor with that id on this site.',
+            ], 404);
+        }
+
+        $userId = (string) $request->user()?->id ?: null;
+
+        foreach ($monitors as $monitor) {
+            RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($site, $monitor, $userId);
+        }
+
+        return response()->json(['data' => [
+            'queued' => $monitors->count(),
+            'ids' => $monitors->pluck('id')->values(),
+        ]], 202);
     }
 
     public function basicAuth(Request $request, Site $site): JsonResponse
@@ -276,14 +478,18 @@ class SiteResourceApiController extends Controller
             ->where('site_id', $site->id)
             ->orderByDesc('is_primary')
             ->orderBy('hostname')
-            ->get(['id', 'hostname', 'is_primary', 'www_redirect', 'comment']);
+            ->get(['id', 'hostname', 'is_primary', 'comment']);
 
+        // `www_redirect` is deliberately absent. The column exists and every
+        // creation path writes false, but nothing reads it — no config builder
+        // emits a redirect — so returning it advertised a setting that does
+        // nothing. Serve www by adding it as a domain alias instead; aliases
+        // reach the vhost, the certificate and the DNS records.
         return response()->json([
             'data' => $domains->map(fn (SiteDomain $d) => [
                 'id' => $d->id,
                 'hostname' => $d->hostname,
                 'is_primary' => $d->is_primary,
-                'www_redirect' => $d->www_redirect,
                 'comment' => $d->comment,
             ]),
         ]);
@@ -293,10 +499,11 @@ class SiteResourceApiController extends Controller
     {
         $this->checkOwnership($request, $site);
 
+        // No `www_redirect`: accepting it let a caller set the flag, read it
+        // back as true, and get no redirect. Nothing implements one.
         $data = $request->validate([
             'hostname' => ['required', 'string', 'max:253'],
             'is_primary' => ['boolean'],
-            'www_redirect' => ['boolean'],
         ]);
 
         $exists = SiteDomain::query()
@@ -316,7 +523,6 @@ class SiteResourceApiController extends Controller
             'site_id' => $site->id,
             'hostname' => $data['hostname'],
             'is_primary' => $data['is_primary'] ?? false,
-            'www_redirect' => $data['www_redirect'] ?? false,
         ]);
 
         return response()->json(['data' => ['id' => $domain->id, 'hostname' => $domain->hostname]], 201);
@@ -401,6 +607,130 @@ class SiteResourceApiController extends Controller
         ]);
     }
 
+    /**
+     * `php artisan <command>` against the site, through the same RemoteCli
+     * engine the workspace and `php artisan dply:artisan` use: risk
+     * classification, the two-tier permission gate, a RemoteCliRun row and
+     * an audit event. Instant commands settle inline; everything else comes
+     * back queued and is polled via {@see artisanRun()}.
+     */
+    public function runArtisan(
+        Request $request,
+        Site $site,
+        ArtisanService $artisan,
+        LaravelConsoleExecutor $console,
+    ): JsonResponse {
+        $this->checkOwnership($request, $site);
+
+        $data = $request->validate([
+            'command' => ['required', 'string', 'max:1000'],
+            'confirm' => ['nullable', 'boolean'],
+        ]);
+
+        $parts = preg_split('/\s+/', trim((string) $data['command'])) ?: [];
+        $command = (string) array_shift($parts);
+        $args = array_values(array_map('strval', $parts));
+
+        // Artisan::buildShellCommand() escapes the args but interpolates the
+        // verb raw. That is safe for operator argv (dply:artisan); an API
+        // token is not, so the verb has to look like an artisan command name
+        // and nothing else.
+        if (! preg_match('/^[A-Za-z][A-Za-z0-9:_.-]*$/', $command)) {
+            return response()->json([
+                'message' => 'Invalid artisan command name.',
+                'code' => 'invalid_command',
+            ], 422);
+        }
+
+        // The engine shells into the site root over SSH — a container or
+        // non-Laravel site would queue a run that dies on the box.
+        if ($console->executionProfile($site) !== 'vm_ssh') {
+            return response()->json([
+                'message' => 'Artisan is available for SSH-managed Laravel sites only. Use your container tooling for this runtime.',
+                'code' => 'artisan_unsupported_runtime',
+            ], 422);
+        }
+
+        $risk = $artisan->classifyRisk($command);
+
+        // The env family prints the site's .env (DB password, APP_KEY) and
+        // classifies as Read, which the RemoteCli gate lets through on
+        // SitePolicy::view — a workspace viewer. Secrets need write access.
+        if (in_array($command, ['env', 'env:show', 'env:decrypt', 'tinker'], true)
+            && ! $request->user()?->can('update', $site)) {
+            return response()->json([
+                'message' => "php artisan {$command} exposes site secrets and needs write access to this site.",
+                'code' => 'permission_denied',
+            ], 403);
+        }
+
+        // No prompt over HTTP, so destructive commands take the same
+        // acknowledge-and-retry shape as the firewall SSH-lockout ack.
+        if ($risk === RiskLevel::Destructive && ! ($data['confirm'] ?? false)) {
+            return response()->json([
+                'message' => "php artisan {$command} is classified destructive — resend with confirm=true to run it.",
+                'code' => 'confirmation_required',
+                'risk' => $risk->value,
+            ], 422);
+        }
+
+        try {
+            $result = $artisan->run(site: $site, command: $command, args: $args, queuedBy: $request->user());
+        } catch (RemoteCliPermissionDeniedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'permission_denied',
+            ], 403);
+        }
+
+        return response()->json(['data' => $this->artisanRunPayload($result->run)]);
+    }
+
+    /**
+     * Poll one artisan run. Scoped to the site so a run id from another
+     * organization cannot be read back through a site this token owns.
+     */
+    public function artisanRun(Request $request, Site $site, string $run): JsonResponse
+    {
+        $this->authorizeSiteRead($request, $site);
+
+        $row = RemoteCliRun::query()
+            ->where('site_id', $site->getKey())
+            ->where('kind', Kind::Artisan)
+            ->find($run);
+
+        if ($row === null) {
+            return response()->json(['message' => 'No artisan run with that id on this site.'], 404);
+        }
+
+        return response()->json(['data' => $this->artisanRunPayload($row)]);
+    }
+
+    /**
+     * Same envelope `dply:artisan --json` prints, so both surfaces agree.
+     *
+     * @return array<string, mixed>
+     */
+    private function artisanRunPayload(RemoteCliRun $run): array
+    {
+        return [
+            'run_id' => $run->id,
+            'command' => $run->command,
+            'args' => $run->args ?? [],
+            'status' => $run->status,
+            'mode' => $run->mode,
+            'risk' => $run->risk->value,
+            'exit_code' => $run->exit_code,
+            'stdout' => (string) $run->stdout,
+            'stderr' => (string) $run->stderr,
+        ];
+    }
+
+    /**
+     * Every site kind — VM, Cloud app, Edge site, function — is a Site row with
+     * a server behind it (`sites.server_id` is NOT NULL), so the server is the
+     * owner of record for all four and these endpoints need no per-kind branch.
+     */
     private function checkOwnership(Request $request, Site $site): void
     {
         $organization = $request->attributes->get('api_organization');

@@ -3,11 +3,11 @@
 namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
-use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
-use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
 use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
+use App\Modules\Certificates\Jobs\ExecuteSiteCertificateJob;
+use App\Modules\Certificates\Jobs\IssueServerWildcardCertificateJob;
 use App\Modules\Certificates\Services\CertificateRequestService;
 use App\Modules\Deploy\Services\DeploymentContractBuilder;
 use App\Modules\Deploy\Services\DeploymentPreflightValidator;
@@ -24,7 +24,6 @@ class SiteProvisioner
         private readonly SiteWebserverConfigApplier $webserverConfigApplier,
         private readonly SiteRuntimeProvisionerRegistry $runtimeProvisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
-        private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
         private readonly CertificateRequestService $certificateRequestService,
         private readonly DeploymentPreflightValidator $preflightValidator,
         private readonly DeploymentContractBuilder $contractBuilder,
@@ -36,24 +35,6 @@ class SiteProvisioner
     {
         $site->loadMissing(['server', 'domains']);
         $this->runPreflight($site);
-
-        if ($site->usesFunctionsRuntime()) {
-            $this->appendLog($site, 'info', 'queued', 'Serverless host provisioning worker started.', [
-                'runtime_profile' => $site->runtimeProfile(),
-                'server_id' => (string) $site->server_id,
-            ]);
-
-            $this->updateProvisioning($site, [
-                'state' => 'configuring_functions_runtime',
-                'webserver' => $site->webserver(),
-                'started_at' => now()->toIso8601String(),
-                'error' => null,
-            ]);
-
-            $this->appendLog($site, 'info', 'configuring_functions_runtime', 'Serverless runtime metadata saved. Waiting for the first deploy to publish a live endpoint.');
-
-            return;
-        }
 
         if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             $runtimeProfile = $site->runtimeProfile();
@@ -196,7 +177,10 @@ class SiteProvisioner
             $detail = (string) ($testingHostnameMeta['error'] ?? '');
 
             throw new \RuntimeException(match ($reason) {
-                'disabled' => 'Testing hostname creation is required before provisioning can continue. Enable DigitalOcean testing hostnames and configure at least one testing domain.',
+                'missing_cloudflare_token' => 'Testing hostname creation requires CLOUDFLARE_DNS_API_TOKEN. Testing hostnames are Cloudflare-only — set a token whose Zone Resources include the testing zones, then: php artisan config:clear',
+                'no_zones_configured' => 'No testing zones are configured. Add at least one to services.cloudflare.vm in config/services.php.',
+                // Legacy rows written before the reasons were split.
+                'disabled' => 'Testing hostname creation is required before provisioning can continue. Set CLOUDFLARE_DNS_API_TOKEN and configure at least one testing zone.',
                 'missing_server_ip' => 'Testing hostname creation requires a server IP address before provisioning can continue.',
                 default => $detail !== ''
                     ? 'Testing hostname creation failed before provisioning could continue: '.$detail
@@ -343,12 +327,14 @@ class SiteProvisioner
             'error' => null,
         ]);
 
-        // Dispatch only when idle (pending/failed) — an in-flight 'issuing' run
-        // holds the lock, so re-dispatching every probe would just no-op.
+        // Dispatch when idle (pending/failed). A live `issuing` run holds the
+        // cache lock, so re-dispatching every probe would just no-op — but a
+        // killed/timed-out worker leaves the row `issuing` forever. Retry
+        // those once the issuer job timeout has elapsed.
         if (in_array($wildcard->status, [
             ServerWildcardCertificate::STATUS_PENDING,
             ServerWildcardCertificate::STATUS_FAILED,
-        ], true)) {
+        ], true) || $wildcard->issuanceIsStale()) {
             $this->appendLog($site, 'info', 'waiting_for_wildcard_tls', 'Issuing wildcard TLS certificate for the testing zone.', [
                 'zone' => $zone,
                 'provider' => $routing['provider'],
@@ -362,34 +348,12 @@ class SiteProvisioner
     /**
      * @return array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string}
      */
-    /** @return array<string, mixed> */
     public function checkReadiness(Site $site): array
     {
         $site->loadMissing(['server', 'domains']);
 
-        if ($site->usesFunctionsRuntime()) {
-            $result = $this->digitalOceanFunctionsSiteProvisioner->readyResult($site);
-            $site->update([
-                'status' => Site::STATUS_FUNCTIONS_CONFIGURED,
-            ]);
-
-            $this->appendLog($site, 'info', 'awaiting_first_deploy', 'Serverless host is configured. Run the first deploy to publish a live endpoint.', [
-                'hostname' => $result['hostname'],
-                'url' => $result['url'],
-            ]);
-
-            $this->updateProvisioning($site, [
-                'state' => 'awaiting_first_deploy',
-                'webserver' => $site->webserver(),
-                'ready_hostname' => $result['hostname'],
-                'ready_url' => $result['url'],
-                'checked_at' => $result['checked_at'],
-                'host_checks' => [],
-                'error' => null,
-            ]);
-
-            return $result;
-        }
+        // The DO Functions readiness branch stood here; its provisioner went
+        // with the serverless surface (remove-cloud-edge-serverless).
 
         if ($site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
             $site->refresh();
@@ -502,7 +466,7 @@ class SiteProvisioner
             'hostname' => $result['hostname'],
             'url' => $result['url'],
             'error' => $result['error'],
-            'checks' => $result['checks'] ?? [],
+            'checks' => $result['checks'],
         ]);
 
         $this->updateProvisioning($site, [
@@ -578,7 +542,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function updateProvisioning(Site $site, array $payload): void
     {
@@ -601,7 +565,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     public function appendLog(Site $site, string $level, string $step, string $message, array $context = []): void
     {
@@ -626,7 +590,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      * @return array<string, mixed>
      */
     private function filterLogContext(array $context): array
@@ -666,7 +630,7 @@ class SiteProvisioner
         }
 
         foreach ($reachability['checks'] ?? [] as $check) {
-            if (($check['hostname']) === $previewHostname && ($check['ok'])) {
+            if ($check['hostname'] === $previewHostname && $check['ok']) {
                 return true;
             }
         }
@@ -675,7 +639,7 @@ class SiteProvisioner
     }
 
     /**
-     * @param  array<string, mixed> $context
+     * @param  array<string, mixed>  $context
      */
     private function queueAutomaticPreviewSsl(Site $site, string $step, string $message, array $context = []): void
     {

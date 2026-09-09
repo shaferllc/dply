@@ -126,8 +126,8 @@ class AuditableDecorator
             'result' => $this->sanitizeAuditResult($result),
             'before_state' => $beforeState,
             'after_state' => $afterState,
-            'ip_address' => request()?->ip(),
-            'user_agent' => request()?->userAgent(),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
             'timestamp' => now(),
             'exception' => $exception ? $exception->getMessage() : null,
         ];

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Logs\LogExplorerWindowedFetchTest;
 
-use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
 use App\Models\Server;
 use App\Modules\Logs\Services\LogExplorerQuery;
 use Mockery;
@@ -13,26 +12,9 @@ use Mockery;
  * The explorer trait branches between the rolling recent() window and a pinned
  * window() slice (a correlation deep-link, e.g. error → logs). These exercise the
  * branch + the graceful-degrade contract without booting a Livewire component or
- * touching ClickHouse — a plain host exposing the protected fetch is enough.
+ * touching ClickHouse — {@see ExplorerHarness} is a plain host exposing the
+ * protected fetch. It lives in its own file so this one stays PSR-4 compliant.
  */
-class ExplorerHarness
-{
-    use ManagesServerLogExplorer;
-
-    public Server $server;
-
-    public function __construct(Server $server)
-    {
-        $this->server = $server;
-    }
-
-    /** @return array<string,mixed> */
-    public function fetch(): array
-    {
-        return $this->loadLogExplorer();
-    }
-}
-
 function harness(): ExplorerHarness
 {
     return new ExplorerHarness(Server::factory()->make(['id' => 'srv_x', 'organization_id' => 'org_x']));

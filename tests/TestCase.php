@@ -3,13 +3,11 @@
 namespace Tests;
 
 use App\Actions\Servers\GetProviderCredentialsForServerType;
-use App\Modules\Billing\Services\EdgeOrganizationUsageReader;
 use App\Modules\Billing\Services\OrganizationBillingStateComputer;
-use App\Modules\Billing\Services\ServerlessOrganizationUsageReader;
 use App\Modules\Notifications\Services\AssignableNotificationChannels;
-use App\Services\ProductionData\ProductionDataMirror;
 use App\Services\Servers\ServerProviderCostEstimator;
 use App\Support\Servers\CacheServiceNetworkExposure;
+use App\Support\Sites\LinkedOrganizationSecrets;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +22,23 @@ abstract class TestCase extends BaseTestCase
      * with "duplicate key value violates unique constraint pg_type_typname_nsp_index".
      */
     protected bool $dropTypes = true;
+
+    /**
+     * Roll back the dply Queue data plane between tests, not just the primary
+     * connection.
+     *
+     * `RefreshDatabase` transacts only the default connection, so rows written
+     * to `dply_queue` (jobs, locks, failed jobs) survived into the next test.
+     * Namespace-scoped queries hid it; anything counting rows outright did
+     * not. Listing the connection here restores per-test isolation for every
+     * current and future queue test, rather than each one remembering to
+     * clean up after itself.
+     *
+     * `null` is the default connection and must stay first.
+     *
+     * @var list<string|null>
+     */
+    protected $connectionsToTransact = [null, 'dply_queue'];
 
     protected function setUp(): void
     {
@@ -82,12 +97,10 @@ abstract class TestCase extends BaseTestCase
         }
 
         GetProviderCredentialsForServerType::flushMemo();
+        LinkedOrganizationSecrets::flushMemo();
         CacheServiceNetworkExposure::flushManagedRuleMemo();
         OrganizationBillingStateComputer::flushMemo();
-        EdgeOrganizationUsageReader::flushMemo();
-        ServerlessOrganizationUsageReader::flushMemo();
         ServerProviderCostEstimator::flushCredentialMemo();
-        ProductionDataMirror::forgetConnectionMemo();
         AssignableNotificationChannels::flushMemo();
 
         parent::tearDown();

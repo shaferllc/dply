@@ -12,9 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
- * @property string $activate_script
- * @property string $clone_script
- * @property array<string, mixed> $deploy_branches
+ * @property string|null $activate_script
+ * @property string|null $clone_script
+ * @property array<string, mixed>|null $deploy_branches
  * @property ?string $description
  * @property bool $is_default
  * @property string $name
@@ -24,8 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read ?Site $site
  * @property-read Collection<int, SiteDeployStep> $steps
  * @property-read Collection<int, SiteDeployHook> $hooks
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteDeployPipeline extends Model
 {

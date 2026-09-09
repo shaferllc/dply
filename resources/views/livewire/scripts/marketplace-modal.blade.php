@@ -11,17 +11,17 @@
                         <x-heroicon-o-book-open class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script presets') }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Script presets') }}</p>
                         <div class="mt-0.5 flex items-center gap-2">
                             <h2 class="text-base font-semibold text-brand-ink">{{ __('Add a script') }}</h2>
                             @if ($webserver !== '')
-                                <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ ucfirst($webserver) }}</span>
+                                <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ ucfirst($webserver) }}</span>
                             @endif
                         </div>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Clone a starter into your organization’s scripts, then run it from Scripts or Server commands.') }}</p>
                     </div>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -73,7 +73,7 @@
 
             {{-- Footer --}}
             <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-3">
-                <a href="{{ route('scripts.marketplace', $webserver !== '' ? ['webserver' => $webserver] : []) }}" wire:navigate class="text-xs font-medium text-brand-forest hover:underline">
+                <a href="{{ route('marketplace.index', ['category' => 'scripts']) }}" wire:navigate class="text-xs font-medium text-brand-forest hover:underline">
                     {{ __('Open full marketplace →') }}
                 </a>
                 <button type="button" x-on:click="$dispatch('close-modal', '{{ \App\Modules\Marketplace\Livewire\Scripts\MarketplaceModal::MODAL_NAME }}')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">

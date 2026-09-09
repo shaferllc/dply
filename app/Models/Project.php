@@ -20,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property-read ?User $user
  * @property-read ?Site $site
  * @property-read Collection<int, SiteDeployment> $deployments
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class Project extends Model
 {

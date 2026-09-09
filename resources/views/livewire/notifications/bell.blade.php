@@ -14,13 +14,15 @@
         <x-slot name="trigger">
             <button
                 type="button"
+                {{-- First open fetches the panel contents; see Bell::render(). --}}
+                @unless ($loaded) wire:click="load" @endunless
                 class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
                 aria-haspopup="menu"
             >
                 <span class="relative inline-flex">
                     <x-heroicon-o-bell class="h-5 w-5 shrink-0 opacity-90" />
                     @if ($unreadCount > 0)
-                        <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-semibold text-brand-ink">
+                        <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-2xs font-semibold text-brand-ink">
                             {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                         </span>
                     @endif
@@ -38,7 +40,7 @@
                     </span>
                     <div>
                         <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
-                        <p class="text-[11px] text-brand-moss">
+                        <p class="text-xs text-brand-moss">
                             @if ($unreadCount > 0)
                                 <span class="font-semibold text-brand-ink">{{ $unreadCount }}</span> {{ __('unread') }}
                             @else
@@ -58,16 +60,18 @@
             {{-- Filters (category chips + alerts toggle) + Clear all. Shown
                  whenever there are unread items so the filter can be changed even
                  when the current filter has emptied the list. --}}
-            @if ($unreadCount > 0)
+            @if ($loaded && $unreadCount > 0)
                 @php
-                    $chipBase = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold transition';
+                    $chipBase = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold transition';
                     $chipOn = 'bg-brand-ink text-brand-cream';
                     $chipOff = 'bg-brand-sand/50 text-brand-moss hover:bg-brand-sand/80 hover:text-brand-ink';
                 @endphp
                 {{-- Stop clicks here from bubbling to the dropdown panel's
                      @click="close()" — filtering/clearing must keep the bell open. --}}
                 <div class="flex items-center gap-2 border-b border-brand-ink/5 bg-white px-3 py-1.5" x-on:click.stop>
-                    <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pb-0.5">
+                    {{-- dply-tablist-scroll: reserves the scrollbar's height and thins it.
+                         pb-0.5 was ~2px, so a macOS always-visible bar painted over the chips. --}}
+                    <div class="dply-tablist-scroll flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
                         <button type="button" wire:click="resetFilters" class="{{ $chipBase }} {{ ($categoryFilters === [] && ! $alertsOnly) ? $chipOn : $chipOff }}">{{ __('All') }}</button>
                         <button type="button" wire:click="toggleAlertsOnly" class="{{ $chipBase }} {{ $alertsOnly ? 'bg-amber-500 text-white' : $chipOff }}">
                             <x-heroicon-m-exclamation-triangle class="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -83,7 +87,7 @@
                             </button>
                         @endforeach
                     </div>
-                    <button type="button" wire:click="markAllAsRead" class="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-semibold text-brand-moss transition hover:text-brand-ink">
+                    <button type="button" wire:click="markAllAsRead" class="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-brand-moss transition hover:text-brand-ink">
                         <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Clear all') }}
                     </button>
@@ -92,6 +96,20 @@
 
             {{-- Unread items. --}}
             <div class="max-h-[26rem] overflow-y-auto">
+                @unless ($loaded)
+                    {{-- First open: the contents are in flight. --}}
+                    <div class="space-y-2 px-4 py-5" aria-busy="true">
+                        @foreach (range(1, min(3, max(1, (int) $unreadCount))) as $skeletonRow)
+                            <div class="flex items-start gap-3">
+                                <div class="h-8 w-8 shrink-0 animate-pulse rounded-lg bg-brand-sand/60"></div>
+                                <div class="min-w-0 flex-1 space-y-1.5">
+                                    <div class="h-3 w-2/3 animate-pulse rounded bg-brand-sand/60"></div>
+                                    <div class="h-2.5 w-1/3 animate-pulse rounded bg-brand-sand/40"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
                 @forelse ($items as $notificationItem)
                     @php
                         $event = $notificationItem->event;
@@ -117,7 +135,7 @@
                                 @if ($notificationItem->body)
                                     <span class="mt-1 line-clamp-2 block text-xs leading-relaxed text-brand-moss">{{ $notificationItem->body }}</span>
                                 @endif
-                                <span class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-brand-mist">
+                                <span class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-mist">
                                     @if ($category)
                                         <span class="inline-flex items-center rounded-md bg-brand-ink/[0.045] px-1.5 py-0.5 font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/[0.06]">{{ str_replace('_', ' ', $category) }}</span>
                                     @endif
@@ -134,7 +152,7 @@
                                 @endphp
                                 @if ($ctaLabel)
                                     {{-- Visual button affordance — the row's openItem handles the click. --}}
-                                    <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm transition group-hover:bg-brand-ink">
+                                    <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-xs font-semibold text-brand-cream shadow-sm transition group-hover:bg-brand-ink">
                                         <x-dynamic-component :component="$ctaIsDownload ? 'heroicon-m-arrow-down-tray' : 'heroicon-m-arrow-up-right'" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                         {{ $ctaLabel }}
                                     </span>
@@ -177,6 +195,7 @@
                         </div>
                     @endif
                 @endforelse
+                @endunless
             </div>
 
             {{-- Footer. --}}

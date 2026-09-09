@@ -50,10 +50,9 @@ class RunDueDeploymentSchedulesCommand extends Command
                 continue;
             }
 
-            // Only VM hosts run this clone/build/release pipeline; edge and
-            // functions runtimes deploy differently and are skipped.
+            // Only VM hosts run this clone/build/release pipeline; edge
+            // runtimes deploy differently and are skipped.
             if (! $server->isVmHost()
-                || $site->usesFunctionsRuntime()
                 || $site->usesEdgeRuntime()) {
                 continue;
             }

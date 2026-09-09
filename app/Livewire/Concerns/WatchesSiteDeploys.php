@@ -24,10 +24,19 @@ use Livewire\Attributes\Computed;
  *
  * Requires the host component to also use {@see GuardsBilledDeploys} (for
  * blockedByDeployPause) and {@see DispatchesToastNotifications}.
+ *
+ * Livewire #[Computed] methods are read as properties in PHP and Blade;
+ * PHPStan cannot see that magic, so the contract is stated here.
+ *
+ * @property-read list<array<string, mixed>> $watchedRows
  */
 trait WatchesSiteDeploys
 {
-    /** Site ids launched from this surface, driving the deploy console. */
+    /**
+     * Site ids launched from this surface, driving the deploy console.
+     *
+     * @var list<string>
+     */
     public array $watchedSiteIds = [];
 
     /** Server-deploy modal: pick which attached sites to include before launching. */
@@ -273,7 +282,7 @@ trait WatchesSiteDeploys
             return;
         }
 
-        $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
+        $this->watchedSiteIds = $siteIds;
         unset($this->watchedRows, $this->watchedInProgress);
         $this->dispatch('deploy-console-focus', siteIds: $this->watchedSiteIds)
             ->to(DeployConsoleSidebar::class);
@@ -306,7 +315,6 @@ trait WatchesSiteDeploys
 
         return $server !== null
             && $server->isVmHost()
-            && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
             && Gate::allows('update', $site);
     }

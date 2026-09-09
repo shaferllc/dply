@@ -13,7 +13,7 @@ test('resolver uses docker engine for docker runtime sites', function () {
     ['resolver' => $resolver, 'docker' => $docker] = makeResolver();
     $project = projectForServer(new Server([
         'meta' => ['host_kind' => Server::HOST_KIND_DOCKER],
-    ]));
+    ]), runtimeProfile: 'docker_web');
 
     expect($resolver->forProject($project))->toBe($docker);
 });
@@ -22,27 +22,27 @@ test('resolver uses kubernetes engine for kubernetes runtime sites', function ()
     ['resolver' => $resolver, 'kubernetes' => $kubernetes] = makeResolver();
     $project = projectForServer(new Server([
         'meta' => ['host_kind' => Server::HOST_KIND_KUBERNETES],
-    ]));
+    ]), runtimeProfile: 'kubernetes_web');
 
     expect($resolver->forProject($project))->toBe($kubernetes);
 });
 
-test('resolver uses functions engine for functions hosts', function () {
-    ['resolver' => $resolver, 'functions' => $functions] = makeResolver();
+test('resolver falls back to byo engine for leftover functions hosts', function () {
+    ['resolver' => $resolver, 'byo' => $byo] = makeResolver();
     $project = projectForServer(new Server([
         'meta' => ['host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS],
     ]));
 
-    expect($resolver->forProject($project))->toBe($functions);
+    expect($resolver->forProject($project))->toBe($byo);
 });
 
-test('resolver uses aws lambda engine for lambda hosts', function () {
-    ['resolver' => $resolver, 'awsLambda' => $awsLambda] = makeResolver();
+test('resolver falls back to byo engine for leftover lambda hosts', function () {
+    ['resolver' => $resolver, 'byo' => $byo] = makeResolver();
     $project = projectForServer(new Server([
         'meta' => ['host_kind' => Server::HOST_KIND_AWS_LAMBDA],
     ]));
 
-    expect($resolver->forProject($project))->toBe($awsLambda);
+    expect($resolver->forProject($project))->toBe($byo);
 });
 
 test('resolver falls back to byo engine for vm sites', function () {
@@ -55,7 +55,7 @@ test('resolver falls back to byo engine for vm sites', function () {
 });
 
 /**
- * @return array{resolver: DeployEngineResolver, byo: DeployEngine, functions: DeployEngine, awsLambda: DeployEngine, docker: DeployEngine, kubernetes: DeployEngine}
+ * @return array{resolver: DeployEngineResolver, byo: DeployEngine, docker: DeployEngine, kubernetes: DeployEngine}
  */
 function makeResolver(): array
 {
@@ -64,20 +64,6 @@ function makeResolver(): array
         public function run(DeployContext $context): array
         {
             return ['output' => 'byo', 'sha' => null];
-        }
-    };
-    $functions = new class implements DeployEngine
-    {
-        public function run(DeployContext $context): array
-        {
-            return ['output' => 'functions', 'sha' => null];
-        }
-    };
-    $awsLambda = new class implements DeployEngine
-    {
-        public function run(DeployContext $context): array
-        {
-            return ['output' => 'aws', 'sha' => null];
         }
     };
     $docker = new class implements DeployEngine
@@ -96,19 +82,17 @@ function makeResolver(): array
     };
 
     return [
-        'resolver' => new DeployEngineResolver($byo, $functions, $awsLambda, $docker, $kubernetes),
+        'resolver' => new DeployEngineResolver($byo, $docker, $kubernetes),
         'byo' => $byo,
-        'functions' => $functions,
-        'awsLambda' => $awsLambda,
         'docker' => $docker,
         'kubernetes' => $kubernetes,
     ];
 }
 
-function projectForServer(Server $server): Project
+function projectForServer(Server $server, ?string $runtimeProfile = null): Project
 {
     $site = new Site([
-        'meta' => [],
+        'meta' => $runtimeProfile !== null ? ['runtime_profile' => $runtimeProfile] : [],
     ]);
     $site->setRelation('server', $server);
 

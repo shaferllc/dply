@@ -95,7 +95,7 @@ final class LookoutBundleProvisioner
         LookoutProject::create([
             'organization_id' => $organizationId,
             'lookout_project_id' => $result['project_id'] ?? null,
-            'name' => $result['project_name'] ?? ('dply-bundle-'.$organizationId),
+            'name' => $result['project_name'],
             'tier' => $tier,
             'status' => LookoutProject::STATUS_ACTIVE,
             'source' => LookoutProject::SOURCE_BUNDLE,

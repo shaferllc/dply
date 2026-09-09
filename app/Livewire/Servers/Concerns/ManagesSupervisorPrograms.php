@@ -120,7 +120,7 @@ trait ManagesSupervisorPrograms
             return $laravelKeys;
         }
 
-        $language = strtolower((string) ($detection['language'] ?? ''));
+        $language = strtolower($detection['language']);
 
         if ($site->isRailsFrameworkDetected()) {
             return $railsKeys;
@@ -558,6 +558,9 @@ trait ManagesSupervisorPrograms
         }
     }
 
+    /**
+     * @return Builder<SupervisorProgram>
+     */
     protected function supervisorProgramQuery(): Builder
     {
         $query = SupervisorProgram::query()->where('server_id', $this->server->id);

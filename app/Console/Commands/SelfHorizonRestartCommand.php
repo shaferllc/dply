@@ -75,6 +75,9 @@ class SelfHorizonRestartCommand extends Command
             $this->warn('[dply] supervisor sync skipped: '.$e->getMessage());
         }
 
+        // Fail-soft: if this process can elevate (root / sudo -n), keep Docker
+        // ready for Edge builds (Horizon user = www-data on control-plane workers).
+
         try {
             Artisan::call('horizon:terminate');
             $this->info('[dply] horizon:terminate signalled; supervisor (Restart=always) relaunches it on the new release.');
@@ -114,4 +117,5 @@ class SelfHorizonRestartCommand extends Command
 
         return $count;
     }
+
 }

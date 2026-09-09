@@ -7,18 +7,25 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
-use App\Modules\Cloud\Services\AwsEc2Service;
-use App\Modules\Cloud\Services\AzureComputeService;
-use App\Modules\Cloud\Services\DigitalOceanService;
-use App\Modules\Cloud\Services\HetznerService;
-use App\Modules\Cloud\Services\LinodeService;
-use App\Modules\Cloud\Services\OracleComputeService;
-use App\Modules\Cloud\Services\UpCloudService;
-use App\Modules\Cloud\Services\VultrService;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogFailure;
+use App\Modules\Providers\Services\AwsEc2Service;
+use App\Modules\Providers\Services\AzureComputeService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\HetznerService;
+use App\Modules\Providers\Services\LinodeService;
+use App\Modules\Providers\Services\OracleComputeService;
+use App\Modules\Providers\Services\UpCloudService;
+use App\Modules\Providers\Services\VultrService;
 use Illuminate\Support\Collection;
 
 /**
- * Region/plan options for the server create wizard (API-backed per credential).
+ * Region/plan options for the server create wizard.
+ *
+ * DigitalOcean / Vultr / Linode plans come from the app-level catalog token
+ * (`DIGITALOCEAN_TOKEN` / `VULTR_TOKEN` / `LINODE_TOKEN`) whenever one is
+ * configured. The selected ProviderCredential is only used to create the
+ * droplet — a stale customer token must not empty the size picker.
  */
 final class ResolveServerCreateCatalog
 {
@@ -31,6 +38,8 @@ final class ResolveServerCreateCatalog
      *     sizes: list<array{value: string, label: string, price_monthly?: float|null, price_hourly?: float|null, pricing_source?: string|null, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>,
      *     region_label: string,
      *     size_label: string,
+     *     error?: string|null,
+     *     source?: 'platform'|'credential',
      *     kubernetes_clusters?: list<array<string, mixed>>
      * }
      */
@@ -39,6 +48,7 @@ final class ResolveServerCreateCatalog
         string $type,
         string $providerCredentialId,
         string $selectedRegion,
+        bool $fallbackToGlobalCatalog = false,
     ): array {
         $empty = [
             'credentials' => collect(),
@@ -46,6 +56,7 @@ final class ResolveServerCreateCatalog
             'sizes' => [],
             'region_label' => __('Region'),
             'size_label' => __('Plan / size'),
+            'error' => null,
         ];
 
         if ($type === 'custom') {
@@ -53,47 +64,147 @@ final class ResolveServerCreateCatalog
         }
 
         $credentials = GetProviderCredentialsForServerType::run($org, $type);
-        if (in_array($type, ['digitalocean_functions', 'aws_lambda'], true)) {
-            return array_merge($empty, ['credentials' => $credentials]);
+
+        if (ProviderApiStatus::isUnreachable($type)) {
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => ProviderApiStatus::operatorMessage($type),
+                'source' => 'platform',
+                'provider_unreachable' => true,
+            ]);
+        }
+
+        // Regions/sizes are a global provider catalog. When the app-level
+        // token is set, use it and stop — do not fall through to the
+        // customer's ProviderCredential (that token is for create only).
+        $platformCatalog = $this->catalogFromGlobalToken($type, $credentials, $selectedRegion);
+        if ($platformCatalog !== null) {
+            $platformCatalog['source'] = 'platform';
+
+            return $this->finalizeCatalog($platformCatalog, $type);
         }
 
         $credential = ($providerCredentialId !== '' && $providerCredentialId !== '0')
             ? $credentials->firstWhere('id', $providerCredentialId)
             : null;
 
-        if ($credentials->isNotEmpty() && $providerCredentialId !== '' && $providerCredentialId !== '0' && ! $credential) {
-            return array_merge($empty, ['credentials' => $credentials]);
+        $staleCredentialId = $credentials->isNotEmpty()
+            && $providerCredentialId !== ''
+            && $providerCredentialId !== '0'
+            && ! $credential;
+
+        if ($staleCredentialId && ! $fallbackToGlobalCatalog) {
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => __('The selected provider credential is no longer available.'),
+            ]);
+        }
+
+        if ($staleCredentialId && $fallbackToGlobalCatalog) {
+            $credential = $credentials->first();
         }
 
         if (! $credential) {
-            if ($type === 'digitalocean' && filled((string) config('services.digitalocean.token'))) {
-                return $this->catalogDigitalOcean($credentials, null, $selectedRegion);
-            }
-
-            if ($type === 'vultr' && filled((string) config('services.vultr.token'))) {
-                return $this->catalogVultr($credentials, null, $selectedRegion);
-            }
-
-            if ($type === 'linode' && filled((string) config('services.linode.token'))) {
-                return $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'));
-            }
-
-            return array_merge($empty, ['credentials' => $credentials]);
+            return array_merge($empty, [
+                'credentials' => $credentials,
+                'error' => $this->missingCatalogCredentialError($type, $fallbackToGlobalCatalog),
+            ]);
         }
 
-        return match ($type) {
+        $catalog = match ($type) {
             'digitalocean' => $this->catalogDigitalOcean($credentials, $credential, $selectedRegion),
             'digitalocean_kubernetes' => $this->catalogDigitalOceanKubernetes($credentials, $credential),
             'hetzner' => $this->catalogHetzner($credentials, $credential, $selectedRegion),
             'linode' => $this->catalogLinode($credentials, $credential),
             'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
-            'ovh' => $this->catalogOvh($credentials, $credential, $selectedRegion),
+            // No 'ovh' arm: catalogOvh() was never written, so listing it here
+            // fataled the create screen the moment DPLY_SERVER_PROVIDER_OVH was
+            // flipped on. OVH is COMING_SOON, so it falls to `default` (empty
+            // catalog + credentials) like gcp and every other unbuilt provider.
+            // Add the arm back together with the catalogOvh() implementation.
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
             'aws' => $this->catalogAws($credentials, $credential),
             'azure' => $this->catalogAzure($credentials, $credential, $selectedRegion),
             'oracle' => $this->catalogOracle($credentials, $credential),
             default => array_merge($empty, ['credentials' => $credentials]),
         };
+
+        $catalog['source'] = 'credential';
+
+        return $this->finalizeCatalog($catalog, $type);
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array<string, mixed>>, sizes: list<array<string, mixed>>, region_label: string, size_label: string, error?: string|null}|null
+     */
+    /**
+     * @param  array<string, mixed>  $catalog
+     * @return array<string, mixed>
+     */
+    private function finalizeCatalog(array $catalog, string $type): array
+    {
+        if (ProviderApiStatus::isUnreachable($type) || ProviderCatalogFailure::isUnreachable($catalog['error'] ?? null)) {
+            $catalog['provider_unreachable'] = true;
+            $catalog['error'] = ProviderCatalogFailure::sanitize($catalog['error'] ?? null, $type);
+        }
+
+        return $catalog;
+    }
+
+    private function catalogFromGlobalToken(string $type, Collection $credentials, string $selectedRegion): ?array
+    {
+        return match ($type) {
+            'digitalocean' => $this->platformToken('digitalocean') !== ''
+                ? $this->catalogDigitalOcean($credentials, null, $selectedRegion)
+                : null,
+            'vultr' => $this->platformToken('vultr') !== ''
+                ? $this->catalogVultr($credentials, null, $selectedRegion)
+                : null,
+            'linode' => $this->platformToken('linode') !== ''
+                ? $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'))
+                : null,
+            default => null,
+        };
+    }
+
+    private function platformToken(string $type): string
+    {
+        $candidates = match ($type) {
+            'digitalocean' => [
+                config('services.digitalocean.token'),
+                config('dply.digitalocean_token'),
+            ],
+            'vultr' => [config('services.vultr.token')],
+            'linode' => [config('services.linode.token')],
+            default => [],
+        };
+
+        foreach ($candidates as $token) {
+            $token = is_string($token) ? trim($token) : '';
+            if ($token !== '') {
+                return $token;
+            }
+        }
+
+        return '';
+    }
+
+    private function missingCatalogCredentialError(string $type, bool $wantedGlobalFallback): ?string
+    {
+        if (! $wantedGlobalFallback) {
+            return null;
+        }
+
+        $provider = match ($type) {
+            'digitalocean', 'digitalocean_kubernetes' => __('DigitalOcean'),
+            'vultr' => __('Vultr'),
+            'linode' => __('Linode'),
+            'hetzner' => __('Hetzner'),
+            default => $type,
+        };
+
+        return __('No :provider credential or platform catalog token is available.', ['provider' => $provider]);
     }
 
     /**
@@ -104,12 +215,13 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
-            $token = config('services.digitalocean.token');
+            $token = $this->platformToken('digitalocean');
             $do = match (true) {
                 $credential !== null => new DigitalOceanService($credential),
-                filled((string) $token) => new DigitalOceanService((string) $token),
+                $token !== '' => new DigitalOceanService($token),
                 default => throw new \RuntimeException('No DigitalOcean token for catalog.'),
             };
 
@@ -173,8 +285,12 @@ final class ResolveServerCreateCatalog
             }
 
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'digitalocean');
+        }
+
+        if ($sizes === [] && $error === null && $selectedRegion !== '') {
+            $error = __('DigitalOcean returned no droplet sizes for :region.', ['region' => $selectedRegion]);
         }
 
         return [
@@ -183,6 +299,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Droplet size'),
+            'error' => $error,
         ];
     }
 
@@ -206,9 +323,6 @@ final class ResolveServerCreateCatalog
 
             $rawClusters = $do->getKubernetesClusters();
             foreach ($rawClusters as $cluster) {
-                if (! is_array($cluster)) {
-                    continue;
-                }
                 $clusters[] = $cluster;
             }
 
@@ -324,6 +438,7 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
             $svc = new HetznerService($credential);
@@ -390,8 +505,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'hetzner');
         }
 
         return [
@@ -400,6 +515,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Location'),
             'size_label' => __('Server type'),
+            'error' => $error ?? null,
         ];
     }
 
@@ -456,11 +572,12 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         try {
-            $token = config('services.linode.token');
+            $token = $this->platformToken('linode');
             $svc = match (true) {
                 $credential !== null => new LinodeService($credential),
-                filled((string) $token) => new LinodeService((string) $token),
+                $token !== '' => new LinodeService($token),
                 default => throw new \RuntimeException('No Linode token for catalog.'),
             };
             foreach ($svc->getRegions() as $reg) {
@@ -493,8 +610,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'linode');
         }
 
         return [
@@ -503,6 +620,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => $regionLabel,
             'size_label' => $sizeLabel,
+            'error' => $error,
         ];
     }
 
@@ -514,12 +632,13 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         $sizes = [];
+        $error = null;
         $selectedRegion = trim($selectedRegion);
         try {
-            $token = config('services.vultr.token');
+            $token = $this->platformToken('vultr');
             $svc = match (true) {
                 $credential !== null => new VultrService($credential),
-                filled((string) $token) => new VultrService((string) $token),
+                $token !== '' => new VultrService($token),
                 default => throw new \RuntimeException('No Vultr token for catalog.'),
             };
             foreach ($svc->getRegions() as $reg) {
@@ -555,8 +674,8 @@ final class ResolveServerCreateCatalog
                 ];
             }
             $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
+        } catch (\Throwable $e) {
+            $error = ProviderCatalogFailure::sanitize($e->getMessage(), 'vultr');
         }
 
         return [
@@ -565,6 +684,7 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Plan'),
+            'error' => $error,
         ];
     }
 
@@ -637,23 +757,23 @@ final class ResolveServerCreateCatalog
             //
         }
         foreach ($awsRegions as $r) {
-            $v = (string) ($r['id'] ?? '');
+            $v = $r['id'];
             if ($v === '') {
                 continue;
             }
             $regions[] = [
                 'value' => $v,
-                'label' => (string) ($r['name'] ?? $v),
+                'label' => $r['name'],
             ];
         }
         foreach (AwsEc2Service::getInstanceTypes() as $s) {
-            $v = (string) ($s['id'] ?? '');
+            $v = $s['id'];
             if ($v === '') {
                 continue;
             }
             $sizes[] = [
                 'value' => $v,
-                'label' => (string) ($s['name'] ?? $v),
+                'label' => $s['name'],
                 'memory_mb' => $this->awsMemoryForInstanceType($v),
                 'vcpus' => $this->awsVcpusForInstanceType($v),
                 'disk_gb' => null,
@@ -677,14 +797,14 @@ final class ResolveServerCreateCatalog
     {
         $regions = [];
         foreach (OracleComputeService::defaultRegions() as $region) {
-            $id = (string) ($region['id'] ?? '');
+            $id = $region['id'];
             if ($id === '') {
                 continue;
             }
 
             $regions[] = [
                 'value' => $id,
-                'label' => (string) ($region['name'] ?? $id),
+                'label' => $region['name'],
             ];
         }
 
@@ -763,13 +883,13 @@ final class ResolveServerCreateCatalog
         try {
             $service = new AzureComputeService($credential);
             foreach ($service->listLocations() as $region) {
-                $id = (string) ($region['id'] ?? '');
+                $id = $region['id'];
                 if ($id === '') {
                     continue;
                 }
                 $regions[] = [
                     'value' => $id,
-                    'label' => (string) ($region['name'] ?? $id),
+                    'label' => $region['name'],
                 ];
             }
         } catch (\Throwable) {
@@ -830,22 +950,6 @@ final class ResolveServerCreateCatalog
             $value = data_get($row, $path);
             if (is_numeric($value)) {
                 return round((float) $value, 4);
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @param  array<string, mixed>  $row
-     * @param  list<string>  $paths
-     */
-    private function extractInt(array $row, array $paths): ?int
-    {
-        foreach ($paths as $path) {
-            $value = data_get($row, $path);
-            if (is_numeric($value)) {
-                return (int) $value;
             }
         }
 

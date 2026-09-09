@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DeployLogRedactor;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -13,24 +14,24 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $status
  * @property ?Carbon $started_at
  * @property ?Carbon $finished_at
- * @property string $exit_code
- * @property string $git_sha
- * @property string $idempotency_key
- * @property string $log_output
- * @property array<string, mixed> $phase_results
+ * @property ?string $exit_code
+ * @property ?string $git_sha
+ * @property ?string $idempotency_key
+ * @property ?string $log_output
+ * @property ?array<string, mixed> $phase_results
  * @property ?string $project_id
- * @property string $release_folder
+ * @property string|null $release_folder
  * @property ?string $resume_of_deployment_id
  * @property ?string $site_id
- * @property string $skip_reason
- * @property string $skip_rule_summary
+ * @property string|null $skip_reason
+ * @property string|null $skip_rule_summary
  * @property string $trigger
  * @property-read ?self $resumeOf
  * @property-read ?Site $site
  * @property-read ?Project $project
  * @property-read ?SiteDeploymentEphemeralCredential $ephemeralCredential
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SiteDeployment extends Model
 {
@@ -47,6 +48,9 @@ class SiteDeployment extends Model
     public const TRIGGER_SYNC_PEER = 'sync_peer';
 
     public const TRIGGER_SCHEDULE = 'schedule';
+
+    /** Control-plane poll found a new tip SHA on the deploy branch. */
+    public const TRIGGER_POLL = 'poll';
 
     public const TRIGGER_RESUME = 'resume';
 
@@ -72,6 +76,7 @@ class SiteDeployment extends Model
 
     protected $fillable = [
         'site_id',
+        'server_id',
         'project_id',
         'idempotency_key',
         'trigger',
@@ -134,6 +139,29 @@ class SiteDeployment extends Model
      *
      * @param  list<array<string, mixed>>  $results
      */
+    /**
+     * Persist the log accumulated so far, so a failure mid-deploy still has one.
+     *
+     * Both deployers build their log in a local variable and only the SUCCESS
+     * path ever wrote it to this row. Every "Deploy failed during the build
+     * phase. See the deployment log for details." therefore showed exactly that
+     * sentence and no log — the detail it points at was thrown away with the
+     * stack frame. Call this immediately before those throws.
+     *
+     * Redaction lives here rather than at the call sites so no future one can
+     * forget it and write credentials into the row.
+     */
+    public function recordPartialLog(string $log): void
+    {
+        $log = trim(DeployLogRedactor::redact($log));
+
+        if ($log === '') {
+            return;
+        }
+
+        $this->forceFill(['log_output' => $log])->save();
+    }
+
     public function recordPhaseResults(string $phase, array $results): void
     {
         $existing = $this->phase_results;
@@ -348,6 +376,12 @@ class SiteDeployment extends Model
     }
 
     /** @return BelongsTo<Site, $this> */
+    /** @return BelongsTo<Server, $this> */
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(Server::class);
+    }
+
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);

@@ -39,6 +39,8 @@ final class UptimeProbeRegionResolver
 
     public function forSite(Site $site): string
     {
+        $site->loadMissing('server');
+
         return $this->resolve($site->server?->region);
     }
 

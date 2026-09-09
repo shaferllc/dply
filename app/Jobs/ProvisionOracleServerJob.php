@@ -6,9 +6,10 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Modules\Cloud\Services\OracleComputeService;
+use App\Modules\Providers\Services\OracleComputeService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ProviderResourceTags;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -64,6 +65,7 @@ class ProvisionOracleServerJob implements ShouldQueue
                 availabilityDomain: $availabilityDomain,
                 shape: $shape,
                 sshPublicKey: $keys['recovery_public_key'],
+                freeformTags: ProviderResourceTags::labels($this->server),
             );
         } catch (Throwable $e) {
             $this->markFailed($this->humanizeApiError($e));

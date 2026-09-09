@@ -49,18 +49,15 @@ class LetsEncryptDnsCertificateEngine implements CertificateEngine
         }
 
         $credentialsPath = sprintf('/tmp/dply-certbot-%s.ini', $certificate->id);
-        $pluginCommand = match ($provider) {
-            'digitalocean' => sprintf(
-                'printf %s > %s && chmod 600 %s && certbot certonly --dns-digitalocean --dns-digitalocean-credentials %s %s --non-interactive --agree-tos -m %s 2>&1',
-                escapeshellarg("dns_digitalocean_token = {$token}\n"),
-                escapeshellarg($credentialsPath),
-                escapeshellarg($credentialsPath),
-                escapeshellarg($credentialsPath),
-                collect($domains)->map(fn (string $domain): string => '-d '.escapeshellarg($domain))->implode(' '),
-                escapeshellarg($email)
-            ),
-            default => throw new \RuntimeException('Unsupported DNS provider.'),
-        };
+        $pluginCommand = sprintf(
+            'printf %s > %s && chmod 600 %s && certbot certonly --dns-digitalocean --dns-digitalocean-credentials %s %s --non-interactive --agree-tos -m %s 2>&1',
+            escapeshellarg("dns_digitalocean_token = {$token}\n"),
+            escapeshellarg($credentialsPath),
+            escapeshellarg($credentialsPath),
+            escapeshellarg($credentialsPath),
+            collect($domains)->map(fn (string $domain): string => '-d '.escapeshellarg($domain))->implode(' '),
+            escapeshellarg($email)
+        );
 
         $certificate->forceFill([
             'status' => SiteCertificate::STATUS_PENDING,

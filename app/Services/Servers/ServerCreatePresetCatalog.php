@@ -30,9 +30,37 @@ namespace App\Services\Servers;
  *   database    — single engine (mysql84 / postgres17 / null)
  *   cache       — single engine (redis / valkey / null)
  *   featured    — boolean — true tiles bubble to the top of the picker
+ *   available   — boolean — false renders the tile as "Coming soon" and
+ *                 refuses to apply it (see {@see self::AVAILABLE_IDS})
  *
  * Custom is intentionally last and empty — the wizard's "I'll pick
  * everything myself" escape hatch.
+ *
+ * @phpstan-type ServerCreatePresetDefinition array{
+ *     id: string,
+ *     name: string,
+ *     description: string,
+ *     role: string,
+ *     webserver: ?string,
+ *     runtimes: array<string, string>,
+ *     php_version: ?string,
+ *     database: ?string,
+ *     cache: ?string,
+ *     featured: bool,
+ * }
+ * @phpstan-type ServerCreatePreset array{
+ *     id: string,
+ *     name: string,
+ *     description: string,
+ *     role: string,
+ *     webserver: ?string,
+ *     runtimes: array<string, string>,
+ *     php_version: ?string,
+ *     database: ?string,
+ *     cache: ?string,
+ *     featured: bool,
+ *     available: bool,
+ * }
  */
 final class ServerCreatePresetCatalog
 {
@@ -55,24 +83,57 @@ final class ServerCreatePresetCatalog
     public const ID_CUSTOM = 'custom';
 
     /**
-     * @return list<array{
-     *     id: string,
-     *     name: string,
-     *     description: string,
-     *     role: string,
-     *     webserver: ?string,
-     *     runtimes: array<string, string>,
-     *     php_version: ?string,
-     *     database: ?string,
-     *     cache: ?string,
-     *     featured: bool,
-     * }>
+     * Templates that fall back to being offered when nothing is configured.
+     *
+     * @var list<string>
      */
-    /** @return array<string, mixed> */
+    public const DEFAULT_AVAILABLE_IDS = [
+        self::ID_LARAVEL,
+        self::ID_RAILS,
+        self::ID_NEXTJS,
+        self::ID_DJANGO,
+        self::ID_POLYGLOT,
+        self::ID_WORDPRESS,
+        self::ID_STATIC,
+        self::ID_DATABASE,
+        self::ID_CUSTOM,
+    ];
+
     /**
-     * @return array<int, array<string, array<string, string>|bool|string|null>>
+     * Anything not on offer still renders — as a greyed "Coming soon" tile — so
+     * the roadmap stays visible, but cannot be picked.
+     *
+     * @see config/server_create.php — the single switch for all three wizard
+     *      coming-soon lists.
+     */
+    public function isAvailable(string $id): bool
+    {
+        $available = config('server_create.available_presets', self::DEFAULT_AVAILABLE_IDS);
+
+        return is_array($available) && in_array($id, $available, true);
+    }
+
+    /**
+     * The catalog, each entry stamped with its current availability.
+     *
+     * `available` is derived here rather than written into every literal below,
+     * so switching a template on or off is a one-line edit to AVAILABLE_IDS and
+     * cannot drift from what the tile says.
+     *
+     * @return list<ServerCreatePreset>
      */
     public function all(): array
+    {
+        return array_map(
+            fn (array $preset): array => $preset + ['available' => $this->isAvailable($preset['id'])],
+            $this->presets(),
+        );
+    }
+
+    /**
+     * @return list<ServerCreatePresetDefinition>
+     */
+    private function presets(): array
     {
         return [
             [
@@ -192,18 +253,7 @@ final class ServerCreatePresetCatalog
     }
 
     /**
-     * @return array<int, array<string, array<string, string>|bool|string|null>>
-     *     id: string,
-     *     name: string,
-     *     description: string,
-     *     role: string,
-     *     webserver: ?string,
-     *     runtimes: array<string, string>,
-     *     php_version: ?string,
-     *     database: ?string,
-     *     cache: ?string,
-     *     featured: bool,
-     * }|null
+     * @return ServerCreatePreset|null
      */
     public function find(string $id): ?array
     {
@@ -222,7 +272,6 @@ final class ServerCreatePresetCatalog
      *
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function toServerMeta(string $id): array
     {
         $preset = $this->find($id);

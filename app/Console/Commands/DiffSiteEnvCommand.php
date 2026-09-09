@@ -21,7 +21,7 @@ use Illuminate\Console\Command;
  *
  * Values are MASKED by default. --reveal prints cleartext.
  *
- * For runtimes without a server file (Docker / K8s / Serverless), the
+ * For runtimes without a server file (Docker / K8s ), the
  * cache IS the truth — the command exits 0 with `unsupported: true` in
  * the JSON payload so scripts can short-circuit.
  *

@@ -1,45 +1,30 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <x-breadcrumb-trail
-        :items="$settingsBreadcrumbs"
-        :site="$site"
-        doc-contextual
-        :contextual-doc-slug="$contextualDocSlug ?? null"
-        class="mb-6"
-    />
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Deployments'),
+        'currentIcon' => 'rocket-launch',
+        'contextualDocSlug' => $contextualDocSlug ?? null,
+    ])
 
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex flex-wrap items-start justify-between gap-4">
-                        <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Deployments') }}</h2>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Deploy, review history, and manage release settings.') }}
-                                </p>
-                            </div>
-                        </div>
-                        @if ($headerRoleLabel !== null)
-                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset {{ $headerRoleTone }}"
-                                  title="{{ __('Your access level for this :resource', ['resource' => strtolower($resourceNoun)]) }}">
-                                @if ($headerIsDeployer)
-                                    <x-heroicon-m-rocket-launch class="h-3 w-3" aria-hidden="true" />
-                                @elseif ($headerCanUpdateSite)
-                                    <x-heroicon-m-pencil-square class="h-3 w-3" aria-hidden="true" />
-                                @else
-                                    <x-heroicon-m-eye class="h-3 w-3" aria-hidden="true" />
-                                @endif
-                                {{ $headerRoleLabel }}
-                            </span>
-                        @endif
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    dense
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-rocket-launch"
+                    :title="__('Deployments')"
+                    :note="$isFunctionsDeployHub ?? false
+                        ? __('Deploy, sync related functions, and review history.')
+                        : __('Deploy, review history, and manage release settings.')"
+                >
+                    <x-slot:actions>
+                        @include('livewire.sites.partials.header-role-badge')
+                    </x-slot:actions>
+                </x-workspace-panel-head>
 
             <main class="min-w-0">
             @php $consoleRun = $this->activeConsoleRun(); @endphp
@@ -61,25 +46,8 @@
                 </div>
             @endif
 
-            <x-ops-copilot-callout :site="$site" />
-
-            @if ($site->server?->isDigitalOceanFunctionsHost())
-                {{-- Serverless deploy hub: the journey component owns redeploy +
-                     live watching, deploy-hooks is its own card below. The
-                     tabbed VM UI doesn't apply here. --}}
-                <livewire:serverless.journey
-                    :server="$server"
-                    :site="$site"
-                    :embedded="true"
-                    wire:key="deploy-journey-{{ $site->id }}"
-                />
-
-                <livewire:sites.deploy-hooks
-                    :site="$site"
-                    wire:key="deploy-hooks-{{ $site->id }}"
-                />
-            @elseif ($isVmDeployHub ?? false)
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+            @if ($isDeployHub ?? false)
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                 @include('livewire.sites.partials.deployments._tabstrip')
             </div>
 
@@ -96,7 +64,16 @@
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_REPOSITORY)
                         @include('livewire.sites.partials.deployments._repository-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_DEPLOY)
-                        @include('livewire.sites.partials.deployments._deploy-panel')
+                        @if ($isFunctionsDeployHub ?? false)
+                            <livewire:serverless.journey
+                                :server="$server"
+                                :site="$site"
+                                :embedded="true"
+                                wire:key="deploy-journey-{{ $site->id }}"
+                            />
+                        @else
+                            @include('livewire.sites.partials.deployments._deploy-panel')
+                        @endif
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SYNC)
                         @include('livewire.sites.partials.deployments._sync-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_ENVIRONMENT)
@@ -111,6 +88,10 @@
                         @include('livewire.sites.partials.deployments._pipeline-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_ROLLOUT)
                         @include('livewire.sites.partials.deployments._rollout-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_RELEASES && ($isFunctionsDeployHub ?? false))
+                        {{-- A function's releases are the host's stored
+                             revisions — same question, different substrate. --}}
+                        @livewire('serverless.rollback-panel', ['site' => $site], key('serverless-rollback-'.$site->id))
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_RELEASES && $atomicReleases)
                         @include('livewire.sites.partials.deployments._releases-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HISTORY)
@@ -119,8 +100,17 @@
                         @include('livewire.sites.partials.deployments._webhook-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HOOKS)
                         @include('livewire.sites.partials.deployments._hooks-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SCHEDULE)
+                        @include('livewire.sites.partials.deployments._schedule-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SETTINGS)
                         @include('livewire.sites.partials.deployments._settings-panel')
+                    @elseif ($isFunctionsDeployHub ?? false)
+                        <livewire:serverless.journey
+                            :server="$server"
+                            :site="$site"
+                            :embedded="true"
+                            wire:key="deploy-journey-fallback-{{ $site->id }}"
+                        />
                     @else
                         @include('livewire.sites.partials.deployments._deploy-panel')
                     @endif
@@ -133,14 +123,23 @@
             @endif
 
             <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
-                <x-cli-snippet :command="'dply sites:deployments '.$site->slug" />
+                <x-cli-snippet :commands="$isFunctionsDeployHub ?? false
+                    ? [
+                        ['label' => __('Deploy'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
+                        ['label' => __('List deployments'), 'command' => 'dply site deployments '.$site->slug],
+                    ]
+                    : [
+                        ['label' => __('Deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                        ['label' => __('List deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                        ['label' => __('List commits'), 'command' => 'dply sites:commits '.$site->slug],
+                    ]" />
             </div>
             </main>
             </section>
         </div>
     </div>
 
-    @if ($isVmDeployHub ?? false)
+    @if ($isDeployHub ?? false)
         @include('livewire.partials.confirm-action-modal')
     @endif
 </div>

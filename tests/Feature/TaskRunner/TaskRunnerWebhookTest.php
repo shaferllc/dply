@@ -236,3 +236,27 @@ test('webhook url uses dply public app url when configured', function () {
     expect($url)->toMatch('#^https?://tunnel\.example\.test/#');
     $this->assertStringContainsString('/webhook/task/update-output/'.$task->id, $url);
 });
+test('signed webhook accepts public app url signature when request host differs', function () {
+    Config::set('app.url', 'https://dply.test');
+    Config::set('dply.public_app_url', 'https://tunnel.example.test');
+
+    $task = Task::query()->create([
+        'name' => 'Tunnel host probe',
+        'action' => 'probe',
+        'status' => TaskStatus::Running,
+        'output' => null,
+    ]);
+
+    $url = $task->webhookUrl('updateOutput');
+    expect($url)->toMatch('#^https?://tunnel\.example\.test/#');
+
+    $path = (string) parse_url($url, PHP_URL_PATH);
+    $query = (string) parse_url($url, PHP_URL_QUERY);
+
+    $this->postJson($path.'?'.$query, ['output' => 'from droplet via tunnel'])
+        ->assertOk()
+        ->assertJson(['status' => 'success']);
+
+    $task->refresh();
+    $this->assertStringContainsString('from droplet via tunnel', (string) $task->output);
+});

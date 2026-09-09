@@ -4,6 +4,15 @@ namespace App\Models;
 
 use App\Jobs\SendNotificationChannelTestEmailJob;
 use App\Mail\NotificationChannelMail;
+use App\Modules\Notifications\Channels\Intercom\IntercomMessage;
+use App\Modules\Notifications\Channels\MicrosoftTeams\MicrosoftTeamsMessage;
+use App\Modules\Notifications\Channels\PagerDuty\PagerDutyMessage;
+use App\Modules\Notifications\Services\DiscordGuildClient;
+use App\Modules\Notifications\Services\IntercomClient;
+use App\Modules\Notifications\Services\MicrosoftTeamsClient;
+use App\Modules\Notifications\Services\PagerDutyClient;
+use App\Modules\Notifications\Services\SlackWorkspaceClient;
+use App\Modules\Notifications\Services\TelegramBotClient;
 use Database\Factories\NotificationChannelFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -35,11 +44,33 @@ class NotificationChannel extends Model
 
     public const TYPE_SLACK = 'slack';
 
+    /**
+     * Slack channels come in two shapes. `oauth` rides a {@see SlackInstallation}
+     * bot token and posts by channel id; anything else is the original pasted
+     * incoming-webhook URL. Stored in `config['auth']` — absent means webhook, so
+     * rows written before "Add to Slack" existed need no backfill.
+     */
+    public const SLACK_AUTH_OAUTH = 'oauth';
+
     public const TYPE_DISCORD = 'discord';
+
+    /**
+     * Discord's twin of {@see SLACK_AUTH_OAUTH}: `oauth` posts through the dply
+     * bot in a connected guild, anything else is a pasted webhook URL. Absent
+     * means webhook, so pre-existing rows need no backfill.
+     */
+    public const DISCORD_AUTH_OAUTH = 'oauth';
 
     public const TYPE_EMAIL = 'email';
 
     public const TYPE_TELEGRAM = 'telegram';
+
+    /**
+     * Telegram's twin of {@see SLACK_AUTH_OAUTH}: `connected` posts through the
+     * deployment bot into a chat discovered via the /start claim check; anything
+     * else is a hand-pasted bot token + chat ID. Absent means manual.
+     */
+    public const TELEGRAM_AUTH_CONNECTED = 'connected';
 
     public const TYPE_PUSHOVER = 'pushover';
 
@@ -50,6 +81,23 @@ class NotificationChannel extends Model
     public const TYPE_GOOGLE_CHAT = 'google_chat';
 
     public const TYPE_MOBILE_APP = 'mobile_app';
+
+    public const TYPE_INTERCOM = 'intercom';
+
+    /**
+     * Intercom recipient shapes, stored in `config['recipient_type']`. These map
+     * onto the `to` object of Intercom's POST /messages: a user by e-mail or id,
+     * a contact (lead) by id, or a bare address that Intercom resolves itself.
+     */
+    public const INTERCOM_TO_USER_EMAIL = 'user_email';
+
+    public const INTERCOM_TO_USER_ID = 'user_id';
+
+    public const INTERCOM_TO_CONTACT_ID = 'contact_id';
+
+    public const INTERCOM_TO_EMAIL = 'email';
+
+    public const TYPE_PAGERDUTY = 'pagerduty';
 
     public const TYPE_WEBHOOK = 'webhook';
 
@@ -66,8 +114,35 @@ class NotificationChannel extends Model
             self::TYPE_ROCKETCHAT,
             self::TYPE_GOOGLE_CHAT,
             self::TYPE_MOBILE_APP,
+            self::TYPE_INTERCOM,
+            self::TYPE_PAGERDUTY,
             self::TYPE_WEBHOOK,
         ];
+    }
+
+    /**
+     * Recipient shapes offered for {@see TYPE_INTERCOM}, in UI order.
+     *
+     * @return list<string>
+     */
+    public static function intercomRecipientTypes(): array
+    {
+        return [
+            self::INTERCOM_TO_USER_EMAIL,
+            self::INTERCOM_TO_USER_ID,
+            self::INTERCOM_TO_CONTACT_ID,
+            self::INTERCOM_TO_EMAIL,
+        ];
+    }
+
+    public static function labelForIntercomRecipientType(string $recipientType): string
+    {
+        return match ($recipientType) {
+            self::INTERCOM_TO_USER_ID => __('User ID'),
+            self::INTERCOM_TO_CONTACT_ID => __('Contact ID'),
+            self::INTERCOM_TO_EMAIL => __('E-mail address (lead or contact)'),
+            default => __('User e-mail address'),
+        };
     }
 
     /**
@@ -113,9 +188,102 @@ class NotificationChannel extends Model
             self::TYPE_ROCKETCHAT => 'Rocket.Chat',
             self::TYPE_GOOGLE_CHAT => 'Google Chat',
             self::TYPE_MOBILE_APP => __('Mobile app'),
+            self::TYPE_INTERCOM => 'Intercom',
+            self::TYPE_PAGERDUTY => 'PagerDuty',
             self::TYPE_WEBHOOK => __('HTTP webhook'),
             default => $type,
         };
+    }
+
+    /**
+     * Heroicon name per type, for the channel list.
+     *
+     * With ten types the text-only badge stopped being scannable — an operator
+     * looking for "the PagerDuty one" was reading every row. Deliberately drawn
+     * from the generic heroicon set rather than brand marks: we do not ship
+     * vendor logos, and a shape that says "this is a pager" carries the meaning.
+     */
+    public static function iconForType(string $type): string
+    {
+        return match ($type) {
+            self::TYPE_SLACK, self::TYPE_ROCKETCHAT => 'heroicon-o-chat-bubble-left-right',
+            self::TYPE_DISCORD => 'heroicon-o-chat-bubble-oval-left-ellipsis',
+            self::TYPE_EMAIL => 'heroicon-o-envelope',
+            self::TYPE_TELEGRAM => 'heroicon-o-paper-airplane',
+            self::TYPE_PUSHOVER, self::TYPE_MOBILE_APP => 'heroicon-o-device-phone-mobile',
+            self::TYPE_MICROSOFT_TEAMS, self::TYPE_GOOGLE_CHAT => 'heroicon-o-chat-bubble-left-ellipsis',
+            self::TYPE_INTERCOM => 'heroicon-o-lifebuoy',
+            self::TYPE_PAGERDUTY => 'heroicon-o-bell-alert',
+            default => 'heroicon-o-globe-alt',
+        };
+    }
+
+    /**
+     * Does this type page a human rather than post a message?
+     *
+     * Drives the "wakes on-call" marker in the UI. Two Slack channels differing
+     * only in label are a nuisance; a PagerDuty channel someone mistook for a
+     * chat channel is a 3am phone call.
+     */
+    public function isPaging(): bool
+    {
+        return $this->type === self::TYPE_PAGERDUTY;
+    }
+
+    /**
+     * One-line, non-secret summary of where this channel actually delivers.
+     *
+     * The list previously showed label + type only, so two Slack channels were
+     * indistinguishable without opening the edit form. Everything here is either
+     * already-public (a chat name, the destination address) or reduced to a host
+     * or a last-four — no token, key, or full webhook URL reaches the page.
+     */
+    public function describeDestination(): string
+    {
+        $cfg = $this->config;
+
+        return match ($this->type) {
+            self::TYPE_SLACK => $this->usesSlackOauth()
+                ? (string) ($this->slackInstallation()->team_name ?? __('Connected workspace'))
+                : self::describeWebhookHost($cfg['webhook_url'] ?? null),
+            self::TYPE_DISCORD => $this->usesDiscordOauth()
+                ? (string) ($this->discordInstallation()->guild_name ?? __('Connected server'))
+                : self::describeWebhookHost($cfg['webhook_url'] ?? null),
+            self::TYPE_EMAIL => (string) ($cfg['email'] ?? ''),
+            self::TYPE_TELEGRAM => $this->usesTelegramConnected()
+                ? (string) ($this->telegramInstallation()->chat_title ?? __('Connected chat'))
+                : __('Chat :id', ['id' => (string) ($cfg['chat_id'] ?? '—')]),
+            self::TYPE_PUSHOVER => __('User key …:tail', ['tail' => self::lastFour($cfg['user_key'] ?? null)]),
+            self::TYPE_MICROSOFT_TEAMS, self::TYPE_ROCKETCHAT, self::TYPE_GOOGLE_CHAT => self::describeWebhookHost($cfg['webhook_url'] ?? null),
+            self::TYPE_MOBILE_APP => __('Device (:platform)', ['platform' => (string) ($cfg['platform'] ?? '—')]),
+            self::TYPE_INTERCOM => trim(((string) ($cfg['recipient'] ?? '')).' · '.mb_strtoupper((string) ($cfg['region'] ?? 'us')), ' ·'),
+            self::TYPE_PAGERDUTY => __('Service key …:tail · :region', [
+                'tail' => self::lastFour($cfg['routing_key'] ?? null),
+                'region' => mb_strtoupper((string) ($cfg['region'] ?? 'us')),
+            ]),
+            self::TYPE_WEBHOOK => self::describeWebhookHost($cfg['url'] ?? null),
+            default => '',
+        };
+    }
+
+    /**
+     * Host only. A Slack/Discord incoming-webhook URL is a bearer credential —
+     * showing it in full would put it in screenshots and shoulder-surfing range.
+     */
+    private static function describeWebhookHost(mixed $url): string
+    {
+        if (! is_string($url) || $url === '') {
+            return __('Not set');
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) && $host !== '' ? $host : __('Custom endpoint');
+    }
+
+    private static function lastFour(mixed $value): string
+    {
+        return is_string($value) && $value !== '' ? mb_substr($value, -4) : '????';
     }
 
     protected $fillable = [
@@ -163,6 +331,8 @@ class NotificationChannel extends Model
             self::TYPE_ROCKETCHAT => $this->sendRocketchatTest($actorLabel),
             self::TYPE_GOOGLE_CHAT => $this->sendGoogleChatTest($actorLabel),
             self::TYPE_MOBILE_APP => $this->sendMobileAppTest($actorLabel),
+            self::TYPE_INTERCOM => $this->sendIntercomTest($actorLabel),
+            self::TYPE_PAGERDUTY => $this->sendPagerDutyTest($actorLabel),
             self::TYPE_WEBHOOK => $this->sendWebhookTest($actorLabel),
             default => ['ok' => false, 'message' => __('Unknown channel type.')],
         };
@@ -173,18 +343,22 @@ class NotificationChannel extends Model
      */
     protected function sendSlackTest(string $actorLabel): array
     {
+        $text = __(':app test notification (:label) from :actor', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        if ($this->usesSlackOauth()) {
+            return $this->postSlackViaBotToken($text);
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return ['ok' => false, 'message' => __('Slack webhook URL is missing.')];
         }
 
-        $payload = [
-            'text' => __(':app test notification (:label) from :actor', [
-                'app' => config('app.name'),
-                'label' => $this->label,
-                'actor' => $actorLabel,
-            ]),
-        ];
+        $payload = ['text' => $text];
 
         $channel = $this->config['channel'] ?? null;
         if (is_string($channel) && $channel !== '') {
@@ -204,23 +378,74 @@ class NotificationChannel extends Model
         return ['ok' => true, 'message' => __('Test message sent.')];
     }
 
+    /** Whether this Slack channel posts through a connected workspace's bot token. */
+    public function usesSlackOauth(): bool
+    {
+        return $this->type === self::TYPE_SLACK
+            && ($this->config['auth'] ?? null) === self::SLACK_AUTH_OAUTH;
+    }
+
+    /** The connected workspace behind an OAuth Slack channel, if it still exists. */
+    public function slackInstallation(): ?SlackInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return SlackInstallation::query()->find($id);
+    }
+
+    /**
+     * Post through the workspace bot token.
+     *
+     * The disconnected-workspace case gets its own message on purpose: it is the
+     * one failure an operator can fix themselves, and "Slack returned an error"
+     * would send them hunting through Slack's admin UI instead of clicking
+     * reconnect.
+     *
+     * @return array{ok: bool, message: string}
+     */
+    protected function postSlackViaBotToken(string $text): array
+    {
+        $installation = $this->slackInstallation();
+        if (! $installation instanceof SlackInstallation) {
+            return ['ok' => false, 'message' => __('The Slack workspace for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $channelId = $this->config['channel_id'] ?? null;
+        if (! is_string($channelId) || $channelId === '') {
+            return ['ok' => false, 'message' => __('No Slack channel is selected.')];
+        }
+
+        $result = SlackWorkspaceClient::for($installation)->postMessage($channelId, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => SlackWorkspaceClient::describeError($result['error'])];
+    }
+
     /**
      * @return array{ok: bool, message: string}
      */
     protected function sendDiscordTest(string $actorLabel): array
     {
+        $text = __('[:app] Test notification (:label) from :actor', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        if ($this->usesDiscordOauth()) {
+            return $this->postDiscordViaBot($text);
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return ['ok' => false, 'message' => __('Discord webhook URL is missing.')];
         }
 
-        $body = [
-            'content' => __('[:app] Test notification (:label) from :actor', [
-                'app' => config('app.name'),
-                'label' => $this->label,
-                'actor' => $actorLabel,
-            ]),
-        ];
+        $body = ['content' => $text];
 
         try {
             $response = Http::timeout(10)->asJson()->post($url, $body);
@@ -233,6 +458,45 @@ class NotificationChannel extends Model
         }
 
         return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /** Whether this Discord channel posts through the dply bot in a connected guild. */
+    public function usesDiscordOauth(): bool
+    {
+        return $this->type === self::TYPE_DISCORD
+            && ($this->config['auth'] ?? null) === self::DISCORD_AUTH_OAUTH;
+    }
+
+    /** The connected guild behind an OAuth Discord channel, if it still exists. */
+    public function discordInstallation(): ?DiscordInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return DiscordInstallation::query()->find($id);
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function postDiscordViaBot(string $text): array
+    {
+        if (! $this->discordInstallation() instanceof DiscordInstallation) {
+            return ['ok' => false, 'message' => __('The Discord server for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $channelId = $this->config['channel_id'] ?? null;
+        if (! is_string($channelId) || $channelId === '') {
+            return ['ok' => false, 'message' => __('No Discord channel is selected.')];
+        }
+
+        $result = DiscordGuildClient::make()->postMessage($channelId, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => DiscordGuildClient::describeError($result['error'])];
     }
 
     /**
@@ -263,17 +527,21 @@ class NotificationChannel extends Model
      */
     protected function sendTelegramTest(string $actorLabel): array
     {
-        $token = $this->config['bot_token'] ?? null;
-        $chatId = $this->config['chat_id'] ?? null;
-        if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
-            return ['ok' => false, 'message' => __('Telegram bot token and chat ID are required.')];
-        }
-
         $text = __('[:app] Test notification (:label) from :actor', [
             'app' => config('app.name'),
             'label' => $this->label,
             'actor' => $actorLabel,
         ]);
+
+        if ($this->usesTelegramConnected()) {
+            return $this->postTelegramViaBot($text);
+        }
+
+        $token = $this->config['bot_token'] ?? null;
+        $chatId = $this->config['chat_id'] ?? null;
+        if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
+            return ['ok' => false, 'message' => __('Telegram bot token and chat ID are required.')];
+        }
 
         $url = 'https://api.telegram.org/bot'.rawurlencode($token).'/sendMessage';
 
@@ -296,6 +564,41 @@ class NotificationChannel extends Model
         }
 
         return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /** Whether this Telegram channel posts through the deployment bot. */
+    public function usesTelegramConnected(): bool
+    {
+        return $this->type === self::TYPE_TELEGRAM
+            && ($this->config['auth'] ?? null) === self::TELEGRAM_AUTH_CONNECTED;
+    }
+
+    /** The connected chat behind a bot-backed Telegram channel, if it still exists. */
+    public function telegramInstallation(): ?TelegramInstallation
+    {
+        $id = $this->config['installation_id'] ?? null;
+        if (! is_string($id) || $id === '') {
+            return null;
+        }
+
+        return TelegramInstallation::query()->find($id);
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function postTelegramViaBot(string $text): array
+    {
+        $installation = $this->telegramInstallation();
+        if (! $installation instanceof TelegramInstallation) {
+            return ['ok' => false, 'message' => __('The Telegram chat for this channel was disconnected. Reconnect it in Notifications settings.')];
+        }
+
+        $result = TelegramBotClient::make()->sendMessage($installation->chat_id, $text);
+
+        return $result['ok']
+            ? ['ok' => true, 'message' => __('Test message sent.')]
+            : ['ok' => false, 'message' => TelegramBotClient::describeError($result['error'])];
     }
 
     /**
@@ -340,18 +643,61 @@ class NotificationChannel extends Model
     /**
      * @return array{ok: bool, message: string}
      */
+    /**
+     * Build the Teams Adaptive Card for this channel.
+     *
+     * Shared by the test button and real delivery, same as the Intercom and
+     * PagerDuty builders, so the two cannot drift.
+     */
+    public function microsoftTeamsMessageFor(string $subject, string $text = '', ?string $actionUrl = null, ?string $actionLabel = null): MicrosoftTeamsMessage
+    {
+        $message = MicrosoftTeamsMessage::create()
+            ->to((string) ($this->config['webhook_url'] ?? ''))
+            ->title($subject)
+            // Teams shows this in the activity feed and the toast, where the
+            // card body is not rendered at all.
+            ->summary($subject);
+
+        foreach (preg_split('/\R{2,}/', $text) ?: [] as $paragraph) {
+            $message->content(trim($paragraph));
+        }
+
+        if ($actionUrl !== null && $actionUrl !== '') {
+            $message->button($actionLabel ?: __('Open in Dply'), $actionUrl);
+        }
+
+        return $message;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
     protected function sendMicrosoftTeamsTest(string $actorLabel): array
     {
-        return $this->sendJsonTextWebhookTest(
-            $this->config['webhook_url'] ?? null,
-            __('[:app] Test notification (:label) from :actor', [
-                'app' => config('app.name'),
-                'label' => $this->label,
-                'actor' => $actorLabel,
-            ]),
-            __('Microsoft Teams webhook URL is missing.'),
-            'Microsoft Teams'
-        );
+        $url = $this->config['webhook_url'] ?? null;
+
+        if (! is_string($url) || $url === '') {
+            return ['ok' => false, 'message' => __('Microsoft Teams workflow URL is missing.')];
+        }
+
+        // Caught here as well as in the client so the operator gets the real
+        // explanation on the button they just pressed.
+        if (MicrosoftTeamsClient::isRetiredConnectorUrl($url)) {
+            return ['ok' => false, 'message' => MicrosoftTeamsClient::describeError('retired_connector')];
+        }
+
+        $message = $this->microsoftTeamsMessageFor(
+            __('Test notification from :app', ['app' => config('app.name')]),
+            __('Channel ":label", triggered by :actor.', ['label' => $this->label, 'actor' => $actorLabel]),
+        )->type('success');
+
+        $result = (new MicrosoftTeamsClient)->send($url, $message->toArray());
+
+        if (! $result['ok']) {
+            return ['ok' => false, 'message' => MicrosoftTeamsClient::describeError($result['error'])];
+        }
+
+        return ['ok' => true, 'message' => __('Test message sent.')];
     }
 
     /**
@@ -414,6 +760,185 @@ class NotificationChannel extends Model
     }
 
     /**
+     * Build the Intercom message for this channel from its encrypted config.
+     *
+     * Both the test button and real delivery come through here so the two can
+     * never drift — the failure mode we're avoiding is a channel that passes its
+     * test and then silently never delivers, which is what TYPE_MOBILE_APP does
+     * today by having a test arm and no delivery arm.
+     */
+    public function intercomMessageFor(string $body, ?string $subject = null): IntercomMessage
+    {
+        $cfg = $this->config;
+
+        $message = IntercomMessage::create($body)
+            ->token((string) ($cfg['access_token'] ?? ''))
+            ->region((string) ($cfg['region'] ?? 'us'))
+            ->from((string) ($cfg['admin_id'] ?? ''));
+
+        $recipient = (string) ($cfg['recipient'] ?? '');
+
+        match ($cfg['recipient_type'] ?? self::INTERCOM_TO_USER_EMAIL) {
+            self::INTERCOM_TO_USER_ID => $message->toUserId($recipient),
+            self::INTERCOM_TO_CONTACT_ID => $message->toContactId($recipient),
+            self::INTERCOM_TO_EMAIL => $message->toEmail($recipient),
+            default => $message->toUserEmail($recipient),
+        };
+
+        if (($cfg['message_type'] ?? IntercomMessage::TYPE_INAPP) === IntercomMessage::TYPE_EMAIL) {
+            // Intercom rejects an email message with no subject, so fall back to
+            // the configured one and then to the app name rather than 400.
+            $message->email()->subject(
+                $subject !== null && $subject !== ''
+                    ? $subject
+                    : (string) ($cfg['subject'] ?? config('app.name'))
+            );
+
+            $template = $cfg['template'] ?? IntercomMessage::TEMPLATE_PLAIN;
+            $template === IntercomMessage::TEMPLATE_PERSONAL ? $message->personal() : $message->plain();
+        } else {
+            // In-app messages sit unread until the contact next opens the
+            // Messenger unless the conversation is opened up front.
+            $message->inapp()->createConversationWithoutContactReply();
+        }
+
+        return $message;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function sendIntercomTest(string $actorLabel): array
+    {
+        $cfg = $this->config;
+        $token = $cfg['access_token'] ?? null;
+        $adminId = $cfg['admin_id'] ?? null;
+        $recipient = $cfg['recipient'] ?? null;
+
+        if (! is_string($token) || $token === '') {
+            return ['ok' => false, 'message' => __('Intercom access token is missing.')];
+        }
+
+        if (! is_string($adminId) || $adminId === '') {
+            return ['ok' => false, 'message' => __('Intercom admin ID is missing.')];
+        }
+
+        if (! is_string($recipient) || $recipient === '') {
+            return ['ok' => false, 'message' => __('Intercom recipient is missing.')];
+        }
+
+        $subject = __('Test from :app', ['app' => config('app.name')]);
+        $text = __(':app test notification for ":label", sent by :actor.', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        $message = $this->intercomMessageFor($text, $subject);
+
+        $result = IntercomClient::make($message->getToken(), $message->getRegion())
+            ->postMessage($message->toArray());
+
+        if (! $result['ok']) {
+            return ['ok' => false, 'message' => IntercomClient::describeError($result['error'])];
+        }
+
+        return ['ok' => true, 'message' => __('Test message sent.')];
+    }
+
+    /**
+     * Build the PagerDuty event for this channel.
+     *
+     * As with Intercom, the test button and real delivery share one builder so
+     * they cannot drift.
+     *
+     * @param  array<string, mixed>  $context  Optional severity / dedup_key / source
+     *                                         from the originating NotificationEvent.
+     */
+    public function pagerDutyMessageFor(string $summary, string $details = '', ?string $actionUrl = null, array $context = []): PagerDutyMessage
+    {
+        $cfg = $this->config;
+
+        $severity = isset($context['severity'])
+            ? PagerDutyMessage::severityFromEventSeverity((string) $context['severity'])
+            : (string) ($cfg['default_severity'] ?? PagerDutyMessage::SEVERITY_ERROR);
+
+        $message = PagerDutyMessage::create()
+            ->setRoutingKey((string) ($cfg['routing_key'] ?? ''))
+            ->region((string) ($cfg['region'] ?? 'us'))
+            ->setSummary($summary)
+            // Default source is the web node's hostname, which is never the
+            // thing that broke — prefer the resource the event is about.
+            ->setSource((string) ($context['source'] ?? $cfg['source'] ?? config('app.name')))
+            ->setSeverity($severity)
+            ->setTimestamp(now()->toIso8601String())
+            ->setClient((string) config('app.name'));
+
+        if (is_string($actionUrl) && $actionUrl !== '') {
+            $message->setClientUrl($actionUrl)->addLink($actionUrl, __('Open in Dply'));
+        }
+
+        // A stable dedup key is what turns a flapping server into one incident
+        // instead of a wall of them, and it is the handle a resolve event needs
+        // later. Without one PagerDuty mints a fresh incident per event.
+        if (isset($context['dedup_key']) && is_string($context['dedup_key']) && $context['dedup_key'] !== '') {
+            $message->setDedupKey($context['dedup_key']);
+        }
+
+        if (is_string($cfg['component'] ?? null) && $cfg['component'] !== '') {
+            $message->setComponent((string) $cfg['component']);
+        }
+
+        if (is_string($cfg['group'] ?? null) && $cfg['group'] !== '') {
+            $message->setGroup((string) $cfg['group']);
+        }
+
+        if (is_string($context['event_key'] ?? null) && $context['event_key'] !== '') {
+            $message->setClass((string) $context['event_key']);
+        }
+
+        if ($details !== '') {
+            $message->addCustomDetail('details', $details);
+        }
+
+        return $message;
+    }
+
+    /**
+     * @return array{ok: bool, message: string}
+     */
+    protected function sendPagerDutyTest(string $actorLabel): array
+    {
+        $routingKey = $this->config['routing_key'] ?? null;
+
+        if (! is_string($routingKey) || $routingKey === '') {
+            return ['ok' => false, 'message' => __('PagerDuty integration key is missing.')];
+        }
+
+        $summary = __(':app test alert for ":label", sent by :actor.', [
+            'app' => config('app.name'),
+            'label' => $this->label,
+            'actor' => $actorLabel,
+        ]);
+
+        // Deliberately `info`, whatever the channel's default severity is. A
+        // test should prove the wiring without waking whoever is on call.
+        $message = $this->pagerDutyMessageFor($summary, '', null, [
+            'severity' => PagerDutyMessage::SEVERITY_INFO,
+            'source' => config('app.name'),
+            'dedup_key' => 'dply-test:'.$this->id,
+        ]);
+
+        $result = PagerDutyClient::make($message->getRegion())->enqueue($message->toArray());
+
+        if (! $result['ok']) {
+            return ['ok' => false, 'message' => PagerDutyClient::describeError($result['error'])];
+        }
+
+        return ['ok' => true, 'message' => __('Test alert sent. It will show on the PagerDuty service as an info-level incident.')];
+    }
+
+    /**
      * @return array{ok: bool, message: string}
      */
     protected function sendMobileAppTest(string $actorLabel): array
@@ -466,8 +991,18 @@ class NotificationChannel extends Model
 
     /**
      * Deliver a short operational alert (insights, health, etc.) to this channel.
+     *
+     * @param  array<string, mixed>  $context  Optional metadata about the originating
+     *                                         event. Chat-shaped channels ignore it
+     *                                         entirely; PagerDuty needs it to set a
+     *                                         real severity and a stable dedup key, so
+     *                                         a flapping resource updates one incident
+     *                                         instead of opening dozens. Recognised
+     *                                         keys: severity, dedup_key, source,
+     *                                         event_key. Defaults to [] so the six
+     *                                         existing call sites are unaffected.
      */
-    public function sendOperationalMessage(string $subject, string $text, ?string $actionUrl = null, ?string $actionLabel = null): void
+    public function sendOperationalMessage(string $subject, string $text, ?string $actionUrl = null, ?string $actionLabel = null, array $context = []): void
     {
         $lines = array_filter([$subject, $text, $actionUrl && $actionLabel ? $actionLabel.': '.$actionUrl : $actionUrl]);
         $full = implode("\n\n", $lines);
@@ -482,6 +1017,8 @@ class NotificationChannel extends Model
                 self::TYPE_MICROSOFT_TEAMS => $this->deliverTeamsPlain($subject, $full),
                 self::TYPE_ROCKETCHAT => $this->deliverRocketchatPlain($full),
                 self::TYPE_GOOGLE_CHAT => $this->deliverGoogleChatPlain($full),
+                self::TYPE_INTERCOM => $this->deliverIntercomPlain($subject, $full),
+                self::TYPE_PAGERDUTY => $this->deliverPagerDutyAlert($subject, $text, $actionUrl, $context),
                 self::TYPE_WEBHOOK => $this->deliverWebhookInsight($subject, $text, $actionUrl),
                 default => null,
             };
@@ -496,6 +1033,18 @@ class NotificationChannel extends Model
 
     protected function deliverSlackPlain(string $text): void
     {
+        if ($this->usesSlackOauth()) {
+            $result = $this->postSlackViaBotToken($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.slack_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return;
@@ -512,6 +1061,18 @@ class NotificationChannel extends Model
 
     protected function deliverDiscordPlain(string $text): void
     {
+        if ($this->usesDiscordOauth()) {
+            $result = $this->postDiscordViaBot($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.discord_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $url = $this->config['webhook_url'] ?? null;
         if (! is_string($url) || $url === '') {
             return;
@@ -545,6 +1106,18 @@ class NotificationChannel extends Model
 
     protected function deliverTelegramPlain(string $text): void
     {
+        if ($this->usesTelegramConnected()) {
+            $result = $this->postTelegramViaBot($text);
+            if (! $result['ok']) {
+                Log::warning('notification_channel.telegram_post_failed', [
+                    'channel_id' => $this->id,
+                    'message' => $result['message'],
+                ]);
+            }
+
+            return;
+        }
+
         $token = $this->config['bot_token'] ?? null;
         $chatId = $this->config['chat_id'] ?? null;
         if (! is_string($token) || $token === '' || ! is_string($chatId) || $chatId === '') {
@@ -574,6 +1147,12 @@ class NotificationChannel extends Model
         ]);
     }
 
+    /**
+     * Was a MessageCard posted to an Office 365 connector. Microsoft retired
+     * connectors between 18 and 22 May 2026, so that payload and that URL both
+     * stopped working; this now posts an Adaptive Card to a Power Automate
+     * Workflows webhook.
+     */
     protected function deliverTeamsPlain(string $title, string $text): void
     {
         $url = $this->config['webhook_url'] ?? null;
@@ -581,13 +1160,17 @@ class NotificationChannel extends Model
             return;
         }
 
-        Http::timeout(10)->asJson()->post($url, [
-            '@type' => 'MessageCard',
-            '@context' => 'https://schema.org/extensions',
-            'summary' => $title,
-            'title' => $title,
-            'text' => $text,
-        ]);
+        $result = (new MicrosoftTeamsClient)->send(
+            $url,
+            $this->microsoftTeamsMessageFor($title, $text)->toArray()
+        );
+
+        if (! $result['ok']) {
+            Log::warning('notification_channel.microsoft_teams_post_failed', [
+                'channel_id' => $this->id,
+                'message' => MicrosoftTeamsClient::describeError($result['error']),
+            ]);
+        }
     }
 
     protected function deliverRocketchatPlain(string $text): void
@@ -608,6 +1191,96 @@ class NotificationChannel extends Model
         }
 
         Http::timeout(10)->asJson()->post($url, ['text' => $text]);
+    }
+
+    protected function deliverIntercomPlain(string $subject, string $text): void
+    {
+        $cfg = $this->config;
+        $token = $cfg['access_token'] ?? null;
+        $adminId = $cfg['admin_id'] ?? null;
+        $recipient = $cfg['recipient'] ?? null;
+
+        if (! is_string($token) || $token === ''
+            || ! is_string($adminId) || $adminId === ''
+            || ! is_string($recipient) || $recipient === '') {
+            return;
+        }
+
+        $message = $this->intercomMessageFor($text, $subject);
+
+        $result = IntercomClient::make($message->getToken(), $message->getRegion())
+            ->postMessage($message->toArray());
+
+        if (! $result['ok']) {
+            Log::warning('notification_channel.intercom_post_failed', [
+                'channel_id' => $this->id,
+                'message' => IntercomClient::describeError($result['error']),
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    protected function deliverPagerDutyAlert(string $subject, string $text, ?string $actionUrl, array $context = []): void
+    {
+        $routingKey = $this->config['routing_key'] ?? null;
+        if (! is_string($routingKey) || $routingKey === '') {
+            return;
+        }
+
+        $message = $this->pagerDutyMessageFor($subject, $text, $actionUrl, $context);
+        $result = PagerDutyClient::make($message->getRegion())->enqueue($message->toArray());
+
+        if (! $result['ok']) {
+            Log::warning('notification_channel.pagerduty_enqueue_failed', [
+                'channel_id' => $this->id,
+                'message' => PagerDutyClient::describeError($result['error']),
+            ]);
+        }
+    }
+
+    /**
+     * Close the incident a previous alert opened, matched on the same dedup key.
+     *
+     * Separate from sendOperationalMessage() because resolving is not "sending a
+     * message" — only PagerDuty has the concept, and callers must opt in when
+     * they actually know a condition cleared.
+     */
+    public function resolvePagerDutyAlert(string $dedupKey): void
+    {
+        if ($this->type !== self::TYPE_PAGERDUTY || $dedupKey === '') {
+            return;
+        }
+
+        $routingKey = $this->config['routing_key'] ?? null;
+        if (! is_string($routingKey) || $routingKey === '') {
+            return;
+        }
+
+        $message = PagerDutyMessage::create()
+            ->setRoutingKey($routingKey)
+            ->region((string) ($this->config['region'] ?? 'us'))
+            ->setDedupKey($dedupKey)
+            ->resolve();
+
+        try {
+            $result = PagerDutyClient::make($message->getRegion())->enqueue($message->toArray());
+        } catch (\Throwable $e) {
+            Log::warning('notification_channel.pagerduty_resolve_failed', [
+                'channel_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if (! $result['ok']) {
+            Log::warning('notification_channel.pagerduty_resolve_failed', [
+                'channel_id' => $this->id,
+                'message' => PagerDutyClient::describeError($result['error']),
+            ]);
+        }
     }
 
     protected function deliverWebhookInsight(string $subject, string $text, ?string $actionUrl): void

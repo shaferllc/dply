@@ -6,7 +6,7 @@
                 <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository & recipe') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Repository source, rollout strategy, pipeline steps, and hooks — the deploy recipe top to bottom. Deploy execution itself lives on the site overview.') }}</p>
             </div>
@@ -102,7 +102,7 @@
                         <span class="font-semibold text-brand-ink">{{ __('Detected') }}</span>
                         <span class="text-brand-moss">{{ str((string) ($functionsDetection['framework'] ?? 'unknown'))->replace('_', ' ')->title() }} · {{ str((string) ($functionsDetection['language'] ?? 'unknown'))->replace('_', ' ')->title() }}</span>
                     </div>
-                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
+                    <span class="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss ring-1 ring-brand-ink/10">
                         {{ strtoupper((string) ($functionsDetection['confidence'] ?? 'low')) }}
                     </span>
                 </div>
@@ -163,7 +163,7 @@
                 <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stages') }}</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stages') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline') }}</h3>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Lay out the deploy as pre, main, and post stages so custom steps stay visible around the core checkout and activation flow.') }}</p>
             </div>
@@ -181,20 +181,20 @@
                             <li class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2">
                                 <div class="flex flex-wrap items-start justify-between gap-3">
                                     <span class="flex flex-wrap items-center gap-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] {{ $step->phaseBadgeClass() }}">{{ $step->phase ?? 'build' }}</span>
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-[0.14em] {{ $step->phaseBadgeClass() }}">{{ $step->phase ?? 'build' }}</span>
                                         <span class="font-mono text-xs text-brand-ink">{{ $step->step_type }}</span>
                                         <span class="text-xs text-brand-moss">· {{ (int) ($step->timeout_seconds ?? 900) }}s</span>
                                         @if ($step->custom_command)
                                             <span class="text-brand-moss">— {{ \Illuminate\Support\Str::limit($step->custom_command, 60) }}</span>
                                         @endif
                                         @if ($step->managed_by_manifest)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-2xs font-semibold text-brand-moss ring-1 ring-brand-ink/10">
                                                 <x-heroicon-o-lock-closed class="h-3 w-3" aria-hidden="true" /> dply.yaml
                                             </span>
                                         @endif
                                     </span>
                                     @if ($step->managed_by_manifest)
-                                        <span class="text-[11px] text-brand-moss">{{ __('managed — edit in dply.yaml') }}</span>
+                                        <span class="text-xs text-brand-moss">{{ __('managed — edit in dply.yaml') }}</span>
                                     @else
                                         <span class="flex gap-3 text-xs">
                                             <button type="button" wire:click="openEditPipelineStep('{{ $step->id }}')" class="text-brand-forest hover:underline">{{ __('Edit') }}</button>
@@ -282,7 +282,7 @@
                     <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hooks') }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Hooks') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pipeline hooks') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                         {{ __('Shell scripts, HTTP webhooks, and notification channels live on the Pipeline timeline — before clone, after any build step, or after activate.') }}
@@ -323,9 +323,9 @@
                             <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activate') }}</p>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activate') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment method') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How each deploy lands the new release and moves traffic to it. Changing the method takes effect on the next deploy; the on-disk layout migrates automatically once that deploy succeeds.') }}</p>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How each deploy lands the new release and moves traffic to it. Enabling no-downtime converts the live checkout into releases/ before the method flips; disabling waits for the next deploy.') }}</p>
                         </div>
                     </div>
                 </div>
@@ -374,7 +374,7 @@
                                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Security') }}</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Security') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ephemeral deploy credentials') }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Issue a one-time SSH key for each deploy, sync it to the server for the rollout, then revoke it when the deploy finishes — success or failure.') }}</p>
                             </div>
@@ -535,27 +535,29 @@
         </dl>
     </details>
     </div>
+
+    <div class="space-y-2.5 border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-2.5 sm:px-6">
+        <x-cli-snippet
+            :summary="__('dply CLI (from your laptop)')"
+            :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"
+            :commands="[
+                ['label' => __('Link this repo'), 'command' => 'dply link --byo '.$site->id],
+                ['label' => __('Deploy (linked repo)'), 'command' => 'dply deploy --follow'],
+                ['label' => __('Deploy this site'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
+                ['label' => __('Tail deploy logs'), 'command' => 'dply site logs --site '.$site->id.' --follow'],
+                ['label' => __('Site status'), 'command' => 'dply site status --site '.$site->id],
+            ]"
+        />
+
+        <x-cli-snippet
+            :summary="__('Artisan (on the server)')"
+            :commands="[
+                ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+                ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
+                ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
+                ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
+                ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
+            ]"
+        />
+    </div>
 </section>
-
-<x-cli-snippet
-    class="mt-6"
-    :summary="__('dply CLI (from your laptop)')"
-    :intro="__('Run `dply link --byo :id` once in your repo root, commit `.dply/site.json`, then deploy with bare `dply deploy`. Re-login with `dply auth refresh` if scopes are missing.', ['id' => $site->id])"
-    :commands="[
-        ['label' => __('Link this repo'), 'command' => 'dply link --byo '.$site->id],
-        ['label' => __('Deploy (linked repo)'), 'command' => 'dply deploy --follow'],
-        ['label' => __('Deploy this site'), 'command' => 'dply site deploy --site '.$site->id.' --follow'],
-        ['label' => __('Tail deploy logs'), 'command' => 'dply site logs --site '.$site->id.' --follow'],
-        ['label' => __('Site status'), 'command' => 'dply site status --site '.$site->id],
-    ]"
-/>
-
-<x-cli-snippet
-    :summary="__('Artisan (on the server)')"
-    :commands="[
-    ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
-    ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
-    ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
-    ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
-    ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
-]" />

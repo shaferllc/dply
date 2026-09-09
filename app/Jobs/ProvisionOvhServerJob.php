@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
-use App\Modules\Cloud\Services\OvhService;
+use App\Modules\Providers\Services\OvhService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -50,6 +50,9 @@ class ProvisionOvhServerJob implements ShouldQueue
             $imageName = (string) config('services.ovh.default_image', 'Ubuntu 24.04');
             $imageId = $ovh->resolveImageId($project, $this->server->region, $imageName);
 
+            // No ProviderResourceTags here: OVH's public-cloud instance create
+            // takes no tags/labels of any kind, so the instance name is the only
+            // handle we get. Every other provider carries dply-<server id>.
             $id = $ovh->createInstance(
                 project: $project,
                 region: $this->server->region,

@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
 use App\Models\Server;
-use App\Modules\Cloud\Services\AzureComputeService;
+use App\Modules\Providers\Services\AzureComputeService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

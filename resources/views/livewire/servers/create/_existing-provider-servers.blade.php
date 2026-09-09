@@ -9,18 +9,13 @@
 
 @if ($existingProviderServers !== [])
     <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-map-pin class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Existing fleet') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where your servers are installed') }}</h3>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Servers already on this provider. Pick a nearby region or co-locate with an existing role.') }}
-                </p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-map-pin"
+            :title="__('Where your servers are installed')"
+            :note="__('Servers already on this provider. Pick a nearby region or co-locate with an existing role.')"
+            class="border-b border-brand-ink/10"
+        />
         <div class="divide-y divide-brand-ink/8">
             @foreach ($existingProviderServers as $server)
                 @php
@@ -36,15 +31,15 @@
                         >
                             {{ $server['name'] }}
                         </a>
-                        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-moss">
+                        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-brand-moss">
                             <span class="inline-flex items-center gap-1">
                                 <x-heroicon-o-map-pin class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                                 {{ $regionLabel }}
                                 @if ($regionValue !== '' && $regionLabel !== strtoupper($regionValue))
-                                    <span class="font-mono text-[10px] uppercase text-brand-mist">{{ $regionValue }}</span>
+                                    <span class="font-mono text-2xs uppercase text-brand-mist">{{ $regionValue }}</span>
                                 @endif
                             </span>
-                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink ring-1 ring-brand-ink/8">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 text-2xs font-medium text-brand-ink ring-1 ring-brand-ink/8">
                                 {{ $server['role_label'] }}
                             </span>
                             @if (($server['sites_count'] ?? 0) > 0)
@@ -56,7 +51,7 @@
                         </div>
                     </div>
                     <span @class([
-                        'inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        'inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                         'border-emerald-200 bg-emerald-50 text-emerald-700' => ($server['status'] ?? '') === 'ready',
                         'border-amber-200 bg-amber-50 text-amber-800' => in_array($server['status'] ?? '', ['pending', 'provisioning'], true),
                         'border-rose-200 bg-rose-50 text-rose-700' => in_array($server['status'] ?? '', ['error', 'disconnected'], true),

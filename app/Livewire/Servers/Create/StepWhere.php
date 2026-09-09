@@ -15,7 +15,10 @@ use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
-use App\Modules\Cloud\Services\DigitalOceanService;
+use App\Modules\Providers\Services\DigitalOceanService;
+use App\Modules\Providers\Services\VultrService;
+use App\Support\Providers\ProviderApiStatus;
+use App\Support\Providers\ProviderCatalogCache;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -40,6 +43,34 @@ class StepWhere extends Component
         ServerCreateActions::afterProviderCredentialStored insteadof ManagesProviderCredentials;
     }
 
+    /** Every host kind the wizard knows how to render, live or not. */
+    public const ALL_PROVIDER_HOST_KINDS = ['vm', 'docker', 'kubernetes'];
+
+    /**
+     * Host kinds on offer, from config/server_create.php. Anything switched off
+     * renders as a disabled "Coming soon" tile: the action refuses it,
+     * validation rejects it, and a draft that already carries one is pulled
+     * back to a plain VM.
+     *
+     * The Docker / Kubernetes wizard machinery behind them is untouched.
+     *
+     * @return list<string>
+     */
+    public static function availableProviderHostKinds(): array
+    {
+        $kinds = config('server_create.available_provider_host_kinds', self::ALL_PROVIDER_HOST_KINDS);
+
+        return is_array($kinds) ? array_values(array_filter(
+            self::ALL_PROVIDER_HOST_KINDS,
+            static fn (string $kind): bool => in_array($kind, $kinds, true),
+        )) : self::ALL_PROVIDER_HOST_KINDS;
+    }
+
+    public static function providerHostKindAvailable(string $kind): bool
+    {
+        return in_array($kind, self::availableProviderHostKinds(), true);
+    }
+
     public ServerCreateForm $form;
 
     public function mount(): mixed
@@ -51,6 +82,17 @@ class StepWhere extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
+
+        // A draft saved while Docker / Kubernetes were still on the menu would
+        // otherwise sit on a selection the step now refuses to validate.
+        if (! self::providerHostKindAvailable($this->form->provider_host_kind)) {
+            $this->form->provider_host_kind = 'vm';
+            if (in_array($this->form->type, ['digitalocean_kubernetes', 'aws_kubernetes'], true)) {
+                $this->form->type = '';
+                $this->active_provider = '';
+            }
+        }
+
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
             if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
@@ -144,7 +186,8 @@ class StepWhere extends Component
 
     public function chooseProviderHostKind(string $kind): void
     {
-        if (! in_array($kind, ['vm', 'docker', 'kubernetes'], true)) {
+        // Coming-soon kinds render disabled, but wire:click stays reachable.
+        if (! self::providerHostKindAvailable($kind)) {
             return;
         }
         $this->form->provider_host_kind = $kind;
@@ -226,13 +269,14 @@ class StepWhere extends Component
             && ($catalog['credentials'] instanceof Collection)
             && $catalog['credentials']->contains('id', $this->form->provider_credential_id);
 
-        $allowed = collect(
+        $allowed = collect($this->provisionOptionList(
             FilterServerProvisionOptionsForCreateForm::run(
                 $this->form->type,
                 $hasLinkedCredential,
                 $role,
-            )['server_roles'] ?? []
-        )->pluck('id')->all();
+            ),
+            'server_roles',
+        ))->pluck('id')->all();
 
         if ($allowed !== [] && ! in_array($role, $allowed, true)) {
             return;
@@ -249,8 +293,26 @@ class StepWhere extends Component
         $this->notifySizeRoleGuidance();
     }
 
+    public function retryProviderCatalog(): void
+    {
+        $type = $this->form->type !== '' ? $this->form->type : (string) $this->active_provider;
+        if ($type === '' || $type === 'custom') {
+            return;
+        }
+
+        ProviderApiStatus::forget($type);
+        ProviderCatalogCache::forgetProvider($type);
+        $this->memoServerCreateCatalog = null;
+        $this->memoServerCreateCatalogKey = null;
+        $this->memoListServerProviderCards = null;
+    }
+
     public function chooseProvider(string $provider): void
     {
+        if (ProviderApiStatus::isUnreachable($provider)) {
+            return;
+        }
+
         // For K8s the tile id is the bare provider name (digitalocean / aws)
         // but the form.type the wizard ultimately stores is the K8s-suffixed
         // variant — that's what StoreServerFromCreateForm dispatches on.
@@ -304,6 +366,38 @@ class StepWhere extends Component
         $this->form->do_vpcs_loading = false;
     }
 
+    public function loadVultrVpcs(): void
+    {
+        if ($this->form->type !== 'vultr' || $this->form->region === '' || $this->form->provider_credential_id === '') {
+            return;
+        }
+
+        $credential = ProviderCredential::query()->find($this->form->provider_credential_id);
+        if (! $credential || $credential->provider !== 'vultr') {
+            return;
+        }
+
+        $this->form->vultr_vpcs_loading = true;
+
+        try {
+            $vultr = new VultrService($credential);
+            $this->form->vultr_vpcs = array_map(
+                static fn (array $vpc): array => [
+                    'id' => $vpc['id'],
+                    'name' => $vpc['description'] !== '' ? $vpc['description'] : $vpc['id'],
+                    'ip_range' => $vpc['v4_subnet'] !== '' && $vpc['v4_subnet_mask'] > 0
+                        ? $vpc['v4_subnet'].'/'.$vpc['v4_subnet_mask']
+                        : '',
+                ],
+                $vultr->listVpcs($this->form->region),
+            );
+        } catch (\Throwable) {
+            $this->form->vultr_vpcs = [];
+        }
+
+        $this->form->vultr_vpcs_loading = false;
+    }
+
     #[On('personal-ssh-key-created')]
     public function refreshPersonalSshKeyState(): void
     {
@@ -344,7 +438,7 @@ class StepWhere extends Component
 
             $rules = [
                 'form.type' => ['required', 'string', 'max:64'],
-                'form.provider_host_kind' => ['required', Rule::in(['vm', 'docker', 'kubernetes'])],
+                'form.provider_host_kind' => ['required', Rule::in(self::availableProviderHostKinds())],
                 'form.provider_credential_id' => ['required', 'string'],
             ];
             $attributes = [
@@ -410,7 +504,7 @@ class StepWhere extends Component
 
         return array_values(array_filter(
             $cards,
-            fn (array $card): bool => in_array($card['id'] ?? '', ['digitalocean', 'aws'], true),
+            fn (array $card): bool => in_array($card['id'], ['digitalocean', 'aws'], true),
         ));
     }
 
@@ -419,7 +513,9 @@ class StepWhere extends Component
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
         $catalog = $context['catalog'];
-        $regionLabels = collect(is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [])
+        /** @var list<array<string, mixed>> $regions */
+        $regions = is_array($catalog['regions'] ?? null) ? array_values(array_filter($catalog['regions'], 'is_array')) : [];
+        $regionLabels = collect($regions)
             ->mapWithKeys(fn (array $region): array => [(string) ($region['value'] ?? '') => (string) ($region['label'] ?? '')])
             ->filter(fn (string $label, string $value): bool => $value !== '')
             ->all();
@@ -446,7 +542,7 @@ class StepWhere extends Component
 
         return view('livewire.servers.create.step-where', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
-            'reachedStep' => $this->currentDraft()?->step ?? 2,
+            'reachedStep' => ($draft = $this->currentDraft()) !== null ? $draft->step : 2,
             'catalog' => $catalog,
             'preflight' => $context['preflight'],
             'provisionOptions' => $context['provisionOptions'],
@@ -454,7 +550,7 @@ class StepWhere extends Component
             'hasLinkedCredential' => $context['hasLinkedCredential'],
             'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
-            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+            'selectedServerRole' => collect($this->provisionOptionList($context['provisionOptions'], 'server_roles'))
                 ->firstWhere('id', $this->form->server_role),
             'roleSizingTip' => $this->roleSizingTip($this->form->server_role),
             'existingProviderServers' => $existingProviderServers,

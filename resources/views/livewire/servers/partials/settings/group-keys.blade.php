@@ -65,56 +65,68 @@
 
 <section id="settings-group-keys" aria-labelledby="settings-group-keys-title">
     {{-- Outbound: provisioned key for Git/scripts --}}
-    <div id="settings-keys-outbound" class="{{ $card }} scroll-mt-24" x-data="{ copied: false, copiedFp: false }">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keys') }}</p>
-                        <h2 id="settings-group-keys-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outbound key (Git & scripts)') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Add this public key on Git hosts or other services that should trust outbound connections from this server. The matching private key never leaves Dply in plain form.') }}
-                        </p>
-                    </div>
-                    @if ($serverPubInfo)
-                        <div class="flex flex-wrap gap-1.5 text-xs">
-                            <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 font-medium text-brand-ink">
-                                {{ $typeLabels[$serverPubInfo['type']] ?? $serverPubInfo['type'] }}
-                            </span>
-                            @if ($serverPubInfo['comment'])
-                                <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-[11px] text-brand-moss">
-                                    {{ $serverPubInfo['comment'] }}
-                                </span>
-                            @endif
-                        </div>
+    <div
+        id="settings-keys-outbound"
+        class="{{ $card }} scroll-mt-24"
+        x-data="{
+            pubKey: {{ \Illuminate\Support\Js::from($serverPub ?? '') }},
+            fingerprint: {{ \Illuminate\Support\Js::from($serverPubFingerprint ?? '') }},
+            copiedPub: {{ \Illuminate\Support\Js::from(__('Public key copied to clipboard')) }},
+            copiedFingerprint: {{ \Illuminate\Support\Js::from(__('Fingerprint copied to clipboard')) }},
+            copyFailed: {{ \Illuminate\Support\Js::from(__('Could not copy to clipboard.')) }},
+            async copy(value, message) {
+                if (! value) { return; }
+                try {
+                    await navigator.clipboard.writeText(value);
+                    window.dispatchEvent(new CustomEvent('toast', { detail: { message, type: 'success' } }));
+                } catch {
+                    window.dispatchEvent(new CustomEvent('toast', { detail: { message: this.copyFailed, type: 'error' } }));
+                }
+            },
+        }"
+    >
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-key"
+            :title="__('Outbound key (Git & scripts)')"
+            :note="__('Add this public key on Git hosts or other services that should trust outbound connections from this server. The matching private key never leaves Dply in plain form.')"
+            title-id="settings-group-keys-title"
+            class="border-b border-brand-ink/10"
+        >
+            @if ($serverPubInfo)
+                <x-slot:actions>
+                    <span class="inline-flex items-center rounded-full border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-medium text-brand-ink">
+                        {{ $typeLabels[$serverPubInfo['type']] ?? $serverPubInfo['type'] }}
+                    </span>
+                    @if ($serverPubInfo['comment'])
+                        <span class="inline-flex items-center rounded-full border border-brand-ink/10 bg-brand-sand/30 px-2 py-0.5 font-mono text-xs text-brand-moss">
+                            {{ $serverPubInfo['comment'] }}
+                        </span>
                     @endif
-                </div>
-            </div>
-        </div>
+                </x-slot:actions>
+            @endif
+        </x-workspace-panel-head>
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
         @if ($serverPub)
             <div class="space-y-4">
                 <div>
                     <x-input-label value="{{ __('Public key (OpenSSH)') }}" />
-                    <div class="mt-1 flex gap-2">
+                    <div class="mt-1 flex items-start gap-2">
                         <textarea
                             readonly
                             rows="3"
                             aria-label="{{ __('Public key') }}"
                             class="min-h-[5rem] flex-1 resize-y rounded-lg border border-brand-ink/15 bg-brand-sand/20 px-3 py-2 font-mono text-xs text-brand-ink"
                         >{{ $serverPub }}</textarea>
-                        <button
+                        <x-secondary-button
                             type="button"
-                            class="h-10 shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
-                            x-on:click="navigator.clipboard.writeText(@js($serverPub)); copied = true; setTimeout(() => copied = false, 2000)"
+                            size="xs"
+                            class="shrink-0"
+                            x-on:click="copy(pubKey, copiedPub)"
                         >
-                            <span x-show="!copied">{{ __('Copy') }}</span>
-                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
-                        </button>
+                            {{ __('Copy') }}
+                        </x-secondary-button>
                     </div>
                 </div>
 
@@ -123,14 +135,14 @@
                         <x-input-label value="{{ __('Fingerprint (SHA-256)') }}" />
                         <div class="mt-1 flex items-center gap-2">
                             <code class="flex-1 truncate rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 font-mono text-xs text-brand-ink">{{ $serverPubFingerprint }}</code>
-                            <button
+                            <x-secondary-button
                                 type="button"
-                                class="h-10 shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
-                                x-on:click="navigator.clipboard.writeText(@js($serverPubFingerprint)); copiedFp = true; setTimeout(() => copiedFp = false, 2000)"
+                                size="xs"
+                                class="shrink-0"
+                                x-on:click="copy(fingerprint, copiedFingerprint)"
                             >
-                                <span x-show="!copiedFp">{{ __('Copy') }}</span>
-                                <span x-show="copiedFp" x-cloak>{{ __('Copied') }}</span>
-                            </button>
+                                {{ __('Copy') }}
+                            </x-secondary-button>
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Compare with the key shown when you authorize the server on a Git host.') }}</p>
                     </div>
@@ -166,31 +178,26 @@
 
     {{-- Inbound: how Dply connects in --}}
     <div id="settings-keys-inbound" class="{{ $card }} scroll-mt-24">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inbound') }}</p>
-                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How Dply connects in') }}</h3>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Dply stores two encrypted private keys for this server. Neither is downloadable. Public-key fingerprints are shown so you can verify them against your server’s authorized_keys.') }}
-                </p>
-            </div>
-        </div>
+        <x-workspace-panel-head
+            dense
+            icon="heroicon-o-shield-check"
+            :title="__('How Dply connects in')"
+            :note="__('Dply stores two encrypted private keys for this server. Neither is downloadable. Public-key fingerprints are shown so you can verify them against your server’s authorized_keys.')"
+            class="border-b border-brand-ink/10"
+        />
 
-        <div class="px-6 py-6 sm:px-7">
+        <div class="px-5 py-4 sm:px-6">
         <dl class="grid gap-4 sm:grid-cols-2">
             <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
                 <div class="flex items-center justify-between gap-2">
                     <dt class="text-sm font-semibold text-brand-ink">{{ __('Operational key') }}</dt>
                     @if ($operationalPub)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-medium text-brand-forest">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ __('Stored') }}
                         </span>
                     @else
-                        <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-800">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-red-600"></span>
                             {{ __('Missing') }}
                         </span>
@@ -198,7 +205,7 @@
                 </div>
                 <dd class="mt-1 text-xs text-brand-moss">{{ __('Used as :user for deploys and Manage actions.', ['user' => $server->ssh_user ?: 'deploy']) }}</dd>
                 @if ($operationalFp)
-                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-[11px] text-brand-ink" title="{{ $operationalFp }}">{{ $operationalFp }}</code>
+                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-xs text-brand-ink" title="{{ $operationalFp }}">{{ $operationalFp }}</code>
                 @endif
             </div>
 
@@ -206,19 +213,19 @@
                 <div class="flex items-center justify-between gap-2">
                     <dt class="text-sm font-semibold text-brand-ink">{{ __('Recovery key (root)') }}</dt>
                     @if ($recoveryPub)
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-[11px] font-medium text-brand-forest">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sage/15 px-2 py-0.5 text-xs font-medium text-brand-forest">
                             <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                             {{ __('Stored') }}
                         </span>
                     @else
-                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/10 px-2 py-0.5 text-[11px] font-medium text-brand-moss">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/10 px-2 py-0.5 text-xs font-medium text-brand-moss">
                             {{ __('Not configured') }}
                         </span>
                     @endif
                 </div>
                 <dd class="mt-1 text-xs text-brand-moss">{{ __('Hidden break-glass key used only when the operational key fails.') }}</dd>
                 @if ($recoveryFp)
-                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-[11px] text-brand-ink" title="{{ $recoveryFp }}">{{ $recoveryFp }}</code>
+                    <code class="mt-3 block truncate rounded-md border border-brand-ink/10 bg-brand-sand/20 px-2 py-1 font-mono text-xs text-brand-ink" title="{{ $recoveryFp }}">{{ $recoveryFp }}</code>
                 @endif
             </div>
         </dl>

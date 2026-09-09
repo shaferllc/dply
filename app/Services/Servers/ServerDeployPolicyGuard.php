@@ -17,7 +17,6 @@ final class ServerDeployPolicyGuard
     /**
      * @return array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
      */
-    /** @return array<string, mixed> */
     public function evaluateServer(Server $server, ?Carbon $at = null): array
     {
         $site = new Site(['server_id' => $server->id]);
@@ -29,7 +28,6 @@ final class ServerDeployPolicyGuard
     /**
      * @return array{allowed: bool, reason: ?string, rule_summary: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}
      */
-    /** @return array<string, mixed> */
     public function evaluate(Site $site, ?Carbon $at = null): array
     {
         $at ??= now();
@@ -110,7 +108,6 @@ final class ServerDeployPolicyGuard
      *     }>,
      * }
      */
-    /** @return array<string, mixed> */
     public function report(Server $server, ?Carbon $at = null): array
     {
         $at ??= now();
@@ -235,7 +232,7 @@ final class ServerDeployPolicyGuard
     }
 
     /**
-     * @param  array<string, mixed> $days
+     * @param  list<string> $days
      */
     public function formatDaysLabel(array $days): string
     {
@@ -265,8 +262,8 @@ final class ServerDeployPolicyGuard
     public function formatRuleSummary(array $rule): string
     {
         $days = ($rule['days'] );
-        $start = (string) ($rule['start'] ?? '');
-        $end = (string) ($rule['end'] ?? '');
+        $start = (string) $rule['start'];
+        $end = (string) $rule['end'];
 
         return $this->formatDaysLabel($days).' · '.$start.'–'.$end;
     }
@@ -274,7 +271,6 @@ final class ServerDeployPolicyGuard
     /**
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function policyForServer(Server $server): array
     {
         $meta = is_array($server->meta) ? $server->meta : [];
@@ -288,7 +284,6 @@ final class ServerDeployPolicyGuard
      * @param  array<string, mixed> $input
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function normalizePolicy(array $input): array
     {
         $defaults = $this->defaultPolicy();
@@ -306,10 +301,8 @@ final class ServerDeployPolicyGuard
     }
 
     /**
-     * @param  array<string, mixed> $input
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function defaultPolicy(): array
     {
         return [
@@ -322,10 +315,6 @@ final class ServerDeployPolicyGuard
 
     /**
      * @return list<array{days: list<string>, start: string, end: string}>
-     */
-    /** @return array<string, mixed> */
-    /**
-     * @return list<array<string, list<string>|string>>
      */
     public function weekendFreezePreset(): array
     {
@@ -382,7 +371,6 @@ final class ServerDeployPolicyGuard
 
     /**
      * @param  array<string, mixed> $policy
-     * @return list<array{id: string, site_name: string, finished_at: Carbon\Carbon|null, message: string, site_url: string}>
      */
     private function recentPolicySkips(Server $server, array $policy): array
     {

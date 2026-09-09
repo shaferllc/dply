@@ -35,7 +35,7 @@ class SiteDeployLayoutMigrator
         }
 
         $from = (string) ($armed['from'] ?? '');
-        $to = (string) ($armed['to'] ?? '');
+        $to = (string) $armed['to'];
         $base = rtrim($site->effectiveRepositoryPath(), '/');
         $archive = $base.'/.dply-layout-archive-'.$timestamp;
 
@@ -59,6 +59,16 @@ class SiteDeployLayoutMigrator
         $site->forceFill(['meta' => $meta])->save();
 
         return $log;
+    }
+
+    /**
+     * Archive leftover flat files at the site root after current is serving.
+     */
+    public function archiveLeftoverFlatRoot(SshConnection $ssh, string $base, string $timestamp): string
+    {
+        $archive = rtrim($base, '/').'/.dply-layout-archive-'.$timestamp;
+
+        return $this->flatToAtomic($ssh, $base, $archive).$this->pruneArchives($ssh, $base);
     }
 
     /**

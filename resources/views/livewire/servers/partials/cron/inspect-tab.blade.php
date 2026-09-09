@@ -1,17 +1,12 @@
 <div class="{{ $card }}">
-    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-        <x-icon-badge>
-            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inspect') }}</p>
-            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inspect crontab') }}</h2>
-            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                {{ __('Read-only: shows the real crontab file for that Linux user. Dply uses the SSH login user for “crontab -l”; other users need “sudo crontab -u … -l” (passwordless sudo).') }}
-            </p>
-        </div>
-    </div>
-    <div class="space-y-4 p-6 sm:p-8">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-command-line"
+        :title="__('Inspect crontab')"
+        :note="__('Read-only: shows the real crontab file for that Linux user. Dply uses the SSH login user for “crontab -l”; other users need “sudo crontab -u … -l” (passwordless sudo).')"
+        class="border-b border-brand-ink/10"
+    />
+    <div class="space-y-3 px-4 py-3.5 sm:px-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1">
                 <x-input-label for="inspect_crontab_user" value="{{ __('Linux user') }}" />

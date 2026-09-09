@@ -63,10 +63,7 @@ class OpenRestyEdgeConfigBuilder
         }
 
         foreach ($customUpstreams as $custom) {
-            if (! is_array($custom)) {
-                continue;
-            }
-            $name = trim((string) ($custom['name'] ?? ''));
+            $name = trim((string) $custom['name']);
             $servers = array_values(array_filter(
                 array_map('trim', (array) ($custom['servers'] ?? [])),
                 fn (string $s): bool => $s !== '',
@@ -78,10 +75,7 @@ class OpenRestyEdgeConfigBuilder
         }
 
         foreach ($customServers as $custom) {
-            if (! is_array($custom)) {
-                continue;
-            }
-            $name = trim((string) ($custom['name'] ?? ''));
+            $name = trim((string) $custom['name']);
             $upstream = trim((string) ($custom['upstream'] ?? ''));
             $serverNames = array_values(array_filter(
                 array_map('trim', (array) ($custom['server_names'] ?? [])),
@@ -148,7 +142,7 @@ NGINX;
     }
 
     /**
-     * @param  array<string, mixed> $servers
+     * @param  list<string> $servers
      */
     private function renderUpstream(string $name, array $servers): string
     {
@@ -168,7 +162,7 @@ NGINX;
     }
 
     /**
-     * @param  array<string, mixed> $serverNames
+     * @param  list<string> $serverNames
      */
     private function renderServerBlock(string $blockName, array $serverNames, int $listenPort, string $upstreamName): string
     {
@@ -216,7 +210,7 @@ NGINX;
     }
 
     /**
-     * @param  array<string, mixed> $serverNames
+     * @param  list<string> $serverNames
      * @return list<string>
      */
     private function serverNamesForPort(array $serverNames, int $listenPort): array
@@ -260,9 +254,7 @@ NGINX;
 
     private function basenameFor(Site $site): string
     {
-        return method_exists($site, 'webserverConfigBasename')
-            ? (string) $site->webserverConfigBasename()
-            : (string) $site->slug;
+        return (string) $site->webserverConfigBasename();
     }
 
     private function sanitize(string $s): string

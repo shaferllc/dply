@@ -49,7 +49,6 @@ class WebserverSmokeTestRunner
      *     truncated: bool,
      * }
      */
-    /** @return array<string, mixed> */
     public function run(Server $server, ?ConsoleEmitter $emitter = null): array
     {
         $emit = $emitter ?? new ConsoleEmitter(null);
@@ -147,7 +146,7 @@ class WebserverSmokeTestRunner
      * Errors get a 0 status and the curl --write-out catches `errormsg`
      * via a trailing pipe.
      *
-     * @param  array<string, mixed> $hostnames
+     * @param  list<string> $hostnames
      */
     private function buildCurlScript(array $hostnames): string
     {
@@ -191,7 +190,7 @@ BASH;
                 continue;
             }
             $parts = explode('|', $line);
-            $host = $parts[0] ?? '';
+            $host = $parts[0];
             $scheme = $parts[1] ?? '';
             if ($host === '' || ! in_array($scheme, ['http', 'https'], true)) {
                 continue;
@@ -280,28 +279,29 @@ BASH;
     {
         // dply's Site model exposes a `webserverHostnames()` array that the
         // per-site config builders already use. First entry is the primary.
-        if (method_exists($site, 'webserverHostnames')) {
-            try {
-                $names = $site->webserverHostnames();
-                if (($names) && $names !== []) {
-                    $first = (string) reset($names);
-                    if ($first !== '') {
-                        return $first;
-                    }
+        try {
+            $names = $site->webserverHostnames();
+            if ($names) {
+                $first = (string) reset($names);
+                if ($first !== '') {
+                    return $first;
                 }
-            } catch (\Throwable) {
-                // Fall through.
             }
+        } catch (\Throwable) {
+            // Fall through.
         }
 
         // Fallback: primary domain → first alias.
+        // ->hostname, not ->name: neither SiteDomain nor SiteDomainAlias has a
+        // `name` column, so this fallback resolved to '' and the smoke test lost
+        // its hostname entirely.
         $primary = $site->domains->first();
         if ($primary !== null) {
-            return (string) $primary->name;
+            return (string) $primary->hostname;
         }
         $alias = $site->domainAliases->first();
         if ($alias !== null) {
-            return (string) $alias->name;
+            return (string) $alias->hostname;
         }
 
         return null;

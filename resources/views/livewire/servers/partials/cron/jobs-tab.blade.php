@@ -1,108 +1,78 @@
-{{-- Slim trigger card — primary "Add cron job" + "Sync crontab" actions, status meta-row.
-     The big add/edit form is now in a modal triggered by the button below. --}}
-<div class="{{ $card }} overflow-hidden">
-    <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <x-icon-badge>
-                <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Jobs') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron jobs') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Stored in Dply, written to the server\'s crontab as a single Dply-managed block on each sync.') }}
-                </p>
-                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                    <span class="inline-flex items-center gap-1">
-                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                        {{ trans_choice('{0} no jobs tracked|{1} :count job tracked|[2,*] :count jobs tracked', $cronJobCount, ['count' => $cronJobCount]) }}
-                        @if ($enabledCronJobCount !== $cronJobCount && $cronJobCount > 0)
-                            ({{ __(':count enabled', ['count' => $enabledCronJobCount]) }})
-                        @endif
-                    </span>
-                    @if ($unsyncedCronCount > 0)
-                        <span class="text-brand-mist/60">·</span>
-                        <span class="inline-flex items-center gap-1 text-amber-700">
-                            <x-heroicon-o-exclamation-triangle class="h-3 w-3" />
-                            {{ trans_choice('{1} :count unsynced change|[2,*] :count unsynced changes', $unsyncedCronCount, ['count' => $unsyncedCronCount]) }}
-                        </span>
-                    @elseif ($latestCronSync)
-                        <span class="text-brand-mist/60">·</span>
-                        <span class="inline-flex items-center gap-1">
-                            <x-heroicon-o-check-circle class="h-3 w-3 text-emerald-600" />
-                            {{ __('synced :time', ['time' => \Illuminate\Support\Carbon::parse($latestCronSync)->diffForHumans()]) }}
-                        </span>
-                    @else
-                        <span class="text-brand-mist/60">·</span>
-                        <span>{{ __('not yet synced') }}</span>
-                    @endif
-                </div>
-            </div>
-        </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
+{{-- One dense head for the whole tab. This used to be two stacked headers — a
+     "JOBS / Cron jobs" trigger card carrying the buttons and a status meta-row,
+     then a second "Scheduled jobs" header directly above the same list. They
+     described the same thing, so the count is the pill, the sync state is the
+     note, and the two actions ride the actions slot. --}}
+@php
+    $cronSyncNote = match (true) {
+        $unsyncedCronCount > 0 => trans_choice('{1} :count unsynced change.|[2,*] :count unsynced changes.', $unsyncedCronCount, ['count' => $unsyncedCronCount]),
+        (bool) $latestCronSync => __('Synced :time.', ['time' => \Illuminate\Support\Carbon::parse($latestCronSync)->diffForHumans()]),
+        default => __('Not yet synced.'),
+    };
+
+    $cronCountLabel = trans_choice('{0} no jobs|{1} :count job|[2,*] :count jobs', $cronJobCount, ['count' => $cronJobCount]);
+    if ($cronJobCount > 0 && $enabledCronJobCount !== $cronJobCount) {
+        $cronCountLabel .= ' · '.__(':count on', ['count' => $enabledCronJobCount]);
+    }
+@endphp
+
+<div class="{{ $card }}">
+    <x-workspace-panel-head
+        dense
+        icon="heroicon-o-calendar-days"
+        :title="__('Cron jobs')"
+        :count="$cronCountLabel"
+        :note="$cronSyncNote.' '.__('Stored in Dply, written to the server\'s crontab as a single Dply-managed block on each sync.')"
+        :tone="$unsyncedCronCount > 0 ? 'amber' : null"
+        class="border-b border-brand-ink/10"
+    >
+        <x-slot:actions>
             <button
                 type="button"
                 x-on:click="$wire.cancelEdit(); $dispatch('open-modal', 'add-cron-job-modal')"
-                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
             >
-                <x-heroicon-o-plus class="h-4 w-4" />
+                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 {{ __('Add cron job') }}
             </button>
-            <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
             <button
                 type="button"
                 wire:click="syncCronJobs"
                 wire:loading.attr="disabled"
                 wire:target="syncCronJobs"
-                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
-                <x-heroicon-o-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-4 w-4" />
-                <span wire:loading wire:target="syncCronJobs" class="inline-flex h-4 w-4 items-center justify-center">
+                <x-heroicon-m-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span wire:loading wire:target="syncCronJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center">
                     <x-spinner variant="forest" size="sm" />
                 </span>
                 <span wire:loading.remove wire:target="syncCronJobs">{{ __('Sync crontab') }}</span>
                 <span wire:loading wire:target="syncCronJobs">{{ __('Syncing…') }}</span>
             </button>
-        </div>
-    </div>
-</div>
+        </x-slot:actions>
+    </x-workspace-panel-head>
 
-{{-- Add / Edit cron job modal. Triggered by the "Add cron job" button on the trigger
-     card and by the per-row Edit button (which sets editing_job_id first, then opens
-     this modal). Closes on successful saveCronJob. --}}
-<div class="{{ $card }}">
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
-                <x-heroicon-o-list-bullet class="h-5 w-5" />
-            </span>
-            <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Scheduled jobs') }}</h2>
-                <p class="mt-0.5 text-sm text-brand-moss">
-                    {{ __('Sync after changes so the Dply-managed crontab block is updated on the server.') }}
-                </p>
-            </div>
-        </div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+    <div class="flex flex-col gap-2 border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
+        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div class="min-w-0 flex-1">
                 <x-input-label for="cron_job_search" value="{{ __('Search jobs') }}" class="sr-only" />
                 <input
                     id="cron_job_search"
                     type="search"
                     wire:model.live.debounce.300ms="cron_job_search"
-                    class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm placeholder:text-brand-mist"
+                    class="block h-8 w-full rounded-lg border border-brand-ink/15 bg-white px-3 text-xs text-brand-ink shadow-sm placeholder:text-brand-mist"
                     placeholder="{{ __('Filter by command or description…') }}"
                 />
             </div>
             @if ($contextSiteModel)
-                <fieldset class="flex flex-wrap items-center gap-3 text-sm">
+                <fieldset class="flex flex-wrap items-center gap-2.5 text-xs">
                     <legend class="sr-only">{{ __('Job list scope') }}</legend>
                     <span class="text-brand-moss">{{ __('Show') }}</span>
-                    <label class="inline-flex cursor-pointer items-center gap-2">
+                    <label class="inline-flex cursor-pointer items-center gap-1.5">
                         <input type="radio" wire:model.live="cron_list_scope" value="site" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
                         <span class="text-brand-ink">{{ __('This site only') }}</span>
                     </label>
-                    <label class="inline-flex cursor-pointer items-center gap-2">
+                    <label class="inline-flex cursor-pointer items-center gap-1.5">
                         <input type="radio" wire:model.live="cron_list_scope" value="all" class="rounded-full border-brand-mist text-brand-ink focus:ring-brand-sage" />
                         <span class="text-brand-ink">{{ __('All jobs on server') }}</span>
                     </label>
@@ -110,7 +80,7 @@
             @endif
         </div>
         @if ($contextSiteModel && $cron_list_scope === 'site')
-            <p class="mt-2 text-xs text-brand-moss">{{ __('Showing jobs attached to :name.', ['name' => $contextSiteModel->name]) }}</p>
+            <p class="text-xs text-brand-moss">{{ __('Showing jobs attached to :name.', ['name' => $contextSiteModel->name]) }}</p>
         @endif
     </div>
     @if (! empty($invalidExpressionJobs))
@@ -131,7 +101,7 @@
                     <ul class="mt-2 space-y-1">
                         @foreach ($invalidExpressionJobs as $bad)
                             <li class="flex flex-wrap items-center gap-2">
-                                <span class="rounded-md bg-white px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-rose-200">{{ $bad['cron_expression'] === '' ? __('(empty)') : $bad['cron_expression'] }}</span>
+                                <span class="rounded-md bg-white px-1.5 py-0.5 font-mono text-xs font-semibold text-rose-800 ring-1 ring-rose-200">{{ $bad['cron_expression'] === '' ? __('(empty)') : $bad['cron_expression'] }}</span>
                                 <span class="truncate text-xs text-rose-900/90">
                                     {{ $bad['description'] !== '' ? $bad['description'] : \Illuminate\Support\Str::limit($bad['command'], 60) }}
                                 </span>
@@ -139,7 +109,7 @@
                                     type="button"
                                     wire:click="startEdit('{{ $bad['id'] }}')"
                                     x-on:click="$dispatch('open-modal', 'add-cron-job-modal')"
-                                    class="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-rose-800 hover:bg-rose-100"
+                                    class="ml-auto inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2 py-0.5 text-xs font-semibold text-rose-800 hover:bg-rose-100"
                                 >
                                     <x-heroicon-o-pencil-square class="h-3 w-3" />
                                     {{ __('Edit') }}
@@ -194,51 +164,51 @@
                             {{-- schedule chip — flips to a rose pill when crontab would reject the expression --}}
                             @if ($hasInvalidExpression)
                                 <x-tooltip :label="__('crontab will reject this expression — click Edit to fix it')">
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-rose-200">
+                                    <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-rose-800 ring-1 ring-rose-200">
                                         <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
                                         {{ $cj->cron_expression === '' ? __('(empty)') : $cj->cron_expression }}
                                     </span>
                                 </x-tooltip>
                             @else
-                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sand/50 px-1.5 py-0.5 font-mono text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                     <x-heroicon-m-clock class="h-3 w-3 text-brand-moss" />
                                     {{ $cj->cron_expression }}
                                 </span>
                             @endif
                             @if ($cronDesc = $cj->cronDescription())
-                                <span class="text-[11px] text-brand-ink/50">{{ $cronDesc }}</span>
+                                <span class="text-xs text-brand-ink/50">{{ $cronDesc }}</span>
                             @endif
                             {{-- user chip --}}
-                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
+                            <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-xs text-brand-ink/80 ring-1 ring-brand-ink/10">
                                 <x-heroicon-m-user class="h-3 w-3 text-brand-moss" />
                                 {{ $cj->user }}
                             </span>
                             @if (! $cj->enabled)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
                                     <x-heroicon-m-pause class="h-3 w-3" />
                                     {{ __('Paused') }}
                                 </span>
                             @endif
                             @if (! $cj->is_synced && ! $cj->system_managed)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[11px] font-medium text-sky-800 ring-1 ring-sky-200" title="{{ __('Pending changes — sync the crontab.') }}">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-800 ring-1 ring-sky-200" title="{{ __('Pending changes — sync the crontab.') }}">
                                     <x-heroicon-m-arrow-path class="h-3 w-3" />
                                     {{ __('Unsynced') }}
                                 </span>
                             @endif
                             @if ($cj->system_managed)
-                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-[11px] font-medium text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-xs font-medium text-brand-forest ring-1 ring-brand-sage/30" title="{{ __('Auto-installed by Dply (read-only).') }}">
                                     <x-heroicon-m-shield-check class="h-3 w-3" />
                                     {{ __('Managed') }}
                                 </span>
                             @endif
                         </div>
 
-                        <p class="mt-1 truncate font-mono text-[11px] leading-relaxed text-brand-moss" title="{{ $cj->command }}">
+                        <p class="mt-1 truncate font-mono text-xs leading-relaxed text-brand-moss" title="{{ $cj->command }}">
                             {{ $cj->command }}
                         </p>
 
                         @if ($siteLabel || ($cj->depends_on_job_id && $cj->dependsOn) || ($cj->last_sync_error && ! $cj->is_synced))
-                            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                            <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-brand-mist">
                                 @if ($siteLabel)
                                     <span class="inline-flex items-center gap-1">
                                         <x-heroicon-m-globe-alt class="h-3 w-3" />

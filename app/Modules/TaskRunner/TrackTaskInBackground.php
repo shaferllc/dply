@@ -252,7 +252,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      * Get the callback data to send with the request.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getCallbackData(): array
     {
         $taskModel = $this->actualTask->getTaskModel();
@@ -274,7 +273,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      * Get the callback headers to send with the request.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getCallbackHeaders(): array
     {
         return [
@@ -323,7 +321,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      * Get the callback retry configuration.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getCallbackRetryConfig(): array
     {
         return [
@@ -396,7 +393,6 @@ class TrackTaskInBackground extends Task implements HasCallbacks
      * Get task information for monitoring and management.
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     public function getTaskInfo(): array
     {
         $taskModel = $this->actualTask->getTaskModel();

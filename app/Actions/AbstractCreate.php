@@ -98,6 +98,19 @@ use Illuminate\Support\Str;
  * - `getBroadcastChannel(...$arguments)` - Configure broadcast channel
  * - `getBroadcastEventName()` - Configure broadcast event name
  * - `getBroadcastPayload($result, array $arguments)` - Customize broadcast payload
+ *
+ * Subclasses define handle() with their own domain signature, so it cannot be
+ * declared `abstract` here (not contravariant with a variadic parent). The tag
+ * states the contract the As* traits call through; a real handle() overrides it.
+ *
+ * @method mixed handle(mixed ...$arguments)
+ *
+ * @phpstan-consistent-constructor
+ *   The As* traits construct actions late-bound — AsEvent does
+ *   `new static(...$arguments)`, AsResource `new static($item)`. The
+ *   constructor comes from AsDependent and is variadic, so every subclass
+ *   shares it; declaring that makes the late-bound construction safe
+ *   instead of unchecked, and PHPStan now enforces the consistency.
  */
 #[TransactionAttempts(1)]
 #[WatermarkMode('append')]

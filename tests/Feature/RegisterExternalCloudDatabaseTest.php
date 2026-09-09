@@ -12,7 +12,7 @@ use App\Models\User;
 use App\Modules\Cloud\Actions\ApplyCloudSiteExtras;
 use App\Modules\Cloud\Actions\CreateCloudSite;
 use App\Modules\Cloud\Actions\RegisterExternalCloudDatabase;
-use App\Modules\Cloud\Jobs\TeardownCloudDatabaseJob;
+use App\Modules\Database\Jobs\TeardownCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;

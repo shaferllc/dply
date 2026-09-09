@@ -7,6 +7,8 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
 use App\Modules\Deploy\Services\DeployPhaseRunner;
+use App\Modules\Deploy\Services\SiteDeployPipelineManager;
+use App\Support\Redis\RedisConnectionTls;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
@@ -31,7 +33,6 @@ class SiteDeployPipelineRunner
     /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function run(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         $build = $this->runBuild($ssh, $site, $workingDirectory);
@@ -51,7 +52,6 @@ class SiteDeployPipelineRunner
      *                                                                   so the caller can persist live progress for the phase timeline.
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_BUILD, $onProgress);
@@ -61,7 +61,6 @@ class SiteDeployPipelineRunner
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runRelease(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RELEASE, $onProgress);
@@ -74,7 +73,86 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
+    /**
+     * Detached, drain-aware Horizon restart — the only safe way to bounce
+     * Horizon from a deploy that Horizon itself is running.
+     *
+     * Terminating inline makes the master exit and systemd (KillMode=mixed)
+     * reap the cgroup, SIGKILLing every in-flight deploy worker: this deploy
+     * and any concurrent customer deploy. setsid detaches from both the SSH
+     * session and the Horizon cgroup so the restarter survives what it triggers.
+     *
+     * Falls back to an inline terminate only when the drain command is not on
+     * the box yet — the deploy that first ships it is still running old code.
+     *
+     * @see \App\Console\Commands\SelfHorizonRestartCommand
+     */
+    protected function selfDeployHorizonRestartShell(): string
+    {
+        return 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
+            .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
+            .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
+            .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
+            .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
+            .'php artisan horizon:terminate 2>&1 || true; '
+            .'fi';
+    }
+
+    /**
+     * Apply the self-deploy Horizon guard to a USER-authored pipeline command.
+     *
+     * dply's own managed restart has been guarded for a while, but an operator
+     * who types `php artisan horizon:terminate` into a site's Restart block
+     * bypassed all of it and silently re-armed the footgun: on a self-deploy
+     * that command kills the worker mid-deploy, and whether the deploy is
+     * recorded as success or failure becomes a race against the shutdown
+     * grace period. That shows up as an intermittent, unexplained
+     * "Deploy failed during the restart phase".
+     *
+     * A command that is EXACTLY a horizon:terminate call is rewritten to the
+     * detached restart. A compound command that merely contains one is left
+     * alone and warned about — silently rewriting half of someone's `&&` chain
+     * would be a worse surprise than the one being fixed.
+     */
+    protected function guardSelfDeployHorizonTerminate(Site $site, string $cmd, string &$log): string
+    {
+        if (! str_contains($cmd, 'horizon:terminate')) {
+            return $cmd;
+        }
+
+        $server = $site->server;
+        if ($server === null || ! $server->isLocalDeployHost()) {
+            return $cmd;
+        }
+
+        if (preg_match('/^\s*(?:php\s+)?artisan\s+horizon:terminate\s*$/', $cmd) === 1) {
+            $log .= "[dply] self-deploy: rewrote `horizon:terminate` to the detached drain-aware restart "
+                ."(terminating inline would SIGKILL this deploy).\n";
+
+            return $this->selfDeployHorizonRestartShell();
+        }
+
+        $log .= "[dply] WARNING: this restart command calls horizon:terminate on the box running the deploy. "
+            ."It can SIGKILL the deploy mid-flight. Remove it (dply restarts Horizon itself) or run it detached "
+            ."via `dply:self-horizon-restart`.\n";
+
+        return $cmd;
+    }
+
+    /**
+     * horizon:terminate / queue:restart need Redis. A TLS miss or blip on a
+     * managed DigitalOcean host must not fail a deploy whose release is already
+     * live. Leave rewritten self-deploy shells alone — they already fail-soft.
+     */
+    protected function failSoftWorkerRestart(string $cmd): string
+    {
+        if (preg_match('/^\s*(?:php\s+)?artisan\s+(?:horizon:terminate|queue:restart)\s*$/', $cmd) !== 1) {
+            return $cmd;
+        }
+
+        return '{ '.$cmd.'; } || { echo "[dply] '.$cmd.' failed (continuing — the release is already live)"; true; }';
+    }
+
     public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RESTART);
@@ -92,7 +170,6 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    /** @return array<string, mixed> */
     public function runManagedRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
     {
         if ($site->isCustom() || $site->runtimeKey() === 'static') {
@@ -145,15 +222,7 @@ class SiteDeployPipelineRunner
                 // deploy job (and any concurrent one) — it runs on the Horizon we'd
                 // bounce. Hand the restart to a DETACHED drain-aware command that
                 // waits for in-flight deploys to finish first, then terminates.
-                // Falls back to the inline terminate only if the command isn't on
-                // the box yet (the deploy that first ships it still runs old code).
-                $parts[] = 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
-                    .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
-                    .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
-                    .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
-                    .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
-                    .'php artisan horizon:terminate 2>&1 || true; '
-                    .'fi';
+                $parts[] = $this->selfDeployHorizonRestartShell();
             } else {
                 // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
                 $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
@@ -169,6 +238,12 @@ class SiteDeployPipelineRunner
             $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "queue:restart" '
                 .'&& { echo "[dply] queue:restart"; php artisan queue:restart 2>&1 || true; }; } || true';
             $labels[] = 'queue workers';
+
+            // Front-matter docs are cached forever in prod — flush so newly
+            // shipped docs/*.md appear in the slide-over without a manual docs:flush.
+            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "docs:flush" '
+                .'&& { echo "[dply] docs:flush"; php artisan docs:flush 2>&1 || true; }; } || true';
+            $labels[] = 'docs cache';
         }
 
         if ($parts === []) {
@@ -203,12 +278,13 @@ class SiteDeployPipelineRunner
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array<string, mixed>
      */
-    /** @return array<string, mixed> */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase, ?callable $onProgress = null): array
     {
+        $this->collapseDuplicatePresetSteps($site);
         $site->loadMissing('deploySteps');
         $cwd = escapeshellarg($workingDirectory);
         $log = '';
+        /** @var list<array<string, mixed>> $steps */
         $steps = [];
         $ok = true;
 
@@ -254,8 +330,10 @@ class SiteDeployPipelineRunner
         // from the log instead of guesswork.
         $log .= sprintf("\n[dply] phase '%s' → working dir: %s\n", $phase, $workingDirectory);
         $log .= sprintf("[dply] %d step(s) queued: %s\n", $ordered->count(), $ordered->pluck('step_type')->implode(', ') ?: '(none)');
+        $phpPin = $this->phpCliGuard()->prefix($site);
         $probe = $ssh->exec(sprintf(
-            'echo "=== [dply] PHASE PROBE: %2$s ==="; '
+            '%3$s'
+            .'echo "=== [dply] PHASE PROBE: %2$s ==="; '
             .'echo "[dply] whoami=$(whoami)"; '
             .'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
             .'echo "[dply] is-symlink=$([ -L %1$s ] && echo yes || echo no)"; '
@@ -267,14 +345,15 @@ class SiteDeployPipelineRunner
             .'echo "[dply] git-sha:"; git -C %1$s rev-parse HEAD 2>&1 || echo "(n/a)"; '
             .'echo "[dply] git-branch:"; git -C %1$s branch --show-current 2>&1 || echo "(n/a)"; '
             .'echo "[dply] git-status:"; git -C %1$s status --short 2>&1 || echo "(n/a)"; '
-            .'echo "[dply] php:"; php --version 2>&1 | head -n 1 || echo "(php not found)"; '
+            .'echo "[dply] php:"; { export PATH="$HOME/.dply/bin:$PATH"; php --version 2>&1 | head -n 1 || echo "(php not found)"; }; '
             .'echo "[dply] composer:"; composer --version 2>&1 | head -n 1 || echo "(composer not found)"; '
             .'echo "[dply] node:"; node --version 2>&1 || echo "(node not found)"; '
             .'echo "[dply] disk:"; df -h %1$s 2>&1; '
             .'echo "[dply] ls:"; ls -la %1$s 2>&1; '
             .'echo "=== [dply] END PHASE PROBE ==="',
             $cwd,
-            $phase
+            $phase,
+            $phpPin !== '' ? '{ '.$phpPin.'export PATH="$HOME/.dply/bin:$PATH"; } && ' : ''
         ), 30);
         $log .= $probe."\n";
 
@@ -284,6 +363,12 @@ class SiteDeployPipelineRunner
             $emitProgress($idx);
 
             $cmd = $this->resolveShellCommand($step);
+            if ($cmd !== null && $cmd !== '') {
+                $cmd = $this->guardSelfDeployHorizonTerminate($site, $cmd, $log);
+                if ($phase === SiteDeployStep::PHASE_RESTART) {
+                    $cmd = $this->failSoftWorkerRestart($cmd);
+                }
+            }
             if ($cmd === null || $cmd === '') {
                 // A step with no resolvable command (e.g. an empty custom
                 // step) is a no-op — record it as skipped so the timeline
@@ -311,7 +396,7 @@ class SiteDeployPipelineRunner
             // would be recorded (and shown on the timeline) as success.
             // The recorded `command` stays clean; only the executed command is
             // prefixed with any tooling guard (e.g. ensure Composer is present).
-            $runCmd = $this->ensureToolingPrefix($step, $cmd).$cmd;
+            $runCmd = $this->ensureToolingPrefix($step, $cmd, $site).$cmd;
             // Echo the fully-resolved shell line (incl. the `cd`) so the log
             // shows precisely what ran and where — invaluable when a step fails.
             $log .= sprintf("[dply] exec (timeout %ds): cd %s && %s\n", $timeout, $workingDirectory, $runCmd);
@@ -326,6 +411,14 @@ class SiteDeployPipelineRunner
             $log .= $hookLog;
 
             $stepOk = $this->outputSucceeded($stepOut) && $this->outputSucceeded($hookLog);
+            if (RedisConnectionTls::looksLikeHandshakeFailure($stepOut.$hookLog)) {
+                $hint = "[dply] DigitalOcean managed Redis on :25061 is TLS-only. "
+                    ."A plaintext dial fails as \"read error on connection\". "
+                    ."Set REDIS_SCHEME=tls (or REDIS_URL=rediss://…) in the live .env "
+                    ."and run `php artisan config:clear`.\n";
+                $log .= $hint;
+                $stepOut .= $hint;
+            }
             $steps[] = [
                 'step_id' => (string) $step->id,
                 'step_type' => (string) $step->step_type,
@@ -355,7 +448,7 @@ class SiteDeployPipelineRunner
         // assets here; if a manifest still can't be produced, fail the phase so
         // the deploy aborts BEFORE cutover instead of going live broken.
         if ($ok && $phase === SiteDeployStep::PHASE_BUILD) {
-            $guard = $this->ensureViteManifest($ssh, $workingDirectory, $cwd);
+            $guard = $this->ensureViteManifest($ssh, $site, $workingDirectory, $cwd);
             $log .= $guard['log'];
             if ($guard['step'] !== null) {
                 $steps[] = $guard['step'];
@@ -375,8 +468,18 @@ class SiteDeployPipelineRunner
      *
      * @return array{log: string, ok: bool, step: ?array<string, mixed>}
      */
-    private function ensureViteManifest(RemoteShell $ssh, string $workingDirectory, string $cwd): array
+    private function ensureViteManifest(RemoteShell $ssh, Site $site, string $workingDirectory, string $cwd): array
     {
+        // public/build/manifest.json is a Laravel-Vite convention. A Node app
+        // (Next, Nuxt, SvelteKit) has its own build output and no such manifest,
+        // so this guard could only ever "fail the deploy because the manifest is
+        // missing" for something that never has one. It fired on a Next.js site
+        // because a stale vite.config.js was left behind by a previous repo.
+        $runtime = (string) ($site->runtimeKey() ?? '');
+        if ($runtime !== '' && ! in_array($runtime, ['php', 'static'], true)) {
+            return ['log' => '', 'ok' => true, 'step' => null];
+        }
+
         $probe = $ssh->exec(sprintf(
             'cd %s 2>/dev/null && { vite=no; for f in vite.config.js vite.config.ts vite.config.mjs vite.config.cjs; do [ -f "$f" ] && vite=yes; done; '
             .'man=no; { [ -f public/build/manifest.json ] || [ -f public/build/.vite/manifest.json ]; } && man=yes; '
@@ -401,8 +504,18 @@ class SiteDeployPipelineRunner
         // tooling prefix by synthesizing an npm step.
         $synthetic = new SiteDeployStep;
         $synthetic->step_type = SiteDeployStep::TYPE_NPM_RUN;
-        $buildCmd = 'npm ci --include=dev && npm run build --if-present';
-        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd).$buildCmd;
+
+        // Follow the repository's package manager. Hardcoding `npm ci` failed
+        // outright on a pnpm/yarn project ("package.json and package-lock.json
+        // are not in sync"), turning a self-heal into a deploy-breaker.
+        $manager = strtolower((string) ($site->resolvedRuntimeAppDetection()['package_manager'] ?? 'npm'));
+        $buildCmd = match ($manager) {
+            'pnpm' => 'corepack pnpm install --prod=false && corepack pnpm run build',
+            'yarn' => 'corepack yarn install && corepack yarn build',
+            'bun' => 'bun install && bun run build',
+            default => 'npm ci --include=dev && npm run build --if-present',
+        };
+        $runCmd = $this->ensureToolingPrefix($synthetic, $buildCmd, $site).$buildCmd;
 
         $start = microtime(true);
         $out = $ssh->exec(sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd), 900);
@@ -476,7 +589,7 @@ class SiteDeployPipelineRunner
      * The node guard skips cleanly when no package.json exists so API-only apps
      * that happen to have an npm command in a shared custom step don't fail.
      */
-    protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd): string
+    protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd, Site $site): string
     {
         $usesComposer = $step->step_type === SiteDeployStep::TYPE_COMPOSER_INSTALL
             || preg_match('/\bcomposer\s/', $cmd) === 1;
@@ -484,12 +597,21 @@ class SiteDeployPipelineRunner
         $usesNode = in_array($step->step_type, [SiteDeployStep::TYPE_NPM_CI, SiteDeployStep::TYPE_NPM_RUN], true)
             || preg_match('/\b(npm|npx|node|yarn|pnpm)\s/', $cmd) === 1;
 
-        if (! $usesComposer && ! $usesNode) {
+        $phpPin = $this->phpCliGuard()->prefix($site);
+        $usesPhp = $phpPin !== '' && (
+            $usesComposer
+            || preg_match('/\bphp\s/', $cmd) === 1
+            || str_contains((string) $step->step_type, 'artisan')
+            || str_contains((string) $step->step_type, 'php')
+        );
+
+        if (! $usesComposer && ! $usesNode && ! $usesPhp) {
             return '';
         }
 
-        // Shared PATH setup — always emitted when any tool guard fires.
-        $prefix = '{ export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:$PATH"; ';
+        // Site PHP wins over mise shims and the distro /usr/bin/php (often 8.3
+        // on Ubuntu 24.04 while the lockfile needs 8.4).
+        $prefix = '{ '.($usesPhp ? $phpPin : '').'export PATH="$HOME/.dply/bin:$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:$PATH"; ';
 
         if ($usesComposer) {
             $prefix .= 'command -v composer >/dev/null 2>&1 || { '
@@ -561,5 +683,36 @@ class SiteDeployPipelineRunner
         }
 
         return $prefix.'} && ';
+    }
+
+    private function phpCliGuard(): SitePhpCliGuard
+    {
+        return app(SitePhpCliGuard::class);
+    }
+
+    /**
+     * Create + Setup both seed runtime defaults, which used to leave two
+     * Composer install rows. Drop extras before this phase queues steps.
+     */
+    private function collapseDuplicatePresetSteps(Site $site): void
+    {
+        $pipeline = $site->relationLoaded('activeDeployPipeline')
+            ? $site->activeDeployPipeline
+            : null;
+
+        if ($pipeline === null && filled($site->active_deploy_pipeline_id)) {
+            $site->loadMissing('activeDeployPipeline');
+            $pipeline = $site->activeDeployPipeline;
+        }
+
+        if ($pipeline === null) {
+            return;
+        }
+
+        if (app(SiteDeployPipelineManager::class)->collapseDuplicatePresetSteps($pipeline) < 1) {
+            return;
+        }
+
+        $site->unsetRelation('deploySteps');
     }
 }

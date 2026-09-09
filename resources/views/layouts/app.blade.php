@@ -39,6 +39,7 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-skip-link />
         <x-impersonation-banner />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
@@ -51,6 +52,20 @@
                     data-organization-id="{{ auth()->user()->currentOrganization()?->id }}"
                     data-user-id="{{ auth()->id() }}"
                 ></div>
+
+                {{-- Trial / pause state is app-wide, so it belongs here rather than
+                     in the shells. It used to live in server-workspace-shell,
+                     organization-shell and project-workspace-shell — which meant
+                     the site workspace pages (Files, Logs, Monitor, Notifications,
+                     Schedule…) never showed it at all, because they hand-roll
+                     their chrome instead of using a shell. A fully paused org has
+                     its agents disconnected; that has to be visible everywhere,
+                     not only on the pages that happen to use a shell.
+
+                     No wrapper: the component renders its own full-bleed band with
+                     an inner max-w-7xl container, so a healthy org (every branch
+                     false, nothing emitted) leaves no blank strip here. --}}
+                <x-trial-pause-banner :organization="auth()->user()->currentOrganization()" />
             @endauth
 
             <!-- Page Heading -->
@@ -63,7 +78,7 @@
             @endisset
 
             <!-- Page Content -->
-            <main class="flex-1 w-full pb-28 sm:pb-32">
+            <main id="main-content" class="flex-1 w-full pb-28 sm:pb-32">
                 {{ $slot }}
             </main>
         </div>
@@ -73,30 +88,12 @@
         {{ $modals ?? '' }}
 
         {{-- Toasts (from Livewire dispatch('notify')) --}}
-        <div x-bind:class="regionClass" aria-live="polite">
-            <template x-for="toast in toasts" :key="toast.id">
-                <div
-                    x-show="true"
-                    x-transition:enter="transition ease-out duration-200"
-                    x-transition:enter-start="opacity-0 translate-y-2"
-                    x-transition:enter-end="opacity-100 translate-y-0"
-                    :class="toast.type === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : toast.type === 'warning'
-                            ? 'bg-amber-50 border-amber-200 text-amber-950'
-                            : 'bg-brand-ink text-brand-cream'"
-                    class="rounded-lg border px-4 py-3 shadow-lg text-sm flex items-center gap-3 min-w-[200px]"
-                >
-                    <span x-text="toast.message"></span>
-                    <button type="button" @click="remove(toast.id)" class="shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss">&times;</button>
-                </div>
-            </template>
-        </div>
+        @include('partials.toast-stack')
 
         @auth
             {{-- The global command palette (⌘K) is now mounted inside
                  <x-site-header> (rendered above) so the shortcut + search also
-                 work on guest marketing pages (changelog / features / pricing)
+                 work on guest marketing pages (features / pricing)
                  when signed in — not just inside this app layout. --}}
 
             {{-- Shared Git provider connect modal (OAuth + PAT). Mounted here — not
@@ -126,7 +123,7 @@
             @unless ($hideDrawer)
                 <div x-data="dplyConsoleDrawer">
                     <div
-                        x-show="open"
+                        x-show="drawerOpen"
                         x-cloak
                         x-transition:enter="transition ease-out duration-200"
                         x-transition:enter-start="translate-y-full opacity-0"
@@ -146,8 +143,8 @@
                                         <span class="inline-flex h-2.5 w-2.5 rounded-full bg-[#28c840]"></span>
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="truncate font-mono text-[11px] font-medium text-slate-200">{{ __('Console') }}</p>
-                                        <p class="truncate text-[10px] text-slate-500">{{ __('SSH shell · ` toggles') }}</p>
+                                        <p class="truncate font-mono text-xs font-medium text-slate-200">{{ __('Console') }}</p>
+                                        <p class="truncate text-2xs text-slate-500">{{ __('SSH shell · ` toggles') }}</p>
                                     </div>
                                 </div>
                                 <button
@@ -197,6 +194,19 @@
 
                     if (url) {
                         window.location.assign(url);
+                    }
+                });
+
+                // Open a third-party link in a new tab WITHOUT navigating away —
+                // used by the Telegram connect flow, which has no redirect back,
+                // so the half-filled channel form has to survive on this page
+                // while the operator picks a chat in the Telegram app.
+                Livewire.on('open-external', (e) => {
+                    const payload = Array.isArray(e) ? e[0] : e;
+                    const url = payload?.url ?? payload?.detail?.url;
+
+                    if (typeof url === 'string' && url.startsWith('https://')) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
                     }
                 });
             });

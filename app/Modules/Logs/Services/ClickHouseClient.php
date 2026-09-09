@@ -27,7 +27,6 @@ class ClickHouseClient
      * @param  array<string, mixed> $params  Bound as ClickHouse {name:Type} params.
      * @return list<array<string, mixed>>
      */
-    /** @return array<string, mixed> */
     public function select(string $sql, array $params = []): array
     {
         $boundQuery = [];
@@ -114,7 +113,7 @@ class ClickHouseClient
 
     public function database(): string
     {
-        return (string) config('server_logs.clickhouse.database', 'dply_logs');
+        return (string) (LogStoreConnection::resolve()['database'] ?? 'dply_logs');
     }
 
     public function table(): string
@@ -138,7 +137,7 @@ class ClickHouseClient
      */
     protected function http(?string $database, array $extraQuery = []): PendingRequest
     {
-        $cfg = (array) config('server_logs.clickhouse');
+        $cfg = LogStoreConnection::resolve();
 
         $query = $extraQuery;
         if ($database !== null) {
@@ -186,7 +185,7 @@ class ClickHouseClient
 
     protected function baseUrl(): string
     {
-        $cfg = (array) config('server_logs.clickhouse');
+        $cfg = LogStoreConnection::resolve();
         $scheme = (string) ($cfg['scheme'] ?? 'http');
         $host = (string) ($cfg['host'] ?? '127.0.0.1');
         $port = (int) ($cfg['http_port'] ?? 8123);

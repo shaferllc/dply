@@ -47,7 +47,6 @@ final class NginxOrphanVhostPruner
      *
      * @return array{orphans: list<array{basename: string, site_id: ?string, server_names: string, in_available: bool, in_enabled: bool}>, kept: int}
      */
-    /** @return array<string, mixed> */
     public function scan(Server $server): array
     {
         return $this->classify($server, $this->connections->forServer($server));
@@ -58,7 +57,6 @@ final class NginxOrphanVhostPruner
      *
      * @return array{removed: list<string>, kept: int, reloaded: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function prune(Server $server, ?ConsoleEmitter $emit = null): array
     {
         $ssh = $this->connections->forServer($server);
@@ -75,10 +73,9 @@ final class NginxOrphanVhostPruner
      * (reusing the already-open connection), then reload. Returns the basenames
      * actually removed so the caller can decide whether the conflict cleared.
      *
-     * @param  array<string, mixed> $candidateBasenames
+     * @param  list<string> $candidateBasenames
      * @return array{removed: list<string>, reloaded: bool, output: string}
      */
-    /** @return array<string, mixed> */
     public function pruneShadowing(Server $server, SshConnection $ssh, array $candidateBasenames, ?ConsoleEmitter $emit = null): array
     {
         $candidates = array_values(array_unique(array_filter(array_map(
@@ -102,7 +99,6 @@ final class NginxOrphanVhostPruner
     /**
      * Read every dply-* vhost off the box and split into orphans vs kept.
      *
-     * @param  array<string, mixed> $candidateBasenames
      * @return array{orphans: list<array{basename: string, site_id: ?string, server_names: string, in_available: bool, in_enabled: bool}>, kept: int}
      */
     private function classify(Server $server, SshConnection $ssh): array
@@ -177,7 +173,7 @@ BASH;
             if ($row['managed'] && $tokens !== [] && ! $hasLiveOwner) {
                 $orphans[] = [
                     'basename' => $row['basename'],
-                    'site_id' => $tokens[0] ?? null,
+                    'site_id' => $tokens[0],
                     'server_names' => $row['server_names'],
                     'in_available' => $row['in_available'],
                     'in_enabled' => $row['in_enabled'],
@@ -193,7 +189,7 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $basenames
+     * @param  list<string> $basenames
      * @return array{removed: list<string>, kept: int, reloaded: bool, output: string}
      */
     private function removeBasenames(Server $server, SshConnection $ssh, array $basenames, int $kept, ?ConsoleEmitter $emit): array

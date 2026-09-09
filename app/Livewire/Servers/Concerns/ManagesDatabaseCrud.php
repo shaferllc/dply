@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\ConsoleAction;
+use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseExtraUser;
+use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Notifications\ServerDatabaseCredentialsNotification;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Modules\Notifications\Services\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -59,7 +60,12 @@ trait ManagesDatabaseCrud
 
     public ?string $new_mysql_collation = null;
 
-    /** @var array{name: string, engine: string, username: string, password: string, host: string, password_generated: bool, username_generated: bool}|null */
+    /**
+     * `password` is unset (and `password_hidden` set) once the operator
+     * dismisses the one-time reveal, so both keys are optional.
+     *
+     * @var array{name: string, engine: string, username: string, password?: string, host: string, password_generated: bool, username_generated: bool, password_hidden?: bool}|null
+     */
     public ?array $generated_database_credentials = null;
 
     public function openEngineDatabaseCreate(string $engine): void
@@ -71,7 +77,7 @@ trait ManagesDatabaseCrud
         }
 
         $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
-        if (! ($capabilities[$engine] ?? false)) {
+        if (! $capabilities[$engine]) {
             $this->toastError(__(':engine is not installed on this server.', ['engine' => DatabaseWorkspaceEngines::label($engine)]));
 
             return;
@@ -209,7 +215,7 @@ trait ManagesDatabaseCrud
             // keep as passed
         } else {
             $capabilities = app(ServerDatabaseHostCapabilities::class)->forServer($this->server);
-            if (($capabilities['mariadb'] ?? false) && ! ($capabilities['mysql'] ?? false)) {
+            if ($capabilities['mariadb'] && ! $capabilities['mysql']) {
                 $engine = 'mariadb';
             } else {
                 $engine = 'mysql';
@@ -269,12 +275,12 @@ trait ManagesDatabaseCrud
             $rules['new_db_password'] = 'nullable';
         } elseif ($this->new_db_username !== '') {
             $rules['new_db_username'] = 'required|string|max:64|regex:/^[a-zA-Z0-9_]+$/';
-            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+            $rules['new_db_password'] = $this->new_db_password !== ''
                 ? 'required|string|max:200'
                 : 'nullable';
         } else {
             $rules['new_db_username'] = 'nullable';
-            $rules['new_db_password'] = $this->new_db_password !== null && $this->new_db_password !== ''
+            $rules['new_db_password'] = $this->new_db_password !== ''
                 ? 'required|string|max:200'
                 : 'nullable';
         }
@@ -288,6 +294,15 @@ trait ManagesDatabaseCrud
         // (operator switched from MySQL → SQLite without re-rendering)
         // can't trip the existing-user branch below.
         if (! DatabaseWorkspaceEngines::isMysqlFamily($this->new_db_engine)) {
+            $this->new_db_user_mode = 'new';
+        }
+
+        // Same guard for a server with nothing to reuse. The form hides the
+        // mode when there are no candidate users, but a snapshot taken while
+        // one still existed (last MySQL database dropped in another tab) would
+        // otherwise submit 'existing' and fail on a dropdown the operator has
+        // no way to populate.
+        if ($this->new_db_user_mode === 'existing' && $this->existingMysqlUserOptions() === []) {
             $this->new_db_user_mode = 'new';
         }
 
@@ -322,7 +337,7 @@ trait ManagesDatabaseCrud
 
         $password = $existingMysqlUser['password'] ?? $this->new_db_password;
         $passwordGenerated = false;
-        if (! $isSqlite && ($password === null || $password === '')) {
+        if (! $isSqlite && $password === '') {
             $password = ServerDatabase::generateConnectionSafePassword();
             $passwordGenerated = true;
         }
@@ -645,7 +660,13 @@ trait ManagesDatabaseCrud
             return false;
         }
 
-        Notification::send($user, new ServerDatabaseCredentialsNotification(
+        // The acting user is the "creator" here; the org decides who else.
+        $recipients = $organization->emailRecipients(Organization::EMAIL_DATABASE_CREDENTIALS, $user);
+        if ($recipients->isEmpty()) {
+            return false;
+        }
+
+        Notification::send($recipients, new ServerDatabaseCredentialsNotification(
             server: $this->server,
             database: $database,
             password: $plainPassword,

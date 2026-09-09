@@ -12,11 +12,17 @@
     $routingTab = 'domains';
     $laravel_tab = 'commands';
 
-    $installedEngines = $this->installedEngines;
+    // Capability-backed; empty until loadDatabaseCapabilities() has run.
+    $installedEngines = $this->capabilitiesLoaded ? $this->installedEngines : [];
     $linked = $this->linkedDatabases;
     $linkable = $this->linkableDatabases;
     $isMysqlFamily = \App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($new_db_engine);
     $isSqlite = \App\Support\Servers\DatabaseWorkspaceEngines::family($new_db_engine) === 'sqlite';
+    $remoteDatabases = $remoteDatabases ?? [];
+    $hasRemoteDatabases = $remoteDatabases !== [];
+    $databaseNote = $hasRemoteDatabases && $installedEngines === []
+        ? __('Configure the hosted database attached to this site, or install an engine on this server to create one here.')
+        : __('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.');
 @endphp
 
 {{-- Standalone Database page — merged chrome (no floating hero). --}}
@@ -33,19 +39,12 @@
 
         <div class="min-w-0 lg:col-span-9">
             <section class="dply-card min-w-0 overflow-hidden p-0">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-5 sm:px-6">
-                    <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0">
-                            <h2 class="text-lg font-semibold tracking-tight text-brand-ink">{{ __('Database') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.') }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                <x-workspace-panel-head
+                    class="border-b border-brand-ink/10"
+                    icon="heroicon-o-circle-stack"
+                    :title="__('Database')"
+                    :note="$databaseNote"
+                />
 
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
@@ -66,11 +65,11 @@
                     </div>
                 @endif
 
-                <div class="border-b border-brand-ink/10 px-3 py-2.5 sm:px-4">
+                <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
                     <x-server-workspace-tablist
                         :aria-label="__('Database sections')"
                         scroll
-                        class="!mb-0 w-full border-0 bg-transparent p-0 shadow-none"
+                        bare class="!mb-0 w-full"
                     >
                         <x-server-workspace-tab id="db-tab-databases" icon="heroicon-o-circle-stack" :active="$dbTab === 'databases'" wire:click="setDatabaseTab('databases')">
                             {{ __('Databases') }}
@@ -84,34 +83,39 @@
                     </x-server-workspace-tablist>
                 </div>
 
-                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0">
-                @if ($dbTab === 'notifications')
-                    @include('livewire.sites.partials.database.notifications-tab')
-                @elseif (empty($installedEngines))
-                    <div class="px-5 py-8 text-center sm:px-6">
-                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
-                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
-                        </div>
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('No database engine installed') }}</h3>
-                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
-                            {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
-                        </p>
-                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
-                            {{ __('Manage server databases') }}
-                        </x-primary-button>
+                {{-- Engine capabilities are an SSH probe, so the panel paints a
+                     skeleton and wire:init fetches them after first paint. Hosted
+                     / remote bindings are already in the control plane, so the
+                     Databases tab can render those without waiting. --}}
+                @unless ($capabilitiesLoaded)
+                    <div wire:init="loadDatabaseCapabilities" @class(['hidden' => $dbTab === 'databases' && $hasRemoteDatabases])>
+                        @unless ($dbTab === 'databases' && $hasRemoteDatabases)
+                            @include('livewire.sites.partials._panel-skeleton')
+                        @endunless
                     </div>
-                @else
-                    @if ($dbTab === 'databases')
+                @endunless
+                @if ($capabilitiesLoaded)
+                    <div class="hidden" wire:loading.class.remove="hidden" wire:target="setDatabaseTab">
+                        @include('livewire.sites.partials._panel-skeleton')
+                    </div>
+                @endif
+                <div wire:key="db-panel-{{ $dbTab }}" class="min-w-0" @if ($capabilitiesLoaded) wire:loading.class="hidden" wire:target="setDatabaseTab" @endif>
+                @if ($dbTab === 'notifications')
+                    @if ($capabilitiesLoaded)
+                        @include('livewire.sites.partials.database.notifications-tab')
+                    @endif
+                @elseif ($dbTab === 'databases')
+                    @if ($hasRemoteDatabases)
+                        @include('livewire.sites.partials.database.remote-databases')
+                    @endif
+
+                    @if ($capabilitiesLoaded && $installedEngines !== [])
                     <section class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                            <x-icon-badge>
-                                <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
+                        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                            <x-heroicon-o-circle-stack class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Databases') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Databases for this site') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Databases linked to :site. Manage users, rotate the password, back up, or drop each one.', ['site' => $site->name]) }}</p>
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Databases for this site') }}</h3>
+                                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Databases linked to :site. Manage users, rotate the password, back up, or drop each one.', ['site' => $site->name]) }}</p>
                             </div>
                         </div>
 
@@ -125,15 +129,28 @@
                                     @php
                                         $family = \App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine);
                                         $supportsUsers = in_array($db->engine, ['mysql', 'mariadb', 'postgres'], true);
+                                        // Managed by a resource binding? Then its DB_* are
+                                        // injected at deploy and detaching belongs on the
+                                        // Environment tab, which removes those too.
+                                        $bindingManaged = $this->bindingManagesDatabase($db);
+                                        // Same Connect panel the Hosted databases section uses. It
+                                        // is addressed by binding id, so it only appears for rows a
+                                        // binding attaches.
+                                        $connectBindingId = $this->connectBindingIdFor($db);
                                     @endphp
-                                    <li class="px-5 py-4 sm:px-6" wire:key="linked-{{ $db->id }}">
+                                    <li class="px-5 py-2.5 sm:px-6" wire:key="linked-{{ $db->id }}">
                                         <div class="flex flex-wrap items-center gap-3">
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-2">
                                                     <span class="font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</span>
-                                                    <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                    <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">
                                                         {{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }}
                                                     </span>
+                                                    @if ($bindingManaged)
+                                                        <span class="rounded-md bg-brand-sage/15 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-forest" title="{{ __('Attached on the Environment tab as a connected resource. It injects DB_* at deploy; detach it there.') }}">
+                                                            {{ __('Connected resource') }}
+                                                        </span>
+                                                    @endif
                                                 </div>
                                                 <p class="mt-1 truncate font-mono text-xs text-brand-moss">
                                                     @if ($family === 'sqlite')
@@ -144,49 +161,101 @@
                                                 </p>
                                             </div>
                                             <div class="flex flex-wrap items-center gap-2">
-                                                @if ($supportsUsers)
-                                                    <x-secondary-button size="xs" type="button" wire:click="openAddUserModal('{{ $db->id }}')">
-                                                        <x-heroicon-o-user-plus class="h-4 w-4" />
-                                                        {{ __('Add user') }}
-                                                    </x-secondary-button>
-                                                    <x-secondary-button
-                                                        size="xs"
-                                                        type="button"
-                                                        wire:click="rotatePassword('{{ $db->id }}')"
-                                                        wire:confirm="{{ __('Rotate the password for :user on :name? You’ll get a new one-time credential link; update the app’s .env afterwards.', ['user' => $db->username, 'name' => $db->name]) }}"
-                                                    >
+                                                @if ($connectBindingId && $family !== 'sqlite')
+                                                    <livewire:sites.database-connect
+                                                        :site="$site"
+                                                        :server="$server"
+                                                        :binding-id="$connectBindingId"
+                                                        :key="'db-connect-'.$connectBindingId"
+                                                    />
+                                                @elseif ($family !== 'sqlite')
+                                                    {{-- No binding to address the Connect panel with (a
+                                                         linked or pre-bindings database). The password
+                                                         handoff still works on its own. --}}
+                                                    <x-secondary-button size="xs" type="button" wire:click="shareCredentials('{{ $db->id }}')">
                                                         <x-heroicon-o-key class="h-4 w-4" />
-                                                        {{ __('Rotate password') }}
+                                                        {{ __('Credentials') }}
                                                     </x-secondary-button>
                                                 @endif
-                                                <x-secondary-button size="xs" type="button" wire:click="backupDatabase('{{ $db->id }}')" wire:loading.attr="disabled" wire:target="backupDatabase('{{ $db->id }}')">
-                                                    <x-heroicon-o-archive-box-arrow-down class="h-4 w-4" />
-                                                    {{ __('Back up now') }}
-                                                </x-secondary-button>
-                                                <x-secondary-button
-                                                    size="xs"
-                                                    type="button"
-                                                    wire:click="unlinkDatabase('{{ $db->id }}')"
-                                                    wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
-                                                >
-                                                    <x-heroicon-o-link-slash class="h-4 w-4" />
-                                                    {{ __('Detach') }}
-                                                </x-secondary-button>
-                                                <button
-                                                    type="button"
-                                                    wire:click="dropDatabase('{{ $db->id }}')"
-                                                    wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
-                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
-                                                >
-                                                    <x-heroicon-o-trash class="h-4 w-4" />
-                                                    {{ __('Drop') }}
-                                                </button>
+                                                {{-- Connect stays inline as the primary action; everything
+                                                     else lives in the kebab so a row never carries six
+                                                     buttons. Mirrors the resource-row actions on the
+                                                     Environment tab. --}}
+                                                <x-overflow-menu fixed :label="__('More database actions')" wire:key="db-actions-{{ $db->id }}">
+                                                    @if ($supportsUsers)
+                                                        <button type="button" wire:click="openAddUserModal('{{ $db->id }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-user-plus class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Add user') }}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="rotatePassword('{{ $db->id }}')"
+                                                            wire:confirm="{{ __('Rotate the password for :user on :name? You’ll get a new one-time credential link; update the app’s .env afterwards.', ['user' => $db->username, 'name' => $db->name]) }}"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                                        >
+                                                            <x-heroicon-o-key class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Rotate password') }}
+                                                        </button>
+                                                    @endif
+
+                                                    {{-- A bound database already shows Connect inline; an
+                                                         unbound one shows Credentials there instead, so the
+                                                         handoff is reachable from exactly one place either way. --}}
+                                                    @if ($connectBindingId && $family !== 'sqlite')
+                                                        <button type="button" wire:click="shareCredentials('{{ $db->id }}')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-key class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Credential link') }}
+                                                        </button>
+                                                    @endif
+
+                                                    <button
+                                                        type="button"
+                                                        wire:click="backupDatabase('{{ $db->id }}')"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="backupDatabase('{{ $db->id }}')"
+                                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                                                    >
+                                                        <x-heroicon-o-archive-box-arrow-down class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                        {{ __('Back up now') }}
+                                                    </button>
+
+                                                    @unless ($bindingManaged)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="unlinkDatabase('{{ $db->id }}')"
+                                                            wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
+                                                            class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                                                        >
+                                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Detach') }}
+                                                        </button>
+                                                    @else
+                                                        {{-- Detaching a bound resource has to remove its injected
+                                                             DB_* too, which only the Environment tab does. --}}
+                                                        <a href="{{ route('sites.environment', [$server, $site]) }}" wire:navigate class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 text-brand-moss" aria-hidden="true" />
+                                                            {{ __('Detach on Environment') }}
+                                                        </a>
+                                                    @endunless
+
+                                                    <div class="my-1 border-t border-brand-ink/10"></div>
+
+                                                    <button
+                                                        type="button"
+                                                        wire:click="dropDatabase('{{ $db->id }}')"
+                                                        wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
+                                                        class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700"
+                                                    >
+                                                        <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                        {{ __('Drop') }}
+                                                    </button>
+                                                </x-overflow-menu>
                                             </div>
                                         </div>
 
                                         @if ($supportsUsers && $db->extraUsers->isNotEmpty())
                                             <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Extra users') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Extra users') }}</p>
                                                 <ul class="mt-1.5 divide-y divide-brand-ink/5">
                                                     @foreach ($db->extraUsers as $user)
                                                         <li class="flex items-center justify-between gap-2 py-1.5" wire:key="extra-{{ $user->id }}">
@@ -205,7 +274,7 @@
 
                                         @if ($db->backups->isNotEmpty())
                                             <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
-                                                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent backups') }}</p>
+                                                <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent backups') }}</p>
                                                 <ul class="mt-1.5 divide-y divide-brand-ink/5">
                                                     @foreach ($db->backups->take(5) as $backup)
                                                         <li class="flex items-center justify-between gap-2 py-1.5" wire:key="backup-{{ $backup->id }}">
@@ -241,22 +310,33 @@
                             </ul>
                         @endif
                     </section>
+                    @elseif ($capabilitiesLoaded && ! $hasRemoteDatabases)
+                    <div class="px-5 py-8 text-center sm:px-6">
+                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
+                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
+                        </div>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('No database engine installed') }}</h3>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
+                        </p>
+                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                            {{ __('Manage server databases') }}
+                        </x-primary-button>
+                    </div>
                     @endif
-
-                    @if ($dbTab === 'create')
+                @elseif ($dbTab === 'create')
+                    @if ($capabilitiesLoaded && $installedEngines !== [])
                     <form wire:submit="createDatabase" class="border-b border-brand-ink/10">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                            <x-icon-badge>
-                                <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
+                        <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                            <x-heroicon-o-plus-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                             <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provision') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a database') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
+                                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Create a database') }}</h3>
+                                <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
                             </div>
                         </div>
 
-                        <div class="space-y-5 px-5 py-5 sm:px-6">
+                        <div class="space-y-3 px-5 py-4 sm:px-6">
                             <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <label for="new_db_engine" class="{{ $labelCls }}">{{ __('Engine') }}</label>
@@ -341,23 +421,27 @@
 
                     @if ($linkable->isNotEmpty())
                         <form wire:submit="linkDatabase" class="border-b border-brand-ink/10">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:px-6">
-                                <x-icon-badge>
-                                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                                </x-icon-badge>
+                            <div class="flex items-start gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3 sm:px-6">
+                                <x-heroicon-o-link class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach') }}</p>
-                                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
-                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
+                                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
+                                    <p class="mt-1 max-w-3xl text-xs leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet — including ones dply doesn’t track yet.') }}</p>
                                 </div>
                             </div>
-                            <div class="flex flex-wrap items-end gap-3 px-5 py-5 sm:px-6">
+                            <div class="flex flex-wrap items-end gap-3 px-5 py-4 sm:px-6">
                                 <div class="min-w-0 flex-1">
                                     <label for="link_database_id" class="{{ $labelCls }}">{{ __('Database') }}</label>
                                     <select id="link_database_id" wire:model="link_database_id" class="{{ $inputCls }}">
                                         <option value="">{{ __('Choose a database…') }}</option>
                                         @foreach ($linkable as $db)
                                             <option value="{{ $db->id }}">{{ $db->name }} ({{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }})</option>
+                                        @endforeach
+                                        {{-- Databases found on the server that dply does not track yet.
+                                             Read from the cached inventory, so this list is only as
+                                             fresh as the last scan on the server Databases page.
+                                             Choosing one adopts it and links it in a single step. --}}
+                                        @foreach ($this->adoptableDatabases as $row)
+                                            <option value="{{ $row['value'] }}">{{ $row['label'] }}</option>
                                         @endforeach
                                     </select>
                                     @error('link_database_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
@@ -369,11 +453,29 @@
                             </div>
                         </form>
                     @endif
+                    @elseif ($capabilitiesLoaded)
+                    <div class="px-5 py-8 text-center sm:px-6">
+                        <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-sand/60">
+                            <x-heroicon-o-circle-stack class="h-6 w-6 text-brand-moss" />
+                        </div>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Create on this server') }}</h3>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            @if ($hasRemoteDatabases)
+                                {{ __('This server has no database engine installed. Configure the hosted database from the Databases tab, or install an engine here to also create one on this server.') }}
+                            @else
+                                {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
+                            @endif
+                        </p>
+                        <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                            {{ __('Manage server databases') }}
+                        </x-primary-button>
+                    </div>
                     @endif
                 @endif
                 </div>
 
-                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-4 sm:px-6">
+                <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-5 py-3 sm:px-6">
                     <x-cli-snippet :commands="[
                         ['label' => __('List databases'), 'command' => 'dply sites:db:list '.$site->slug],
                         ['label' => __('Create database'), 'command' => 'dply sites:db:create '.$site->slug.' <name>'],
@@ -388,16 +490,18 @@
         <div class="p-6">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ $share_context === 'rotated' ? __('Password rotated') : __('Database created') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ ['rotated' => __('Password rotated'), 'shared' => __('Connection credentials')][$share_context] ?? __('Database created') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">
                         @if ($share_context === 'rotated')
                             {{ __('The new password is being applied on the server — the banner confirms when it’s done.', ['name' => $share_link_db_name]) }}
+                        @elseif ($share_context === 'shared')
+                            {{ __('Open the link below to reveal the username and password for :name.', ['name' => $share_link_db_name]) }}
                         @else
                             {{ __(':name is being provisioned in the background — the banner confirms when it’s ready.', ['name' => $share_link_db_name]) }}
                         @endif
                     </p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
@@ -444,7 +548,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Add database user') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">{{ __('Grants a new user full privileges on this database. The user is created on the server in the background.') }}</p>
                 </div>
-                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                <button aria-label="{{ __('Close') }}" type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')" class="dply-hit-44 shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
                     <x-heroicon-o-x-mark class="h-5 w-5" />
                 </button>
             </div>
