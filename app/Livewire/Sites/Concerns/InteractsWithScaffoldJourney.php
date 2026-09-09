@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
-use App\Jobs\ResetSiteToBlankJob;
+use App\Actions\Sites\ResetSiteApp;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Show;
 use App\Models\Site;
@@ -62,46 +62,15 @@ trait InteractsWithScaffoldJourney
      * Keeps the site shell (server, domains, testing URL, certificates) exactly
      * as disconnectAndStartOver() does; only the application is removed.
      */
-    public function resetScaffoldAndChooseAgain(): void
+    public function resetScaffoldAndChooseAgain(ResetSiteApp $reset): void
     {
         $this->authorize('update', $this->site);
 
-        $site = $this->site;
-        $meta = is_array($site->meta) ? $site->meta : [];
-
-        unset($meta['scaffold']);
-
-        // The "skipped" sentinel is what makes Site::canRechooseApp() true, so
-        // the picker reopens instead of the workspace bouncing straight back.
-        $meta['choose_app'] = [
-            'skipped' => true,
-            'reset_at' => now()->toIso8601String(),
-            'reset_by_user_id' => Auth::id(),
-        ];
-
-        $site->forceFill([
-            // Clearing the status matters as much as clearing the meta:
-            // lacksInstalledApp() short-circuits on STATUS_SCAFFOLD_FAILED, so
-            // leaving it would keep canRechooseApp() false and the picker shut
-            // even with the scaffold gone. AWAITING_APP is precisely this state.
-            'status' => Site::STATUS_AWAITING_APP,
-            'git_repository_url' => '',
-            'git_branch' => 'main',
-            'last_deploy_at' => null,
-            'meta' => $meta,
-        ])->save();
-
-        // Theme/plugin repos belonged to the app being abandoned.
-        $site->gitSources()->delete();
-
-        // Wipes the half-written install — a failed WordPress scaffold can
-        // leave a broken wp-config.php behind, which makes every later wp-cli
-        // call fail — and restores the splash page.
-        ResetSiteToBlankJob::dispatch((string) $site->id);
+        $reset->run($this->site, Auth::id() === null ? null : (string) Auth::id());
 
         $this->redirect(route('sites.choose-app', [
-            'server' => $site->server_id,
-            'site' => $site->id,
+            'server' => $this->site->server_id,
+            'site' => $this->site->id,
         ]), navigate: true);
     }
 

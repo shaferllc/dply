@@ -50,6 +50,37 @@
         </div>
     @endif
 
+    {{-- Reset the installed app. Lives here, not only in the Repository tab's
+         danger zone (which reads as being about Git) or the scaffold journey
+         (which only renders during/after an install) — a working site had no
+         obvious route back to the picker. --}}
+    @if ($this->siteHasResettableApp())
+        <section class="border-b border-brand-ink/10">
+            <div class="flex flex-col gap-2.5 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-4">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Reset app and start over') }}</h3>
+                    </div>
+                    <p class="mt-1 max-w-2xl text-xs leading-relaxed text-brand-moss">
+                        {{ __('Wipes the deployed application and its env from the server, then reopens the app picker. The server, domains, testing URL, certificates and resource bindings are kept. This cannot be undone.') }}
+                    </p>
+                </div>
+                @can('update', $site)
+                    <x-spinner-button
+                        variant="danger"
+                        wire:click="resetSiteApp"
+                        wire:target="resetSiteApp"
+                        wire:confirm="{{ __('Wipe this site\'s application and pick again? Domains, certificates and bindings are kept. This cannot be undone.') }}"
+                        class="shrink-0"
+                    >
+                        {{ __('Reset app') }}
+                    </x-spinner-button>
+                @endcan
+            </div>
+        </section>
+    @endif
+
     {{-- Clone site --}}
     @can('clone', $site)
         <section class="border-b border-brand-ink/10">

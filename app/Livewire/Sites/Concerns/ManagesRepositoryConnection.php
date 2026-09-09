@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Actions\Sites\ResetSiteApp;
 use App\Jobs\PreflightSiteSetupJob;
 use App\Livewire\Sites\Commits;
 use App\Livewire\Sites\Files;
@@ -274,42 +275,15 @@ trait ManagesRepositoryConnection
      * application is removed — so the operator can connect a different repo or
      * pick a new app from a clean slate.
      */
-    public function disconnectAndStartOver(): void
+    public function disconnectAndStartOver(ResetSiteApp $reset): void
     {
         Gate::authorize('update', $this->site);
 
-        $site = $this->site;
-        $meta = is_array($site->meta) ? $site->meta : [];
-        foreach (['git_ref_kind', 'git_source_control_account_id', 'git_provider_kind', 'scaffold'] as $key) {
-            unset($meta[$key]);
-        }
-        // Re-open the app picker for this site (services-first "skipped" sentinel
-        // makes Site::canRechooseApp() return true).
-        $meta['choose_app'] = [
-            'skipped' => true,
-            'reset_at' => now()->toIso8601String(),
-            'reset_by_user_id' => auth()->id(),
-        ];
-
-        $site->forceFill([
-            'git_repository_url' => '',
-            'git_branch' => 'main',
-            'last_deploy_at' => null,
-            'meta' => $meta,
-        ])->save();
-
-        // Theme/plugin repos belong to the app being removed, so they go with
-        // it — otherwise a reset site keeps rows pointing at directories
-        // ResetSiteToBlankJob is about to wipe. Dropped rather than torn down
-        // per-source: that job removes the whole deployed tree, which already
-        // includes every materialized theme and plugin.
-        $site->gitSources()->delete();
-
-        \App\Jobs\ResetSiteToBlankJob::dispatch((string) $site->id);
+        $reset->run($this->site, auth()->id() === null ? null : (string) auth()->id());
 
         $this->toastSuccess(__('Repository disconnected — wiping the deployed app and resetting to a blank splash page.'));
 
-        $this->redirect(route('sites.show', ['server' => $this->server, 'site' => $site]), navigate: true);
+        $this->redirect(route('sites.show', ['server' => $this->server, 'site' => $this->site]), navigate: true);
     }
 
     public function enableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void

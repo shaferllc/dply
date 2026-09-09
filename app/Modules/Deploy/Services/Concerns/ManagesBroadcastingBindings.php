@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Pennant\Feature;
 use RuntimeException;
@@ -23,6 +24,9 @@ trait ManagesBroadcastingBindings
 {
     /** BYO broadcasting drivers the operator can wire their own credentials for. */
     private const BROADCAST_BYO_DRIVERS = ['pusher', 'reverb', 'ably', 'log', 'null'];
+
+    /** Loopback ports self-hosted Reverb daemons are allocated from. */
+    private const REVERB_PORT_RANGE = [8080, 8180];
 
     /**
      * Managed broadcasting apps in the site's org an operator can attach (share
@@ -60,9 +64,11 @@ trait ManagesBroadcastingBindings
     }
 
     /**
-     * Configure how the app broadcasts. Two paths share one binding:
+     * Configure how the app broadcasts. Three paths share one binding:
      *  - kind=managed → a dply-managed RealtimeApp (Cloudflare relay), either an
      *    existing app (shared across sites) or a freshly provisioned, billed one.
+     *  - kind=self_hosted → Laravel Reverb on the site's OWN server: dply mints
+     *    the credentials, allocates a loopback port and stands the daemon up.
      *  - kind=byo     → the operator's own Pusher/Reverb/Ably (or log/null).
      * Both inject BROADCAST_CONNECTION + the driver's connection vars, plus the
      * VITE_ mirror so Laravel Echo works without hand-adding client vars.
@@ -75,6 +81,7 @@ trait ManagesBroadcastingBindings
 
         return match ($kind) {
             'managed' => $this->attachManagedBroadcasting($site, $params),
+            'self_hosted' => $this->attachSelfHostedReverb($site),
             'byo' => $this->attachByoBroadcasting($site, $params),
             default => throw new InvalidArgumentException(__('Choose a broadcasting option.')),
         };

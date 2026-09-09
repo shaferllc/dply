@@ -11,6 +11,7 @@ use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Sites\Concerns\ManagesErrorsNotifications;
 use App\Livewire\Sites\Concerns\ManagesSiteAccessGate;
 use App\Livewire\Sites\Concerns\ManagesSiteAliases;
+use App\Livewire\Sites\Concerns\ManagesSiteAppReset;
 use App\Livewire\Sites\Concerns\ManagesSiteCertificates;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySync;
 use App\Livewire\Sites\Concerns\ManagesSiteDomainsGeneral;
@@ -45,6 +46,7 @@ class Settings extends Show
     use DismissesDaemonSuggestions;
     use ManagesSiteAccessGate;
     use ManagesSiteAliases;
+    use ManagesSiteAppReset;
     use ManagesSiteBindings;
     use ManagesSiteCertificates;
     use ManagesSiteDeploySync;

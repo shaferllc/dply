@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\WordPress\GitSourcesPanelTest;
 
+use App\Jobs\ResetSiteToBlankJob;
 use App\Livewire\Sites\GitSources;
 use App\Livewire\Sites\Repository;
+use App\Livewire\Sites\Settings;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -241,4 +243,52 @@ test('a repo-less wordpress site can still be reset and re-choose its app', func
         ->call('disconnectAndStartOver');
 
     expect($site->fresh()->canRechooseApp())->toBeTrue();
+});
+
+test('a healthy app can be reset on demand from the danger section', function () {
+    Queue::fake();
+    $user = panelUser();
+    $site = panelSite($user);
+
+    $site->gitSources()->create([
+        'kind' => 'theme',
+        'slug' => 'my-theme',
+        'repository_url' => 'git@github.com:acme/my-theme.git',
+        'git_branch' => 'main',
+    ]);
+
+    // Nothing is wrong with this site — resetting is just something you may
+    // want to do. Previously only the Repository tab's danger zone (repo-gated)
+    // or the scaffold journey (install-time only) offered it.
+    Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $site->server, 'site' => $site, 'section' => 'danger'])
+        ->call('resetSiteApp');
+
+    $site->refresh();
+
+    expect($site->status)->toBe(Site::STATUS_AWAITING_APP)
+        ->and($site->canRechooseApp())->toBeTrue()
+        ->and(data_get($site->meta, 'scaffold'))->toBeNull()
+        ->and($site->gitSources()->count())->toBe(0);
+
+    Queue::assertPushed(ResetSiteToBlankJob::class);
+});
+
+test('a site with no app has nothing to reset', function () {
+    $user = panelUser();
+
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()->id,
+        'meta' => ['webserver' => 'nginx', 'php_version' => '8.3'],
+    ]);
+    $bare = Site::factory()->for($server)->create(['slug' => 'bare', 'meta' => []]);
+    $bare->forceFill(['git_repository_url' => ''])->save();
+
+    $component = Livewire::actingAs($user)
+        ->test(Settings::class, ['server' => $server, 'site' => $bare->fresh(), 'section' => 'danger']);
+
+    // Gates the Danger-section block. Covers both shapes an app can take: a
+    // connected repo, or a manage-in-place install with no repo at all.
+    expect($component->instance()->siteHasResettableApp())->toBeFalse();
 });

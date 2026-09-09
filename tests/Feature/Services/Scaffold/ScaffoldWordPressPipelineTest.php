@@ -283,3 +283,60 @@ test('wp config create pipes extra php instead of using a shell heredoc', functi
         }
     }
 });
+
+test('wordpress is installed where the webserver actually serves', function () {
+    $site = makeScaffoldingSite();
+    $site->forceFill([
+        'repository_path' => '/home/dply/my-wp-blog',
+        'document_root' => '/home/dply/my-wp-blog',
+    ])->save();
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->once()->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->once()->andReturn('ok');
+
+    $commands = [];
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturnUsing(function (...$args) use (&$commands) {
+        $commands[] = (string) ($args[2] ?? '');
+
+        return new ProcessOutput('twentytwentyfive', 0, false);
+    });
+
+    (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site->fresh());
+
+    $all = implode("\n", $commands);
+
+    // The pipeline used to write into '<path>/current' — the atomic-release
+    // convention, which a manage-in-place install does not use. nginx served
+    // '<path>' (document_root = repository_path + an empty web_subdir), so the
+    // site showed only the splash page, and WpCli's `wp --path=<document_root>`
+    // ran against a directory containing no WordPress.
+    expect($all)->toContain("'/home/dply/my-wp-blog'")
+        ->and($all)->not->toContain('/home/dply/my-wp-blog/current');
+});
+
+test('the install path falls back to the conventional one when unset', function () {
+    $site = makeScaffoldingSite();
+    $site->forceFill(['repository_path' => null, 'document_root' => null])->save();
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->once()->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->once()->andReturn('ok');
+
+    $commands = [];
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturnUsing(function (...$args) use (&$commands) {
+        $commands[] = (string) ($args[2] ?? '');
+
+        return new ProcessOutput('twentytwentyfive', 0, false);
+    });
+
+    (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site->fresh());
+
+    expect(implode("\n", $commands))->toContain("'/home/dply/my-wp-blog'");
+});

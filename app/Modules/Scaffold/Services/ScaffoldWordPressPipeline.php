@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Modules\RemoteCli\Services\WpCli;
 use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -447,9 +448,27 @@ class ScaffoldWordPressPipeline
         }
     }
 
+    /**
+     * Where WordPress is installed — the path the webserver actually serves.
+     *
+     * This returned '/home/dply/<slug>/current', the atomic-release convention,
+     * which does not apply to a manage-in-place install: there are no releases
+     * and no `current` symlink. The site's document_root is
+     * `repository_path + web_subdir` and the WordPress tile sets web_subdir to
+     * '', so nginx served '/home/dply/<slug>' while every file landed one level
+     * down in 'current/'. The result was a site showing only the dply splash
+     * page, AND an empty WordPress management surface — {@see WpCli}
+     * runs `wp --path=<document_root>`, so every wp-cli call ran against a
+     * directory with no WordPress in it.
+     *
+     * Deliberately the same resolution order WpCli uses, so the installer and
+     * wp-cli can never disagree about where the install lives again.
+     */
     private function deployPath(Site $site): string
     {
-        return '/home/dply/'.$site->slug.'/current';
+        return $site->document_root
+            ?: $site->repository_path
+            ?: '/home/dply/'.$site->slug;
     }
 
     /**
