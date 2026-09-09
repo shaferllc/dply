@@ -298,6 +298,13 @@ trait ManagesRepositoryConnection
             'meta' => $meta,
         ])->save();
 
+        // Theme/plugin repos belong to the app being removed, so they go with
+        // it — otherwise a reset site keeps rows pointing at directories
+        // ResetSiteToBlankJob is about to wipe. Dropped rather than torn down
+        // per-source: that job removes the whole deployed tree, which already
+        // includes every materialized theme and plugin.
+        $site->gitSources()->delete();
+
         \App\Jobs\ResetSiteToBlankJob::dispatch((string) $site->id);
 
         $this->toastSuccess(__('Repository disconnected — wiping the deployed app and resetting to a blank splash page.'));

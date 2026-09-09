@@ -20,6 +20,7 @@ use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBackend;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteBinding;
+use App\Models\SiteGitSource;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
@@ -411,6 +412,18 @@ trait HasSiteRelationships
     public function bindings(): HasMany
     {
         return $this->hasMany(SiteBinding::class);
+    }
+
+    /**
+     * Themes and plugins that come from their own Git repositories. Separate
+     * from the site's single `git_repository_url` (the application itself)
+     * because each theme/plugin is independently versioned.
+     *
+     * @return HasMany<SiteGitSource, $this>
+     */
+    public function gitSources(): HasMany
+    {
+        return $this->hasMany(SiteGitSource::class);
     }
 
     /** @return BelongsToMany<OrganizationSecret, $this> */

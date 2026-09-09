@@ -147,6 +147,7 @@ use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
 use App\Livewire\Sites\Database as SitesDatabase;
+use App\Livewire\Sites\GitSources as SitesGitSources;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
 use App\Livewire\Sites\DeploySyncGroups;
@@ -707,6 +708,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
+    // WordPress themes/plugins that come from their own repos. The component
+    // 404s for non-WordPress sites, so no extra middleware gate is needed.
+    Route::livewire('servers/{server}/sites/{site}/git-sources', SitesGitSources::class)->name('sites.git-sources');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
     // Hands a credential-bearing connection URI to a desktop database client.
