@@ -48,6 +48,7 @@ class AppCatalog
      */
     private const SUPPORTED_DB_ENGINES = [
         'wordpress' => ['mysql', 'mariadb'],
+        'wordpress-bedrock' => ['mysql', 'mariadb'],
         'laravel' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
         'craft' => ['mysql', 'mariadb', 'postgres'],
         'drupal' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
@@ -79,9 +80,15 @@ class AppCatalog
                 return $supported === null
                     || array_intersect($supported, $installedFamilies) !== [];
             })
-            // Auto-install (scaffold) apps are temporarily marked "coming soon".
+            // Per-app coming-soon list. This was a blanket `kind === 'scaffold'`
+            // test, which meant no installer could ship without shipping all
+            // six; the config list lets each graduate as its pipeline is proven.
             ->map(function (array $tile): array {
-                $tile['coming_soon'] = ($tile['kind'] ?? '') === 'scaffold';
+                $tile['coming_soon'] = in_array(
+                    $tile['key'] ?? '',
+                    (array) config('sites.choose_app_coming_soon', []),
+                    true,
+                );
 
                 return $tile;
             })
@@ -140,7 +147,7 @@ class AppCatalog
             [
                 'key' => 'wordpress',
                 'label' => __('WordPress'),
-                'description' => __('Install a fresh WordPress site, database and admin user included. Managed in place — no Git repo.'),
+                'description' => __('Install a fresh WordPress site, database, theme and admin user included.'),
                 'icon' => 'heroicon-o-newspaper',
                 'kind' => 'scaffold',
                 'needs_db' => true,
@@ -148,7 +155,35 @@ class AppCatalog
                 'needs_admin_email' => true,
                 'framework' => 'wordpress',
                 'web_subdir' => '',
+                'wp_layout' => 'classic',
                 'pipeline_job' => RunWordPressScaffoldJob::class,
+            ],
+            [
+                'key' => 'wordpress-bedrock',
+                'label' => __('WordPress (Bedrock)'),
+                'description' => __('WordPress as a Composer project — core, themes and plugins are dependencies, and the site is a Git repo from the start.'),
+                'icon' => 'heroicon-o-cube-transparent',
+                'kind' => 'scaffold',
+                'needs_db' => true,
+                'needs_php' => true,
+                'needs_admin_email' => true,
+                'framework' => 'wordpress',
+                // Bedrock serves from web/, with core under web/wp.
+                'web_subdir' => '/web',
+                // Recorded so the themes/plugins-as-repos work can tell the two
+                // WordPress layouts apart without re-deriving it from the key.
+                'wp_layout' => 'bedrock',
+                'recipe' => [
+                    'package' => 'roots/bedrock',
+                    'needs_db' => true,
+                    // Bedrock's .env is not Laravel's: DB_*, WP_HOME/WP_SITEURL
+                    // and the eight salts.
+                    'env' => 'bedrock',
+                    'migrate' => false,
+                    // composer create-project only lays down files; without this
+                    // the site renders the WordPress installer.
+                    'wp_install' => true,
+                ],
             ],
             [
                 'key' => 'laravel',

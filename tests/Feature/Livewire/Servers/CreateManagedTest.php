@@ -69,3 +69,33 @@ test('creating a managed server dispatches the provision job and redirects', fun
 
     Queue::assertPushed(ProvisionHetznerServerJob::class);
 });
+
+/** Deployer in the current org — the role ServerPolicy::create denies. */
+function managedServerDeployer(): User
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'deployer']);
+    session(['current_organization_id' => $org->id]);
+
+    return $user;
+}
+
+test('a deployer cannot open the managed server create page', function () {
+    Livewire::actingAs(managedServerDeployer())
+        ->test(CreateManaged::class)
+        ->assertForbidden();
+});
+
+test('a deployer gets a 403 from the managed create route itself', function () {
+    Queue::fake();
+
+    // The actual attack surface: surface.managed_servers defaults on, so the
+    // page is reachable by URL for any org member.
+    test()->actingAs(managedServerDeployer())
+        ->get(route('servers.create.managed'))
+        ->assertForbidden();
+
+    expect(Server::query()->count())->toBe(0);
+    Queue::assertNothingPushed();
+});

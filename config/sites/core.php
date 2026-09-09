@@ -2,6 +2,34 @@
 
 return [
 
+    /*
+    |--------------------------------------------------------------------------
+    | Choose-app tiles still marked "coming soon"
+    |--------------------------------------------------------------------------
+    | Keys from App\Services\Sites\AppCatalog that render disabled with a
+    | "Coming soon" badge. This used to be a blanket `kind === 'scaffold'` rule,
+    | which gated every one-click installer at once — so shipping one of them
+    | meant shipping all six. An explicit list lets each installer graduate on
+    | its own as its pipeline is proven.
+    |
+    | Same shape as `server_workspace.webserver_coming_soon`.
+    */
+    'choose_app_coming_soon' => [
+        'laravel',
+        'statamic',
+        'symfony',
+        'craft',
+        'drupal',
+    ],
+
+    /*
+    | Theme the WordPress scaffold installs and activates. `wp core download
+    | --skip-content` deliberately omits the bundled themes, so without this the
+    | install succeeds and then the front end fatals with no active theme.
+    | Slug must exist on wordpress.org.
+    */
+    'wordpress_default_theme' => env('DPLY_WP_DEFAULT_THEME', 'twentytwentyfive'),
+
     'nginx_sites_available' => env('DPLY_NGINX_SITES_AVAILABLE', '/etc/nginx/sites-available'),
 
     'nginx_sites_enabled' => env('DPLY_NGINX_SITES_ENABLED', '/etc/nginx/sites-enabled'),

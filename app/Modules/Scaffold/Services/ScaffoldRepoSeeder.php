@@ -28,8 +28,20 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
  */
 class ScaffoldRepoSeeder
 {
-    /** Frameworks that get a seeded repo. WordPress/Drupal are manage-in-place. */
+    /**
+     * Frameworks that get a seeded repo. Classic WordPress and Drupal are
+     * manage-in-place — the install itself is the source of truth.
+     */
     private const CODE_FIRST = ['laravel', 'symfony', 'statamic', 'craft'];
+
+    /**
+     * WordPress layouts that ARE code-first. Bedrock is framework=wordpress but
+     * a Composer project: composer.json is the source of truth, so it belongs
+     * in version control from the first commit like any other code-first app.
+     * Keyed on the layout rather than the framework because both WordPress
+     * layouts share framework=wordpress.
+     */
+    private const CODE_FIRST_LAYOUTS = ['bedrock'];
 
     public function __construct(private readonly ExecuteRemoteTaskOnServer $executor) {}
 
@@ -41,9 +53,20 @@ class ScaffoldRepoSeeder
     public function seed(Site $site): bool
     {
         $framework = strtolower((string) ($site->meta['scaffold']['framework'] ?? ''));
-        if (! in_array($framework, self::CODE_FIRST, true)) {
+        $layout = strtolower((string) ($site->meta['scaffold']['layout'] ?? ''));
+
+        $codeFirst = in_array($framework, self::CODE_FIRST, true)
+            || in_array($layout, self::CODE_FIRST_LAYOUTS, true);
+
+        if (! $codeFirst) {
             return false;
         }
+
+        // Commit message names what was actually scaffolded; "Wordpress" would
+        // be misleading for a Bedrock tree.
+        $label = $layout !== '' && in_array($layout, self::CODE_FIRST_LAYOUTS, true)
+            ? ucfirst($layout)
+            : ucfirst($framework);
 
         $workTree = '/home/dply/'.$site->slug.'/current';
         $bare = '/home/dply/'.$site->slug.'.git';
@@ -72,7 +95,7 @@ class ScaffoldRepoSeeder
             BASH,
             escapeshellarg($workTree),
             escapeshellarg($bare),
-            escapeshellarg('Initial '.ucfirst($framework).' scaffold via dply'),
+            escapeshellarg('Initial '.$label.' scaffold via dply'),
         );
 
         $out = $this->executor->runInlineBash(

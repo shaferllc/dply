@@ -296,6 +296,12 @@ class ChooseApp extends Component
         if ($recipe !== null) {
             $scaffoldMeta['recipe'] = $recipe;
         }
+        // Which WordPress layout this site is ('classic' | 'bedrock'). Both are
+        // framework=wordpress, so the layout is what tells them apart — themes
+        // and plugins land in wp-content/ for one and web/app/ for the other.
+        if (isset($tile['wp_layout'])) {
+            $scaffoldMeta['layout'] = (string) $tile['wp_layout'];
+        }
 
         $this->site->forceFill([
             'type' => SiteType::Php,

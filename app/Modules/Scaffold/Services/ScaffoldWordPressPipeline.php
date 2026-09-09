@@ -28,7 +28,8 @@ use Throwable;
  *   3. wp_download   — wp core download into the deploy directory
  *   4. wp_config     — wp config create with the generated DB credentials + salts
  *   5. wp_install    — wp core install with admin email + generated password
- *   6. apply_hardening — opinionated-secure defaults (Q18):
+ *   6. wp_theme      — install + activate a theme (see below)
+ *   7. apply_hardening — opinionated-secure defaults (Q18):
  *                       - DISALLOW_FILE_EDIT in wp-config
  *                       - FORCE_SSL_ADMIN in wp-config
  *                       - Hello Dolly + Akismet removed
@@ -69,6 +70,7 @@ class ScaffoldWordPressPipeline
             ['wp_download', fn () => $this->stepWpDownload($site)],
             ['wp_config', fn () => $this->stepWpConfig($site)],
             ['wp_install', fn () => $this->stepWpInstall($site, $adminPassword)],
+            ['wp_theme', fn () => $this->stepInstallTheme($site)],
             ['apply_hardening', fn () => $this->stepApplyHardening($site)],
         ];
 
@@ -128,6 +130,7 @@ class ScaffoldWordPressPipeline
             ScaffoldStep::pending('wp_download', 'wp core download'),
             ScaffoldStep::pending('wp_config', 'wp config create'),
             ScaffoldStep::pending('wp_install', 'wp core install + seed admin'),
+            ScaffoldStep::pending('wp_theme', 'Install + activate theme'),
             ScaffoldStep::pending('apply_hardening', 'Apply opinionated hardening'),
         ];
         $this->setMeta($site, 'scaffold.steps', $steps);
@@ -324,6 +327,54 @@ class ScaffoldWordPressPipeline
         if ($out->getExitCode() !== 0) {
             throw new \RuntimeException('wp core install failed: '.$out->getBuffer());
         }
+    }
+
+    /**
+     * Install and activate a theme.
+     *
+     * Not optional, and not cosmetic: step 3 runs `wp core download
+     * --skip-content`, which omits the bundled themes on purpose (smaller
+     * download, none of the cruft `apply_hardening` would only delete again).
+     * Nothing put one back, so `wp core install` succeeded and every scaffolded
+     * site then fatalled on its first front-end request with no active theme.
+     *
+     * Fails the step rather than warning: a WordPress site that cannot render
+     * is not a successful scaffold, and a loud failure in the journey UI beats
+     * handing someone a white screen.
+     */
+    private function stepInstallTheme(Site $site): void
+    {
+        $deployPath = $this->deployPath($site);
+        $theme = trim((string) config('sites.wordpress_default_theme', 'twentytwentyfive'));
+
+        if ($theme === '') {
+            throw new \RuntimeException('No WordPress default theme configured (sites.wordpress_default_theme).');
+        }
+
+        $cmd = sprintf(
+            'cd %s && wp theme install %s --activate --no-color && wp theme list --status=active --field=name',
+            escapeshellarg($deployPath),
+            escapeshellarg($theme),
+        );
+        $out = $this->executor->runInlineBash(
+            server: $site->server,
+            name: 'scaffold-wp:theme-install',
+            inlineBash: $cmd,
+            timeoutSeconds: 120,
+        );
+
+        if ($out->getExitCode() !== 0) {
+            throw new \RuntimeException('wp theme install failed: '.$out->getBuffer());
+        }
+
+        // `wp theme install` can exit 0 having only warned (already installed,
+        // or activation skipped), so confirm something is actually active
+        // instead of trusting the exit code.
+        if (trim($out->getBuffer()) === '') {
+            throw new \RuntimeException('No active theme after installing '.$theme.'; the site would not render.');
+        }
+
+        $this->setMeta($site, 'scaffold.theme', $theme);
     }
 
     private function stepApplyHardening(Site $site): void

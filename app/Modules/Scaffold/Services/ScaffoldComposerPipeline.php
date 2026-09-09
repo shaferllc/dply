@@ -42,6 +42,12 @@ use Throwable;
  */
 class ScaffoldComposerPipeline
 {
+    /** The eight salts Bedrock's config expects in .env. */
+    private const BEDROCK_SALT_KEYS = [
+        'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY',
+        'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT',
+    ];
+
     public function __construct(
         private readonly ScaffoldPrerequisites $prerequisites,
         private readonly ServerDatabaseProvisioner $databaseProvisioner,
@@ -70,10 +76,20 @@ class ScaffoldComposerPipeline
         $envStrategy = (string) ($recipe['env'] ?? 'none');
         $runMigrate = (bool) ($recipe['migrate'] ?? false);
 
-        $this->initSteps($site, $package, $needsDb, $envStrategy, $runMigrate);
+        // WordPress-on-Composer (Bedrock): files alone render the WordPress
+        // installer, so the recipe also asks for a wp-cli install pass.
+        $wpInstall = (bool) ($recipe['wp_install'] ?? false);
+
+        $this->initSteps($site, $package, $needsDb, $envStrategy, $runMigrate, $wpInstall);
+
+        $adminPassword = null;
+        if ($wpInstall) {
+            $adminPassword = Str::password(20);
+            $this->setMeta($site, 'scaffold.admin_password', encrypt($adminPassword));
+        }
 
         $steps = [
-            ['prereqs', fn () => $this->stepPrereqs($site)],
+            ['prereqs', fn () => $this->stepPrereqs($site, $wpInstall)],
             ['placeholder_dns', fn () => $this->stepAssignPlaceholderDns($site)],
         ];
         if ($needsDb) {
@@ -82,6 +98,13 @@ class ScaffoldComposerPipeline
         $steps[] = ['composer_create', fn () => $this->stepComposerCreate($site, $package)];
         if ($envStrategy === 'laravel') {
             $steps[] = ['write_env', fn () => $this->stepWriteEnv($site, $needsDb)];
+        }
+        if ($envStrategy === 'bedrock') {
+            $steps[] = ['write_env', fn () => $this->stepWriteBedrockEnv($site, $needsDb)];
+        }
+        if ($wpInstall) {
+            $steps[] = ['wp_install', fn () => $this->stepWpInstall($site, (string) $adminPassword)];
+            $steps[] = ['wp_theme', fn () => $this->stepInstallTheme($site)];
         }
         if ($runMigrate) {
             $steps[] = ['migrate', fn () => $this->stepMigrate($site)];
@@ -160,7 +183,7 @@ class ScaffoldComposerPipeline
         return is_array($recipe) ? $recipe : [];
     }
 
-    private function initSteps(Site $site, string $package, bool $needsDb, string $envStrategy, bool $runMigrate): void
+    private function initSteps(Site $site, string $package, bool $needsDb, string $envStrategy, bool $runMigrate, bool $wpInstall = false): void
     {
         $steps = [
             ScaffoldStep::pending('prereqs', 'Verify prerequisites (composer)'),
@@ -173,6 +196,13 @@ class ScaffoldComposerPipeline
         if ($envStrategy === 'laravel') {
             $steps[] = ScaffoldStep::pending('write_env', 'Write .env and generate app key');
         }
+        if ($envStrategy === 'bedrock') {
+            $steps[] = ScaffoldStep::pending('write_env', 'Write .env (DB, URLs, salts)');
+        }
+        if ($wpInstall) {
+            $steps[] = ScaffoldStep::pending('wp_install', 'wp core install + seed admin');
+            $steps[] = ScaffoldStep::pending('wp_theme', 'Install + activate theme');
+        }
         if ($runMigrate) {
             $steps[] = ScaffoldStep::pending('migrate', 'Run migrations');
         }
@@ -180,11 +210,20 @@ class ScaffoldComposerPipeline
         $this->setMeta($site, 'scaffold.started_at', now()->toISOString());
     }
 
-    private function stepPrereqs(Site $site): void
+    private function stepPrereqs(Site $site, bool $needsWpCli = false): void
     {
         $result = $this->prerequisites->ensureComposer($site->server);
         if (! $result->ok()) {
             throw new \RuntimeException('Composer install failed: '.$result->error);
+        }
+
+        // Bedrock is a Composer project that still needs wp-cli to install
+        // WordPress itself; composer create-project only lays down files.
+        if ($needsWpCli) {
+            $wp = $this->prerequisites->ensureWpCli($site->server);
+            if (! $wp->ok()) {
+                throw new \RuntimeException('wp-cli install failed: '.$wp->error);
+            }
         }
     }
 
@@ -372,6 +411,134 @@ class ScaffoldComposerPipeline
         if ($out->getExitCode() !== 0) {
             throw new \RuntimeException('write env failed: '.$out->getBuffer());
         }
+    }
+
+    /**
+     * Bedrock's .env schema — not Laravel's, despite the Laravel-shaped file.
+     * Bedrock reads DB_* (not DB_CONNECTION/DB_DATABASE), needs WP_HOME and
+     * WP_SITEURL to build every URL, and needs the eight WordPress salts.
+     *
+     * Salts are generated here rather than curled from
+     * api.wordpress.org/secret-key on the box: one less network dependency in
+     * the provision path, and the box never has to be able to reach wp.org for
+     * a site to come up.
+     */
+    private function stepWriteBedrockEnv(Site $site, bool $needsDb): void
+    {
+        $deployPath = $this->deployPath($site);
+        $url = $this->siteUrl($site);
+
+        $lines = [
+            'WP_ENV=production',
+            'WP_HOME='.$url,
+            'WP_SITEURL='.$url.'/wp',
+        ];
+
+        if ($needsDb) {
+            $db = $site->fresh()->meta['scaffold']['database'] ?? [];
+            $lines[] = 'DB_NAME='.(string) ($db['name'] ?? '');
+            $lines[] = 'DB_USER='.(string) ($db['username'] ?? '');
+            $lines[] = 'DB_PASSWORD='.(isset($db['password']) ? decrypt($db['password']) : '');
+            $lines[] = 'DB_HOST=127.0.0.1';
+        }
+
+        foreach (self::BEDROCK_SALT_KEYS as $key) {
+            // 64 chars of printable entropy, matching what wp.org's salt
+            // service returns. Str::random is CSPRNG-backed.
+            $lines[] = $key."='".Str::random(64)."'";
+        }
+
+        $cmd = sprintf(
+            'cd %s && printf %s > .env',
+            escapeshellarg($deployPath),
+            escapeshellarg(implode("\n", $lines)."\n"),
+        );
+
+        $out = $this->executor->runInlineBash(
+            server: $site->server,
+            name: 'scaffold-composer:write-bedrock-env',
+            inlineBash: $cmd,
+            timeoutSeconds: 60,
+        );
+        if ($out->getExitCode() !== 0) {
+            throw new \RuntimeException('write bedrock env failed: '.$out->getBuffer());
+        }
+    }
+
+    /**
+     * `wp core install` against a Bedrock tree. --path points at web/wp (where
+     * Bedrock installs core); wp-cli picks Bedrock's wp-config up from the
+     * project root, so WP_CONTENT_DIR still resolves to web/app.
+     */
+    private function stepWpInstall(Site $site, string $password): void
+    {
+        $deployPath = $this->deployPath($site);
+        $email = (string) ($site->meta['scaffold']['admin_email'] ?? 'admin@example.com');
+
+        $cmd = sprintf(
+            'cd %s && wp core install --path=web/wp --url=%s --title=%s --admin_user=admin --admin_email=%s --admin_password=%s --skip-email',
+            escapeshellarg($deployPath),
+            escapeshellarg($this->siteUrl($site)),
+            escapeshellarg($site->name),
+            escapeshellarg($email),
+            escapeshellarg($password),
+        );
+        $out = $this->executor->runInlineBash(
+            server: $site->server,
+            name: 'scaffold-composer:wp-core-install',
+            inlineBash: $cmd,
+            timeoutSeconds: 120,
+        );
+        if ($out->getExitCode() !== 0) {
+            throw new \RuntimeException('wp core install failed: '.$out->getBuffer());
+        }
+    }
+
+    /**
+     * Bedrock ships no themes either (web/app/themes is empty after
+     * create-project), so the same no-active-theme fatal applies here as in the
+     * classic pipeline. Same config key, same verify-don't-trust-exit-code.
+     */
+    private function stepInstallTheme(Site $site): void
+    {
+        $deployPath = $this->deployPath($site);
+        $theme = trim((string) config('sites.wordpress_default_theme', 'twentytwentyfive'));
+
+        if ($theme === '') {
+            throw new \RuntimeException('No WordPress default theme configured (sites.wordpress_default_theme).');
+        }
+
+        $cmd = sprintf(
+            'cd %s && wp theme install %s --activate --no-color --path=web/wp && wp theme list --status=active --field=name --path=web/wp',
+            escapeshellarg($deployPath),
+            escapeshellarg($theme),
+        );
+        $out = $this->executor->runInlineBash(
+            server: $site->server,
+            name: 'scaffold-composer:wp-theme-install',
+            inlineBash: $cmd,
+            timeoutSeconds: 120,
+        );
+
+        if ($out->getExitCode() !== 0) {
+            throw new \RuntimeException('wp theme install failed: '.$out->getBuffer());
+        }
+        if (trim($out->getBuffer()) === '') {
+            throw new \RuntimeException('No active theme after installing '.$theme.'; the site would not render.');
+        }
+
+        $this->setMeta($site, 'scaffold.theme', $theme);
+    }
+
+    /**
+     * Site URL for WP_HOME / --url. placeholder_dns runs before both, so a
+     * primaryDomain() exists by here. http:// matches the classic pipeline.
+     */
+    private function siteUrl(Site $site): string
+    {
+        $hostname = $site->primaryDomain()?->hostname;
+
+        return 'http://'.(is_string($hostname) && $hostname !== '' ? $hostname : 'localhost');
     }
 
     private function stepMigrate(Site $site): void

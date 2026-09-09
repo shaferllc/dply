@@ -179,3 +179,32 @@ function ownerWithOrg(): User
 
     return $user;
 }
+
+/** Deployer in the current org — the role CloudDatabasePolicy::create denies. */
+function deployerWithOrg(): User
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'deployer']);
+    session(['current_organization_id' => $org->id]);
+
+    return $user;
+}
+
+test('a deployer cannot open the cloud database create page', function () {
+    Livewire::actingAs(deployerWithOrg())
+        ->test(CloudDatabaseCreate::class)
+        ->assertForbidden();
+});
+
+test('a deployer gets a 403 from the cloud database create route itself', function () {
+    Queue::fake();
+    Http::fake();
+
+    test()->actingAs(deployerWithOrg())
+        ->get(route('cloud.databases.create'))
+        ->assertForbidden();
+
+    expect(CloudDatabase::query()->count())->toBe(0);
+    Queue::assertNotPushed(ProvisionCloudDatabaseJob::class);
+});

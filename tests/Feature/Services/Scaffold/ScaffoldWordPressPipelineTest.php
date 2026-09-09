@@ -67,7 +67,7 @@ function makeScaffoldingSite(string $serverEngine = 'mariadb114'): Site
         ],
     ]);
 }
-test('happy path walks all six steps', function () {
+test('happy path walks every step', function () {
     $site = makeScaffoldingSite();
 
     $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
@@ -90,8 +90,8 @@ test('happy path walks all six steps', function () {
 
     $steps = collect($site->meta['scaffold']['steps']);
 
-    // 7 = original 6 + the new placeholder_dns step
-    expect($steps)->toHaveCount(7);
+    // 8 = original 6 + placeholder_dns + wp_theme
+    expect($steps)->toHaveCount(8);
     expect($steps->every(fn ($s) => $s['state'] === ScaffoldStep::STATE_COMPLETED))->toBeTrue();
 
     // Q18 hardening opinions recorded for the Hardening tab to read.
@@ -191,4 +191,53 @@ test('wp install uses placeholder hostname in url argument', function () {
 
     expect($installBash)->not->toBeNull('wp core install step should have run');
     $this->assertStringContainsString("--url='http://my-wp-blog.203-0-113-42.nip.io'", $installBash);
+});
+
+test('the scaffold installs and activates a theme', function () {
+    config(['sites.wordpress_default_theme' => 'twentytwentyfive']);
+    $site = makeScaffoldingSite();
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->once()->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->once()->andReturn('ok');
+
+    // `wp core download --skip-content` ships no themes, so the scaffold has to
+    // put one back or the site fatals on its first front-end request.
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('twentytwentyfive', 0, false));
+
+    $result = (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site);
+
+    expect($result['ok'])->toBeTrue();
+
+    $site->refresh();
+    expect($site->meta['scaffold']['theme'])->toBe('twentytwentyfive');
+
+    $steps = collect($site->meta['scaffold']['steps']);
+    expect($steps->firstWhere('key', 'wp_theme'))->not->toBeNull();
+});
+
+test('the scaffold fails loudly when no theme ends up active', function () {
+    $site = makeScaffoldingSite();
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->once()->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->once()->andReturn('ok');
+
+    // wp theme install can exit 0 having only warned, so the step verifies an
+    // active theme rather than trusting the exit code. Empty output = none.
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('', 0, false));
+
+    $result = (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site);
+
+    expect($result['ok'])->toBeFalse();
+    expect($result['failed_step'])->toBe('wp_theme');
+
+    $site->refresh();
+    expect($site->status)->toBe(Site::STATUS_SCAFFOLD_FAILED);
 });

@@ -61,6 +61,14 @@ class DatabaseCreate extends Component
     public function mount(): void
     {
         abort_unless(Feature::active('surface.databases'), 404);
+
+        // Every other operation on a cloud database already authorizes
+        // (DatabaseIndex::delete, and every action on DatabaseShow). Create was
+        // the one door left open, even though CloudDatabasePolicy::create was
+        // written for exactly this: a deployer ships code against an existing
+        // cluster and may not mint new billable infrastructure.
+        $this->authorize('create', CloudDatabase::class);
+
         $this->syncCatalogDefaults();
     }
 
@@ -76,6 +84,10 @@ class DatabaseCreate extends Component
 
     public function create(): void
     {
+        // Livewire methods are directly reachable, so the gate belongs on the
+        // action too and not only on mount().
+        $this->authorize('create', CloudDatabase::class);
+
         $org = auth()->user()?->currentOrganization();
         if ($org === null) {
             $this->toastError(__('Select or create an organization first.'));

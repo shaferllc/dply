@@ -8,6 +8,7 @@ use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\StoreManagedServer;
 use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\Server;
 use App\Modules\Billing\Services\ServerResourceCostCalculator;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\View\View;
@@ -42,6 +43,14 @@ class CreateManaged extends Component
     {
         abort_unless($this->managedAvailable(), 404);
 
+        // Same bar as every BYO wizard step (Create\Step*): minting a server is
+        // not a deployer action. This flow spends on dply's OWN platform account
+        // rather than a customer credential, and the server it creates has no
+        // workspace_id — so ServerPolicy::update() grants the creator full host
+        // control afterwards. Skipping the check here was a privilege escalation,
+        // not just a billing hole.
+        $this->authorize('create', Server::class);
+
         $platform = ServerHostingPlatformContext::fromConfig();
         $regions = $platform->regions();
         $this->region = array_key_exists($platform->defaultRegion, $regions)
@@ -70,6 +79,11 @@ class CreateManaged extends Component
 
     public function create(StoreManagedServer $store): mixed
     {
+        // Re-checked on the action, not just mount: a Livewire component is a
+        // live endpoint, so a mount-only gate is bypassable by posting straight
+        // at the method.
+        $this->authorize('create', Server::class);
+
         $user = auth()->user();
         $org = $user?->currentOrganization();
 
