@@ -8,8 +8,11 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
+use App\Models\SupervisorProgram;
 use App\Modules\Deploy\Services\SiteBindingManager;
+use App\Services\Servers\SupervisorProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 
 uses(RefreshDatabase::class);
 
@@ -126,4 +129,39 @@ test('a site with no hostname is refused rather than wired to an unreachable vho
 
     expect(fn () => app(SiteBindingManager::class)->attachExisting($site, 'broadcasting', ['kind' => 'self_hosted']))
         ->toThrow(\InvalidArgumentException::class);
+});
+
+test('switching away from self-hosted removes the daemon instead of leaving it crash-looping', function () {
+    [$site] = reverbFixture();
+
+    $manager = app(SiteBindingManager::class);
+    $manager->attachExisting($site, 'broadcasting', ['kind' => 'self_hosted']);
+
+    // The setup job creates the program on the box; stand in for it here so the
+    // switch has something to clean up.
+    SupervisorProgram::query()->create([
+        'server_id' => $site->server_id,
+        'site_id' => $site->id,
+        'slug' => 'reverb-test',
+        'program_type' => 'reverb',
+        'command' => 'php artisan reverb:start --host=127.0.0.1 --port=8080',
+        'directory' => '/home/dply/app',
+        'user' => 'dply',
+        'numprocs' => 1,
+        'is_active' => true,
+    ]);
+
+    // No SSH in a unit test — assert on what we ask the provisioner to do.
+    $mock = Mockery::mock(SupervisorProvisioner::class);
+    $mock->shouldReceive('deleteConfigFile')->once();
+    app()->instance(SupervisorProvisioner::class, $mock);
+
+    $manager->attachExisting($site->fresh(), 'broadcasting', [
+        'kind' => 'byo',
+        'driver' => 'ably',
+        'ably_key' => 'abc.def:ghi',
+    ]);
+
+    expect(SupervisorProgram::query()->where('site_id', $site->id)->where('program_type', 'reverb')->exists())
+        ->toBeFalse();
 });

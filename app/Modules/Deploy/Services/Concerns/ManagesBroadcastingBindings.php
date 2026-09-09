@@ -81,6 +81,17 @@ trait ManagesBroadcastingBindings
     {
         $kind = strtolower(trim((string) ($params['kind'] ?? 'managed')));
 
+        // Switching AWAY from self-hosted replaces the injected env, but the
+        // Reverb daemon is not part of the binding row — left running it would
+        // restart forever against credentials the app no longer has. Reconfiguring
+        // is not a detach, so teardownBroadcasting() never sees it.
+        if ($kind !== 'self_hosted') {
+            $current = $site->bindings->firstWhere('type', 'broadcasting');
+            if ($current instanceof SiteBinding && (string) $current->target_type === 'broadcasting_self_hosted') {
+                $this->teardownSelfHostedReverb($current);
+            }
+        }
+
         return match ($kind) {
             'managed' => $this->attachManagedBroadcasting($site, $params),
             'self_hosted' => $this->attachSelfHostedReverb($site),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\ConsoleActions\ConsoleEmitter;
@@ -14,6 +15,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -52,10 +54,17 @@ class SetUpSiteReverbJob implements ShouldQueue
     public function handle(ExecuteRemoteTaskOnServer $exec, SupervisorProvisioner $provisioner): void
     {
         $emit = new ConsoleEmitter($this->consoleActionId);
+
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $site = Site::query()->with(['server', 'bindings'])->find($this->siteId);
 
         if ($site === null || $site->server === null) {
-            $emit->error(__('This site has no server to run Reverb on.'), 'reverb');
+            $this->fail($emit, __('This site has no server to run Reverb on.'));
 
             return;
         }
@@ -65,14 +74,14 @@ class SetUpSiteReverbJob implements ShouldQueue
         $port = (int) ($env['REVERB_SERVER_PORT'] ?? 0);
 
         if ($port <= 0) {
-            $emit->error(__('The broadcasting resource has no Reverb port — reconnect it.'), 'reverb');
+            $this->fail($emit, __('The broadcasting resource has no Reverb port — reconnect it.'));
 
             return;
         }
 
         $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
         if ($dir === '') {
-            $emit->error(__('This site has no deployed app directory yet — deploy it once, then connect Reverb.'), 'reverb');
+            $this->fail($emit, __('This site has no deployed app directory yet — deploy it once, then connect Reverb.'));
 
             return;
         }
@@ -95,30 +104,40 @@ class SetUpSiteReverbJob implements ShouldQueue
         ]);
 
         try {
-            $out = $exec->runInlineBash(
+            $result = $exec->runInlineBash(
                 $site->server,
                 'site:reverb-composer-require',
                 $script,
                 timeoutSeconds: $this->timeout - 120,
                 asRoot: false,
-                // Markers, not the exit code, decide the verdict — the same
-                // reason EnsureSiteComposerPackageJob reads them.
-            )->getBuffer();
+            );
         } catch (\Throwable $e) {
-            $emit->error(__('Could not install laravel/reverb: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'reverb');
+            $this->fail($emit, __('Could not install laravel/reverb: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
 
+        // A timed-out require emits neither marker, so the checks below would
+        // all fall through and report success on a run that never finished.
+        if ($result->isTimeout()) {
+            $this->fail($emit, __('composer require laravel/reverb timed out.'));
+
+            return;
+        }
+
+        // Markers, not the exit code, decide the verdict — the same reason
+        // EnsureSiteComposerPackageJob reads them.
+        $out = $result->getBuffer();
+
         if (str_contains($out, 'DPLY_NO_COMPOSER')) {
-            $emit->error(__('Composer is not installed on this server — require laravel/reverb in the app manually.'), 'reverb');
+            $this->fail($emit, __('Composer is not installed on this server — require laravel/reverb in the app manually.'));
 
             return;
         }
 
         if (str_contains($out, 'DPLY_FAILED')) {
             $emit->step('reverb', Str::limit(trim($out), 4000));
-            $emit->error(__('composer require laravel/reverb did not complete — see the output.'), 'reverb');
+            $this->fail($emit, __('composer require laravel/reverb did not complete — see the output.'));
 
             return;
         }
@@ -139,7 +158,7 @@ class SetUpSiteReverbJob implements ShouldQueue
             // container's call() rather than a bare method call.
             app()->call([app(PushSiteEnvJob::class, ['siteId' => $this->siteId, 'userId' => $this->userId]), 'handle']);
         } catch (\Throwable $e) {
-            $emit->error(__('Could not push the .env: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'reverb');
+            $this->fail($emit, __('Could not push the .env: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -159,7 +178,7 @@ class SetUpSiteReverbJob implements ShouldQueue
                 asRoot: false,
             );
         } catch (\Throwable $e) {
-            $emit->error(__('Could not clear the config cache: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'reverb');
+            $this->fail($emit, __('Could not clear the config cache: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -197,7 +216,7 @@ class SetUpSiteReverbJob implements ShouldQueue
         try {
             $provisioner->syncProgram($site->server->fresh(), (string) $program->id);
         } catch (\Throwable $e) {
-            $emit->error(__('Reverb saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'reverb');
+            $this->fail($emit, __('Reverb saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -211,7 +230,7 @@ class SetUpSiteReverbJob implements ShouldQueue
         try {
             app()->call([app(ApplySiteWebserverConfigJob::class, ['siteId' => $this->siteId, 'userId' => $this->userId]), 'handle']);
         } catch (\Throwable $e) {
-            $emit->error(__('Reverb is running, but the webserver config did not reload: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'reverb');
+            $this->fail($emit, __('Reverb is running, but the webserver config did not reload: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -223,8 +242,36 @@ class SetUpSiteReverbJob implements ShouldQueue
             $emit->step('reverb', __('Deploys will now restart Reverb.'));
         }
 
-        $emit->success(__('Reverb is live on :host. Echo connects with no further setup.', [
+        $this->succeed($emit, __('Reverb is live on :host. Echo connects with no further setup.', [
             'host' => (string) ($env['REVERB_HOST'] ?? $site->server->name),
-        ]), 'reverb');
+        ]));
+    }
+
+    /**
+     * Terminal states are written to the row, not just emitted: the UI watcher
+     * ({@see \App\Livewire\Concerns\WatchesConsoleActionOutcomes}) reads
+     * `console_actions.status` and would otherwise sit on "running" until the
+     * run went stale, whatever the console output said.
+     */
+    private function fail(ConsoleEmitter $emit, string $message): void
+    {
+        $emit->error($message, 'reverb');
+        $this->complete(failed: true, error: Str::limit($message, 500));
+    }
+
+    private function succeed(ConsoleEmitter $emit, string $message): void
+    {
+        $emit->success($message, 'reverb');
+        $this->complete(failed: false);
+    }
+
+    private function complete(bool $failed, ?string $error = null): void
+    {
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => $failed ? ConsoleAction::STATUS_FAILED : ConsoleAction::STATUS_COMPLETED,
+            'finished_at' => now(),
+            'error' => $failed ? $error : null,
+            'updated_at' => now(),
+        ]);
     }
 }

@@ -89,7 +89,11 @@ class SetUpSiteQueueingJob implements ShouldQueue
         $emit->step('setup', __('Pushing the .env to :server …', ['server' => (string) $site->server->name]));
 
         try {
-            app(PushSiteEnvJob::class, ['siteId' => $this->siteId, 'userId' => $this->userId])->handle();
+            // handle() takes an injected SiteEnvPusher, so a bare method call
+            // throws ArgumentCountError — which the catch below turned into a
+            // "could not push the .env" every single time. Resolve through the
+            // container instead.
+            app()->call([app(PushSiteEnvJob::class, ['siteId' => $this->siteId, 'userId' => $this->userId]), 'handle']);
         } catch (\Throwable $e) {
             $emit->error(__('Could not push the .env: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'setup');
 
