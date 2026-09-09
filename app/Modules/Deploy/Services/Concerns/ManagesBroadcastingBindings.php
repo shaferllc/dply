@@ -9,7 +9,9 @@ use App\Models\Organization;
 use App\Modules\Realtime\Models\RealtimeApp;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Models\SupervisorProgram;
 use App\Models\User;
+use App\Services\Servers\SupervisorProvisioner;
 use App\Modules\Realtime\Services\RealtimeBackendFactory;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -174,6 +176,110 @@ trait ManagesBroadcastingBindings
     }
 
     /**
+     * Stand Laravel Reverb up ON the site's own server, with nothing for the
+     * operator to type. dply mints the app credentials, allocates a free
+     * loopback port and records it on the site meta — which is what flips
+     * {@see \App\Models\Site::shouldProxyReverbInWebserver()}, so every
+     * webserver builder already emits the wss + Pusher-HTTP-API proxy for it
+     * with no new config code. The composer require, the supervisor program and
+     * the vhost reload are driven by {@see \App\Jobs\SetUpSiteReverbJob},
+     * dispatched once this binding saves.
+     *
+     * Re-running keeps the existing credentials and port: rotating them on a
+     * reconfigure would break every connected client for no reason.
+     */
+    private function attachSelfHostedReverb(Site $site): SiteBinding
+    {
+        $server = $site->server;
+        if ($server === null || $server->hostCapabilities()->supportsSsh() !== true) {
+            throw new InvalidArgumentException(__('Self-hosted Reverb needs a site on a dply-managed server. Bring your own credentials instead.'));
+        }
+
+        // Reverb is served through the site's own vhost, so it needs a hostname
+        // to be reachable at — and the browser needs one to dial wss://.
+        $host = strtolower(trim((string) ($site->primaryDomain()?->hostname ?: $site->testingHostname())));
+        if ($host === '') {
+            throw new InvalidArgumentException(__('Add a domain to this site first — Reverb serves websockets on it.'));
+        }
+
+        $existing = $site->bindings->firstWhere('type', 'broadcasting');
+        $prior = ($existing instanceof SiteBinding && (string) $existing->target_type === 'broadcasting_self_hosted')
+            ? (array) $existing->injected_env
+            : [];
+
+        $port = (int) ($prior['REVERB_SERVER_PORT'] ?? 0) ?: $this->freeReverbPort($site);
+
+        // The two keys the webserver builders read. Written here so connecting
+        // the resource is the whole setup — no second trip to the Runtime tab.
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $reverbMeta = is_array($meta['laravel_reverb'] ?? null) ? $meta['laravel_reverb'] : [];
+        $reverbMeta['port'] = $port;
+        $reverbMeta['ws_path'] = trim((string) ($reverbMeta['ws_path'] ?? '')) ?: '/app';
+        $meta['laravel_reverb'] = $reverbMeta;
+        $site->forceFill(['meta' => $meta])->save();
+
+        $env = [
+            'BROADCAST_CONNECTION' => 'reverb',
+            'REVERB_APP_ID' => (string) ($prior['REVERB_APP_ID'] ?? random_int(100000, 999999)),
+            'REVERB_APP_KEY' => (string) ($prior['REVERB_APP_KEY'] ?? Str::lower(Str::random(20))),
+            'REVERB_APP_SECRET' => (string) ($prior['REVERB_APP_SECRET'] ?? Str::lower(Str::random(20))),
+            // What the app and the browser dial: the public vhost, which proxies
+            // both the websocket path and /apps/* down to the loopback port.
+            'REVERB_HOST' => $host,
+            'REVERB_PORT' => '443',
+            'REVERB_SCHEME' => 'https',
+            // What the daemon binds. Loopback, never 0.0.0.0 — the raw port must
+            // not be reachable from outside; everything arrives via the vhost.
+            'REVERB_SERVER_HOST' => '127.0.0.1',
+            'REVERB_SERVER_PORT' => (string) $port,
+        ];
+
+        return $this->persist($site, 'broadcasting', [
+            'mode' => 'provision_new',
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'name' => 'reverb',
+            'target_type' => 'broadcasting_self_hosted',
+            'target_id' => (string) $server->id,
+            'injected_env' => [...$env, ...$this->broadcastingViteMirror($env)],
+            'config' => ['kind' => 'self_hosted', 'driver' => 'reverb', 'port' => $port],
+        ]);
+    }
+
+    /**
+     * First unused loopback port for Reverb on this site's server. Two sites
+     * both defaulting to 8080 would fight over the socket and the loser
+     * crash-loops under Supervisor with nothing in the UI saying why, so the
+     * port is allocated rather than defaulted. Octane ports count as taken —
+     * they live on the same loopback.
+     */
+    private function freeReverbPort(Site $site): int
+    {
+        [$from, $to] = self::REVERB_PORT_RANGE;
+
+        $taken = [];
+        $siblings = Site::query()
+            ->where('server_id', $site->server_id)
+            ->whereKeyNot($site->getKey())
+            ->get(['id', 'meta', 'octane_port']);
+
+        foreach ($siblings as $sibling) {
+            foreach ([(int) (data_get($sibling->meta, 'laravel_reverb.port') ?? 0), (int) ($sibling->octane_port ?? 0)] as $used) {
+                if ($used > 0) {
+                    $taken[$used] = true;
+                }
+            }
+        }
+
+        for ($port = $from; $port <= $to; $port++) {
+            if (! isset($taken[$port])) {
+                return $port;
+            }
+        }
+
+        throw new RuntimeException(__('No free websocket port left on this server.'));
+    }
+
+    /**
      * @param  array<string, mixed> $params
      */
     private function attachByoBroadcasting(Site $site, array $params): SiteBinding
@@ -319,6 +425,11 @@ trait ManagesBroadcastingBindings
             if ($key === 'PUSHER_APP_SECRET' || $key === 'REVERB_APP_SECRET') {
                 continue;
             }
+            // REVERB_SERVER_* is the daemon's own bind address (loopback).
+            // Mirroring it would tell the browser to dial 127.0.0.1.
+            if (str_starts_with((string) $key, 'REVERB_SERVER_')) {
+                continue;
+            }
             if (str_starts_with($key, 'PUSHER_') || str_starts_with($key, 'REVERB_')) {
                 $mirror['VITE_'.$key] = $value;
             }
@@ -335,6 +446,12 @@ trait ManagesBroadcastingBindings
      */
     private function teardownBroadcasting(SiteBinding $binding): void
     {
+        if ((string) $binding->target_type === 'broadcasting_self_hosted') {
+            $this->teardownSelfHostedReverb($binding);
+
+            return;
+        }
+
         if ((string) $binding->target_type !== 'realtime_app') {
             return;
         }
@@ -367,5 +484,40 @@ trait ManagesBroadcastingBindings
         }
 
         $app->forceFill(['status' => RealtimeApp::STATUS_PAUSED])->save();
+    }
+
+    /**
+     * Detaching self-hosted Reverb has to take the daemon with it. The env goes
+     * with the binding, so a program left behind would keep restarting against
+     * credentials the app no longer has — a crash-loop nobody would think to
+     * look for. The site meta port stays: it costs nothing and re-attaching
+     * then reuses the same port instead of drifting up the range.
+     */
+    private function teardownSelfHostedReverb(SiteBinding $binding): void
+    {
+        $site = $binding->site;
+        if ($site === null || $site->server === null) {
+            return;
+        }
+
+        $programs = SupervisorProgram::query()
+            ->where('site_id', $site->id)
+            ->where('program_type', 'reverb')
+            ->get();
+
+        if ($programs->isEmpty()) {
+            return;
+        }
+
+        $provisioner = app(SupervisorProvisioner::class);
+
+        foreach ($programs as $program) {
+            try {
+                $provisioner->deleteConfigFile($site->server, (string) $program->id);
+            } catch (\Throwable) {
+                // Best-effort: an unreachable box must not block the detach.
+            }
+            $program->delete();
+        }
     }
 }

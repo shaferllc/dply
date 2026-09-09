@@ -119,8 +119,14 @@ trait BuildsSiteBindingFormDefaults
 
         $defaultTier = (string) config('realtime.default_tier', 'starter');
 
+        // Self-hosted Reverb is the zero-typing default whenever the site sits
+        // on a server dply can reach: one click and the daemon, the proxy and
+        // the credentials all exist. Sites with no such server (and repeat
+        // visits to an existing binding) keep the old default.
+        $canSelfHost = $this->site->server?->hostCapabilities()->supportsSsh() === true;
+
         return [
-            'kind' => (string) ($cfg['kind'] ?? 'managed'),
+            'kind' => (string) ($cfg['kind'] ?? ($canSelfHost ? 'self_hosted' : 'managed')),
             // Managed: attach an existing app vs provision a new (billed) one.
             'provision' => ! $hasApps,
             'realtime_app_id' => (string) ($existing?->target_type === 'realtime_app' ? $existing->target_id : ''),

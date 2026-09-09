@@ -363,6 +363,16 @@ return [
             'failed' => 'Queue setup failed.',
             'stale' => 'Queue setup did not finish.',
         ],
+        // Self-hosted Reverb setup: composer require + env push + supervisor +
+        // vhost reload. The composer step alone can run minutes on a cold
+        // cache, so it gets the same long stale window the remediation fixers do.
+        'reverb_setup' => [
+            'running' => 'Setting up Reverb on :host …',
+            'completed' => 'Reverb is running.',
+            'failed' => 'Reverb setup failed.',
+            'stale' => 'Reverb setup did not finish.',
+            'stale_seconds' => 1200,
+        ],
         'queue_dispatch' => [
             'running' => 'Dispatching a job on :host …',
             'completed' => 'A worker took the job off the queue.',
@@ -448,8 +458,8 @@ return [
         // without these kinds the run has nowhere to show on this page (the
         // in-partial console-banner suppresses itself when section ===
         // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'reverb_setup', 'site_remediate', 'site_test', 'binding_validate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'reverb_setup', 'site_remediate', 'install_docker', 'db_engine_install', 'managed_db_provision', 'managed_db_resize'],
         // Queue section: the canary and the depth sweep both report here, so
         // the banner has to know their kinds or the page renders no console.
         // 'systemd' rides along because retry/delete/flush go through

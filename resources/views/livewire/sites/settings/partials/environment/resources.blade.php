@@ -1816,7 +1816,15 @@
                     // The managed (dply-hosted, billed) relay path is gated behind
                     // surface.realtime. When off, only bring-your-own is offered.
                     $bcManagedEnabled = \Laravel\Pennant\Feature::active('surface.realtime');
-                    $bcKind = $bcManagedEnabled ? (string) ($bindingForm['kind'] ?? 'managed') : 'byo';
+                    // Self-hosted Reverb needs a box dply can SSH into.
+                    $bcSelfHostEnabled = $site->server?->hostCapabilities()->supportsSsh() === true;
+                    $bcKind = (string) ($bindingForm['kind'] ?? ($bcSelfHostEnabled ? 'self_hosted' : 'managed'));
+                    if ($bcKind === 'managed' && ! $bcManagedEnabled) {
+                        $bcKind = $bcSelfHostEnabled ? 'self_hosted' : 'byo';
+                    }
+                    if ($bcKind === 'self_hosted' && ! $bcSelfHostEnabled) {
+                        $bcKind = $bcManagedEnabled ? 'managed' : 'byo';
+                    }
                     $bcProvision = (bool) ($bindingForm['provision'] ?? false);
                     $bcDriver = (string) ($bindingForm['driver'] ?? 'pusher');
                     $bcTiers = $this->broadcastingTiers();
@@ -1824,22 +1832,44 @@
                     $bcTierPrice = number_format((($bcTiers[$bcTier]['price_cents'] ?? 0) / 100), 2);
                 @endphp
                 <div class="space-y-4">
-                    {{-- Managed (dply relay) vs bring-your-own. The managed relay
-                         toggle only shows when surface.realtime is enabled; BYO is
-                         always available. Self-hosted Reverb on the VM is
-                         orchestrated separately (coming next). --}}
-                    @if ($bcManagedEnabled)
+                    {{-- Three ways to broadcast: the dply relay (gated on
+                         surface.realtime), Reverb on this site's own server, and
+                         bring-your-own. BYO is always available, so the toggle
+                         only renders once there is a second choice to make. --}}
+                    @if ($bcManagedEnabled || $bcSelfHostEnabled)
                         <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
-                            <button type="button" wire:click="$set('bindingForm.kind', 'managed')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
-                                {{ __('dply realtime') }}
-                            </button>
+                            @if ($bcManagedEnabled)
+                                <button type="button" wire:click="$set('bindingForm.kind', 'managed')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                    {{ __('dply realtime') }}
+                                </button>
+                            @endif
+                            @if ($bcSelfHostEnabled)
+                                <button type="button" wire:click="$set('bindingForm.kind', 'self_hosted')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'self_hosted' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                    {{ __('Reverb on this server') }}
+                                </button>
+                            @endif
                             <button type="button" wire:click="$set('bindingForm.kind', 'byo')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'byo' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
                                 {{ __('Bring your own') }}
                             </button>
                         </div>
                     @endif
 
-                    @if ($bcKind === 'managed')
+                    @if ($bcKind === 'self_hosted')
+                        {{-- Deliberately fieldless. Every value an operator would
+                             otherwise type — app id, key, secret, host, port — is
+                             derived or generated, which is the whole point. --}}
+                        <div class="space-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-3 text-xs text-brand-moss">
+                            <p class="text-sm font-semibold text-brand-ink">{{ __('Laravel Reverb, on :server', ['server' => (string) ($site->server?->name ?? __('this server'))]) }}</p>
+                            <p>{{ __('Saving requires laravel/reverb in the app, generates the app credentials, runs Reverb under Supervisor on a private port, and serves it over wss:// on this site\'s own domain. Nothing to fill in and nothing to pay — it runs on the server you already have.') }}</p>
+                            <ul class="list-disc space-y-0.5 pl-4">
+                                <li>{{ __('Injects BROADCAST_CONNECTION=reverb, the REVERB_* variables and the VITE_REVERB_* mirror for Laravel Echo.') }}</li>
+                                <li>{{ __('Echo needs no extra configuration — the defaults match what is injected.') }}</li>
+                            </ul>
+                            @if ($site->primaryDomain() === null && trim((string) $site->testingHostname()) === '')
+                                <p class="font-semibold text-brand-ink">{{ __('Add a domain to this site first — Reverb serves websockets on it.') }}</p>
+                            @endif
+                        </div>
+                    @elseif ($bcKind === 'managed')
                         {{-- Attach an existing app (share across sites) vs provision
                              a new, billed one. --}}
                         <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">

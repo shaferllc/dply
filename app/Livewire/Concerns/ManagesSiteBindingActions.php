@@ -8,6 +8,7 @@ use App\Enums\ServerProvider;
 use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Jobs\InstallDatabaseEngineJob;
 use App\Jobs\RunSetupScriptJob;
+use App\Jobs\SetUpSiteReverbJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Models\AiCredential;
 use App\Models\CaptchaCredential;
@@ -1194,6 +1195,28 @@ trait ManagesSiteBindingActions
         if ($binding->type === 'error_tracking'
             && (((array) $binding->config)['provider'] ?? '') === 'lookout') {
             $this->ensureComposerPackage($binding, 'lookout/tracing');
+        }
+
+        // Connecting self-hosted Reverb must "just work": the binding only
+        // records credentials, a port and the meta the vhost builders read.
+        // This is what requires the package, gets the env on the box, runs the
+        // daemon and publishes the websocket route.
+        if ($binding->type === 'broadcasting'
+            && (((array) $binding->config)['kind'] ?? '') === 'self_hosted') {
+            $run = $this->seedQueuedConsoleAction('reverb_setup', __('Setting up Reverb'));
+
+            SetUpSiteReverbJob::dispatch(
+                (string) $run->id,
+                (string) $this->site->id,
+                (string) auth()->id() ?: null,
+            );
+
+            $this->dispatch('dply-console-action-focus');
+            $this->watchConsoleAction(
+                $run,
+                __('Reverb is running — Echo connects with no further setup.'),
+                __('Reverb setup did not finish — see the console output.'),
+            );
         }
 
         // Connecting a mail transport must "just work" too: API-based providers
