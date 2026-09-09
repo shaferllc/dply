@@ -319,3 +319,19 @@ test('a failed scaffold can be reset back to the app picker', function () {
     // or the next installer inherits it.
     Bus::assertDispatched(ResetSiteToBlankJob::class);
 });
+
+test('the general page links a failed install to the journey page', function () {
+    [$user, $server, $site] = makeSite(Site::STATUS_SCAFFOLD_FAILED, [
+        'attempt_count' => 1,
+        'steps' => [['key' => 'wp_install', 'label' => 'wp install', 'state' => ScaffoldStep::STATE_FAILED, 'error' => 'oops']],
+    ]);
+
+    // The General card showed "Scaffold failed" as inert metadata, and the
+    // retry / start-over controls live on scaffold-journey, which nothing
+    // linked to (Sites\Show, which claims to host that flow, is unrouted).
+    test()->actingAs($user)
+        ->get(route('sites.show', ['server' => $server, 'site' => $site]))
+        ->assertOk()
+        ->assertSee('The app install failed')
+        ->assertSee(route('sites.scaffold-journey', ['server' => $server, 'site' => $site]), false);
+});

@@ -6,6 +6,42 @@
     $headLink = 'inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-0.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40';
 @endphp
 
+{{-- An app install that is running or has failed. The General card shows
+     "Scaffold failed" as a flat metadata value with nothing to act on, and the
+     retry / start-over controls live on the standalone scaffold-journey page
+     that nothing linked to — App\Livewire\Sites\Show, whose docblock claims to
+     render that flow inside the workspace shell, is not routed at all. Until
+     that is reconciled, this is the signpost. --}}
+@if ($site->isScaffoldInstalling())
+    @php $scaffoldDidFail = $site->status === \App\Models\Site::STATUS_SCAFFOLD_FAILED; @endphp
+    <section class="mb-4 overflow-hidden rounded-2xl border {{ $scaffoldDidFail ? 'border-rose-200 bg-rose-50/50' : 'border-brand-ink/10 bg-brand-sand/20' }}">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <div class="flex min-w-0 items-start gap-3">
+                <x-dynamic-component
+                    :component="$scaffoldDidFail ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-arrow-path'"
+                    class="mt-0.5 h-5 w-5 shrink-0 {{ $scaffoldDidFail ? 'text-rose-600' : 'text-brand-sage' }}"
+                    aria-hidden="true"
+                />
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-brand-ink">
+                        {{ $scaffoldDidFail ? __('The app install failed') : __('An app is installing') }}
+                    </h2>
+                    <p class="mt-1 max-w-2xl text-xs leading-relaxed {{ $scaffoldDidFail ? 'text-red-800/80' : 'text-brand-moss' }}">
+                        {{ $scaffoldDidFail
+                            ? __('Open the install timeline to see which step failed, retry it, or start over and pick a different app.')
+                            : __('Open the install timeline to follow each step as it runs.') }}
+                    </p>
+                </div>
+            </div>
+            <a href="{{ route('sites.scaffold-journey', ['server' => $server, 'site' => $site]) }}" wire:navigate
+                class="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl px-4 text-xs font-semibold shadow-sm transition {{ $scaffoldDidFail ? 'bg-rose-700 text-white hover:bg-rose-800' : 'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' }}">
+                {{ $scaffoldDidFail ? __('Fix or start over') : __('View progress') }}
+                <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+            </a>
+        </div>
+    </section>
+@endif
+
 {{-- Services-first: a live site with no app yet. Configure services here, then
      connect a repo — the bindings wire into the first deploy automatically.
      Stays outside the merged General card (see settings.blade.php). --}}
