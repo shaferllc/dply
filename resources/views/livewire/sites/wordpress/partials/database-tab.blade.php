@@ -12,6 +12,42 @@
         <p class="border-b border-rose-200/70 bg-rose-50/60 px-3 py-2 text-xs text-rose-700 sm:px-4">{{ $message }}</p>
     @enderror
 
+    {{-- Remote access: connection facts + an ssh -L tunnel for TablePlus /
+         DBeaver / the mysql client. Read-only — the password never enters the
+         DOM; it lives in the site's own config. --}}
+    @if ($dbRemote)
+        @php $dbTarget = $dbRemote['target']; @endphp
+        <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Remote access') }}</p>
+                    <p class="mt-0.5 max-w-2xl text-xs text-brand-moss">{{ __('Connect TablePlus, DBeaver, DataGrip or the mysql client through an SSH tunnel to this server.') }}</p>
+                </div>
+                <a href="{{ route('servers.databases', $site->server) }}" class="text-xs font-semibold text-brand-ink underline decoration-brand-sage underline-offset-2 hover:text-brand-forest">{{ __('Server database settings') }}</a>
+            </div>
+            <dl class="mt-2 grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3 sm:grid-cols-5">
+                @foreach ([__('SSH') => $dbRemote['ssh'], __('Host') => $dbTarget->host, __('Port') => $dbTarget->port, __('Database') => $dbTarget->database, __('User') => $dbTarget->username] as $dbLabel => $dbValue)
+                    <div class="min-w-0">
+                        <dt class="text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $dbLabel }}</dt>
+                        <dd class="mt-0.5 break-all font-mono text-xs text-brand-ink">{{ $dbValue }}</dd>
+                    </div>
+                @endforeach
+            </dl>
+            @if ($dbRemote['tunnel'])
+                <div class="mt-2 min-w-0">
+                    <x-cli-snippet :commands="[
+                        ['label' => __('Tunnel'), 'command' => $dbRemote['tunnel']['tunnel']],
+                        ['label' => __('Connection URI'), 'command' => $dbRemote['tunnel']['uri']],
+                        ['label' => __('Terminal client'), 'command' => $dbRemote['tunnel']['connect']],
+                    ]" :summary="__('Tunnel commands')" />
+                </div>
+            @else
+                <p class="mt-2 text-xs text-brand-moss">{{ __('The site’s server is not ready for SSH, so a tunnel cannot be built yet.') }}</p>
+            @endif
+            <p class="mt-2 text-xs text-brand-moss">{{ __('The password is not shown here — it is DB_PASSWORD in this site’s wp-config.php (or .env on Bedrock).') }}</p>
+        </div>
+    @endif
+
     {{-- Health first: size and integrity are what you check before deciding
          whether a snapshot or a repair is the next move. --}}
     <div class="border-b border-brand-ink/10">

@@ -88,3 +88,14 @@ test('only the iaas managed backends allow trusted-source writes', function (): 
         // dply did not provision an external database and must not firewall it.
         ->and(DatabaseConnectionTarget::backendSupportsTrustedSourceWrites(CloudDatabase::BACKEND_EXTERNAL))->toBeFalse();
 });
+
+test('versioned server engine ids resolve to their family', function (): void {
+    // Server databases store mysql84 / mariadb114; matching the literal id sent
+    // them down the Postgres arm — port 5432, psql, postgresql://.
+    $target = pgTarget(['engine' => 'mysql84', 'host' => '127.0.0.1', 'port' => 3306, 'sslMode' => null]);
+
+    expect(DatabaseConnectionTarget::defaultPortFor('mysql84'))->toBe(3306)
+        ->and(DatabaseConnectionTarget::defaultPortFor('mariadb114'))->toBe(3306)
+        ->and($target->clientCommand())->toStartWith('mysql ')
+        ->and($target->uriScheme())->toBe('mysql');
+});

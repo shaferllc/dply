@@ -27,6 +27,11 @@ use App\Support\Servers\InstalledStack;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use App\Models\ServerDatabase;
+use App\Support\Servers\DatabaseConnectionTarget;
+use App\Support\Servers\DatabaseConnectionTargetResolver;
+use App\Support\Servers\DatabaseJumpHostAccess;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -308,7 +313,48 @@ class WordPressSection extends Component
             // would have its cloned themes overwritten by the next deploy.
             'gitSourcesSupported' => app(GitSourceMaterializerFactory::class)->supports($this->site),
             'coreManagedByComposer' => $this->coreManagedByComposer(),
+            'dbRemote' => $this->tab === 'database' ? $this->remoteDatabaseAccess() : null,
         ]);
+    }
+
+    /**
+     * Connection facts + an `ssh -L` tunnel for the site's own database.
+     *
+     * Read-only on purpose: the WordPress database has no `database` binding,
+     * so the binding-keyed Connect panel can't address it, and adopting one
+     * would take over DB_* at deploy. Null (no card) when nothing resolves.
+     *
+     * @return array{target: DatabaseConnectionTarget, ssh: string, tunnel: ?array<string, mixed>}|null
+     */
+    private function remoteDatabaseAccess(): ?array
+    {
+        $server = $this->site->server;
+        if ($server === null) {
+            return null;
+        }
+
+        $databases = ServerDatabase::query()->where('server_id', $server->id);
+        $id = data_get($this->site->meta, 'scaffold.database.server_database_id');
+        $db = filled($id) ? (clone $databases)->find($id) : null;
+        // Not scaffolded by dply: fall back to the name the pipeline derives.
+        $db ??= (clone $databases)->where('name', 'dply_'.Str::slug($this->site->slug, '_'))->first();
+
+        if (! $db instanceof ServerDatabase || DatabaseWorkspaceEngines::family((string) $db->engine) === 'sqlite') {
+            return null;
+        }
+
+        // defaultPort(), not DatabaseConnectionTarget::defaultPortFor(): engines
+        // are versioned ids (mysql84), which the latter maps to 5432.
+        $target = DatabaseConnectionTarget::fromServerDatabase($db, '127.0.0.1', $db->defaultPort());
+        $reason = app(DatabaseConnectionTargetResolver::class)->tunnelUnavailableReason($target, $server);
+
+        return [
+            'target' => $target,
+            'ssh' => DatabaseJumpHostAccess::sshUserFor($server).'@'.$server->ip_address,
+            'tunnel' => $reason === null
+                ? DatabaseJumpHostAccess::tunnelCommandsFor($target, $server, DatabaseJumpHostAccess::BASE_LOCAL_PORT)
+                : null,
+        ];
     }
 
     /**

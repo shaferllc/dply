@@ -1319,3 +1319,35 @@ test('reset password rejects a short typed password and a blank one generates', 
     expect($component->instance()->revealedUserPassword())->toBeString()->not->toBe('')
         ->and($component->get('resettingPasswordLogin'))->toBe('jo');
 });
+
+test('database tab shows remote access for the site database', function () {
+    [$user, $site] = makeWpSite();
+    $db = \App\Models\ServerDatabase::factory()->create([
+        'server_id' => $site->server_id,
+        'name' => 'dply_wpremote',
+        'username' => 'dply_wpremote',
+        'engine' => 'mysql84',
+        'host' => 'localhost',
+    ]);
+    $site->update(['meta' => ['scaffold' => ['framework' => 'wordpress', 'database' => ['server_database_id' => $db->id]]]]);
+    // ready() sets only the status; a tunnel also needs the box's SSH key.
+    $site->server->update(['ssh_private_key' => 'test-key']);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site->fresh()])
+        ->set('tab', 'database')
+        ->assertSee('Remote access')
+        ->assertSee('dply_wpremote')
+        ->assertSeeHtml(':127.0.0.1:3306')
+        // The password never reaches the page.
+        ->assertDontSee('secret');
+});
+
+test('database tab has no remote access card when no database resolves', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'database')
+        ->assertDontSee('Remote access');
+});

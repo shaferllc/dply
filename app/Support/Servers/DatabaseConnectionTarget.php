@@ -116,7 +116,9 @@ final class DatabaseConnectionTarget
 
     public static function defaultPortFor(string $engine): int
     {
-        return match ($engine) {
+        // Server databases store versioned ids (mysql84, mariadb114); match on
+        // the family or they all fall through to 5432.
+        return match (DatabaseWorkspaceEngines::family($engine)) {
             'mysql', 'mariadb' => 3306,
             'redis' => 6379,
             'mongodb' => 27017,
@@ -157,7 +159,7 @@ final class DatabaseConnectionTarget
 
     public function isMysqlFamily(): bool
     {
-        return in_array($this->engine, ['mysql', 'mariadb'], true);
+        return in_array(DatabaseWorkspaceEngines::family($this->engine), ['mysql', 'mariadb'], true);
     }
 
     public function uriScheme(): string
