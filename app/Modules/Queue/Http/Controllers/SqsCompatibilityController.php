@@ -110,7 +110,7 @@ class SqsCompatibilityController extends Controller
             $queue,
             $body,
             (int) $this->field('DelaySeconds', 0),
-            null,
+            $this->groupId($this->field('MessageGroupId')),
         );
 
         $this->wakeDrainers($context, $queue);
@@ -147,7 +147,7 @@ class SqsCompatibilityController extends Controller
             // Per entry, NOT collapsed the way the delay below is. One batch may
             // carry several message groups; folding them to a single key would
             // serialise unrelated work and order none of it.
-            $groupIds[] = null;
+            $groupIds[] = $this->groupId($entry['MessageGroupId'] ?? null);
             $delay = max($delay, (int) ($entry['DelaySeconds'] ?? 0));
         }
 
