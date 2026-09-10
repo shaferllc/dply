@@ -57,7 +57,7 @@ trait ManagesSiteSystemUsers
             return;
         }
 
-        $this->system_user_remote_rows = $rows;
+        $this->system_user_remote_rows = $this->withoutFtpAccounts($rows);
         $this->system_users_loaded = true;
     }
 
@@ -103,12 +103,31 @@ trait ManagesSiteSystemUsers
         }
 
         try {
-            $this->system_user_remote_rows = $service->listPasswdUsersWithSiteCounts($this->server->fresh(), $lister);
+            $this->system_user_remote_rows = $this->withoutFtpAccounts(
+                $service->listPasswdUsersWithSiteCounts($this->server->fresh(), $lister)
+            );
             $this->system_users_loaded = true;
         } catch (\Throwable $e) {
             $this->system_user_list_error = $e->getMessage();
             $this->system_user_remote_rows = [];
         }
+    }
+
+    /**
+     * FTP accounts are shell-less (`ForceCommand internal-sftp`) and hold no web
+     * group membership, so picking one as a site's file owner / PHP-FPM pool
+     * user would break the site. They stay visible on the server's System users
+     * page — they are just not selectable here.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    protected function withoutFtpAccounts(array $rows): array
+    {
+        return array_values(array_filter(
+            $rows,
+            static fn (array $row): bool => empty($row['is_sftp']),
+        ));
     }
 
     public function openSystemUserAssignModal(): void

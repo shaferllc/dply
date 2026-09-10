@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\ManagesSiteFtpAccounts;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerFileBrowserAtomicWriter;
@@ -29,7 +30,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Files extends Component
 {
-    use DispatchesToastNotifications;
+    use DispatchesToastNotifications, ManagesSiteFtpAccounts;
 
     public Server $server;
 
@@ -111,6 +112,12 @@ class Files extends Component
             'effectiveLoginUser' => $this->effectiveLoginUser(),
             'siteRoot' => $this->siteRoot(),
             'isAtomic' => $this->site->isAtomicDeploys(),
+            // FTP (SFTP) accounts panel — same tab, because an operator wanting
+            // to hand someone file access is already here doing it by hand.
+            'ftpAccounts' => $this->ftpAccounts(),
+            'ftpRevealedPassword' => $this->revealedFtpPassword(),
+            'ftpRevealedUsername' => $this->revealedFtpUsername(),
+            'ftpSyncGroupWarning' => $this->ftpSyncGroupWarning(),
             'editMaxBytes' => (int) config('server_file_browser.edit_max_bytes', 1_048_576),
             'downloadMaxBytes' => (int) config('server_file_browser.download_max_bytes', 26_214_400),
             // Settings shell (sidebar + breadcrumb) — same vars the sibling

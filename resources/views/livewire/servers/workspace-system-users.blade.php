@@ -194,6 +194,17 @@
                                                     {{ __('login') }}
                                                 </span>
                                             @endif
+                                            {{-- FTP accounts are real Linux users in the same
+                                                 /etc/passwd namespace, so they are listed here
+                                                 rather than in a second table that could
+                                                 disagree with this one. Managed from the site's
+                                                 Files tab. --}}
+                                            @if (! empty($row['is_sftp']))
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-violet-800 ring-1 ring-violet-200">
+                                                    <x-heroicon-m-arrow-up-tray class="h-3 w-3" />
+                                                    {{ __('FTP') }}
+                                                </span>
+                                            @endif
                                             @if (! empty($row['is_orphan']))
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-amber-200">
                                                     <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
@@ -312,9 +323,9 @@
                                         <button
                                             type="button"
                                             wire:click="openRemoveModal('{{ $row['username'] }}')"
-                                            @disabled($isRemoving || $inUse || ! empty($row['is_protected']))
+                                            @disabled($isRemoving || $inUse || ! empty($row['is_protected']) || ! empty($row['is_sftp']))
                                             class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : ($inUse ? __('Reassign its sites, workers, and cron jobs first') : __('Remove this account'))) }}"
+                                            title="{{ $isRemoving ? __('Removal in progress…') : (! empty($row['is_sftp']) ? __('Remove FTP accounts from the site’s Files tab') : (! empty($row['is_protected']) ? __('Protected accounts cannot be removed') : ($inUse ? __('Reassign its sites, workers, and cron jobs first') : __('Remove this account')))) }}"
                                         >
                                             @if ($isRemoving)
                                                 <x-spinner variant="forest" size="sm" />

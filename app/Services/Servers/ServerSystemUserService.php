@@ -4,6 +4,7 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\ServerSystemUser;
+use App\Models\SftpAccount;
 use App\Models\Site;
 use App\Services\SshConnection;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ class ServerSystemUserService
      * flags). Stale records (users no longer present on the host) are removed
      * in the same transaction so the table reflects reality on each sync.
      *
-     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_sftp: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     public function listPasswdUsersWithSiteCounts(Server $server, ServerPasswdUserLister $lister): array
     {
@@ -91,13 +92,22 @@ class ServerSystemUserService
 
     /**
      * @param  list<array{username: string, uid: int|null, home: string, shell: string, groups: list<string>}>  $details
-     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
+     * @return list<array{username: string, site_count: int, worker_count: int, cron_count: int, is_protected: bool, is_sftp: bool, is_orphan: bool, uid: int|null, home: string, shell: string, groups: list<string>, sites: list<array{id: string, name: string}>}>
      */
     private function buildEnrichedRows(Server $server, array $details): array
     {
         $sitesByUser = $this->sitesByEffectiveUser($server);
         $workerCounts = $this->deletionPolicy->workerCountsByUsername($server);
         $cronCounts = $this->deletionPolicy->cronCountsByUsername($server);
+
+        // Both features useradd into one /etc/passwd, so this page is the single
+        // list over that namespace — FTP accounts appear here, badged, rather
+        // than in a second table that could disagree with this one.
+        $sftpUsernames = SftpAccount::query()
+            ->where('server_id', $server->id)
+            ->pluck('username')
+            ->map(static fn ($u): string => strtolower(trim((string) $u)))
+            ->all();
 
         $rows = [];
         foreach ($details as $d) {
@@ -108,10 +118,16 @@ class ServerSystemUserService
             $workerCount = $workerCounts[$key] ?? 0;
             $cronCount = $cronCounts[$key] ?? 0;
             $protected = $this->deletionPolicy->isProtected($server, $username);
-            $inUse = $siteCount > 0 || $workerCount > 0 || $cronCount > 0;
+            $isSftp = in_array($key, $sftpUsernames, true);
+
+            // An FTP account owns no sites, workers or crons by design, so
+            // without this it would be labelled an orphan and the UI would
+            // invite the operator to delete a working account.
+            $inUse = $siteCount > 0 || $workerCount > 0 || $cronCount > 0 || $isSftp;
 
             $rows[] = [
                 'username' => $username,
+                'is_sftp' => $isSftp,
                 'site_count' => $siteCount,
                 'worker_count' => $workerCount,
                 'cron_count' => $cronCount,
@@ -381,6 +397,14 @@ if [ -d "\$ROOT/bootstrap/cache" ]; then
 fi
 BASH;
 
+        // Every `find -exec chmod` above rewrites the mode bits, which squashes
+        // the POSIX ACL mask — so any FTP account granted access to this tree
+        // silently drops to no access. Re-assert those grants in the same run;
+        // resolved lazily because SftpAccountProvisioner depends on this class.
+        foreach (SftpAccount::query()->where('site_id', $site->id)->with(['server', 'site'])->get() as $account) {
+            $script .= "\n".app(SftpAccountProvisioner::class)->grantScript($account);
+        }
+
         $this->runPrivileged($server, $script, 900);
 
         $this->writeOperationMeta(
@@ -414,7 +438,15 @@ BASH;
         }
     }
 
-    private function assertAcceptableCreateUsername(Server $server, string $username): void
+    /**
+     * Reserved-name guard (root, the deploy user). Public so callers can run it
+     * before persisting anything: createUser() enforces it too, but on the
+     * queue worker — validating only there means a reserved name is accepted by
+     * the form, written to the database, and fails minutes later out of band.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertAcceptableCreateUsername(Server $server, string $username): void
     {
         $lower = strtolower($username);
         $this->assertNotRoot($username);

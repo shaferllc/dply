@@ -574,4 +574,7 @@
             </div>
         </x-modal>
     @endif
+    {{-- FTP (SFTP) accounts — same tab, because handing someone file access
+         is the job an operator is already here trying to do by hand. --}}
+    @include('livewire.sites.partials.files.ftp-accounts')
 </div>
