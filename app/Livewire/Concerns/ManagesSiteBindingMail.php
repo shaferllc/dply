@@ -101,7 +101,11 @@ trait ManagesSiteBindingMail
             ->get()
             ->map(fn (MailCredential $c): array => [
                 'id' => (string) $c->id,
-                'label' => (string) $c->name,
+                // Name the Cloudflare account — a saved token only sends for
+                // domains onboarded in the account it was created with.
+                'label' => (string) $c->name.(($c->credentials['account_id'] ?? '') !== ''
+                    ? ' — '.__('account').' '.substr((string) $c->credentials['account_id'], 0, 8).'…'
+                    : ''),
             ])
             ->all();
     }

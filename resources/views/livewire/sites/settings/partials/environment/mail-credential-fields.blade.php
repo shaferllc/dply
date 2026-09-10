@@ -28,7 +28,8 @@
         </div>
     </div>
 @endif
-@unless ($mailUsingSaved)
+{{-- Cloudflare keeps its guided panel + Verify with saved credentials; only the key inputs hide. --}}
+@unless ($mailUsingSaved && $mailProvider !== 'cloudflare')
     @if ($mailProvider === 'smtp')
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -106,6 +107,7 @@
             <x-text-input id="binding_mail_sgkey" type="password" wire:model="bindingForm.api_key" class="mt-1 block w-full font-mono text-sm" placeholder="SG.…" />
         </div>
     @elseif ($mailProvider === 'cloudflare')
+        @unless ($mailUsingSaved)
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <x-input-label for="binding_mail_cfacct" :value="__('Account ID')" />
@@ -116,6 +118,7 @@
                 <x-text-input id="binding_mail_cfkey" type="password" wire:model="bindingForm.key" class="mt-1 block w-full font-mono text-sm" placeholder="Email Sending: Edit token" />
             </div>
         </div>
+        @endunless
 
         {{-- Guided + verified setup: dply walks the (dashboard-only) Cloudflare
              onboarding, reads the zone through your connected DNS token to
@@ -212,6 +215,7 @@
         </div>
     @endif
 
+    @unless ($mailUsingSaved)
     <div class="space-y-2">
         <label class="flex items-center gap-2 text-xs font-semibold text-brand-ink">
             <input type="checkbox" wire:model.live="bindingForm.save_credential" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40" />
@@ -221,4 +225,5 @@
             <x-text-input wire:model="bindingForm.credential_name" class="block w-full text-sm" :placeholder="__('Name (optional)')" />
         @endif
     </div>
+    @endunless
 @endunless

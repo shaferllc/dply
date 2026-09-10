@@ -46,6 +46,16 @@ final class MailSendFailureHint
             return 'This looks like a missing package. Add the provider\'s transport package to your app\'s composer.json and redeploy.';
         }
 
+        // The one Cloudflare code that is NOT ambiguous: the From domain isn't a
+        // sending domain in the account this token belongs to. The address is
+        // fine — the account is wrong (typically a saved credential created for
+        // another domain's account). Must sit above the catch-all branch below.
+        if ($provider === 'cloudflare' && $has('sender_not_configured')) {
+            return 'Cloudflare has no sending domain for this From address in the account this token belongs to. '
+                .'Add the From domain under Email → Email Sending in that same Cloudflare account, or use an account ID + token from the account where it is set up. '
+                .'A saved credential keeps the account it was created with.';
+        }
+
         // Cloudflare rejects both an unauthorised sender and an unroutable
         // destination with the same opaque code, so name both.
         if ($provider === 'cloudflare' && $has('email.invalid', 'email.sending.error')) {

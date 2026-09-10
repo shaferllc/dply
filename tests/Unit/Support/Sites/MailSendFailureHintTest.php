@@ -38,3 +38,16 @@ test('an unrecognised error produces no hint at all', function () {
     expect(MailSendFailureHint::for('cloudflare', 'Connection timed out after 30000 ms'))->toBeNull()
         ->and(MailSendFailureHint::for('smtp', 'Expected response code 250 but got 550'))->toBeNull();
 });
+
+test('cloudflare sender_not_configured points at the token account, not the address', function () {
+    // Verbatim from a send with a saved credential whose Cloudflare account
+    // never had the From domain onboarded.
+    $hint = MailSendFailureHint::for(
+        'cloudflare',
+        'Symfony\\Component\\Mailer\\Exception\\TransportException: email.sending.error.email.sender_not_configured',
+    );
+
+    expect($hint)->toContain('account this token belongs to')
+        ->and($hint)->toContain('saved credential')
+        ->and($hint)->not->toContain('MAIL_FROM_ADDRESS');
+});

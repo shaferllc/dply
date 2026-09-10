@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Models\MailCredential;
 use App\Modules\Providers\Cloudflare\CloudflareGuidedMailProvider;
 use App\Support\Mail\Guided\GuidedMailGate;
 use App\Support\Mail\Guided\GuidedMailStep;
@@ -100,12 +101,26 @@ trait ManagesSiteBindingCloudflareEmail
             return;
         }
 
+        // A saved credential hides the account/token inputs — verify through it,
+        // so the wrong-account case surfaces here instead of on the server.
+        // ponytail: mirrors SiteBindingManager::resolveMailCredentials (private); share it if a 2nd caller appears.
+        $creds = $this->bindingForm;
+        $savedId = trim((string) ($this->bindingForm['credential_id'] ?? ''));
+        if ($savedId !== '') {
+            $saved = MailCredential::query()
+                ->where('organization_id', $this->site->organization_id)
+                ->where('provider', 'cloudflare')
+                ->whereKey($savedId)
+                ->first();
+            $creds = array_merge($creds, (array) ($saved?->credentials ?? []));
+        }
+
         $result = app(CloudflareGuidedMailProvider::class)->verify(
             $this->site,
             $domain,
             [
-                'account_id' => (string) ($this->bindingForm['account_id'] ?? ''),
-                'key' => (string) ($this->bindingForm['key'] ?? ''),
+                'account_id' => (string) ($creds['account_id'] ?? ''),
+                'key' => (string) ($creds['key'] ?? ''),
                 'from_address' => (string) ($this->bindingForm['from_address'] ?? ''),
                 'from_name' => (string) ($this->bindingForm['from_name'] ?? ''),
             ],
