@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\Snapshot;
 use App\Models\User;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -176,11 +177,9 @@ test('wp cron switch to system disables wp cron constant', function () {
         '--user' => 'admin@example.com',
     ]);
 
-    $run = RemoteCliRun::query()->where('command', 'config set')->sole();
-    expect($run->args)->toBe(['DISABLE_WP_CRON', 'true', '--raw', '--type=constant']);
-
-    $site->refresh();
-    expect($site->meta['wp_cron']['handler'])->toBe('system_cron');
+    // The command runs the same job as the Cron tab — it installs the crontab
+    // entry before disabling wp-cron (SwitchWordPressCronHandlerJobTest).
+    Bus::assertDispatchedSync(SwitchWordPressCronHandlerJob::class, fn ($job) => $job->to === 'system' && $job->siteId === (string) $site->id);
 });
 test('wp cron switch back to wp cron deletes constant', function () {
     Bus::fake();
@@ -192,11 +191,7 @@ test('wp cron switch back to wp cron deletes constant', function () {
         '--user' => 'admin@example.com',
     ]);
 
-    $run = RemoteCliRun::query()->where('command', 'config delete')->sole();
-    expect($run->args)->toBe(['DISABLE_WP_CRON', '--type=constant']);
-
-    $site->refresh();
-    expect($site->meta['wp_cron']['handler'])->toBe('wp_cron');
+    Bus::assertDispatchedSync(SwitchWordPressCronHandlerJob::class, fn ($job) => $job->to === 'wp-cron' && $job->siteId === (string) $site->id);
 });
 test('wp cron switch rejects unknown target', function () {
     makeSite();

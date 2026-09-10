@@ -180,22 +180,39 @@
     @endif
 
     {{-- PLUGINS --}}
-    {{-- Scheduled events. The Cron tab could switch the handler but never showed
-         what was scheduled, so a stuck job was invisible from here. --}}
+    {{-- Scheduled events: what WordPress has queued, what is overdue, and the
+         controls to run or unschedule them. --}}
     @if ($tab === 'cron')
+        @php $cronView = $this->cronEventRows(); @endphp
         <div class="border-b border-brand-ink/10 last:border-b-0">
             <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Scheduled events') }}</h3>
-                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Everything WordPress has queued, and when it is next due. Run one now to test it.') }}</p>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Everything WordPress has queued and when it is next due. Events long overdue mean cron is not running.') }}</p>
                 </div>
-                <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-arrow-path" target="loadCronEvents" wire:click="loadCronEvents">{{ __('Load events') }}</x-spinner-button>
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($canMutate)
+                        <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-play" target="runDueCronEvents" wire:click="runDueCronEvents">{{ __('Run all due') }}</x-spinner-button>
+                    @endif
+                    <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-arrow-path" target="loadCronEvents" wire:click="loadCronEvents">{{ $cronEventsLoaded ? __('Refresh') : __('Load events') }}</x-spinner-button>
+                </div>
             </div>
 
             @if ($cronEventsLoaded)
+                @if ($cronView['overdue'] > 0)
+                    <p class="border-b border-amber-200/70 bg-amber-50/70 px-3 py-2 text-xs text-amber-900 sm:px-4">
+                        {{ trans_choice('{1} 1 event is overdue by more than 10 minutes.|[2,*] :count events are overdue by more than 10 minutes.', $cronView['overdue'], ['count' => $cronView['overdue']]) }}
+                        {{ data_get($site->meta, 'wp_cron.handler') === 'system_cron' ? __('The system crontab entry may not be running.') : __('wp-cron only runs when someone visits — consider system cron.') }}
+                    </p>
+                @endif
+
                 @if ($cronEvents === [])
                     <p class="px-3 py-3 text-xs text-brand-moss sm:px-4">{{ __('No events scheduled.') }}</p>
                 @else
+                    <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+                        <input type="search" wire:model.live.debounce.250ms="cronEventFilter" aria-label="{{ __('Filter events') }}" placeholder="{{ __('Filter by hook') }}" class="block w-full rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest sm:max-w-xs" />
+                        <span class="text-2xs text-brand-mist">{{ __(':shown of :total', ['shown' => count($cronView['rows']), 'total' => count($cronEvents)]) }}</span>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-left text-xs">
                             <thead class="bg-brand-sand/30 text-2xs uppercase tracking-wide text-brand-moss">
@@ -207,13 +224,23 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-brand-ink/10">
-                                @foreach ($cronEvents as $event)
-                                    <tr>
-                                        <td class="px-3 py-2 font-mono text-brand-ink sm:px-4">{{ $event['hook'] ?? '—' }}</td>
-                                        <td class="px-3 py-2 text-brand-moss">{{ $event['next_run_relative'] ?? ($event['next_run'] ?? '—') }}</td>
-                                        <td class="px-3 py-2 text-brand-moss">{{ $event['recurrence'] ?? '—' }}</td>
+                                @foreach ($cronView['rows'] as $event)
+                                    <tr wire:key="cron-{{ $event['hook'] }}-{{ $event['next_run'] }}" @class(['bg-amber-50/40' => $event['overdue']])>
+                                        <td class="px-3 py-2 font-mono text-brand-ink sm:px-4">{{ $event['hook'] ?: '—' }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">
+                                            {{ $event['relative'] ?: ($event['next_run'] ?: '—') }}
+                                            @if ($event['overdue'])
+                                                <span class="ml-1 rounded-full bg-amber-100 px-1.5 text-2xs font-semibold text-amber-900">{{ __('overdue') }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $event['recurrence'] ?: '—' }}</td>
                                         <td class="px-3 py-2 text-right sm:px-4">
-                                            <x-spinner-button size="xs" variant="secondary" type="button" target="runCronEvent" wire:click="runCronEvent('{{ $event['hook'] ?? '' }}')">{{ __('Run now') }}</x-spinner-button>
+                                            @if ($canMutate)
+                                                <div class="inline-flex gap-1.5">
+                                                    <x-spinner-button size="xs" variant="secondary" type="button" target="runCronEvent" wire:click="runCronEvent(@js($event['hook']))">{{ __('Run now') }}</x-spinner-button>
+                                                    <button type="button" wire:click="confirmDeleteCronEvent(@js($event['hook']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Unschedule') }}</button>
+                                                </div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -261,72 +288,7 @@
     @endif
 
     @if ($tab === 'hardening')
-        @php
-            $hardeningOpinions = collect(data_get($site->meta, 'scaffold.hardening', []))->keyBy('key');
-            $opinions = [
-                'disallow_file_edit' => [
-                    'title' => __('Disallow in-admin file editor'),
-                    'description' => __('Removes the Plugins / Themes file editor from wp-admin. Common attack vector for compromised admin accounts.'),
-                    'wp_constant' => 'DISALLOW_FILE_EDIT',
-                ],
-                'force_ssl_admin' => [
-                    'title' => __('Force SSL on /wp-admin'),
-                    'description' => __('Refuses unencrypted login + admin pages. Required for the placeholder URL since it ships with HTTPS.'),
-                    'wp_constant' => 'FORCE_SSL_ADMIN',
-                ],
-                'disable_wp_cron' => [
-                    'title' => __('Disable wp-cron'),
-                    'description' => __('Prevents WP from running cron on every page load. Pair with the Cron tab\'s "system cron" switch for the recommended setup.'),
-                    'wp_constant' => 'DISABLE_WP_CRON',
-                ],
-            ];
-        @endphp
-        <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
-                <div class="min-w-0">
-                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
-                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
-                </div>
-            </div>
-
-            <div class="px-3 py-2.5 sm:px-4">
-            <x-input-error :messages="$errors->get('hardening')" class="mb-3" />
-
-            <div class="space-y-3">
-                @foreach ($opinions as $key => $copy)
-                    @php $enabled = (bool) ($hardeningOpinions[$key]['enabled'] ?? false); @endphp
-                    <div class="flex items-start justify-between gap-4 rounded-xl border border-brand-ink/10 bg-brand-cream/20 p-4">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2">
-                                <p class="text-sm font-semibold text-brand-ink">{{ $copy['title'] }}</p>
-                                <span class="rounded bg-brand-ink/[0.04] px-1.5 py-0.5 font-mono text-2xs text-brand-moss">{{ $copy['wp_constant'] }}</span>
-                            </div>
-                            <p class="mt-1 text-xs text-brand-moss">{{ $copy['description'] }}</p>
-                        </div>
-                        <button
-                            type="button"
-                            wire:click="toggleHardening('{{ $key }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="toggleHardening"
-                            @class([
-                                'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
-                                'bg-brand-sage' => $enabled,
-                                'bg-brand-mist/40' => ! $enabled,
-                            ])
-                            aria-pressed="{{ $enabled ? 'true' : 'false' }}"
-                            aria-label="{{ $copy['title'] }}"
-                        >
-                            <span @class([
-                                'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-                                'translate-x-5' => $enabled,
-                                'translate-x-1' => ! $enabled,
-                            ])></span>
-                        </button>
-                    </div>
-                @endforeach
-            </div>
-            </div>
-        </div>
+        @include('livewire.sites.wordpress.partials.hardening-tab')
     @endif
 
     {{-- Footer strip, matching every other workspace card (see logs.blade.php).

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\WordPress;
 
+use App\Jobs\SiteResetPermissionsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\RemoteCliRun;
@@ -23,6 +24,7 @@ use App\Services\WordPress\CoreReleases;
 use App\Services\WordPress\PluginDirectory;
 use App\Services\WordPress\ThemeDirectory;
 use App\Support\Servers\InstalledStack;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -238,6 +240,24 @@ class WordPressSection extends Component
     public array $cronEvents = [];
 
     public bool $cronEventsLoaded = false;
+
+    public string $cronEventFilter = '';
+
+    // ── Tools: site settings ─────────────────────────────────────────────────
+    /** @var array{blogname: ?string, blogdescription: ?string, blog_public: ?string, home: ?string, siteurl: ?string, debug: ?bool}|null */
+    public ?array $siteSettings = null;
+
+    public string $settingsTitle = '';
+
+    public string $settingsTagline = '';
+
+    public string $settingsHome = '';
+
+    public string $settingsSiteurl = '';
+
+    // ── Hardening ────────────────────────────────────────────────────────────
+    /** @var list<array{key: string, label: string, status: string, detail: string}>|null */
+    public ?array $securityScan = null;
 
     /**
      * Reset user password, shown exactly once.
@@ -1072,7 +1092,16 @@ class WordPressSection extends Component
             return;
         }
 
-        $allowed = ['disallow_file_edit', 'force_ssl_admin', 'disable_wp_cron'];
+        // disable_wp_cron is not toggled here any more: flipping the constant
+        // alone, with no crontab entry behind it, stopped every scheduled task.
+        // The Cron tab's handler switch does both halves in order.
+        if ($opinionKey === 'disable_wp_cron') {
+            $this->addError('hardening', __('wp-cron is managed from the Cron tab, which installs the crontab entry that replaces it.'));
+
+            return;
+        }
+
+        $allowed = ['disallow_file_edit', 'force_ssl_admin', 'disallow_file_mods'];
         if (! in_array($opinionKey, $allowed, true)) {
             $this->addError('hardening', __('Unknown hardening opinion.'));
 
@@ -1087,7 +1116,7 @@ class WordPressSection extends Component
         $constant = match ($opinionKey) {
             'disallow_file_edit' => 'DISALLOW_FILE_EDIT',
             'force_ssl_admin' => 'FORCE_SSL_ADMIN',
-            'disable_wp_cron' => 'DISABLE_WP_CRON',
+            'disallow_file_mods' => 'DISALLOW_FILE_MODS',
         };
 
         try {
@@ -1645,8 +1674,461 @@ class WordPressSection extends Component
 
     public function runCronEvent(string $hook, WpCli $wpcli): void
     {
-        $this->wp($wpcli, 'cron event run', [$hook]);
-        $this->toastSuccess(__('Ran :hook.', ['hook' => $hook]));
+        if (! $this->isValidCronHook($hook)) {
+            $this->addError('cron', __('Unknown event.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'cron event run', [$hook], errorBag: 'cron') !== null) {
+            $this->toastSuccess(__('Queued: running :hook.', ['hook' => $hook]));
+        }
+    }
+
+    /** Run everything due — what the system crontab entry does each minute. */
+    public function runDueCronEvents(WpCli $wpcli): void
+    {
+        if ($this->wp($wpcli, 'cron event run', ['--due-now'], errorBag: 'cron') !== null) {
+            $this->toastSuccess(__('Queued: running every due event.'));
+        }
+    }
+
+    public function confirmDeleteCronEvent(string $hook): void
+    {
+        if (! $this->isValidCronHook($hook)) {
+            $this->addError('cron', __('Unknown event.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'deleteCronEvent',
+            arguments: [$hook],
+            title: __('Unschedule :hook?', ['hook' => $hook]),
+            message: __('Removes every scheduled occurrence of this hook. A plugin that still needs it usually schedules it again on its next load.'),
+            confirmLabel: __('Unschedule'),
+            destructive: true,
+            details: [['label' => __('Hook'), 'value' => $hook, 'mono' => true]],
+        );
+    }
+
+    public function deleteCronEvent(string $hook, WpCli $wpcli): void
+    {
+        if (! $this->isValidCronHook($hook)) {
+            $this->addError('cron', __('Unknown event.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'cron event delete', [$hook], errorBag: 'cron') === null) {
+            return;
+        }
+
+        $this->cronEvents = array_values(array_filter($this->cronEvents, static fn (array $e): bool => ($e['hook'] ?? '') !== $hook));
+        $this->toastSuccess(__('Queued: unscheduling :hook.', ['hook' => $hook]));
+    }
+
+    /**
+     * Events for the table, filtered, each flagged overdue when it was due
+     * more than 10 minutes ago — the tell-tale of cron not running at all.
+     *
+     * @return array{rows: list<array{hook: string, next_run: string, relative: string, recurrence: string, overdue: bool}>, overdue: int}
+     */
+    public function cronEventRows(): array
+    {
+        $needle = mb_strtolower(trim($this->cronEventFilter));
+        $cutoff = now('UTC')->subMinutes(10);
+        $rows = [];
+        $overdue = 0;
+
+        foreach ($this->cronEvents as $event) {
+            $next = (string) ($event['next_run_gmt'] ?? '');
+            $late = false;
+            if ($next !== '') {
+                try {
+                    $late = CarbonImmutable::parse($next, 'UTC')->lt($cutoff);
+                } catch (\Throwable) {
+                    $late = false;
+                }
+            }
+            $overdue += $late ? 1 : 0;
+
+            $hook = (string) ($event['hook'] ?? '');
+            if ($needle !== '' && ! str_contains(mb_strtolower($hook), $needle)) {
+                continue;
+            }
+
+            $rows[] = [
+                'hook' => $hook,
+                'next_run' => $next,
+                'relative' => (string) ($event['next_run_relative'] ?? ''),
+                'recurrence' => (string) ($event['recurrence'] ?? ''),
+                'overdue' => $late,
+            ];
+        }
+
+        return ['rows' => $rows, 'overdue' => $overdue];
+    }
+
+    private function isValidCronHook(string $hook): bool
+    {
+        return preg_match('/^[A-Za-z0-9_.:\/][A-Za-z0-9_.:\/-]{0,190}$/', $hook) === 1;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Tools: site settings, debug logging, thumbnails.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** The options operators change in wp-admin most, read in one go. */
+    public function loadSiteSettings(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('tools');
+
+        $settings = [
+            'blogname' => $this->readOption($wpcli, 'blogname'),
+            'blogdescription' => $this->readOption($wpcli, 'blogdescription'),
+            'blog_public' => $this->readOption($wpcli, 'blog_public'),
+            'home' => $this->readOption($wpcli, 'home'),
+            'siteurl' => $this->readOption($wpcli, 'siteurl'),
+            'debug' => ($debug = $this->configConstant($wpcli, 'WP_DEBUG')) === null ? null : $debug === true,
+        ];
+
+        $this->siteSettings = $settings;
+        $this->settingsTitle = (string) $settings['blogname'];
+        $this->settingsTagline = (string) $settings['blogdescription'];
+        $this->settingsHome = (string) $settings['home'];
+        $this->settingsSiteurl = (string) $settings['siteurl'];
+    }
+
+    public function saveSiteIdentity(WpCli $wpcli): void
+    {
+        $title = trim($this->settingsTitle);
+        $tagline = trim($this->settingsTagline);
+
+        if ($title === '') {
+            $this->addError('tools', __('The site title can\'t be empty.'));
+
+            return;
+        }
+        foreach ([$title, $tagline] as $value) {
+            // A leading dash would reach wp-cli as a flag, not a value.
+            if (mb_strlen($value) > 200 || str_starts_with($value, '-') || preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
+                $this->addError('tools', __('Keep the title and tagline under 200 characters, on one line, not starting with a dash.'));
+
+                return;
+            }
+        }
+
+        foreach (['blogname' => $title, 'blogdescription' => $tagline] as $option => $value) {
+            if ($value !== (string) ($this->siteSettings[$option] ?? '')) {
+                if ($this->wp($wpcli, 'option update', [$option, $value]) === null) {
+                    return;
+                }
+                $this->siteSettings[$option] = $value;
+            }
+        }
+
+        $this->toastSuccess(__('Queued: site identity updated.'));
+    }
+
+    /** "Discourage search engines" — the switch staging sites forget, and live sites leave on by accident. */
+    public function setSearchVisibility(bool $visible, WpCli $wpcli): void
+    {
+        if ($this->wp($wpcli, 'option update', ['blog_public', $visible ? '1' : '0']) === null) {
+            return;
+        }
+
+        if ($this->siteSettings !== null) {
+            $this->siteSettings['blog_public'] = $visible ? '1' : '0';
+        }
+        $this->toastSuccess($visible
+            ? __('Queued: search engines may index this site.')
+            : __('Queued: search engines are asked not to index this site.'));
+    }
+
+    public function confirmSiteAddress(): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $home = $this->normalizeSiteUrl($this->settingsHome);
+        $siteurl = $this->normalizeSiteUrl($this->settingsSiteurl);
+        if ($home === null || $siteurl === null) {
+            $this->addError('tools', __('Enter full http:// or https:// addresses.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'saveSiteAddress',
+            arguments: [$home, $siteurl],
+            title: __('Change the site address?'),
+            message: __('WordPress starts building every link and redirect from the new address immediately. Links stored in posts keep the old one — run Search and replace afterwards.'),
+            confirmLabel: __('Change address'),
+            destructive: true,
+            details: [
+                ['label' => __('Site address (home)'), 'value' => $home, 'mono' => true],
+                ['label' => __('WordPress address (siteurl)'), 'value' => $siteurl, 'mono' => true],
+            ],
+            warning: __('If the address does not change afterwards, WP_HOME / WP_SITEURL constants in wp-config.php are overriding it.'),
+        );
+    }
+
+    public function saveSiteAddress(string $home, string $siteurl, WpCli $wpcli): void
+    {
+        // Directly callable, so re-checked.
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $home = $this->normalizeSiteUrl($home);
+        $siteurl = $this->normalizeSiteUrl($siteurl);
+        if ($home === null || $siteurl === null) {
+            $this->addError('tools', __('Enter full http:// or https:// addresses.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'option update', ['home', $home]) === null || $this->wp($wpcli, 'option update', ['siteurl', $siteurl]) === null) {
+            return;
+        }
+
+        if ($this->siteSettings !== null) {
+            $this->siteSettings['home'] = $home;
+            $this->siteSettings['siteurl'] = $siteurl;
+        }
+        $this->toastSuccess(__('Queued: site address changed.'));
+    }
+
+    /**
+     * Debug logging: errors to wp-content/debug.log, never to visitors.
+     * `config set` runs at the Destructive tier (admin/owner).
+     */
+    public function setDebugLogging(bool $on, WpCli $wpcli): void
+    {
+        if ($this->coreManagedByComposer()) {
+            $this->addError('tools', __('This is a Bedrock site: set WP_DEBUG in .env or config/environments instead.'));
+
+            return;
+        }
+        if (! $this->canDestroyHere()) {
+            $this->addError('tools', __('Debug logging needs an admin or owner.'));
+
+            return;
+        }
+
+        $sets = $on
+            ? [['WP_DEBUG', 'true'], ['WP_DEBUG_LOG', 'true'], ['WP_DEBUG_DISPLAY', 'false']]
+            : [['WP_DEBUG', 'false']];
+        foreach ($sets as [$constant, $value]) {
+            if ($this->wp($wpcli, 'config set', [$constant, $value, '--raw', '--type=constant']) === null) {
+                return;
+            }
+        }
+
+        if ($this->siteSettings !== null) {
+            $this->siteSettings['debug'] = $on;
+        }
+        $this->toastSuccess($on
+            ? __('Queued: debug logging on — errors go to wp-content/debug.log, never to visitors.')
+            : __('Queued: debug logging off.'));
+    }
+
+    /** Only the missing sizes — the fix after switching to a theme with new image sizes. */
+    public function regenerateThumbnails(WpCli $wpcli): void
+    {
+        if (! $this->canDestroyHere()) {
+            $this->addError('tools', __('Regenerating thumbnails needs an admin or owner.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'media regenerate', ['--only-missing', '--yes']) !== null) {
+            $this->toastSuccess(__('Queued: generating missing thumbnail sizes.'));
+        }
+    }
+
+    private function normalizeSiteUrl(string $url): ?string
+    {
+        $url = rtrim(trim($url), '/');
+
+        return filter_var($url, FILTER_VALIDATE_URL) !== false && preg_match('#^https?://#i', $url) === 1 ? $url : null;
+    }
+
+    /** One option's value; null when unreadable (or masked for this viewer). */
+    private function readOption(WpCli $wpcli, string $option): ?string
+    {
+        try {
+            $result = $wpcli->run($this->site, 'option get', [$option], auth()->user());
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $value = trim($result->stdout());
+
+        return $result->isFailed() || $value === '********' ? null : $value;
+    }
+
+    /** configConstant()'s answer for a constant wp-config.php does not define. */
+    private const UNDEFINED = "\0undefined";
+
+    /**
+     * A wp-config constant, json-decoded; self::UNDEFINED when it is not
+     * defined (distinct from defined-as-false: WordPress shows errors when
+     * WP_DEBUG is on and WP_DEBUG_DISPLAY is undefined); null when the read
+     * failed or the value is masked for this viewer.
+     */
+    private function configConstant(WpCli $wpcli, string $name): mixed
+    {
+        try {
+            $result = $wpcli->run($this->site, 'config get', [$name, '--type=constant', '--format=json'], auth()->user());
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($result->isFailed()) {
+            return str_contains($result->stderr(), 'is not defined') ? self::UNDEFINED : null;
+        }
+
+        return json_decode(trim($result->stdout()), true);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Hardening: scan, registration, permissions, login protection.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** Plugins that protect the login form; any one active passes the check. */
+    private const LOGIN_PROTECTION_PLUGINS = ['limit-login-attempts-reloaded', 'wordfence', 'wp-2fa', 'two-factor', 'loginizer', 'all-in-one-wp-security-and-firewall', 'better-wp-security'];
+
+    /**
+     * Read-only security scan: about ten wp-cli reads over SSH, each check
+     * degrading to "unknown" on its own rather than failing the whole scan.
+     * Gated on update rights: viewers get masked config values, which must
+     * never be scored as a pass.
+     */
+    public function runSecurityScan(WpCli $wpcli, AdvisoryProvider $advisories): void
+    {
+        $this->authorize('update', $this->site);
+
+        $checks = [];
+        $add = static function (string $key, string $label, string $status, string $detail) use (&$checks): void {
+            $checks[] = ['key' => $key, 'label' => $label, 'status' => $status, 'detail' => $detail];
+        };
+
+        $version = $this->siteWordPressVersion($wpcli);
+        $status = app(CoreReleases::class)->status($version);
+        $add('core', __('WordPress core'), match ($status) {
+            'latest' => 'pass', 'outdated' => 'warn', 'insecure' => 'fail', default => 'unknown',
+        }, $version !== null ? __('Version :v — :s', ['v' => $version, 's' => $status ?? __('status unknown')]) : __('Could not read the version.'));
+
+        $this->loadPlugins($wpcli, $advisories);
+        if ($this->getErrorBag()->has('plugins')) {
+            $add('plugins', __('Plugins'), 'unknown', __('Could not list plugins.'));
+        } else {
+            $vulnerable = collect($this->plugins)->filter(static fn (array $p): bool => ! empty($p['advisories']))->pluck('name');
+            $outdated = collect($this->plugins)->where('update', 'available')->pluck('name');
+            $add('plugins', __('Plugins'), $vulnerable->isNotEmpty() ? 'fail' : ($outdated->isNotEmpty() ? 'warn' : 'pass'), $vulnerable->isNotEmpty()
+                ? __('Known vulnerabilities: :list', ['list' => $vulnerable->implode(', ')])
+                : ($outdated->isNotEmpty() ? __('Updates waiting: :list', ['list' => $outdated->implode(', ')]) : __('No known vulnerabilities, all up to date.')));
+
+            $protected = collect($this->plugins)->contains(static fn (array $p): bool => $p['status'] === 'active' && in_array($p['name'], self::LOGIN_PROTECTION_PLUGINS, true));
+            $add('login', __('Login protection'), $protected ? 'pass' : 'warn', $protected
+                ? __('A login-protection plugin is active.')
+                : __('Nothing limits password guessing on wp-login.php.'));
+        }
+
+        $this->loadThemes($wpcli);
+        if ($this->getErrorBag()->has('themes')) {
+            $add('themes', __('Themes'), 'unknown', __('Could not list themes.'));
+        } else {
+            $inactive = collect($this->themes)->where('status', 'inactive')->count();
+            $outdated = collect($this->themes)->where('update', 'available')->count();
+            $add('themes', __('Themes'), $outdated > 0 || $inactive > 1 ? 'warn' : 'pass', trim(
+                ($outdated > 0 ? __(':n theme update(s) waiting.', ['n' => $outdated]).' ' : '')
+                .($inactive > 1 ? __(':n inactive themes — unused code is still attack surface; keep one default as a fallback.', ['n' => $inactive]) : '')
+            ) ?: __('Up to date, no unused themes.'));
+        }
+
+        $this->loadUsers($wpcli);
+        if ($this->getErrorBag()->has('users')) {
+            $add('users', __('Accounts'), 'unknown', __('Could not list users.'));
+        } else {
+            $admins = collect($this->users)->filter(fn (array $u): bool => $this->hasRole($u, 'administrator'))->count();
+            $adminLogin = collect($this->users)->contains(static fn (array $u): bool => strtolower($u['login']) === 'admin');
+            $add('users', __('Accounts'), $adminLogin ? 'warn' : 'pass', ($adminLogin
+                ? __('An account is named "admin" — the first username bots try.').' '
+                : '').__(':n administrator(s).', ['n' => $admins]));
+        }
+
+        $open = $this->readOption($wpcli, 'users_can_register');
+        $role = $this->readOption($wpcli, 'default_role');
+        $add('registration', __('Registration'), match (true) {
+            $open === null => 'unknown',
+            $open === '1' && $role === 'administrator' => 'fail',
+            $open === '1' => 'warn',
+            default => 'pass',
+        }, match (true) {
+            $open === null => __('Could not read the setting.'),
+            $open === '1' => __('Anyone can register, as :role.', ['role' => $role ?? '?']),
+            default => __('Registration is closed.'),
+        });
+
+        foreach ([
+            ['DISALLOW_FILE_EDIT', 'file_edit', __('Admin file editor'), __('The wp-admin file editor is off.'), __('The wp-admin file editor is on — a stolen admin login can rewrite PHP.')],
+            ['FORCE_SSL_ADMIN', 'ssl_admin', __('Admin over HTTPS'), __('wp-admin is forced to HTTPS.'), __('wp-admin can be reached over plain HTTP.')],
+        ] as [$constant, $key, $label, $passText, $warnText]) {
+            $value = $this->configConstant($wpcli, $constant);
+            $add($key, $label, $value === null ? 'unknown' : ($value === true ? 'pass' : 'warn'), $value === null ? __('Could not read :c.', ['c' => $constant]) : ($value === true ? $passText : $warnText));
+        }
+
+        $debug = $this->configConstant($wpcli, 'WP_DEBUG');
+        $display = $this->configConstant($wpcli, 'WP_DEBUG_DISPLAY');
+        // Undefined WP_DEBUG_DISPLAY means "display" — only an explicit false hides errors.
+        $shown = $debug === true && $display !== false;
+        $add('debug', __('Error display'), $debug === null ? 'unknown' : ($shown ? 'fail' : 'pass'), match (true) {
+            $debug === null => __('Could not read WP_DEBUG.'),
+            $shown => __('Debug output is shown to visitors — it leaks paths and queries.'),
+            default => __('Errors are not shown to visitors.'),
+        });
+
+        $this->securityScan = $checks;
+    }
+
+    /** Registration closed, and the default role back to subscriber. */
+    public function lockDownRegistration(WpCli $wpcli): void
+    {
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('hardening', __('Admin or owner role required.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'option update', ['users_can_register', '0'], errorBag: 'hardening') === null
+            || $this->wp($wpcli, 'option update', ['default_role', 'subscriber'], errorBag: 'hardening') === null) {
+            return;
+        }
+        $this->toastSuccess(__('Queued: registration closed, default role set to subscriber.'));
+    }
+
+    /** Re-assert dply's ownership and modes on the site's files (queued). */
+    public function resetFilePermissions(): void
+    {
+        $org = $this->site->organization;
+        if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
+            $this->addError('hardening', __('Admin or owner role required.'));
+
+            return;
+        }
+
+        SiteResetPermissionsJob::dispatch((string) $this->site->id, (string) auth()->id());
+        $this->toastSuccess(__('Resetting file permissions in the background.'));
+    }
+
+    public function installLoginProtection(WpCli $wpcli): void
+    {
+        $this->runWpAction($wpcli, 'plugin install', 'limit-login-attempts-reloaded', 'hardening', ['--activate']);
     }
 
     /**

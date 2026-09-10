@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\WordPress\WordPressSectionTest;
 
 use App\Enums\SiteType;
+use App\Jobs\SiteResetPermissionsJob;
 use App\Livewire\Sites\WordPress\WordPressSection;
 use App\Models\Organization;
 use App\Models\RemoteCliRun;
@@ -1105,4 +1106,175 @@ test('the autoload audit counts what WordPress actually autoloads', function () 
     expect($audit['total'])->toBe(800)
         ->and($audit['count'])->toBe(2)
         ->and($audit['top'][0]['name'])->toBe('big_plugin_cache');
+});
+
+/** Stub wp-cli by command: the first needle found in the built shell line wins. */
+function fakeWpCommands(array $map): void
+{
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturnUsing(function ($server, $name, $bash, callable $cb) use ($map) {
+            foreach ($map as $needle => [$out, $exit]) {
+                if (str_contains($bash, $needle)) {
+                    $cb($exit === 0 ? 'out' : 'err', $out);
+
+                    return new ProcessOutput($out, $exit, false);
+                }
+            }
+
+            return new ProcessOutput('', 0, false);
+        });
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+}
+
+test('cron events flag what is long overdue and filter by hook', function () {
+    [$user, $site] = makeWpSite();
+
+    $view = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('cronEvents', [
+            ['hook' => 'wp_version_check', 'next_run_gmt' => now('UTC')->subHour()->format('Y-m-d H:i:s'), 'recurrence' => '12 hours'],
+            ['hook' => 'woocommerce_cleanup', 'next_run_gmt' => now('UTC')->addHour()->format('Y-m-d H:i:s'), 'recurrence' => '1 day'],
+        ])
+        ->set('cronEventFilter', 'woo')
+        ->instance()->cronEventRows();
+
+    expect($view['overdue'])->toBe(1)
+        ->and(array_column($view['rows'], 'hook'))->toBe(['woocommerce_cleanup'])
+        ->and($view['rows'][0]['overdue'])->toBeFalse();
+});
+
+test('run all due and unschedule queue the right cron commands', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('runDueCronEvents')
+        ->call('confirmDeleteCronEvent', 'bad hook; rm')
+        ->assertHasErrors('cron')
+        ->call('confirmDeleteCronEvent', 'my_plugin_sync')
+        ->assertSet('confirmActionModalMethod', 'deleteCronEvent');
+    $component->call('confirmActionModal');
+
+    expect(RemoteCliRun::query()->where('command', 'cron event run')->sole()->args)->toBe(['--due-now'])
+        ->and(RemoteCliRun::query()->where('command', 'cron event delete')->sole()->args)->toBe(['my_plugin_sync']);
+});
+
+test('saving site identity only writes what changed and refuses a leading dash', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('siteSettings', ['blogname' => 'Old', 'blogdescription' => 'Same', 'blog_public' => '1', 'home' => null, 'siteurl' => null, 'debug' => false])
+        ->set('settingsTitle', '--flag')
+        ->set('settingsTagline', 'Same')
+        ->call('saveSiteIdentity')
+        ->assertHasErrors('tools')
+        ->set('settingsTitle', 'New name')
+        ->call('saveSiteIdentity');
+
+    expect(RemoteCliRun::query()->where('command', 'option update')->sole()->args)->toBe(['blogname', 'New name']);
+});
+
+test('changing the site address confirms first, and bedrock refuses', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('settingsHome', 'https://new.example.com/')
+        ->set('settingsSiteurl', 'https://new.example.com')
+        ->call('confirmSiteAddress')
+        ->assertSet('confirmActionModalMethod', 'saveSiteAddress');
+    expect(RemoteCliRun::query()->count())->toBe(0);
+    $component->call('confirmActionModal');
+
+    expect(RemoteCliRun::query()->where('command', 'option update')->pluck('args')->all())
+        ->toBe([['home', 'https://new.example.com'], ['siteurl', 'https://new.example.com']]);
+
+    $site->update(['meta' => ['scaffold' => ['framework' => 'wordpress', 'layout' => 'bedrock']]]);
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('saveSiteAddress', 'https://x.example.com', 'https://x.example.com')
+        ->assertHasErrors('core');
+    expect(RemoteCliRun::query()->count())->toBe(2);
+});
+
+test('debug logging logs to a file and never displays, admin only', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('setDebugLogging', true);
+
+    expect(RemoteCliRun::query()->where('command', 'config set')->pluck('args')->all())->toBe([
+        ['WP_DEBUG', 'true', '--raw', '--type=constant'],
+        ['WP_DEBUG_LOG', 'true', '--raw', '--type=constant'],
+        ['WP_DEBUG_DISPLAY', 'false', '--raw', '--type=constant'],
+    ]);
+
+    [$member, $memberSite] = makeWpSite(userRole: 'member');
+    Livewire::actingAs($member)
+        ->test(WordPressSection::class, ['site' => $memberSite])
+        ->call('setDebugLogging', true)
+        ->assertHasErrors('tools');
+});
+
+test('the security scan reads the real state and scores each check', function () {
+    [$user, $site] = makeWpSite();
+    fakeCoreReleases();
+    $advisories = Mockery::mock(AdvisoryProvider::class);
+    $advisories->shouldReceive('forPlugin')->andReturn([]);
+    app()->instance(AdvisoryProvider::class, $advisories);
+
+    fakeWpCommands([
+        'core version' => ['6.8.8', 0],
+        'plugin list' => [json_encode([['name' => 'hello', 'status' => 'active', 'version' => '1.7', 'update' => 'none']]), 0],
+        'theme list' => [json_encode([
+            ['name' => 'twentytwentyfive', 'status' => 'active', 'version' => '1.0', 'update' => 'none'],
+            ['name' => 'twentytwentyfour', 'status' => 'inactive', 'version' => '1.0', 'update' => 'none'],
+            ['name' => 'twentytwentythree', 'status' => 'inactive', 'version' => '1.0', 'update' => 'none'],
+        ]), 0],
+        'user list' => [json_encode([['ID' => 1, 'user_login' => 'admin', 'display_name' => 'Admin', 'user_email' => 'a@example.com', 'roles' => 'administrator']]), 0],
+        "'users_can_register'" => ['1', 0],
+        "'default_role'" => ['administrator', 0],
+        "'DISALLOW_FILE_EDIT'" => ['true', 0],
+        "'FORCE_SSL_ADMIN'" => ["Error: The constant 'FORCE_SSL_ADMIN' is not defined in the 'wp-config.php' file.", 1],
+        "'WP_DEBUG_DISPLAY'" => ["Error: The constant 'WP_DEBUG_DISPLAY' is not defined in the 'wp-config.php' file.", 1],
+        "'WP_DEBUG'" => ['true', 0],
+    ]);
+
+    $scan = collect(Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('runSecurityScan')
+        ->get('securityScan'))->pluck('status', 'key');
+
+    expect($scan->all())->toMatchArray([
+        'core' => 'warn',          // 6.8.8 is "outdated"
+        'plugins' => 'pass',
+        'login' => 'warn',         // no login-protection plugin
+        'themes' => 'warn',        // two unused themes
+        'users' => 'warn',         // an account named admin
+        'registration' => 'fail',  // open, as administrator
+        'file_edit' => 'pass',
+        'ssl_admin' => 'warn',     // not defined
+        // WP_DEBUG on with WP_DEBUG_DISPLAY undefined: WordPress displays errors.
+        'debug' => 'fail',
+    ]);
+});
+
+test('hardening quick fixes queue the right work, and wp-cron is left to the Cron tab', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('lockDownRegistration')
+        ->call('resetFilePermissions')
+        ->call('toggleHardening', 'disallow_file_mods')
+        ->call('toggleHardening', 'disable_wp_cron')
+        ->assertHasErrors('hardening');
+
+    expect(RemoteCliRun::query()->where('command', 'option update')->pluck('args')->all())
+        ->toBe([['users_can_register', '0'], ['default_role', 'subscriber']])
+        ->and(RemoteCliRun::query()->where('command', 'config set')->sole()->args)->toBe(['DISALLOW_FILE_MODS', 'true', '--raw', '--type=constant']);
+    Queue::assertPushed(SiteResetPermissionsJob::class);
 });
