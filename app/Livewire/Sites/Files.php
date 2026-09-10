@@ -122,6 +122,7 @@ class Files extends Component
             'ftpAdoptable' => $this->ftpAdoptableUsernames(),
             'ftpDeployUser' => $this->ftpDeployUsername(),
             'ftpAccountKeys' => $this->ftpAccountKeys(),
+            'ftpProfileKeys' => $this->ftpProfileKeys(),
             'editMaxBytes' => (int) config('server_file_browser.edit_max_bytes', 1_048_576),
             'downloadMaxBytes' => (int) config('server_file_browser.download_max_bytes', 26_214_400),
             // Settings shell (sidebar + breadcrumb) — same vars the sibling

@@ -41,6 +41,8 @@ trait ManagesSiteFtpAccounts
 
     public string $ftp_key_public = '';
 
+    public string $ftp_key_profile_id = '';
+
     public ?string $ftp_error = null;
 
     public ?string $ftp_pending_delete_id = null;
@@ -186,6 +188,41 @@ trait ManagesSiteFtpAccounts
         $this->ftp_error = null;
         $this->ftp_adopt_username = '';
         $this->showFtpAdoptModal = true;
+
+        // The candidate list reads the server_system_users snapshot, which is
+        // only written when someone visits the server's System users page and
+        // loads it. Most operators reaching this modal never have — so without
+        // this the list is empty on a server full of accounts. Probe on open
+        // when the snapshot is cold: an explicit user action, never the render
+        // path, and skipped once a snapshot exists.
+        if ($this->ftpAdoptableUsernames() === []) {
+            $this->loadFtpAdoptableAccounts();
+        }
+    }
+
+    /**
+     * SSH-probes /etc/passwd and persists the snapshot the candidate list reads.
+     * Safe to call repeatedly. Failures surface inline rather than throwing —
+     * an unreachable server should explain itself, not blank the modal.
+     */
+    public function loadFtpAdoptableAccounts(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->ftp_error = __('The server must be ready with SSH before loading accounts.');
+
+            return;
+        }
+
+        try {
+            app(ServerSystemUserService::class)->listPasswdUsersWithSiteCounts(
+                $this->server->fresh(),
+                app(ServerPasswdUserLister::class),
+            );
+        } catch (\Throwable $e) {
+            $this->ftp_error = $e->getMessage();
+        }
     }
 
     public function closeFtpAdoptModal(): void
@@ -263,12 +300,27 @@ trait ManagesSiteFtpAccounts
             ->all();
     }
 
+    /**
+     * The operator's own saved keys, so the common case is a pick rather than a
+     * copy-paste round trip through their terminal.
+     *
+     * @return \Illuminate\Support\Collection<int, UserSshKey>
+     */
+    public function ftpProfileKeys()
+    {
+        return UserSshKey::query()
+            ->where('user_id', Auth::id())
+            ->orderBy('name')
+            ->get(['id', 'name', 'public_key']);
+    }
+
     public function openFtpKeyModal(string $accountId): void
     {
         $this->authorize('update', $this->site);
         $this->ftp_error = null;
         $this->ftp_key_name = '';
         $this->ftp_key_public = '';
+        $this->ftp_key_profile_id = '';
         $this->ftp_key_account_id = $accountId;
     }
 
@@ -294,20 +346,43 @@ trait ManagesSiteFtpAccounts
                 ->where('site_id', $this->site->id)
                 ->findOrFail($this->ftp_key_account_id);
 
-            if (! UserSshKey::publicKeyLooksValid($this->ftp_key_public)) {
-                throw new \RuntimeException(__('That does not look like a valid SSH public key.'));
+            if ($this->ftp_key_profile_id !== '') {
+                // One of the operator's own saved keys. Recorded as managed by
+                // that UserSshKey (the same shape the server-level key screen
+                // uses) so the row is traceable back to its owner, and
+                // updateOrCreate keeps re-picking the same key idempotent.
+                $profileKey = UserSshKey::query()
+                    ->where('user_id', Auth::id())
+                    ->findOrFail($this->ftp_key_profile_id);
+
+                ServerAuthorizedKey::query()->updateOrCreate(
+                    [
+                        'server_id' => $this->server->id,
+                        'managed_key_type' => UserSshKey::class,
+                        'managed_key_id' => $profileKey->id,
+                        'target_linux_user' => $account->username,
+                    ],
+                    [
+                        'name' => trim($this->ftp_key_name) !== '' ? trim($this->ftp_key_name) : $profileKey->name,
+                        'public_key' => trim((string) $profileKey->public_key),
+                    ],
+                );
+            } else {
+                if (! UserSshKey::publicKeyLooksValid($this->ftp_key_public)) {
+                    throw new \RuntimeException(__('That does not look like a valid SSH public key.'));
+                }
+
+                $name = trim($this->ftp_key_name) !== ''
+                    ? trim($this->ftp_key_name)
+                    : __('FTP key for :user', ['user' => $account->username]);
+
+                ServerAuthorizedKey::query()->create([
+                    'server_id' => $this->server->id,
+                    'target_linux_user' => $account->username,
+                    'name' => $name,
+                    'public_key' => trim($this->ftp_key_public),
+                ]);
             }
-
-            $name = trim($this->ftp_key_name) !== ''
-                ? trim($this->ftp_key_name)
-                : __('FTP key for :user', ['user' => $account->username]);
-
-            ServerAuthorizedKey::query()->create([
-                'server_id' => $this->server->id,
-                'target_linux_user' => $account->username,
-                'name' => $name,
-                'public_key' => trim($this->ftp_key_public),
-            ]);
 
             // The key reaches the box on the queue — an SSH round trip in the
             // HTTP request would hang the modal until max_execution_time.

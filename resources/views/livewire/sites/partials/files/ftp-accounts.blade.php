@@ -168,7 +168,7 @@
                         @if ($account->status === \App\Models\SftpAccount::STATUS_ERROR)
                             <p class="mt-1 font-mono text-xs text-rose-700">{{ $account->last_error }}</p>
                         @else
-                            <x-copy-value class="mt-1 max-w-md" :value="$ftpUri($account->username)" />
+                            <x-sftp-connection class="mt-1" :user="$account->username" :host="$ftpHost" />
                         @endif
 
                         {{-- Keys live in server_authorized_keys, keyed by
@@ -230,7 +230,7 @@
                 <p class="mt-0.5">
                     {{ __('The :user account already supports SFTP using this server\'s SSH key — point your client at it with key auth, no password needed.', ['user' => $ftpDeployUser]) }}
                 </p>
-                <x-copy-value class="mt-2 max-w-md" :value="$ftpUri($ftpDeployUser)" />
+                <x-sftp-connection class="mt-2" :user="$ftpDeployUser" :host="$ftpHost" />
                 <p class="mt-2 text-xs">
                     {{ __('It cannot be given a password here: FTP accounts are forced into file-transfer-only sessions, which would break every deploy that runs as :user.', ['user' => $ftpDeployUser]) }}
                 </p>
@@ -278,9 +278,19 @@
             </div>
 
             @if (empty($ftpAdoptable))
-                <p class="rounded-md bg-brand-sand/40 px-3 py-2 text-sm text-brand-moss">
-                    {{ __('No eligible accounts. Load this server\'s system users first, or create a new FTP account instead.') }}
-                </p>
+                <div class="rounded-md bg-brand-sand/40 px-3 py-3 text-sm text-brand-moss">
+                    <p>{{ __('No eligible accounts found on this server. Every account is either already granted, or is the deploy user, which cannot be used.') }}</p>
+                    <div class="mt-2">
+                        <x-spinner-button
+                            size="xs"
+                            variant="secondary"
+                            type="button"
+                            icon="heroicon-o-arrow-path"
+                            target="loadFtpAdoptableAccounts"
+                            wire:click="loadFtpAdoptableAccounts"
+                        >{{ __('Re-scan the server') }}</x-spinner-button>
+                    </div>
+                </div>
             @else
                 <div>
                     <x-input-label for="ftp_adopt_username" :value="__('Account')" />
@@ -322,16 +332,37 @@
                 </p>
             </div>
 
+            {{-- Your own saved keys first: picking one is the common case, and
+                 pasting means a detour through a terminal. --}}
+            @if ($ftpProfileKeys->isNotEmpty())
+                <div>
+                    <x-input-label for="ftp_key_profile_id" :value="__('Use one of your saved keys')" />
+                    <select id="ftp_key_profile_id" wire:model.live="ftp_key_profile_id" class="mt-1 block w-full rounded-md border-brand-ink/15 text-sm shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                        <option value="">{{ __('Paste a different key…') }}</option>
+                        @foreach ($ftpProfileKeys as $profileKey)
+                            <option value="{{ $profileKey->id }}">{{ $profileKey->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             <div>
                 <x-input-label for="ftp_key_name" :value="__('Label')" />
                 <x-text-input id="ftp_key_name" class="mt-1 block w-full" type="text" wire:model="ftp_key_name" autocomplete="off" placeholder="{{ __('Designer laptop') }}" />
+                @if ($ftp_key_profile_id !== '')
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Optional — defaults to the saved key\'s own name.') }}</p>
+                @endif
             </div>
 
-            <div>
-                <x-input-label for="ftp_key_public" :value="__('Public key')" />
-                <textarea id="ftp_key_public" rows="4" wire:model="ftp_key_public" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-xs shadow-sm focus:border-brand-forest focus:ring-brand-forest" placeholder="ssh-ed25519 AAAAC3Nza..."></textarea>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('The public half only — never paste a private key.') }}</p>
-            </div>
+            {{-- Hidden while a saved key is selected: two sources for one key is
+                 how you end up granting the wrong one. --}}
+            @if ($ftp_key_profile_id === '')
+                <div>
+                    <x-input-label for="ftp_key_public" :value="__('Public key')" />
+                    <textarea id="ftp_key_public" rows="4" wire:model="ftp_key_public" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-xs shadow-sm focus:border-brand-forest focus:ring-brand-forest" placeholder="ssh-ed25519 AAAAC3Nza..."></textarea>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('The public half only — never paste a private key.') }}</p>
+                </div>
+            @endif
 
             @if ($ftp_error)
                 <p class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-200">{{ $ftp_error }}</p>
