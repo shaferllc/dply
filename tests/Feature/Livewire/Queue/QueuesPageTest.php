@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Livewire\Queue\QueuesPageTest;
 
 use App\Models\Organization;
-use App\Models\ServiceCredential;
 use App\Models\User;
 use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Contracts\QueueStore;
@@ -220,8 +219,11 @@ test('the detail page shows the endpoint and the env an app needs', function () 
         ])
         ->assertSee('https://queue.dply.test/api/queue/v1/'.$namespace->id)
         ->assertSee('QUEUE_CONNECTION=dply')
-        // The two limits an operator would otherwise discover in production.
-        ->assertSee('not strictly FIFO', false)
+        // The two behaviours an operator would otherwise discover in production.
+        // Ordering is per group, not per queue — the page stopped saying
+        // "not strictly FIFO" when group keys became reachable.
+        ->assertSee('Ordering is per group', false)
+        ->assertSee('MessageGroupId', false)
         ->assertSee('Horizon');
 });
 

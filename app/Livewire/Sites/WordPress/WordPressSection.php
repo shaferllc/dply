@@ -16,9 +16,11 @@ use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\WpCli;
 use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
 use App\Modules\Snapshots\Services\SnapshotService;
+use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -32,7 +34,7 @@ use Livewire\Component;
  *
  * Permission checks delegate to {@see WpCli} via the underlying
  * {@see RemoteCliPermissions} gate (Q17), which uses
- * {@see \App\Policies\SitePolicy} (view for Read, update for
+ * {@see SitePolicy} (view for Read, update for
  * anything else). Org membership is not treated as site-update.
  */
 class WordPressSection extends Component
@@ -100,6 +102,42 @@ class WordPressSection extends Component
     public ?array $core = null;
 
     public bool $coreLoaded = false;
+
+    // ── Tools tab ────────────────────────────────────────────────────────────
+    /** Live wp maintenance-mode status; null until probed. */
+    public ?bool $maintenanceActive = null;
+
+    public string $searchReplaceFrom = '';
+
+    public string $searchReplaceTo = '';
+
+    /** Dry-run report from the last search-replace preview. */
+    public ?string $searchReplacePreview = null;
+
+    public ?string $permalinkStructure = null;
+
+    public string $permalinkInput = '/%postname%/';
+
+    // ── Database health ──────────────────────────────────────────────────────
+    public ?array $dbHealth = null;
+
+    // ── Core integrity ───────────────────────────────────────────────────────
+    public ?string $checksumReport = null;
+
+    // ── Cron events ──────────────────────────────────────────────────────────
+    public array $cronEvents = [];
+
+    public bool $cronEventsLoaded = false;
+
+    /**
+     * Reset user password, shown exactly once.
+     *
+     * Protected, not public: public Livewire properties are serialized into the
+     * DOM snapshot and round-trip on every later request.
+     */
+    protected ?string $revealedUserPassword = null;
+
+    protected ?string $revealedUserLogin = null;
 
     public function mount(Site $site): void
     {
@@ -242,6 +280,9 @@ class WordPressSection extends Component
                 'status' => (string) ($row['status'] ?? ''),
                 'version' => $version,
                 'update' => (string) ($row['update'] ?? 'none'),
+                // `wp plugin list --format=json` reports auto_update as on/off.
+                // Dropped here, the row toggle would always render "off".
+                'auto_update' => (string) ($row['auto_update'] ?? 'off'),
                 'advisories' => array_map(fn ($a) => [
                     'id' => $a->id,
                     'title' => $a->title,
@@ -366,6 +407,9 @@ class WordPressSection extends Component
             'status' => (string) ($row['status'] ?? ''),
             'version' => (string) ($row['version'] ?? ''),
             'update' => (string) ($row['update'] ?? 'none'),
+            // `wp theme list --format=json` reports auto_update as on/off.
+            // Dropped here, the row toggle would always render "off".
+            'auto_update' => (string) ($row['auto_update'] ?? 'off'),
         ], $rows);
 
         $this->themesLoaded = true;
@@ -766,5 +810,296 @@ class WordPressSection extends Component
             ->orderByDesc('created_at')
             ->limit(25)
             ->get();
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Tools, health and integrity.
+    //
+    // Every one of these routes through WpCli::run(), so risk classification,
+    // the permission gate and the instant-vs-queued split are inherited rather
+    // than re-decided here. Read-only probes land in WpCli's instantCommands()
+    // allowlist and return inline; anything mutating queues and streams.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** Shared plumbing so each feature below stays a few honest lines. */
+    public function revealedUserPassword(): ?string
+    {
+        return $this->revealedUserPassword;
+    }
+
+    public function revealedUserLogin(): ?string
+    {
+        return $this->revealedUserLogin;
+    }
+
+    private function wp(WpCli $wpcli, string $command, array $args = [], bool $mutating = true): ?string
+    {
+        if ($mutating) {
+            $this->authorize('update', $this->site);
+        }
+
+        try {
+            return trim($wpcli->run(
+                site: $this->site,
+                command: $command,
+                args: $args,
+                queuedBy: auth()->user(),
+            )->stdout());
+        } catch (RemoteCliPermissionDeniedException) {
+            $this->addError('tools', __('Your role can\'t run that on this site.'));
+
+            return null;
+        } catch (\Throwable $e) {
+            $this->addError('tools', $e->getMessage());
+
+            return null;
+        }
+    }
+
+    /** 1. Maintenance mode — the switch you want before touching a live site. */
+    public function loadMaintenanceStatus(WpCli $wpcli): void
+    {
+        $out = $this->wp($wpcli, 'maintenance-mode status', [], mutating: false);
+        if ($out === null) {
+            return;
+        }
+
+        // wp prints "Maintenance mode is active." / "... not active."
+        $this->maintenanceActive = str_contains(strtolower($out), 'not active') === false
+            && str_contains(strtolower($out), 'active');
+    }
+
+    public function toggleMaintenanceMode(WpCli $wpcli): void
+    {
+        $enable = $this->maintenanceActive !== true;
+        $this->wp($wpcli, 'maintenance-mode '.($enable ? 'activate' : 'deactivate'));
+        $this->maintenanceActive = $enable;
+
+        $this->toastSuccess($enable
+            ? __('Maintenance mode on — visitors see the maintenance page.')
+            : __('Maintenance mode off.'));
+    }
+
+    /**
+     * 2. Search-replace, preview first.
+     *
+     * The single most destructive routine command in WordPress: it rewrites
+     * serialized data across every table. Preview is a real --dry-run through
+     * the same code path, so what you approve is what runs.
+     */
+    public function previewSearchReplace(WpCli $wpcli): void
+    {
+        if (trim($this->searchReplaceFrom) === '' || trim($this->searchReplaceTo) === '') {
+            $this->addError('tools', __('Both the search and replace values are required.'));
+
+            return;
+        }
+
+        $this->searchReplacePreview = $this->wp($wpcli, 'search-replace', [
+            $this->searchReplaceFrom,
+            $this->searchReplaceTo,
+            '--dry-run',
+            '--report-changed-only',
+            '--precise',
+        ], mutating: false);
+    }
+
+    public function confirmSearchReplace(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'runSearchReplace',
+            [],
+            __('Rewrite URLs across the database'),
+            __('Replaces every occurrence of :from with :to, including inside serialized data.', [
+                'from' => $this->searchReplaceFrom,
+                'to' => $this->searchReplaceTo,
+            ]),
+            __('Run replacement'),
+            true,
+            null,
+            null,
+            '',
+            false,
+            __('Take a snapshot first — this rewrites live content and cannot be undone from here.'),
+        );
+    }
+
+    public function runSearchReplace(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'search-replace', [
+            $this->searchReplaceFrom,
+            $this->searchReplaceTo,
+            '--precise',
+            '--report-changed-only',
+        ]);
+
+        $this->searchReplacePreview = null;
+        $this->toastSuccess(__('Search and replace queued.'));
+    }
+
+    /** 3. Salt rotation — invalidates every session, the fix after a leak. */
+    public function confirmRotateSalts(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'rotateSalts',
+            [],
+            __('Rotate security keys'),
+            __('Generates new WordPress salts. Everyone is signed out, including you, on the next request.'),
+            __('Rotate salts'),
+            true,
+        );
+    }
+
+    public function rotateSalts(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'config shuffle-salts');
+        $this->toastSuccess(__('Salts rotated. All sessions are invalidated.'));
+    }
+
+    /** 4. Flush object cache and expired transients. */
+    public function flushCaches(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'cache flush');
+        $this->wp($wpcli, 'transient delete', ['--all']);
+        $this->toastSuccess(__('Object cache and transients flushed.'));
+    }
+
+    /** 5. Permalinks — reading the structure, and flushing rewrite rules. */
+    public function loadPermalinks(WpCli $wpcli): void
+    {
+        $this->permalinkStructure = $this->wp($wpcli, 'option get', ['permalink_structure'], mutating: false);
+        if (is_string($this->permalinkStructure) && trim($this->permalinkStructure) !== '') {
+            $this->permalinkInput = trim($this->permalinkStructure);
+        }
+    }
+
+    public function savePermalinks(WpCli $wpcli): void
+    {
+        $structure = trim($this->permalinkInput);
+        if ($structure === '') {
+            $this->addError('tools', __('Permalink structure cannot be empty.'));
+
+            return;
+        }
+
+        $this->wp($wpcli, 'rewrite structure', [$structure, '--hard']);
+        $this->permalinkStructure = $structure;
+        $this->toastSuccess(__('Permalink structure updated and rewrite rules flushed.'));
+    }
+
+    public function flushRewrites(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'rewrite flush', ['--hard']);
+        $this->toastSuccess(__('Rewrite rules flushed.'));
+    }
+
+    /** 6. Database health: size, integrity check, then optimize/repair. */
+    public function loadDbHealth(WpCli $wpcli): void
+    {
+        $size = $this->wp($wpcli, 'db size', ['--human-readable'], mutating: false);
+        $check = $this->wp($wpcli, 'db check', [], mutating: false);
+
+        $this->dbHealth = [
+            'size' => $size,
+            'check' => $check,
+            // wp db check echoes "OK" per table; anything else is worth a look.
+            'ok' => is_string($check) && ! preg_match('/\b(error|corrupt|crashed)\b/i', $check),
+        ];
+    }
+
+    public function optimizeDatabase(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'db optimize');
+        $this->toastSuccess(__('Database optimize queued.'));
+    }
+
+    public function repairDatabase(WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'db repair');
+        $this->toastSuccess(__('Database repair queued.'));
+    }
+
+    /**
+     * 7. Core integrity — verify every core file against WordPress.org
+     * checksums. The cheapest malware/tamper check there is.
+     */
+    public function verifyChecksums(WpCli $wpcli): void
+    {
+        $out = $this->wp($wpcli, 'core verify-checksums', [], mutating: false);
+        $this->checksumReport = $out === null || $out === ''
+            ? __('No output — the check queued; re-run once it finishes.')
+            : $out;
+    }
+
+    /** 8. Auto-updates, per plugin and per theme. */
+    public function togglePluginAutoUpdate(string $slug, bool $enable, WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'plugin auto-updates '.($enable ? 'enable' : 'disable'), [$slug]);
+        $this->toastSuccess($enable
+            ? __('Auto-updates enabled for :slug.', ['slug' => $slug])
+            : __('Auto-updates disabled for :slug.', ['slug' => $slug]));
+    }
+
+    public function toggleThemeAutoUpdate(string $slug, bool $enable, WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'theme auto-updates '.($enable ? 'enable' : 'disable'), [$slug]);
+        $this->toastSuccess($enable
+            ? __('Auto-updates enabled for :slug.', ['slug' => $slug])
+            : __('Auto-updates disabled for :slug.', ['slug' => $slug]));
+    }
+
+    /**
+     * 9. Scheduled events. The Cron tab could switch the handler but never
+     * showed what was actually scheduled — so a stuck job was invisible.
+     */
+    public function loadCronEvents(WpCli $wpcli): void
+    {
+        $out = $this->wp($wpcli, 'cron event list', ['--format=json'], mutating: false);
+        $rows = is_string($out) && $out !== '' ? json_decode($out, associative: true) : [];
+
+        $this->cronEvents = is_array($rows)
+            ? array_values(array_filter($rows, 'is_array'))
+            : [];
+        $this->cronEventsLoaded = true;
+    }
+
+    public function runCronEvent(string $hook, WpCli $wpcli): void
+    {
+        $this->wp($wpcli, 'cron event run', [$hook]);
+        $this->toastSuccess(__('Ran :hook.', ['hook' => $hook]));
+    }
+
+    /**
+     * 10. User maintenance. The Users tab was read-only, so the two things an
+     * operator actually needs — lock someone out, or get back in — meant
+     * dropping to the console.
+     */
+    public function resetUserPassword(string $login, WpCli $wpcli): void
+    {
+        $password = Str::password(24, letters: true, numbers: true, symbols: false, spaces: false);
+
+        $this->wp($wpcli, 'user update', [$login, '--user_pass='.$password, '--skip-email']);
+
+        // Shown once, like every other generated credential in dply.
+        $this->revealedUserPassword = $password;
+        $this->revealedUserLogin = $login;
+        $this->toastSuccess(__('Password reset for :login — copy it now.', ['login' => $login]));
+    }
+
+    public function changeUserRole(string $login, string $role, WpCli $wpcli): void
+    {
+        $allowed = ['administrator', 'editor', 'author', 'contributor', 'subscriber'];
+        if (! in_array($role, $allowed, true)) {
+            $this->addError('users', __('Unknown role.'));
+
+            return;
+        }
+
+        $this->wp($wpcli, 'user set-role', [$login, $role]);
+        $this->toastSuccess(__(':login is now :role.', ['login' => $login, 'role' => $role]));
     }
 }

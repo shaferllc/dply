@@ -123,6 +123,20 @@
                                         @else
                                             <button type="button" wire:click="activatePlugin(@js($plugin['name']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Activate') }}</button>
                                         @endif
+                                        @php $autoOn = ($plugin['auto_update'] ?? 'off') === 'on'; @endphp
+                                        {{-- Auto-updates: the difference between a
+                                             CVE patched overnight and one that waits
+                                             for someone to notice. --}}
+                                        <button
+                                            type="button"
+                                            wire:click="togglePluginAutoUpdate(@js($plugin['name']), {{ $autoOn ? 'false' : 'true' }})"
+                                            title="{{ $autoOn ? __('Auto-updates on — click to disable') : __('Auto-updates off — click to enable') }}"
+                                            @class([
+                                                'rounded-md border px-2 py-1 text-xs font-medium',
+                                                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' => $autoOn,
+                                                'border-brand-ink/15 text-brand-moss hover:bg-brand-sand/40' => ! $autoOn,
+                                            ])
+                                        >{{ $autoOn ? __('Auto ✓') : __('Auto') }}</button>
                                         @if ($canDestroy)
                                             <button type="button" wire:click="confirmDeletePlugin(@js($plugin['name']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Delete') }}</button>
                                         @endif

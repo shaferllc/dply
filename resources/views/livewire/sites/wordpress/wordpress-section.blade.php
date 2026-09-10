@@ -32,6 +32,7 @@
                 'core' => ['label' => __('Core'), 'icon' => 'heroicon-o-cube'],
                 'database' => ['label' => __('Database'), 'icon' => 'heroicon-o-circle-stack'],
                 'cron' => ['label' => __('Cron'), 'icon' => 'heroicon-o-clock'],
+                'tools' => ['label' => __('Tools'), 'icon' => 'heroicon-o-wrench-screwdriver'],
                 'hardening' => ['label' => __('Hardening'), 'icon' => 'heroicon-o-shield-check'],
             ] as $key => $meta)
                 <x-server-workspace-tab :icon="$meta['icon']" :active="$tab === $key" wire:click="$set('tab', '{{ $key }}')">
@@ -172,6 +173,51 @@
     @endif
 
     {{-- PLUGINS --}}
+    {{-- Scheduled events. The Cron tab could switch the handler but never showed
+         what was scheduled, so a stuck job was invisible from here. --}}
+    @if ($tab === 'cron')
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Scheduled events') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Everything WordPress has queued, and when it is next due. Run one now to test it.') }}</p>
+                </div>
+                <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-arrow-path" target="loadCronEvents" wire:click="loadCronEvents">{{ __('Load events') }}</x-spinner-button>
+            </div>
+
+            @if ($cronEventsLoaded)
+                @if ($cronEvents === [])
+                    <p class="px-3 py-3 text-xs text-brand-moss sm:px-4">{{ __('No events scheduled.') }}</p>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-left text-xs">
+                            <thead class="bg-brand-sand/30 text-2xs uppercase tracking-wide text-brand-moss">
+                                <tr>
+                                    <th class="px-3 py-2 sm:px-4">{{ __('Hook') }}</th>
+                                    <th class="px-3 py-2">{{ __('Next run') }}</th>
+                                    <th class="px-3 py-2">{{ __('Recurrence') }}</th>
+                                    <th class="px-3 py-2 text-right sm:px-4">{{ __('Actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/10">
+                                @foreach ($cronEvents as $event)
+                                    <tr>
+                                        <td class="px-3 py-2 font-mono text-brand-ink sm:px-4">{{ $event['hook'] ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $event['next_run_relative'] ?? ($event['next_run'] ?? '—') }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $event['recurrence'] ?? '—' }}</td>
+                                        <td class="px-3 py-2 text-right sm:px-4">
+                                            <x-spinner-button size="xs" variant="secondary" type="button" target="runCronEvent" wire:click="runCronEvent('{{ $event['hook'] ?? '' }}')">{{ __('Run now') }}</x-spinner-button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            @endif
+        </div>
+    @endif
+
     @if ($tab === 'plugins')
         @include('livewire.sites.wordpress.partials.plugins-tab')
     @endif
@@ -193,6 +239,37 @@
 
     {{-- DATABASE --}}
     @if ($tab === 'database')
+        {{-- Health first: size and integrity are what you check before deciding
+             whether a snapshot or a repair is the next move. --}}
+        <div class="border-b border-brand-ink/10">
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Database health') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Size on disk, a table integrity check, and the two repair routines.') }}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-arrow-path" target="loadDbHealth" wire:click="loadDbHealth">{{ __('Check') }}</x-spinner-button>
+                    <x-spinner-button size="xs" variant="secondary" type="button" target="optimizeDatabase" wire:click="optimizeDatabase">{{ __('Optimize') }}</x-spinner-button>
+                    <x-spinner-button size="xs" variant="secondary" type="button" target="repairDatabase" wire:click="repairDatabase">{{ __('Repair') }}</x-spinner-button>
+                </div>
+            </div>
+            @if ($dbHealth !== null)
+                <div class="px-3 py-3 sm:px-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-2xs text-brand-ink ring-1 ring-brand-ink/10">{{ $dbHealth['size'] ?: __('size unknown') }}</span>
+                        <span @class([
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
+                            'bg-emerald-50 text-emerald-800 ring-emerald-200' => $dbHealth['ok'],
+                            'bg-rose-50 text-rose-800 ring-rose-200' => ! $dbHealth['ok'],
+                        ])>{{ $dbHealth['ok'] ? __('tables ok') : __('needs attention') }}</span>
+                    </div>
+                    @if (! empty($dbHealth['check']))
+                        <pre class="mt-2 max-h-40 overflow-auto rounded-md bg-brand-sand/50 p-3 font-mono text-2xs leading-relaxed text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $dbHealth['check'] }}</pre>
+                    @endif
+                </div>
+            @endif
+        </div>
+
         <div class="border-b border-brand-ink/10 last:border-b-0">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
@@ -245,6 +322,10 @@
     @endif
 
     {{-- HARDENING --}}
+    @if ($tab === 'tools')
+        @include('livewire.sites.wordpress.partials.tools-tab')
+    @endif
+
     @if ($tab === 'hardening')
         @php
             $hardeningOpinions = collect(data_get($site->meta, 'scaffold.hardening', []))->keyBy('key');

@@ -4,6 +4,18 @@
             <h3 class="text-sm font-semibold text-brand-ink">{{ __('Users') }}</h3>
             <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Read-only inventory from `wp user list`. Creating, deleting, and role changes stay in the wp-admin / Console for now.') }}</p>
         </div>
+
+    @if ($this->revealedUserPassword())
+        <div class="border-b border-emerald-200/70 bg-emerald-50/50 px-3 py-3 sm:px-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Copy this now') }}</p>
+            <p class="mt-0.5 text-xs text-emerald-800/80">{{ __('Shown once and never stored. If it is lost, reset it again.') }}</p>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                <x-copy-value plain :label="__('Login')" :value="$this->revealedUserLogin()" />
+                <x-copy-value plain :label="__('Password')" :value="$this->revealedUserPassword()" />
+            </div>
+        </div>
+    @endif
+
         @if ($usersLoaded)
             <button type="button" wire:click="loadUsers" wire:loading.attr="disabled" wire:target="loadUsers" class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                 <span wire:loading.remove wire:target="loadUsers" class="inline-flex items-center gap-1.5">
@@ -35,6 +47,7 @@
                         <th class="px-4 py-3">{{ __('Name') }}</th>
                         <th class="px-4 py-3">{{ __('Email') }}</th>
                         <th class="px-4 py-3">{{ __('Roles') }}</th>
+                        <th class="px-4 py-3 text-right sm:px-6">{{ __('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-brand-ink/10 bg-white">
@@ -51,6 +64,24 @@
                                     @empty
                                         <span class="text-brand-mist">—</span>
                                     @endforelse
+                                </div>
+                            </td>
+                            {{-- The Users tab was read-only, so the two things an
+                                 operator actually needs — lock someone out, or get
+                                 back in — meant dropping to the console. --}}
+                            <td class="px-4 py-3 text-right sm:px-6">
+                                <div class="flex items-center justify-end gap-2">
+                                    <select
+                                        class="rounded-md border-brand-ink/15 py-1 text-xs shadow-sm focus:border-brand-forest focus:ring-brand-forest"
+                                        wire:change="changeUserRole('{{ $wpUser['login'] }}', $event.target.value)"
+                                        aria-label="{{ __('Change role for :login', ['login' => $wpUser['login']]) }}"
+                                    >
+                                        <option value="">{{ __('Change role…') }}</option>
+                                        @foreach (['administrator', 'editor', 'author', 'contributor', 'subscriber'] as $roleOption)
+                                            <option value="{{ $roleOption }}">{{ $roleOption }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-spinner-button size="xs" variant="secondary" type="button" target="resetUserPassword" wire:click="resetUserPassword('{{ $wpUser['login'] }}')">{{ __('Reset password') }}</x-spinner-button>
                                 </div>
                             </td>
                         </tr>

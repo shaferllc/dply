@@ -94,6 +94,21 @@
                                         @unless ($active)
                                             <button type="button" wire:click="activateTheme(@js($theme['name']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Activate') }}</button>
                                         @endunless
+
+                                        {{-- Auto-updates: the difference between a
+                                             CVE patched overnight and one that waits
+                                             for someone to notice. --}}
+                                        @php $themeAutoOn = ($theme['auto_update'] ?? 'off') === 'on'; @endphp
+                                        <button
+                                            type="button"
+                                            wire:click="toggleThemeAutoUpdate(@js($theme['name']), {{ $themeAutoOn ? 'false' : 'true' }})"
+                                            title="{{ $themeAutoOn ? __('Auto-updates on — click to disable') : __('Auto-updates off — click to enable') }}"
+                                            @class([
+                                                'rounded-md border px-2 py-1 text-xs font-medium',
+                                                'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100' => $themeAutoOn,
+                                                'border-brand-ink/15 text-brand-moss hover:bg-brand-sand/40' => ! $themeAutoOn,
+                                            ])
+                                        >{{ $themeAutoOn ? __('Auto ✓') : __('Auto') }}</button>
                                         @if ($canDestroy && ! $active)
                                             <button type="button" wire:click="confirmDeleteTheme(@js($theme['name']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Delete') }}</button>
                                         @endif

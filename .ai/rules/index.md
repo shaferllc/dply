@@ -5,4 +5,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Jobs/** | .ai/rules/jobs.md |
+| app/Modules/Queue/** | .ai/rules/queue.md |
 | resources/views/** | .ai/rules/views.md |

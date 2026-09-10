@@ -182,6 +182,13 @@ class DockerWorkerRuntime implements WorkerRuntime
                 $command,
             ),
             sprintf('rm -f %s', escapeshellarg($envFile)),
+            // A `docker run` that fails AFTER creating the container — a bad
+            // command, a binary missing from the image — leaves it sitting in
+            // `Created` forever. Nothing points at it once the start is
+            // reported failed, so every failed scale-up would leak one.
+            // Found by the fleet smoke test against a real daemon; no mocked
+            // test could have shown it.
+            sprintf('[ "$DPLY_RUN_RC" -eq 0 ] || docker rm -f %s >/dev/null 2>&1 || true', escapeshellarg($container)),
             'exit "$DPLY_RUN_RC"',
         ]));
     }

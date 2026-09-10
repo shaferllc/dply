@@ -66,4 +66,20 @@
     @endif
 
     <x-input-error :messages="$errors->get('core')" class="px-6 pb-4" />
+
+    {{-- Integrity: every core file compared against WordPress.org checksums.
+         The cheapest tamper/malware check available, and it needs no agent. --}}
+    <div class="border-t border-brand-ink/10 px-3 py-3 sm:px-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Verify core files') }}</p>
+                <p class="mt-0.5 max-w-2xl text-xs text-brand-moss">{{ __('Compares every core file against the official checksums for this version. Anything modified or unexpected is listed.') }}</p>
+            </div>
+            <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-finger-print" target="verifyChecksums" wire:click="verifyChecksums">{{ __('Verify') }}</x-spinner-button>
+        </div>
+
+        @if ($checksumReport !== null)
+            <pre class="mt-3 max-h-56 overflow-auto rounded-md bg-brand-sand/50 p-3 font-mono text-2xs leading-relaxed text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $checksumReport }}</pre>
+        @endif
+    </div>
 </div>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue;
 
+use App\Modules\Queue\Console\FleetSmokeTestCommand;
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Queue\Console\MeterFleetUsageCommand;
 use App\Modules\Queue\Console\MeterQueueUsageCommand;
@@ -11,8 +12,8 @@ use App\Modules\Queue\Console\QueueDoctorCommand;
 use App\Modules\Queue\Console\QueueFleetTickCommand;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Contracts\WorkerRuntime;
-use App\Modules\Queue\Livewire\QueueNamespaceShow;
 use App\Modules\Queue\Livewire\FleetPanel;
+use App\Modules\Queue\Livewire\QueueNamespaceShow;
 use App\Modules\Queue\Livewire\Queues;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Observers\QueueNamespaceBillingObserver;
@@ -75,6 +76,7 @@ class QueueServiceProvider extends ServiceProvider
                 QueueDoctorCommand::class,
                 // Sizes managed worker fleets against real queue pressure.
                 QueueFleetTickCommand::class,
+                FleetSmokeTestCommand::class,
                 // Hourly roll-up of worker time into billable MiB-seconds.
                 MeterFleetUsageCommand::class,
             ]);
