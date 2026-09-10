@@ -44,14 +44,10 @@
     {{-- CONSOLE --}}
     @if ($tab === 'console')
         <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
-                <x-icon-badge>
-                    <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Console') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('wp-cli Console') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Run any wp-cli command. Inspect commands return inline; mutating commands queue and stream their output.') }}</p>
                     @if (! $canMutate)
                         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Your role can inspect this site. Mutating wp-cli (install, users, SQL) needs edit access. Secret values stay hidden.') }}</p>
                     @endif
@@ -134,14 +130,10 @@
             $handler = data_get($site->meta, 'wp_cron.handler', 'wp_cron');
         @endphp
         <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
-                <x-icon-badge>
-                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cron') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
                 </div>
             </div>
 
@@ -202,14 +194,10 @@
     {{-- DATABASE --}}
     @if ($tab === 'database')
         <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
-                <x-icon-badge>
-                    <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Database snapshots') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Manual `mysqldump` / `pg_dump` snapshots stored on this server (7-day TTL). BYO S3 destinations land in a follow-up PR.') }}</p>
                 </div>
                 <button
                     type="button"
@@ -279,14 +267,10 @@
             ];
         @endphp
         <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
-                <x-icon-badge>
-                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </x-icon-badge>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hardening') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Hardening defaults') }}</h3>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Each toggle below is an opinion the WordPress scaffold pipeline applied. Flip any of them off if your site has a specific reason — your audit log records every change.') }}</p>
                 </div>
             </div>
 

@@ -1,12 +1,8 @@
-<section class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
+<div>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
         <div class="min-w-0">
-            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Users') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Users') }}</h3>
-            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Read-only inventory from `wp user list`. Creating, deleting, and role changes stay in the wp-admin / Console for now.') }}</p>
+            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Users') }}</h3>
+            <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Read-only inventory from `wp user list`. Creating, deleting, and role changes stay in the wp-admin / Console for now.') }}</p>
         </div>
         @if ($usersLoaded)
             <button type="button" wire:click="loadUsers" wire:loading.attr="disabled" wire:target="loadUsers" class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
@@ -65,4 +61,4 @@
     @endif
 
     <x-input-error :messages="$errors->get('users')" class="px-6 pb-4" />
-</section>
+</div>
