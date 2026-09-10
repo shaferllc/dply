@@ -49,8 +49,10 @@ class SftpAccountProvisioner
     {
         return <<<'CFG'
 # Managed by dply — file-transfer accounts. Edits are overwritten.
-# Sorts after 99-dply-hardening.conf; the trailing `Match all` closes this
-# block so later Include'd files are not absorbed into it.
+# Sorts after 99-dply-hardening.conf; the trailing `Match all` closes these
+# blocks so later Include'd files are not absorbed into them.
+
+# File-transfer-only accounts: password auth plus a hard file-transfer jail.
 Match Group dply-sftp
     PasswordAuthentication yes
     ForceCommand internal-sftp
@@ -58,6 +60,13 @@ Match Group dply-sftp
     X11Forwarding no
     PermitTunnel no
     PermitTTY no
+
+# Password auth ONLY — no ForceCommand, no other restriction. This is the group
+# the deploy user may join: it can then authenticate with a password for SFTP
+# while still running the shell commands every deploy depends on.
+Match Group dply-ftp-pw
+    PasswordAuthentication yes
+
 Match all
 
 CFG;
@@ -73,6 +82,7 @@ CFG;
         $path = self::SNIPPET_PATH;
         $snippet = $this->snippet();
         $group = SftpAccount::GROUP;
+        $passwordGroup = SftpAccount::PASSWORD_GROUP;
 
         $script = <<<BASH
 set -u
@@ -86,6 +96,7 @@ if ! command -v setfacl >/dev/null 2>&1; then
 fi
 
 getent group {$group} >/dev/null 2>&1 || groupadd {$group}
+getent group {$passwordGroup} >/dev/null 2>&1 || groupadd {$passwordGroup}
 
 # Old sshd builds without an Include line would silently ignore the snippet,
 # leaving accounts that authenticate but get a shell instead of a jailed sftp.
@@ -277,11 +288,7 @@ BASH;
             throw new \RuntimeException(__('Account is not attached to a server.'));
         }
 
-        // Belt and braces around the heredoc: a password containing a newline
-        // would let the rest of the line be read as another chpasswd entry.
-        if (! preg_match('/^[A-Za-z0-9]{12,128}$/', $password)) {
-            throw new \RuntimeException(__('Generated password failed its own format check.'));
-        }
+        $this->assertPasswordFormat($password);
 
         $u = $account->username;
 
@@ -347,6 +354,94 @@ BASH, 600);
         // trees. Also re-runs the deletion policy guards.
         $report('deleting linux account '.$account->username);
         $this->systemUsers->deleteUserFromServer($server, $account->username);
+    }
+
+    /**
+     * Gives the deploy user a password it can use for SFTP.
+     *
+     * Joins {@see SftpAccount::PASSWORD_GROUP}, never {@see SftpAccount::GROUP}:
+     * the second group only flips PasswordAuthentication on, so the account
+     * keeps its shell and every deploy keeps working. What this DOES do is put
+     * a typed password on a sudo-capable account reachable from the internet,
+     * so it is opt-in and reversible rather than something we set up by default.
+     */
+    public function setDeployUserPassword(Server $server, string $username, string $password): void
+    {
+        $this->assertPasswordFormat($password);
+        $this->ensureServerPrerequisites($server);
+
+        $u = escapeshellarg($username);
+        $group = escapeshellarg(SftpAccount::PASSWORD_GROUP);
+
+        $this->runPrivileged($server, <<<BASH
+set -u
+id -u {$u} >/dev/null 2>&1 || { echo "DPLY_ERR: {$u} does not exist"; exit 1; }
+gpasswd -a {$u} {$group}
+chpasswd <<'DPLY_PW'
+{$username}:{$password}
+DPLY_PW
+usermod -U {$u}
+BASH, 120);
+    }
+
+    /**
+     * Revokes the deploy user's password login: leaves the group and locks the
+     * password hash. Key-based access — how dply itself connects — is untouched.
+     */
+    public function clearDeployUserPassword(Server $server, string $username): void
+    {
+        $u = escapeshellarg($username);
+        $group = escapeshellarg(SftpAccount::PASSWORD_GROUP);
+
+        $this->runPrivileged($server, <<<BASH
+set -u
+gpasswd -d {$u} {$group} 2>/dev/null || true
+passwd -l {$u} >/dev/null 2>&1 || true
+BASH, 120);
+    }
+
+    /**
+     * Site-wide FTP kill switch.
+     *
+     * Disabling drops group membership AND locks the password. Either alone is
+     * insufficient: leaving the group but keeping the password means the account
+     * still authenticates wherever password auth is on, and locking the password
+     * alone leaves any attached SSH key working.
+     *
+     * @param  list<string>  $usernames
+     */
+    public function setSiteAccountsEnabled(Server $server, array $usernames, bool $enabled, ?callable $step = null): void
+    {
+        if ($usernames === []) {
+            return;
+        }
+
+        $report = $step ?? static fn (string $m): null => null;
+        $group = escapeshellarg(SftpAccount::GROUP);
+        $lines = [];
+
+        foreach ($usernames as $username) {
+            $u = escapeshellarg($this->systemUsers->validatePasswdStyleUsername($username));
+
+            $lines[] = $enabled
+                ? "gpasswd -a {$u} {$group}; usermod -U {$u} 2>/dev/null || true"
+                : "gpasswd -d {$u} {$group} 2>/dev/null || true; usermod -L {$u} 2>/dev/null || true";
+        }
+
+        $report(($enabled ? 'enabling ' : 'disabling ').count($usernames).' ftp account(s)');
+
+        $this->runPrivileged($server, "set -u\n".implode("\n", $lines), 300);
+    }
+
+    /**
+     * A newline would let the rest of the heredoc line be read as another
+     * chpasswd entry — i.e. set a password on an account we did not name.
+     */
+    private function assertPasswordFormat(string $password): void
+    {
+        if (! preg_match('/^[A-Za-z0-9]{12,128}$/', $password)) {
+            throw new \RuntimeException(__('Generated password failed its own format check.'));
+        }
     }
 
     /** Site tree for a site-scoped account, the whole sites parent for a server-scoped one. */

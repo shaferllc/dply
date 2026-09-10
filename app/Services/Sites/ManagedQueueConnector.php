@@ -7,6 +7,7 @@ namespace App\Services\Sites;
 use App\Models\Site;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Support\QueueEndpoint;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -97,16 +98,24 @@ final class ManagedQueueConnector
         return QueueNamespace::query()->where('site_id', $site->id)->first();
     }
 
-    /** Whether the platform can offer this at all. */
+    /**
+     * Whether the platform can offer this at all.
+     *
+     * Resolved through {@see QueueEndpoint::base()} rather than read from
+     * `queue_service.public_url` directly. Reading the raw key skips the
+     * documented `dply.public_app_url` fallback, which is how this surface came
+     * to be invisible on an environment where the fleet half — which does go
+     * through the resolver — worked fine. One reader, one answer.
+     */
     public static function available(): bool
     {
         return (bool) config('queue_service.enabled', false)
-            && trim((string) config('queue_service.public_url', '')) !== '';
+            && QueueEndpoint::base() !== '';
     }
 
     public static function endpoint(): string
     {
-        return rtrim((string) config('queue_service.public_url', ''), '/');
+        return QueueEndpoint::base();
     }
 
     /**

@@ -31,6 +31,14 @@
                     size="xs"
                     variant="secondary"
                     type="button"
+                    :icon="$ftpEnabled ? 'heroicon-o-pause-circle' : 'heroicon-o-play-circle'"
+                    target="toggleSiteFtp"
+                    wire:click="toggleSiteFtp"
+                >{{ $ftpEnabled ? __('Disable FTP') : __('Enable FTP') }}</x-spinner-button>
+                <x-spinner-button
+                    size="xs"
+                    variant="secondary"
+                    type="button"
                     icon="heroicon-o-user-plus"
                     target="openFtpAdoptModal"
                     wire:click="openFtpAdoptModal"
@@ -89,6 +97,23 @@
                         :value="$ftpUri($ftpRevealedUsername)"
                     />
                 </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Kill switch is on. The accounts below still exist — they are out of the
+         group and their passwords are locked — so the list stays visible rather
+         than implying the accounts were deleted. --}}
+    @if (! $ftpEnabled)
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/30 px-5 py-4 sm:px-6">
+            <x-icon-badge tone="brand">
+                <x-heroicon-o-pause-circle class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0 text-sm text-brand-moss">
+                <p class="font-semibold text-brand-ink">{{ __('FTP is disabled for this site') }}</p>
+                <p class="mt-0.5">
+                    {{ __('The accounts below are kept along with their file access, but cannot log in. Re-enabling restores them without recreating anything.') }}
+                </p>
             </div>
         </div>
     @endif
@@ -231,8 +256,24 @@
                     {{ __('The :user account already supports SFTP using this server\'s SSH key — point your client at it with key auth, no password needed.', ['user' => $ftpDeployUser]) }}
                 </p>
                 <x-sftp-connection class="mt-2" :user="$ftpDeployUser" :host="$ftpHost" />
+
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    @if ($ftpDeployUserHasPassword)
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">
+                            {{ __('password login on') }}
+                        </span>
+                        <x-spinner-button size="xs" variant="secondary" type="button" target="setDeployUserFtpPassword" wire:click="setDeployUserFtpPassword">{{ __('Reset password') }}</x-spinner-button>
+                        <x-spinner-button size="xs" variant="danger" type="button" target="clearDeployUserFtpPassword" wire:click="clearDeployUserFtpPassword">{{ __('Remove password login') }}</x-spinner-button>
+                    @else
+                        <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-key" target="setDeployUserFtpPassword" wire:click="setDeployUserFtpPassword">{{ __('Set a password for this account') }}</x-spinner-button>
+                    @endif
+                </div>
+
                 <p class="mt-2 text-xs">
-                    {{ __('It cannot be given a password here: FTP accounts are forced into file-transfer-only sessions, which would break every deploy that runs as :user.', ['user' => $ftpDeployUser]) }}
+                    {{ __('A password here enables password login only — :user keeps its shell, so deploys are unaffected. It cannot be turned into a file-transfer-only account: that would force every dply command into an SFTP session.', ['user' => $ftpDeployUser]) }}
+                </p>
+                <p class="mt-1 text-xs">
+                    {{ __('Weigh it up: this account can sudo, and a password makes it reachable by guessing rather than by key alone. Key auth needs no password at all.') }}
                 </p>
             </div>
         </div>

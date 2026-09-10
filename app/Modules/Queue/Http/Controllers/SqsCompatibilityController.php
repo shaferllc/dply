@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Queue\Contracts\QueueStore;
 use App\Models\ServiceCredential;
+use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Services\FleetWaker;
 use App\Modules\Queue\Support\ClaimedJob;
 use App\Modules\Queue\Support\QueueAction;
+use App\Modules\Queue\Support\QueueEndpoint;
 use App\Modules\Queue\Support\QueueEntitlements;
 use App\Modules\Queue\Support\QueueRequestContext;
-use App\Modules\Queue\Services\FleetWaker;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Throwable;
 
 /**
  * The SQS-compatible surface of dply Queue.
@@ -361,8 +360,13 @@ class SqsCompatibilityController extends Controller
     {
         $name = (string) $this->field('QueueName', 'default');
 
+        // Same resolver the customer's env was written from: a GetQueueUrl that
+        // answered with a different base than the one they were configured with
+        // would send a client somewhere it has no credentials for.
+        $base = QueueEndpoint::base();
+
         return $this->ok([
-            'QueueUrl' => rtrim((string) config('queue_service.public_url', url('/api/queue/v1')), '/').'/'.$name,
+            'QueueUrl' => ($base !== '' ? $base : rtrim(url('/api/queue/v1'), '/')).'/'.$name,
         ]);
     }
 

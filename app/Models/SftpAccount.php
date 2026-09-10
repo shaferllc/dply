@@ -46,6 +46,17 @@ class SftpAccount extends Model
     /** Supplementary group the sshd Match block keys off. */
     public const GROUP = 'dply-sftp';
 
+    /**
+     * Password auth WITHOUT ForceCommand.
+     *
+     * The deploy user cannot join {@see GROUP}: forcing internal-sftp on it
+     * would turn every dply SSH command into a file-transfer session. But the
+     * ForceCommand is the dangerous half, not the password — so this second
+     * group opts an account into password authentication and nothing else,
+     * leaving its shell and command execution untouched.
+     */
+    public const PASSWORD_GROUP = 'dply-ftp-pw';
+
     /** dply ran useradd; removal deletes the Linux account. */
     public const SOURCE_CREATED = 'created';
 

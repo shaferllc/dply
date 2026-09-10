@@ -7,7 +7,9 @@ namespace App\Livewire\Sites\Concerns;
 use App\Jobs\CreateSftpAccountJob;
 use App\Jobs\DeleteSftpAccountJob;
 use App\Jobs\ResetSftpAccountPasswordJob;
+use App\Jobs\SetDeployUserFtpPasswordJob;
 use App\Jobs\SyncAuthorizedKeysJob;
+use App\Jobs\ToggleSiteFtpJob;
 use App\Models\ConsoleAction;
 use App\Models\ServerAuthorizedKey;
 use App\Models\SftpAccount;
@@ -180,6 +182,77 @@ trait ManagesSiteFtpAccounts
     public function ftpDeployUsername(): string
     {
         return trim((string) $this->server->ssh_user) ?: 'dply';
+    }
+
+    /** Site-wide kill switch. Accounts and grants survive it, so it is reversible. */
+    public function ftpEnabled(): bool
+    {
+        return ! (bool) data_get($this->site->meta, 'ftp_disabled', false);
+    }
+
+    public function toggleSiteFtp(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $enable = ! $this->ftpEnabled();
+        $run = $this->seedFtpConsoleAction($enable
+            ? __('Enabling FTP for this site …')
+            : __('Disabling FTP for this site …'));
+
+        ToggleSiteFtpJob::dispatch((string) $this->site->id, $enable, (string) Auth::id(), (string) $run->id);
+
+        $this->toastSuccess($enable
+            ? __('Enabling FTP for this site.')
+            : __('Disabling FTP. Accounts are kept, but cannot log in.'));
+    }
+
+    public function deployUserHasFtpPassword(): bool
+    {
+        return (bool) data_get($this->server->meta, 'deploy_user_ftp_password', false);
+    }
+
+    /**
+     * Password login for the deploy user. Joins the password-only group, so the
+     * account keeps its shell and deploys keep working — see
+     * {@see SftpAccount::PASSWORD_GROUP}.
+     */
+    public function setDeployUserFtpPassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $username = $this->ftpDeployUsername();
+        $password = SftpAccount::generatePassword();
+
+        $run = $this->seedFtpConsoleAction(__('Enabling password login for :user …', ['user' => $username]));
+        SetDeployUserFtpPasswordJob::dispatch(
+            (string) $this->site->id,
+            $username,
+            $password,
+            (string) Auth::id(),
+            (string) $run->id,
+        );
+
+        $this->ftp_revealed_password = $password;
+        $this->ftp_revealed_username = $username;
+        $this->toastSuccess(__('Password queued. It is shown once — copy it now.'));
+    }
+
+    public function clearDeployUserFtpPassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $username = $this->ftpDeployUsername();
+        $run = $this->seedFtpConsoleAction(__('Removing password login for :user …', ['user' => $username]));
+
+        SetDeployUserFtpPasswordJob::dispatch(
+            (string) $this->site->id,
+            $username,
+            null,
+            (string) Auth::id(),
+            (string) $run->id,
+        );
+
+        $this->toastSuccess(__('Password login removal queued. Key access is unaffected.'));
     }
 
     public function openFtpAdoptModal(): void
