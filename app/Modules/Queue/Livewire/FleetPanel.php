@@ -49,6 +49,21 @@ class FleetPanel extends Component
 
     public int $max_workers = 3;
 
+    /**
+     * The image workers run. Required: a fleet without one starts nothing, and
+     * before this field existed that was the silent default.
+     */
+    public string $image = '';
+
+    public string $registry_username = '';
+
+    /**
+     * Write-only. Never populated from the stored value on edit — the column is
+     * encrypted and there is no reason to round-trip a secret through a form —
+     * so blank on save means "keep what is there", not "clear it".
+     */
+    public string $registry_password = '';
+
     /** Fleet currently being resized, if any. */
     public ?string $editingId = null;
 
@@ -108,7 +123,9 @@ class FleetPanel extends Component
                         ?? ($fleet->meta['avg_job_seconds'] ?? null),
                     'reason' => $fleet->meta['last_reason'] ?? null,
                     'last_scaled_at' => $fleet->last_scaled_at?->diffForHumans(),
-                    'image' => trim((string) ($fleet->meta['image'] ?? '')),
+                    'image' => trim((string) ($fleet->image ?: ($fleet->meta['image'] ?? ''))),
+                    'registry_username' => (string) ($fleet->registry_username ?? ''),
+                    'has_registry_auth' => ($fleet->registry_username ?? '') !== '',
                 ];
             })
             ->all();
@@ -153,6 +170,9 @@ class FleetPanel extends Component
             'queue' => $this->queue,
             'class' => $this->class,
             'status' => ManagedQueueFleet::STATUS_ACTIVE,
+            'image' => trim($this->image),
+            'registry_username' => trim($this->registry_username) ?: null,
+            'registry_password' => $this->registry_password !== '' ? $this->registry_password : null,
             'memory_mib' => $this->memory_mib,
             // A pro fleet is defined by never sleeping, so its floor is at
             // least one whatever was typed.
@@ -163,6 +183,7 @@ class FleetPanel extends Component
         ]);
 
         $this->creating = false;
+        $this->registry_password = '';
         unset($this->fleets);
 
         $this->toastSuccess(__('Fleet created. Workers start when jobs arrive on :queue.', ['queue' => $this->queue]));
@@ -175,6 +196,10 @@ class FleetPanel extends Component
 
         $this->editingId = $fleet->id;
         $this->class = $fleet->class;
+        $this->image = (string) ($fleet->image ?? '');
+        $this->registry_username = (string) ($fleet->registry_username ?? '');
+        // Deliberately not loaded — see the property docblock.
+        $this->registry_password = '';
         $this->memory_mib = $fleet->memory_mib;
         $this->min_workers = $fleet->min_workers;
         $this->max_workers = $fleet->max_workers;
@@ -199,12 +224,20 @@ class FleetPanel extends Component
         $this->authorize('update', $this->namespace());
 
         $this->validate([
+            'image' => $this->imageRule(),
+            'registry_username' => 'nullable|string|max:255',
+            'registry_password' => 'nullable|string|max:4096',
             'memory_mib' => $this->memoryRule(),
             'min_workers' => 'required|integer|min:0|max:1000',
             'max_workers' => 'required|integer|min:1|max:1000|gte:min_workers',
         ]);
 
         $fleet->forceFill([
+            'image' => trim($this->image),
+            'registry_username' => trim($this->registry_username) ?: null,
+            // Blank leaves the stored secret alone; clearing the username is
+            // how you turn authentication off.
+            ...($this->registry_password !== '' ? ['registry_password' => $this->registry_password] : []),
             'memory_mib' => $this->memory_mib,
             'min_workers' => $fleet->class === ManagedQueueFleet::CLASS_PRO
                 ? max(1, $this->min_workers)
@@ -213,6 +246,7 @@ class FleetPanel extends Component
         ])->save();
 
         $this->editingId = null;
+        $this->registry_password = '';
         unset($this->fleets);
 
         $this->toastSuccess(__('Fleet resized. The range applies on the next tick; memory applies as workers are replaced.'));
@@ -267,10 +301,27 @@ class FleetPanel extends Component
         return [
             'queue' => ['required', 'string', 'max:'.self::MAX_QUEUE_NAME, 'regex:/^[A-Za-z0-9_-]+$/'],
             'class' => 'required|in:'.ManagedQueueFleet::CLASS_FLEX.','.ManagedQueueFleet::CLASS_PRO,
+            'image' => $this->imageRule(),
+            'registry_username' => 'nullable|string|max:255',
+            'registry_password' => 'nullable|string|max:4096',
             'memory_mib' => $this->memoryRule(),
             'min_workers' => 'required|integer|min:0|max:1000',
             'max_workers' => 'required|integer|min:1|max:1000|gte:min_workers',
         ];
+    }
+
+    /**
+     * A Docker image reference.
+     *
+     * Loose on purpose — registries differ on what they accept and dply is not
+     * the authority on that. It rejects whitespace and shell metacharacters,
+     * which is the part that matters: the value reaches a `docker pull` inside
+     * a bash script, and `escapeshellarg` in the runtime is the belt to this
+     * braces.
+     */
+    private function imageRule(): string
+    {
+        return 'required|string|max:512|regex:/^[A-Za-z0-9][A-Za-z0-9._\/:@-]*$/';
     }
 
     /**

@@ -65,6 +65,9 @@ class ManagedQueueFleet extends Model
         'queue',
         'class',
         'status',
+        'image',
+        'registry_username',
+        'registry_password',
         'memory_mib',
         'min_workers',
         'max_workers',
@@ -85,6 +88,9 @@ class ManagedQueueFleet extends Model
             'quiet_ticks' => 'integer',
             'last_scaled_at' => 'datetime',
             'meta' => 'array',
+            // Same treatment every other stored credential gets in this
+            // codebase; a registry token is a password.
+            'registry_password' => 'encrypted',
         ];
     }
 

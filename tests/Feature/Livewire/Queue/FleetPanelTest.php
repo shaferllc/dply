@@ -11,6 +11,7 @@ use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Models\QueueNamespace;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -53,6 +54,7 @@ function makeFleet(array $attributes = []): ManagedQueueFleet
 test('a fleet can be created with a class, a size and a range', function () {
     panel()
         ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')
         ->set('queue', 'invoices')
         ->set('class', ManagedQueueFleet::CLASS_FLEX)
         ->set('memory_mib', 512)
@@ -72,6 +74,7 @@ test('a fleet can be created with a class, a size and a range', function () {
 test('a pro fleet is forced to a floor of at least one worker', function () {
     panel()
         ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')
         ->set('queue', 'ledger')
         ->set('class', ManagedQueueFleet::CLASS_PRO)
         ->set('min_workers', 0)
@@ -87,6 +90,7 @@ test('a second fleet on the same queue is refused with an explanation', function
 
     panel()
         ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')
         ->set('queue', 'invoices')
         ->call('create')
         ->assertHasErrors('queue');
@@ -97,22 +101,26 @@ test('a second fleet on the same queue is refused with an explanation', function
 test('queue names are restricted to what can live in a URL path', function () {
     panel()
         ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')
         ->set('queue', 'not a queue!')
         ->call('create')
         ->assertHasErrors('queue');
 });
 
 test('flex is capped at 2 GiB and pro at 8 GiB', function () {
-    panel()->call('startCreating')->set('class', 'flex')->set('queue', 'a')->set('memory_mib', 4096)
+    panel()->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')->set('class', 'flex')->set('queue', 'a')->set('memory_mib', 4096)
         ->call('create')->assertHasErrors('memory_mib');
 
-    panel()->call('startCreating')->set('class', 'pro')->set('queue', 'b')->set('memory_mib', 4096)
+    panel()->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')->set('class', 'pro')->set('queue', 'b')->set('memory_mib', 4096)
         ->call('create')->assertHasNoErrors();
 });
 
 test('the maximum cannot be below the minimum', function () {
     panel()
         ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:latest')
         ->set('queue', 'c')
         ->set('min_workers', 5)
         ->set('max_workers', 2)
@@ -195,4 +203,96 @@ test('a fleet with no image says nothing will start', function () {
     makeFleet(['meta' => []]);
 
     panel()->assertSee('No worker image set');
+});
+
+/**
+ * The gap this whole slice closes: before the image was a form field, nothing
+ * outside the tests ever wrote it, so `FleetReconciler::scaleUp()` logged
+ * `queue.fleet.no_image` and started zero workers on every tick — while the
+ * panel reported "Workers start when jobs arrive".
+ */
+test('a fleet cannot be created without an image', function () {
+    panel()
+        ->call('startCreating')
+        ->set('image', '')
+        ->set('queue', 'invoices')
+        ->call('create')
+        ->assertHasErrors('image');
+
+    expect(ManagedQueueFleet::query()->where('queue', 'invoices')->exists())->toBeFalse();
+});
+
+test('an image that could break out of the pull command is refused', function () {
+    panel()
+        ->call('startCreating')
+        ->set('image', 'app:latest; rm -rf /')
+        ->set('queue', 'invoices')
+        ->call('create')
+        ->assertHasErrors('image');
+});
+
+test('the image and registry user are stored on the fleet', function () {
+    panel()
+        ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:v2')
+        ->set('registry_username', 'acme-bot')
+        ->set('registry_password', 'ghp_secret')
+        ->set('queue', 'invoices')
+        ->call('create')
+        ->assertHasNoErrors();
+
+    $fleet = ManagedQueueFleet::query()->where('queue', 'invoices')->firstOrFail();
+
+    expect($fleet->image)->toBe('ghcr.io/acme/app:v2')
+        ->and($fleet->registry_username)->toBe('acme-bot')
+        ->and($fleet->registry_password)->toBe('ghp_secret');
+});
+
+test('the registry token is encrypted at rest', function () {
+    panel()
+        ->call('startCreating')
+        ->set('image', 'ghcr.io/acme/app:v2')
+        ->set('registry_username', 'acme-bot')
+        ->set('registry_password', 'ghp_secret')
+        ->set('queue', 'invoices')
+        ->call('create');
+
+    $raw = (string) DB::table('dply_queue_fleets')->where('queue', 'invoices')->value('registry_password');
+
+    expect($raw)->not->toBe('ghp_secret')
+        ->and($raw)->not->toContain('ghp_secret');
+});
+
+test('editing never round-trips the stored token through the form', function () {
+    $fleet = makeFleet(['registry_username' => 'acme-bot', 'registry_password' => 'ghp_secret']);
+
+    panel()->call('edit', $fleet->id)->assertSet('registry_password', '');
+});
+
+test('saving with a blank token keeps the stored one', function () {
+    $fleet = makeFleet(['registry_username' => 'acme-bot', 'registry_password' => 'ghp_secret']);
+
+    panel()
+        ->call('edit', $fleet->id)
+        ->set('image', 'ghcr.io/acme/app:v3')
+        ->set('registry_password', '')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $fleet->refresh();
+
+    expect($fleet->image)->toBe('ghcr.io/acme/app:v3')
+        ->and($fleet->registry_password)->toBe('ghp_secret');
+});
+
+test('saving with a new token replaces the stored one', function () {
+    $fleet = makeFleet(['registry_username' => 'acme-bot', 'registry_password' => 'ghp_secret']);
+
+    panel()
+        ->call('edit', $fleet->id)
+        ->set('registry_password', 'ghp_rotated')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($fleet->refresh()->registry_password)->toBe('ghp_rotated');
 });

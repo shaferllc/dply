@@ -58,7 +58,7 @@
 
                     @if ($canManage)
                         <div class="flex shrink-0 flex-wrap items-center gap-1.5">
-                            <button type="button" wire:click="edit('{{ $fleet['id'] }}')" class="{{ $btnOutline }}">{{ __('Resize') }}</button>
+                            <button type="button" wire:click="edit('{{ $fleet['id'] }}')" class="{{ $btnOutline }}">{{ __('Configure') }}</button>
                             <button type="button" wire:click="togglePause('{{ $fleet['id'] }}')" class="{{ $btnOutline }}">
                                 {{ $fleet['status'] === 'active' ? __('Pause') : __('Resume') }}
                             </button>
@@ -107,6 +107,23 @@
 
                 @if ($editingId === $fleet['id'])
                     <div class="mt-3 grid gap-2 border-t border-brand-ink/10 pt-3 sm:grid-cols-3">
+                        <label class="block sm:col-span-3">
+                            <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Worker image') }}</span>
+                            <input type="text" wire:model="image" class="dply-input mt-1 w-full font-mono" placeholder="ghcr.io/acme/app:latest" maxlength="512" />
+                            @error('image') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                        </label>
+                        <label class="block">
+                            <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Registry user') }}</span>
+                            <input type="text" wire:model="registry_username" class="dply-input mt-1 w-full" autocomplete="off" placeholder="{{ __('public image — leave blank') }}" />
+                            @error('registry_username') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                        </label>
+                        <label class="block sm:col-span-2">
+                            <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Registry token') }}</span>
+                            <input type="password" wire:model="registry_password" class="dply-input mt-1 w-full" autocomplete="new-password"
+                                   placeholder="{{ $fleet['has_registry_auth'] ? __('stored — leave blank to keep') : __('public image — leave blank') }}" />
+                            @error('registry_password') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                        </label>
+
                         <label class="block">
                             <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Memory (MiB)') }}</span>
                             <input type="number" wire:model="memory_mib" class="dply-input mt-1 w-full" min="256" step="256" />
@@ -124,7 +141,7 @@
                         </label>
 
                         <div class="flex items-center gap-2 sm:col-span-3">
-                            <button type="button" wire:click="save" class="dply-btn dply-btn-xs">{{ __('Save size') }}</button>
+                            <button type="button" wire:click="save" class="dply-btn dply-btn-xs">{{ __('Save fleet') }}</button>
                             <button type="button" wire:click="cancelEdit" class="{{ $btnOutline }}">{{ __('Cancel') }}</button>
                         </div>
                     </div>
@@ -146,6 +163,27 @@
                 </p>
 
                 <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    <label class="block sm:col-span-2">
+                        <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Worker image') }}</span>
+                        <input type="text" wire:model="image" class="dply-input mt-1 w-full font-mono" placeholder="ghcr.io/acme/app:latest" maxlength="512" />
+                        <span class="mt-0.5 block text-2xs text-brand-mist">
+                            {{ __('Your app, as a container. Workers run `php artisan queue:work dply` inside it, so it needs the dply connection in config/queue.php — the same block on this page.') }}
+                        </span>
+                        @error('image') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Registry user') }}</span>
+                        <input type="text" wire:model="registry_username" class="dply-input mt-1 w-full" autocomplete="off" placeholder="{{ __('public image — leave blank') }}" />
+                        @error('registry_username') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                    </label>
+
+                    <label class="block">
+                        <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Registry token') }}</span>
+                        <input type="password" wire:model="registry_password" class="dply-input mt-1 w-full" autocomplete="new-password" placeholder="{{ __('public image — leave blank') }}" />
+                        @error('registry_password') <span class="mt-0.5 block text-2xs text-rose-700">{{ $message }}</span> @enderror
+                    </label>
+
                     <label class="block">
                         <span class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Queue name') }}</span>
                         <input type="text" wire:model="queue" class="dply-input mt-1 w-full font-mono" maxlength="39" />

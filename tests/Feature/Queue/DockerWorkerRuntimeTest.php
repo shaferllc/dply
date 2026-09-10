@@ -35,6 +35,8 @@ function spec(array $overrides = []): WorkerSpec
         memoryMib: $overrides['memoryMib'] ?? 1024,
         graceSeconds: $overrides['graceSeconds'] ?? 90,
         env: $overrides['env'] ?? ['DPLY_QUEUE_URL' => 'https://dply.test/api/queue/v1/ns', 'DPLY_QUEUE_SECRET' => 's3cret'],
+        registryUsername: $overrides['registryUsername'] ?? null,
+        registryPassword: $overrides['registryPassword'] ?? null,
     );
 }
 
@@ -100,7 +102,7 @@ test('the worker runs queue:work against its own queue on the dply connection', 
     expect($script())
         ->toContain("queue:work dply --queue='invoices'")
         ->toContain("'registry.dply.test/app:v3'")
-        ->toContain("DPLY_QUEUE_SECRET=s3cret");
+        ->toContain('DPLY_QUEUE_SECRET=s3cret');
 });
 
 test('the handle carries placement so a stop knows which machine to ask', function () {
@@ -157,4 +159,65 @@ test('a handle whose host is gone is neither alive nor stoppable', function () {
 
     expect($this->runtime->isAlive($handle))->toBeFalse();
     $this->runtime->stop($handle, 90);
+});
+
+/**
+ * Without a pull the run only works on a host that already happens to have the
+ * image cached — and the allocator picks the host, so the same fleet would
+ * start on one machine and fail on the next.
+ */
+test('the image is pulled before it is run', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec());
+
+    expect($script())->toContain("docker pull 'registry.dply.test/app:v3'");
+    expect(strpos($script(), 'docker pull'))->toBeLessThan(strpos($script(), 'docker run'));
+});
+
+test('a public image needs no login', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec());
+
+    expect($script())->not->toContain('docker login');
+});
+
+test('a private image logs in with the token off the command line', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec([
+        'image' => 'ghcr.io/acme/app:v3',
+        'registryUsername' => 'acme-bot',
+        'registryPassword' => 'ghp_secret',
+    ]));
+
+    $out = $script();
+
+    expect($out)
+        ->toContain("docker login 'ghcr.io' -u 'acme-bot' --password-stdin")
+        // `docker login -p` would put the token in the process table, where
+        // every other tenant on this host can read it out of `ps`.
+        ->not->toContain('-p ghp_secret')
+        ->not->toContain("--password 'ghp_secret'");
+});
+
+/**
+ * `runInlineBash` runs under `set -e`. A pull that aborted the script would
+ * skip the logout and leave one customer's registry session on a shared host
+ * for the next tenant to inherit.
+ */
+test('a failed pull still logs out, then fails the start', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec([
+        'image' => 'ghcr.io/acme/app:v3',
+        'registryUsername' => 'acme-bot',
+        'registryPassword' => 'ghp_secret',
+    ]));
+
+    $out = $script();
+
+    expect($out)->toContain('DPLY_PULL_RC');
+    expect(strpos($out, 'docker logout'))->toBeLessThan(strpos($out, 'exit "$DPLY_PULL_RC"'));
 });

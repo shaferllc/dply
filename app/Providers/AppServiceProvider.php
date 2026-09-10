@@ -15,6 +15,7 @@ use App\Listeners\UpdateDispatchedJobLifecycle;
 use App\Livewire\Pulse\DatabaseServersCard;
 use App\Livewire\Pulse\RedisServersCard;
 use App\Livewire\Pulse\WorkerServersCard;
+use App\Livewire\Sites\WordPress\WordPressSection;
 use App\Models\BackupConfiguration;
 use App\Models\CloudDatabase;
 use App\Models\GitProviderToken;
@@ -365,6 +366,7 @@ class AppServiceProvider extends ServiceProvider
         DevCommands::artisan('schedule:work');
 
         $this->registerCustomPulseCards();
+        $this->registerCaseSensitiveLivewireAliases();
 
         $this->discardCorruptedViteHotFile();
 
@@ -829,5 +831,23 @@ class AppServiceProvider extends ServiceProvider
         Livewire::component('pulse.redis-servers', RedisServersCard::class);
         Livewire::component('pulse.database-servers', DatabaseServersCard::class);
         Livewire::component('pulse.worker-servers', WorkerServersCard::class);
+    }
+
+    /**
+     * Components whose class name does not survive Livewire's alias convention.
+     *
+     * Livewire studly-cases each dotted segment, so `sites.wordpress.wordpress-section`
+     * resolves to App\Livewire\Sites\Wordpress\WordpressSection — lowercase `p`.
+     * The real class is WordPress\WordPressSection. macOS's case-insensitive
+     * filesystem loads it anyway; Linux does not, so this surfaced only in
+     * production, as "Unable to find component" 500s on the WordPress tab.
+     *
+     * Registering the alias explicitly beats renaming the class: a case-only
+     * rename is not something git replays reliably onto a case-insensitive
+     * checkout, so the rename itself would be the next production-only bug.
+     */
+    private function registerCaseSensitiveLivewireAliases(): void
+    {
+        Livewire::component('sites.wordpress.wordpress-section', WordPressSection::class);
     }
 }

@@ -20,6 +20,9 @@ final readonly class WorkerSpec
      * @param  string  $image  the customer's app image
      * @param  array<string, string>  $env  injected on top of the app's own
      * @param  int  $graceSeconds  time to finish the current job on stop
+     * @param  string|null  $registryUsername  set only for a private image
+     * @param  string|null  $registryPassword  plaintext at this point; the
+     *                                         runtime must keep it off argv
      */
     public function __construct(
         public string $fleetId,
@@ -28,6 +31,8 @@ final readonly class WorkerSpec
         public int $memoryMib,
         public int $graceSeconds,
         public array $env = [],
+        public ?string $registryUsername = null,
+        public ?string $registryPassword = null,
     ) {}
 
     public static function forFleet(ManagedQueueFleet $fleet, string $image, array $env = []): self
@@ -41,6 +46,8 @@ final readonly class WorkerSpec
             // be reclaimed at any moment, pro promises long jobs finish.
             graceSeconds: $fleet->graceSeconds(),
             env: $env,
+            registryUsername: $fleet->registry_username ?: null,
+            registryPassword: $fleet->registry_password ?: null,
         );
     }
 }

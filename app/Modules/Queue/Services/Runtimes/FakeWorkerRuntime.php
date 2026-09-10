@@ -75,6 +75,20 @@ class FakeWorkerRuntime implements WorkerRuntime
         return count($this->running);
     }
 
+    /**
+     * The specs behind the running workers.
+     *
+     * `runningCount()` answers how many, which is enough for scaling tests but
+     * not for anything about *what* was started — the image and the registry
+     * credentials on it have no other observable.
+     *
+     * @return list<WorkerSpec>
+     */
+    public function runningSpecs(): array
+    {
+        return array_values($this->running);
+    }
+
     /** @return list<array{action: string, ref: string}> */
     public function log(): array
     {

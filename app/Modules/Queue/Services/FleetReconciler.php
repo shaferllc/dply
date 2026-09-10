@@ -12,6 +12,7 @@ use App\Modules\Queue\Support\FleetSignal;
 use App\Modules\Queue\Support\ScalingDecision;
 use App\Modules\Queue\Support\WorkerHandle;
 use App\Modules\Queue\Support\WorkerSpec;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -142,7 +143,10 @@ class FleetReconciler
     /** @return int workers actually started */
     private function scaleUp(ManagedQueueFleet $fleet, int $count): int
     {
-        $image = trim((string) ($fleet->meta['image'] ?? ''));
+        // The column is the source of truth; `meta` is the pre-2026-09-09
+        // location, kept so a fleet configured before the field existed keeps
+        // running rather than silently scaling to zero on deploy.
+        $image = trim((string) ($fleet->image ?: ($fleet->meta['image'] ?? '')));
 
         if ($image === '') {
             Log::warning('queue.fleet.no_image', ['fleet_id' => $fleet->id]);
@@ -259,7 +263,7 @@ class FleetReconciler
         ])->save();
     }
 
-    /** @return \Illuminate\Database\Eloquent\Builder<ManagedQueueWorker> */
+    /** @return Builder<ManagedQueueWorker> */
     private function liveWorkers(ManagedQueueFleet $fleet)
     {
         return ManagedQueueWorker::query()->where('fleet_id', $fleet->id)->live();

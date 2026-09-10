@@ -163,12 +163,82 @@ class DockerWorkerRuntime implements WorkerRuntime
             max(30, $spec->graceSeconds),
         );
 
-        return sprintf(
-            "docker run %s %s %s",
-            implode(' ', $flags),
-            escapeshellarg($spec->image),
-            $command,
-        );
+        return implode("\n", array_filter([
+            $this->fetchScript($spec),
+            sprintf(
+                'docker run %s %s %s',
+                implode(' ', $flags),
+                escapeshellarg($spec->image),
+                $command,
+            ),
+        ]));
+    }
+
+    /**
+     * Authenticate if needed, then pull.
+     *
+     * Without this the run only works for an image already cached on whichever
+     * host the allocator happened to pick — which is nondeterministic, so the
+     * same fleet would start on one machine and fail on the next.
+     *
+     * The password is written to a shell variable and piped to
+     * `--password-stdin`, never passed as an argument: `docker login -p` puts
+     * the credential in the process table, where every other tenant's `ps` can
+     * read it. `set +x` guards against the script being traced, and the logout
+     * runs regardless so the host does not accumulate one customer's registry
+     * session for the next one to inherit.
+     */
+    private function fetchScript(WorkerSpec $spec): string
+    {
+        $pull = sprintf('docker pull %s', escapeshellarg($spec->image));
+
+        if (($spec->registryUsername ?? '') === '' || ($spec->registryPassword ?? '') === '') {
+            return $pull;
+        }
+
+        $registry = self::registryHostFor($spec->image);
+
+        $logoutTarget = $registry === '' ? '' : escapeshellarg($registry);
+
+        return implode("\n", [
+            'set +x',
+            'DPLY_REGISTRY_PASSWORD='.escapeshellarg((string) $spec->registryPassword),
+            sprintf(
+                'printf %%s "$DPLY_REGISTRY_PASSWORD" | docker login %s-u %s --password-stdin >/dev/null',
+                $registry === '' ? '' : escapeshellarg($registry).' ',
+                escapeshellarg((string) $spec->registryUsername),
+            ),
+            'unset DPLY_REGISTRY_PASSWORD',
+            // The pull's status is captured rather than allowed to abort the
+            // script: `runInlineBash` runs under `set -e`, so a failed pull
+            // would skip the logout below and leave one customer's registry
+            // session on a shared host for the next tenant to inherit. Logout
+            // first, then fail with the pull's own code.
+            $pull.' && DPLY_PULL_RC=0 || DPLY_PULL_RC=$?',
+            sprintf('docker logout %s >/dev/null 2>&1 || true', $logoutTarget),
+            '[ "$DPLY_PULL_RC" -eq 0 ] || exit "$DPLY_PULL_RC"',
+        ]);
+    }
+
+    /**
+     * The registry `docker login` needs for this image reference.
+     *
+     * Docker's own rule: the first path segment is a registry host only when it
+     * looks like one — it contains a dot or a port, or is literally localhost.
+     * `acme/app` is Docker Hub with an org named acme, not a host named acme.
+     * Returning '' means Docker Hub, which is what `docker login` defaults to.
+     */
+    public static function registryHostFor(string $image): string
+    {
+        $first = explode('/', trim($image), 2)[0];
+
+        if (! str_contains($image, '/')) {
+            return '';
+        }
+
+        return str_contains($first, '.') || str_contains($first, ':') || $first === 'localhost'
+            ? $first
+            : '';
     }
 
     /** @return array{0: ?Server, 1: string} */

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\FleetReconcilerTest;
 
 use App\Models\Organization;
+use App\Models\ServiceCredential;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Contracts\WorkerRuntime;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\FleetReconciler;
+use App\Modules\Queue\Services\FleetWorkerEnvironment;
 use App\Modules\Queue\Services\Runtimes\FakeWorkerRuntime;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -202,7 +204,7 @@ test('workers are handed the namespace endpoint and a live credential', function
     push(20);
     reconciler()->reconcile($this->fleet);
 
-    $env = app(\App\Modules\Queue\Services\FleetWorkerEnvironment::class)->for($this->fleet->fresh());
+    $env = app(FleetWorkerEnvironment::class)->for($this->fleet->fresh());
 
     expect($env['QUEUE_CONNECTION'])->toBe('dply')
         ->and($env['DPLY_QUEUE_URL'])->toBe('https://queue.dply.test/api/queue/v1/'.$this->namespace->id)
@@ -215,7 +217,7 @@ test('scaling up does not mint a credential per worker', function () {
     push(60);
     reconciler()->reconcile($this->fleet);
 
-    expect(\App\Models\ServiceCredential::query()->count())->toBe(1);
+    expect(ServiceCredential::query()->count())->toBe(1);
 });
 
 /** The panel has nowhere else to read "why is this fleet this size" from. */
@@ -227,3 +229,26 @@ test('the tick persists the reason it scaled', function () {
     expect($this->fleet->fresh()->meta['last_reason'] ?? '')->toContain('pending');
 });
 
+/**
+ * The column is the source of truth from 2026-09-09; `meta['image']` was the
+ * only location before the field existed, and a fleet configured then must
+ * keep running rather than scale silently to zero on deploy.
+ */
+test('the image column takes precedence over the legacy meta key', function () {
+    $this->fleet->forceFill(['image' => 'ghcr.io/acme/app:v9'])->save();
+
+    push(3);
+    reconciler()->reconcile($this->fleet->fresh());
+
+    expect($this->runtime->runningSpecs())->not->toBeEmpty();
+    expect($this->runtime->runningSpecs()[0]->image)->toBe('ghcr.io/acme/app:v9');
+});
+
+test('a fleet configured before the column existed still starts workers', function () {
+    // image column null, meta key set — exactly the pre-migration shape.
+    push(3);
+    reconciler()->reconcile($this->fleet->fresh());
+
+    expect($this->runtime->runningSpecs())->not->toBeEmpty();
+    expect($this->runtime->runningSpecs()[0]->image)->toBe('registry.dply.test/app:latest');
+});
