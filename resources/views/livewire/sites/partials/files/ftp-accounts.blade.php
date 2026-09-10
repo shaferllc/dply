@@ -10,6 +10,11 @@
 @php
     $ftpHost = $server->ip_address ?: $server->name;
     $ftpPending = $ftpAccounts->contains(fn ($a) => $a->status === \App\Models\SftpAccount::STATUS_PENDING);
+
+    // Built in PHP, never interpolated in the template: `@` immediately before
+    // `{{` is Blade's own escape directive, so `{{ $user }}@{{ $host }}` emits
+    // the literal braces instead of the host.
+    $ftpUri = static fn (string $user): string => 'sftp://'.$user.'@'.$ftpHost.':22';
 @endphp
 
 <section class="dply-card mt-6 min-w-0 overflow-hidden p-0" id="ftp-accounts">
@@ -68,19 +73,21 @@
                         {{ __('It is shown once and never stored. If it is lost, reset it — there is nothing to look up.') }}
                     </p>
 
-                    <dl class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach ([
-                            ['label' => __('Host'), 'value' => $ftpHost],
-                            ['label' => __('Username'), 'value' => $ftpRevealedUsername],
-                            ['label' => __('Password'), 'value' => $ftpRevealedPassword],
-                            ['label' => __('Protocol'), 'value' => 'SFTP · 22'],
-                        ] as $field)
-                            <div class="min-w-0">
-                                <dt class="text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-800/70">{{ $field['label'] }}</dt>
-                                <dd class="mt-1 truncate rounded-md bg-white/70 px-2 py-1 font-mono text-sm text-brand-ink ring-1 ring-emerald-200/70" title="{{ $field['value'] }}">{{ $field['value'] }}</dd>
-                            </div>
-                        @endforeach
-                    </dl>
+                    <div class="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <x-copy-value plain :label="__('Host')" :value="$ftpHost" />
+                        <x-copy-value plain :label="__('Username')" :value="$ftpRevealedUsername" />
+                        <x-copy-value plain :label="__('Password')" :value="$ftpRevealedPassword" />
+                        <x-copy-value plain :label="__('Port')" value="22" />
+                    </div>
+
+                    {{-- The whole thing in one string: most clients accept a
+                         pasted sftp:// URI and fill the fields themselves. --}}
+                    <x-copy-value
+                        plain
+                        class="mt-3 max-w-xl"
+                        :label="__('Connection string')"
+                        :value="$ftpUri($ftpRevealedUsername)"
+                    />
                 </div>
             </div>
         </div>
@@ -138,6 +145,7 @@
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($ftpAccounts as $account)
                 @php
+                    $accountKeys = collect($ftpAccountKeys[$account->username] ?? []);
                     $tone = match ($account->status) {
                         \App\Models\SftpAccount::STATUS_ACTIVE => ['bg-emerald-50 text-emerald-800 ring-emerald-200', __('Active')],
                         \App\Models\SftpAccount::STATUS_ERROR => ['bg-rose-50 text-rose-800 ring-rose-200', __('Failed')],
@@ -157,15 +165,37 @@
                                 </span>
                             @endif
                         </div>
-                        <p class="mt-1 truncate font-mono text-xs text-brand-moss">
-                            @if ($account->status === \App\Models\SftpAccount::STATUS_ERROR)
-                                <span class="text-rose-700">{{ $account->last_error }}</span>
-                            @else
-                                sftp://{{ $account->username }}@{{ $ftpHost }}:22
-                            @endif
-                        </p>
+                        @if ($account->status === \App\Models\SftpAccount::STATUS_ERROR)
+                            <p class="mt-1 font-mono text-xs text-rose-700">{{ $account->last_error }}</p>
+                        @else
+                            <x-copy-value class="mt-1 max-w-md" :value="$ftpUri($account->username)" />
+                        @endif
+
+                        {{-- Keys live in server_authorized_keys, keyed by
+                             target_linux_user — so FTP accounts reuse the
+                             synchronizer's fingerprint reconcile rather than
+                             storing keys of their own. --}}
+                        @if ($accountKeys->isNotEmpty())
+                            <ul class="mt-2 flex flex-wrap gap-1.5">
+                                @foreach ($accountKeys as $key)
+                                    <li class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs text-brand-moss ring-1 ring-brand-ink/10">
+                                        <x-heroicon-m-key class="h-3 w-3" aria-hidden="true" />
+                                        <span class="max-w-[16rem] truncate">{{ $key->name }}</span>
+                                        <button type="button" class="font-semibold text-rose-600 hover:text-rose-800" wire:click="removeFtpKey('{{ $key->id }}')" title="{{ __('Remove this key') }}">&times;</button>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </div>
                     <div class="flex items-center gap-2">
+                        <x-spinner-button
+                            size="xs"
+                            variant="secondary"
+                            type="button"
+                            icon="heroicon-o-key"
+                            target="openFtpKeyModal"
+                            wire:click="openFtpKeyModal('{{ $account->id }}')"
+                        >{{ __('SSH keys') }}@if ($accountKeys->isNotEmpty()) <span class="ml-1 rounded-full bg-brand-sand/60 px-1.5 text-2xs">{{ $accountKeys->count() }}</span>@endif</x-spinner-button>
                         <x-spinner-button
                             size="xs"
                             variant="secondary"
@@ -200,8 +230,8 @@
                 <p class="mt-0.5">
                     {{ __('The :user account already supports SFTP using this server\'s SSH key — point your client at it with key auth, no password needed.', ['user' => $ftpDeployUser]) }}
                 </p>
-                <p class="mt-1 font-mono text-xs">sftp://{{ $ftpDeployUser }}@{{ $ftpHost }}:22</p>
-                <p class="mt-1 text-xs">
+                <x-copy-value class="mt-2 max-w-md" :value="$ftpUri($ftpDeployUser)" />
+                <p class="mt-2 text-xs">
                     {{ __('It cannot be given a password here: FTP accounts are forced into file-transfer-only sessions, which would break every deploy that runs as :user.', ['user' => $ftpDeployUser]) }}
                 </p>
             </div>
@@ -277,6 +307,39 @@
             <div class="flex justify-end gap-2">
                 <x-secondary-button size="xs" type="button" wire:click="closeFtpAdoptModal">{{ __('Cancel') }}</x-secondary-button>
                 <x-spinner-button size="xs" variant="primary" type="button" target="adoptFtpAccount" wire:click="adoptFtpAccount" :disabled="empty($ftpAdoptable)">{{ __('Grant access') }}</x-spinner-button>
+            </div>
+        </div>
+    </x-modal>
+@endif
+
+@if ($ftp_key_account_id)
+    <x-modal name="site-ftp-key" :show="true" max-width="lg">
+        <div class="space-y-4 p-6">
+            <div>
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Add an SSH key') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">
+                    {{ __('Lets this account connect with a key instead of the password. Both keep working — a client set up with a key simply never uses the password.') }}
+                </p>
+            </div>
+
+            <div>
+                <x-input-label for="ftp_key_name" :value="__('Label')" />
+                <x-text-input id="ftp_key_name" class="mt-1 block w-full" type="text" wire:model="ftp_key_name" autocomplete="off" placeholder="{{ __('Designer laptop') }}" />
+            </div>
+
+            <div>
+                <x-input-label for="ftp_key_public" :value="__('Public key')" />
+                <textarea id="ftp_key_public" rows="4" wire:model="ftp_key_public" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-xs shadow-sm focus:border-brand-forest focus:ring-brand-forest" placeholder="ssh-ed25519 AAAAC3Nza..."></textarea>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('The public half only — never paste a private key.') }}</p>
+            </div>
+
+            @if ($ftp_error)
+                <p class="rounded-md bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-rose-200">{{ $ftp_error }}</p>
+            @endif
+
+            <div class="flex justify-end gap-2">
+                <x-secondary-button size="xs" type="button" wire:click="closeFtpKeyModal">{{ __('Cancel') }}</x-secondary-button>
+                <x-spinner-button size="xs" variant="primary" type="button" target="addFtpKey" wire:click="addFtpKey">{{ __('Add key') }}</x-spinner-button>
             </div>
         </div>
     </x-modal>

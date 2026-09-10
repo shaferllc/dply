@@ -110,6 +110,7 @@ class SqsCompatibilityController extends Controller
             $queue,
             $body,
             (int) $this->field('DelaySeconds', 0),
+            null,
         );
 
         $this->wakeDrainers($context, $queue);
@@ -134,6 +135,7 @@ class SqsCompatibilityController extends Controller
 
         $bodies = [];
         $ids = [];
+        $groupIds = [];
         $delay = 0;
 
         foreach ($entries as $entry) {
@@ -142,6 +144,10 @@ class SqsCompatibilityController extends Controller
             }
             $bodies[] = (string) ($entry['MessageBody'] ?? '');
             $ids[] = (string) ($entry['Id'] ?? '');
+            // Per entry, NOT collapsed the way the delay below is. One batch may
+            // carry several message groups; folding them to a single key would
+            // serialise unrelated work and order none of it.
+            $groupIds[] = null;
             $delay = max($delay, (int) ($entry['DelaySeconds'] ?? 0));
         }
 
@@ -157,6 +163,7 @@ class SqsCompatibilityController extends Controller
             $queue,
             $bodies,
             $delay,
+            $groupIds,
         );
 
         $this->wakeDrainers($context, $queue);
@@ -553,6 +560,21 @@ class SqsCompatibilityController extends Controller
     }
 
     /** One field out of the decoded AWS JSON body. */
+    /**
+     * Read an SQS `MessageGroupId` off the wire.
+     *
+     * Accepted on any queue, unlike real SQS, which rejects it unless the queue
+     * name ends in `.fifo`. dply has no separate FIFO queue type — ordering is
+     * per group and costs an ungrouped queue nothing — so requiring a magic
+     * suffix would only make a working client fail. A non-string (the SDK will
+     * not send one, a hand-rolled client might) is ignored rather than cast,
+     * since `Array` as an ordering key would group unrelated jobs together.
+     */
+    private function groupId(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
     private function field(string $key, mixed $default = null): mixed
     {
         return $this->body[$key] ?? $default;

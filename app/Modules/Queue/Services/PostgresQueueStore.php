@@ -49,12 +49,12 @@ class PostgresQueueStore implements QueueStore
         private readonly QueueJobDurations $durations,
     ) {}
 
-    public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0): string
+    public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0, ?string $groupKey = null): string
     {
-        return $this->pushBulk($namespace, $queue, [$payload], $delaySeconds)[0];
+        return $this->pushBulk($namespace, $queue, [$payload], $delaySeconds, [$groupKey])[0];
     }
 
-    public function pushBulk(QueueNamespace $namespace, string $queue, array $payloads, int $delaySeconds = 0): array
+    public function pushBulk(QueueNamespace $namespace, string $queue, array $payloads, int $delaySeconds = 0, array $groupKeys = []): array
     {
         if ($payloads === []) {
             return [];
@@ -64,7 +64,13 @@ class PostgresQueueStore implements QueueStore
         $rows = [];
         $ids = [];
 
-        foreach ($payloads as $payload) {
+        // Both re-indexed: the pairing is positional, and a caller that filtered
+        // one list with array_filter() would otherwise hand us gapped keys and
+        // silently group jobs under the wrong key.
+        $payloads = array_values($payloads);
+        $groupKeys = array_values($groupKeys);
+
+        foreach ($payloads as $index => $payload) {
             $meta = $this->inspector->inspect($payload);
             $id = (string) Str::ulid();
             $ids[] = $id;
@@ -84,7 +90,11 @@ class PostgresQueueStore implements QueueStore
                 'job_max_tries' => $meta['job_max_tries'],
                 'batch_id' => $meta['batch_id'],
                 'display_name' => $meta['display_name'],
-                'group_key' => $meta['group_key'] ?? null,
+                // An explicit key wins over one found in the payload: the
+                // caller passing it knows the transport (SQS MessageGroupId),
+                // while the payload sniff is a fallback for clients that can
+                // only express ordering inside the body.
+                'group_key' => $this->normalizeGroupKey($groupKeys[$index] ?? null) ?? $meta['group_key'] ?? null,
                 'payload_bytes' => strlen($payload),
                 'created_at' => DB::raw('now()'),
             ];
@@ -556,6 +566,24 @@ class PostgresQueueStore implements QueueStore
         }
 
         return $normalized === [] ? ['default'] : $normalized;
+    }
+
+    /**
+     * Trim an explicit group key to what the column holds.
+     *
+     * Blank is not a group — an SQS client that always sends the parameter and
+     * leaves it empty must stay ungrouped, not pile every job onto one ordered
+     * group and serialise the whole queue.
+     */
+    private function normalizeGroupKey(?string $groupKey): ?string
+    {
+        if ($groupKey === null) {
+            return null;
+        }
+
+        $groupKey = trim($groupKey);
+
+        return $groupKey === '' ? null : mb_substr($groupKey, 0, 128);
     }
 
     private function normalizeQueue(string $queue): string

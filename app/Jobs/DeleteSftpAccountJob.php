@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
 use App\Models\SftpAccount;
 use App\Models\Site;
 use App\Services\Servers\SftpAccountProvisioner;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Removes the Linux account, its ACL grants and its home, then the DB row.
@@ -87,6 +89,24 @@ class DeleteSftpAccountJob implements ShouldBeUnique, ShouldQueue
                 $account,
                 fn (string $message) => $emit->step('sftp_account', $message),
             );
+
+            // Authorized keys are stored per Linux user, not per FTP account, so
+            // they outlive the account unless removed here. Left behind they
+            // would be re-synced onto a user that no longer exists (created
+            // accounts) or silently keep granting access (adopted ones).
+            $removedKeys = ServerAuthorizedKey::query()
+                ->where('server_id', $account->server_id)
+                ->where('target_linux_user', $username)
+                ->delete();
+
+            if ($removedKeys > 0) {
+                $emit->step('sftp_account', 'removed '.$removedKeys.' ssh key(s) for '.$username);
+                SyncAuthorizedKeysJob::dispatch(
+                    (string) $account->server_id,
+                    (string) Str::ulid(),
+                    $this->userId,
+                );
+            }
 
             $account->delete();
 

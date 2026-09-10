@@ -162,7 +162,7 @@
                             {{ __('An external app also needs one line in config/queue.php: the stock sqs block has no endpoint key, and without one the AWS SDK routes to real AWS regardless of the URL above.') }}
                         </p>
                         <p class="mt-1.5">
-                            {{ __('Delivery is not strictly FIFO under concurrency — jobs are claimed with SKIP LOCKED, so a busy queue can hand out work slightly out of order. Horizon needs Redis and does not work against this driver.') }}
+                            {{ __('Ungrouped jobs are claimed with SKIP LOCKED, so a busy queue can hand out work slightly out of order. Give a job a MessageGroupId — or a groupKey in its payload — and every job sharing that key runs one at a time, in order, while other groups keep running in parallel. Horizon needs Redis and does not work against this driver.') }}
                         </p>
                     </div>
                 </div>

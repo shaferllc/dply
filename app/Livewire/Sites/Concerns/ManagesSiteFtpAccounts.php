@@ -7,13 +7,17 @@ namespace App\Livewire\Sites\Concerns;
 use App\Jobs\CreateSftpAccountJob;
 use App\Jobs\DeleteSftpAccountJob;
 use App\Jobs\ResetSftpAccountPasswordJob;
+use App\Jobs\SyncAuthorizedKeysJob;
 use App\Models\ConsoleAction;
+use App\Models\ServerAuthorizedKey;
 use App\Models\SftpAccount;
+use App\Models\UserSshKey;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerSystemUserService;
 use App\Services\Servers\SftpAccountProvisioner;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 /**
  * FTP (SFTP) accounts for one site, hosted on the site's Files tab — the
@@ -30,6 +34,12 @@ trait ManagesSiteFtpAccounts
     public bool $showFtpAdoptModal = false;
 
     public string $ftp_adopt_username = '';
+
+    public ?string $ftp_key_account_id = null;
+
+    public string $ftp_key_name = '';
+
+    public string $ftp_key_public = '';
 
     public ?string $ftp_error = null;
 
@@ -220,6 +230,131 @@ trait ManagesSiteFtpAccounts
         } catch (\Throwable $e) {
             $this->ftp_error = $e->getMessage();
         }
+    }
+
+    /**
+     * SSH keys already on file for these accounts, keyed by username.
+     *
+     * Reuses {@see ServerAuthorizedKey}, which is already per-Linux-user
+     * (`target_linux_user`) — so FTP accounts need no key storage of their own,
+     * and inherit the synchronizer's fingerprint RECONCILE. That matters most
+     * for adopted accounts: the sync only ever removes keys dply itself wrote,
+     * so an operator's pre-existing keys on that account survive untouched.
+     *
+     * @return array<string, \Illuminate\Support\Collection<int, ServerAuthorizedKey>>
+     */
+    public function ftpAccountKeys(): array
+    {
+        $usernames = SftpAccount::query()
+            ->where('site_id', $this->site->id)
+            ->pluck('username')
+            ->all();
+
+        if ($usernames === []) {
+            return [];
+        }
+
+        return ServerAuthorizedKey::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('target_linux_user', $usernames)
+            ->orderBy('name')
+            ->get()
+            ->groupBy('target_linux_user')
+            ->all();
+    }
+
+    public function openFtpKeyModal(string $accountId): void
+    {
+        $this->authorize('update', $this->site);
+        $this->ftp_error = null;
+        $this->ftp_key_name = '';
+        $this->ftp_key_public = '';
+        $this->ftp_key_account_id = $accountId;
+    }
+
+    public function closeFtpKeyModal(): void
+    {
+        $this->ftp_key_account_id = null;
+        $this->ftp_error = null;
+    }
+
+    /**
+     * Key auth alongside the password. The Match block leaves
+     * PasswordAuthentication on for the group either way, so adding a key is
+     * additive — an account can be used with either, and a customer who only
+     * ever uses a key simply never types the generated one.
+     */
+    public function addFtpKey(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->ftp_error = null;
+
+        try {
+            $account = SftpAccount::query()
+                ->where('site_id', $this->site->id)
+                ->findOrFail($this->ftp_key_account_id);
+
+            if (! UserSshKey::publicKeyLooksValid($this->ftp_key_public)) {
+                throw new \RuntimeException(__('That does not look like a valid SSH public key.'));
+            }
+
+            $name = trim($this->ftp_key_name) !== ''
+                ? trim($this->ftp_key_name)
+                : __('FTP key for :user', ['user' => $account->username]);
+
+            ServerAuthorizedKey::query()->create([
+                'server_id' => $this->server->id,
+                'target_linux_user' => $account->username,
+                'name' => $name,
+                'public_key' => trim($this->ftp_key_public),
+            ]);
+
+            // The key reaches the box on the queue — an SSH round trip in the
+            // HTTP request would hang the modal until max_execution_time.
+            SyncAuthorizedKeysJob::dispatch(
+                (string) $this->server->id,
+                (string) Str::ulid(),
+                (string) Auth::id(),
+                request()->ip(),
+            );
+
+            $this->ftp_key_account_id = null;
+            $this->toastSuccess(__('SSH key queued for :user.', ['user' => $account->username]));
+        } catch (\Throwable $e) {
+            $this->ftp_error = $e->getMessage();
+        }
+    }
+
+    public function removeFtpKey(string $keyId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $usernames = SftpAccount::query()
+            ->where('site_id', $this->site->id)
+            ->pluck('username')
+            ->all();
+
+        // Scoped to this site's FTP accounts so the site surface can never
+        // delete a key belonging to a shell user or to the deploy account.
+        $key = ServerAuthorizedKey::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('target_linux_user', $usernames)
+            ->find($keyId);
+
+        if (! $key) {
+            return;
+        }
+
+        $key->delete();
+
+        SyncAuthorizedKeysJob::dispatch(
+            (string) $this->server->id,
+            (string) Str::ulid(),
+            (string) Auth::id(),
+            request()->ip(),
+        );
+
+        $this->toastSuccess(__('SSH key removal queued.'));
     }
 
     public function openFtpCreateModal(): void

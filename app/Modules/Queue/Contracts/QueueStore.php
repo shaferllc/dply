@@ -28,16 +28,26 @@ interface QueueStore
      * Enqueue one job. Returns its id.
      *
      * @param  int  $delaySeconds  0 for immediately claimable
+     * @param  string|null  $groupKey  per-group FIFO key; overrides one carried
+     *                                 in the payload. Null leaves the job
+     *                                 ungrouped and fully concurrent.
      */
-    public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0): string;
+    public function push(QueueNamespace $namespace, string $queue, string $payload, int $delaySeconds = 0, ?string $groupKey = null): string;
 
     /**
      * Enqueue several jobs in one round trip.
      *
+     * `$groupKeys` is positional, NOT collapsed across the batch the way a
+     * shared delay is: one SendMessageBatch may legitimately carry entries for
+     * several groups, and folding them together would order nothing while
+     * looking like it worked.
+     *
      * @param  list<string>  $payloads
+     * @param  list<string|null>  $groupKeys  aligned with $payloads by position;
+     *                                        short or absent means ungrouped
      * @return list<string> ids, in the order given
      */
-    public function pushBulk(QueueNamespace $namespace, string $queue, array $payloads, int $delaySeconds = 0): array;
+    public function pushBulk(QueueNamespace $namespace, string $queue, array $payloads, int $delaySeconds = 0, array $groupKeys = []): array;
 
     /**
      * Claim up to `$limit` jobs, making them invisible for the lease.

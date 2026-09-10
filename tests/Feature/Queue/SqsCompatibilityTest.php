@@ -244,6 +244,68 @@ test('SendMessageBatch enqueues every entry', function () {
     expect(sqsCall($ctx, 'GetQueueAttributes')->json('Attributes.ApproximateNumberOfMessages'))->toBe('2');
 });
 
+test('SendMessage carries MessageGroupId onto the job', function () {
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessage', [
+        'MessageBody' => 'one',
+        'MessageGroupId' => 'customer:42',
+    ])->assertOk();
+
+    expect(DB::connection('dply_queue')->table('dply_queue_jobs')
+        ->where('namespace_id', $ctx['namespace']->id)
+        ->value('group_key'))->toBe('customer:42');
+});
+
+test('SendMessage needs no .fifo queue name to accept a group', function () {
+    // Real SQS rejects MessageGroupId unless the queue name ends in `.fifo`.
+    // dply has no separate FIFO queue type, so requiring the suffix would only
+    // make a working client fail.
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessage', ['MessageBody' => 'one', 'MessageGroupId' => 'g'], 'emails')->assertOk();
+
+    expect(DB::connection('dply_queue')->table('dply_queue_jobs')
+        ->where('queue', 'emails')
+        ->value('group_key'))->toBe('g');
+});
+
+test('SendMessageBatch keeps each entry in its own group', function () {
+    // Not collapsed the way DelaySeconds is: one batch may legitimately carry
+    // several groups, and folding them would order nothing.
+    $ctx = sqsNamespace();
+
+    sqsCall($ctx, 'SendMessageBatch', ['Entries' => [
+        ['Id' => 'a', 'MessageBody' => 'one', 'MessageGroupId' => 'customer:1'],
+        ['Id' => 'b', 'MessageBody' => 'two'],
+        ['Id' => 'c', 'MessageBody' => 'three', 'MessageGroupId' => 'customer:2'],
+    ]])->assertOk();
+
+    $keys = DB::connection('dply_queue')->table('dply_queue_jobs')
+        ->where('namespace_id', $ctx['namespace']->id)
+        ->orderBy('id')
+        ->pluck('group_key')
+        ->all();
+
+    expect($keys)->toBe(['customer:1', null, 'customer:2']);
+});
+
+test('a grouped queue hands out one job at a time over the wire', function () {
+    $ctx = sqsNamespace();
+
+    foreach (['one', 'two'] as $body) {
+        sqsCall($ctx, 'SendMessage', ['MessageBody' => $body, 'MessageGroupId' => 'g'])->assertOk();
+    }
+
+    $first = sqsCall($ctx, 'ReceiveMessage', ['MaxNumberOfMessages' => 10])->assertOk();
+
+    expect($first->json('Messages'))->toHaveCount(1);
+    expect($first->json('Messages.0.Body'))->toBe('one');
+
+    // The second stays invisible while the first is leased.
+    expect(sqsCall($ctx, 'ReceiveMessage', ['MaxNumberOfMessages' => 10])->json('Messages') ?? [])->toBe([]);
+});
+
 test('the queue name comes from the URL path', function () {
     $ctx = sqsNamespace();
 

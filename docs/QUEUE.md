@@ -123,7 +123,48 @@ Horizon cannot run on a non-Redis driver. The namespace page covers what you wou
 
 ## Ordering
 
-Jobs are claimed with `SKIP LOCKED`, which is not strictly FIFO under concurrent workers. Laravel users often expect the `database` driver's ordering; if your workload genuinely depends on strict ordering, it needs to be enforced in your job design rather than assumed from the queue.
+By default jobs are claimed with `SKIP LOCKED`, which is not strictly FIFO under concurrent workers — Laravel users often expect the `database` driver's ordering and do not get it.
+
+When ordering matters, group the jobs that need it. A job carrying a **group key** is held to one at a time, in order; jobs with different keys still run fully in parallel, and ungrouped jobs are untouched. This is the shape SQS message groups use, and it is almost always the real requirement — "this customer's events in order", never "the entire queue in order".
+
+Global FIFO is deliberately not offered: it caps a queue at one worker, which is the same as turning the autoscaler off.
+
+### Setting a group key
+
+Any SQS client can send `MessageGroupId` on `SendMessage` or per entry on `SendMessageBatch`. Unlike real SQS, the queue name does **not** have to end in `.fifo`.
+
+Laravel's stock `sqs` driver never sends that parameter, so a Laravel app sets the key in the payload instead. Add this to the `DplyQueue` class from **Drain faster** on the namespace page:
+
+```php
+protected function createPayload($job, $queue, $data = '', $delay = null)
+{
+    $payload = json_decode(parent::createPayload($job, $queue, $data, $delay), true);
+
+    if (is_object($job) && ($job->groupKey ?? null)) {
+        $payload['groupKey'] = (string) $job->groupKey;
+    }
+
+    return json_encode($payload);
+}
+```
+
+Then any job that declares one is ordered against its siblings:
+
+```php
+class SyncCustomer implements ShouldQueue
+{
+    public string $groupKey;
+
+    public function __construct(public int $customerId)
+    {
+        $this->groupKey = "customer:{$customerId}";
+    }
+}
+```
+
+Without the connection class, `Queue::createPayloadUsing(fn () => ['groupKey' => '…'])` in a service provider sets one key for every job on the connection.
+
+A key is capped at 128 characters. Blank counts as ungrouped, so a client that always sends the parameter and sometimes leaves it empty does not accidentally serialise its whole queue onto one group.
 
 ## Deleting a namespace
 

@@ -305,9 +305,9 @@
                                  instructions, not in a changelog somewhere. --}}
                             <dl class="mt-4 space-y-2 rounded-lg bg-brand-sand/30 px-3 py-2.5 text-xs leading-relaxed text-brand-moss">
                                 <div>
-                                    <dt class="font-semibold text-brand-ink">{{ __('Delivery is not strictly FIFO') }}</dt>
+                                    <dt class="font-semibold text-brand-ink">{{ __('Ordering is per group, not per queue') }}</dt>
                                     <dd class="mt-0.5">
-                                        {{ __('Jobs are claimed in visibility order with SKIP LOCKED, so concurrent workers can finish out of order, and a released or retried job rejoins by its new visibility time. Order-sensitive work needs a chain or a batch, exactly as it would on SQS.') }}
+                                        {{ __('By default jobs are claimed in visibility order with SKIP LOCKED, so concurrent workers can finish out of order. Set a MessageGroupId on the message — or a groupKey in the payload — and dply holds every job sharing that key to one at a time, in order; different keys still run fully in parallel, so grouping one customer costs the rest of the queue nothing.') }}
                                     </dd>
                                 </div>
                                 <div>
@@ -319,11 +319,13 @@
                             </dl>
                         </div>
 
-                        {{-- Drain throughput. The stock SQS driver asks for one
+                        {{-- Drain throughput, plus the write-side hook for
+                             per-group ordering. The stock SQS driver asks for one
                              message per request and never long-polls, so a drain
                              costs two round trips per job and is capped by the
-                             tier rate long before Postgres is troubled. This is
-                             the opt-in that fixes the read half. --}}
+                             tier rate long before Postgres is troubled; it also
+                             has no way to send a MessageGroupId. One class fixes
+                             both, which is why they share a snippet. --}}
                         @php
                             $drainSnippet = <<<'PHP'
                             // app/Queue/DplyQueue.php
@@ -364,6 +366,22 @@
                                         $queue,
                                     );
                                 }
+
+                                /**
+                                 * Per-group FIFO. Laravel's SQS driver never sends
+                                 * MessageGroupId, so the key travels in the payload.
+                                 * A job without $groupKey is unaffected.
+                                 */
+                                protected function createPayload($job, $queue, $data = '', $delay = null)
+                                {
+                                    $payload = json_decode(parent::createPayload($job, $queue, $data, $delay), true);
+
+                                    if (is_object($job) && ($job->groupKey ?? null)) {
+                                        $payload['groupKey'] = (string) $job->groupKey;
+                                    }
+
+                                    return json_encode($payload);
+                                }
                             }
                             PHP;
 
@@ -397,10 +415,10 @@
                                 <div class="min-w-0">
                                     <h3 class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
                                         <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                        {{ __('Drain faster') }}
+                                        {{ __('Drain faster, order what needs it') }}
                                     </h3>
                                     <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">
-                                        {{ __('Laravel’s stock SQS driver fetches one job per request and does not long-poll, so every job costs two round trips. Swapping in a batching queue class fetches ten at a time and waits for work — roughly a 10× cut in receive requests, with no change to your jobs.') }}
+                                        {{ __('Laravel’s stock SQS driver fetches one job per request, does not long-poll, and cannot send a MessageGroupId. Swapping in one queue class fetches ten at a time and waits for work — roughly a 10× cut in receive requests — and lets a job declare a $groupKey to be ordered against its siblings. Jobs that declare neither are unchanged.') }}
                                     </p>
                                 </div>
                                 <x-secondary-button type="button" x-on:click="open = ! open" class="text-xs">
