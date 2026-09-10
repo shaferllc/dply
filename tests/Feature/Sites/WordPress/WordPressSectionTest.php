@@ -10,6 +10,7 @@ use App\Livewire\Sites\WordPress\WordPressSection;
 use App\Models\Organization;
 use App\Models\RemoteCliRun;
 use App\Models\Server;
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
@@ -24,8 +25,12 @@ use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\FileBrowserWriteResult;
+use App\Services\Servers\ServerFileBrowserAtomicWriter;
+use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
+use App\Support\Servers\FileBrowserFileRead;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -1322,7 +1327,7 @@ test('reset password rejects a short typed password and a blank one generates', 
 
 test('database tab shows remote access for the site database', function () {
     [$user, $site] = makeWpSite();
-    $db = \App\Models\ServerDatabase::factory()->create([
+    $db = ServerDatabase::factory()->create([
         'server_id' => $site->server_id,
         'name' => 'dply_wpremote',
         'username' => 'dply_wpremote',
@@ -1347,7 +1352,7 @@ test('database tab shows remote access for the site database', function () {
 test('database tab sets up passwordless tunnel access and a one-paste TablePlus launch', function () {
     Queue::fake();
     [$user, $site] = makeWpSite();
-    $db = \App\Models\ServerDatabase::factory()->create([
+    $db = ServerDatabase::factory()->create([
         'server_id' => $site->server_id,
         'name' => 'dply_wptunnel',
         'username' => 'dply_wptunnel',
@@ -1378,4 +1383,125 @@ test('database tab has no remote access card when no database resolves', functio
         ->test(WordPressSection::class, ['site' => $site])
         ->set('tab', 'database')
         ->assertDontSee('Remote access');
+});
+
+function fakeWpConfigRead(string $content = "<?php\ndefine('WP_DEBUG', false);\n"): void
+{
+    $reader = Mockery::mock(ServerFileBrowserRemoteReader::class);
+    $reader->shouldReceive('read')
+        ->with(Mockery::any(), '/home/dply/wp/current/wp-config.php', Mockery::any(), Mockery::any())
+        ->andReturn(new FileBrowserFileRead(
+            path: '/home/dply/wp/current/wp-config.php',
+            size: strlen($content),
+            mtime: 1715000000,
+            sha256: str_repeat('a', 64),
+            mime: 'text/x-php',
+            isBinary: false,
+            content: $content,
+        ));
+    app()->instance(ServerFileBrowserRemoteReader::class, $reader);
+}
+
+test('wp-config tab opens the file and saves the edit through the atomic writer', function () {
+    [$user, $site] = makeWpSite();
+    $site->update(['git_repository_url' => null]);
+    fakeWpConfigRead();
+
+    $writer = Mockery::mock(ServerFileBrowserAtomicWriter::class);
+    $writer->shouldReceive('write')
+        ->once()
+        ->with(Mockery::any(), '/home/dply/wp/current/wp-config.php', str_repeat('a', 64), 1715000000, "<?php\ndefine('WP_DEBUG', true);\n", Mockery::any())
+        ->andReturn(new FileBrowserWriteResult(ok: true, conflictReason: null, newSha256: str_repeat('b', 64), newMtime: 1715000100));
+    app()->instance(ServerFileBrowserAtomicWriter::class, $writer);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'config')
+        ->call('loadWpConfig')
+        ->assertHasNoErrors()
+        ->assertSet('wpConfigPath', '/home/dply/wp/current/wp-config.php')
+        // Scaffolded install: no repo, so no deploy-overwrite detour on save.
+        ->assertSet('wpConfigWillBeOverwrittenOnDeploy', false)
+        ->set('config_contents', "<?php\ndefine('WP_DEBUG', true);\n")
+        ->call('saveWpConfig')
+        ->assertHasNoErrors()
+        ->assertSet('wpConfigSha256', str_repeat('b', 64));
+});
+
+test('wp-config save refuses content that would break the site', function (string $broken, string $message) {
+    [$user, $site] = makeWpSite();
+    fakeWpConfigRead();
+
+    $writer = Mockery::mock(ServerFileBrowserAtomicWriter::class);
+    $writer->shouldReceive('write')->never();
+    app()->instance(ServerFileBrowserAtomicWriter::class, $writer);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'config')
+        ->call('loadWpConfig')
+        ->set('config_contents', $broken)
+        ->call('saveWpConfig', true)
+        ->assertHasErrors('wpconfig')
+        ->assertSee($message);
+})->with([
+    'syntax error' => ["<?php\ndefine('WP_DEBUG', true\n", 'PHP syntax error on line'],
+    // Tokenizes fine as inline HTML — and would be served as plain text.
+    'no opening tag' => ["define('WP_DEBUG', true);\n", 'must start with'],
+]);
+
+test('wp-config save surfaces a conflict when the file changed on disk', function () {
+    [$user, $site] = makeWpSite();
+    fakeWpConfigRead();
+
+    $writer = Mockery::mock(ServerFileBrowserAtomicWriter::class);
+    $writer->shouldReceive('write')->once()->andReturn(new FileBrowserWriteResult(ok: false, conflictReason: 'CONFLICT', newSha256: '', newMtime: 0));
+    app()->instance(ServerFileBrowserAtomicWriter::class, $writer);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('loadWpConfig')
+        ->call('saveWpConfig', true)
+        ->assertHasErrors('wpconfig')
+        ->assertSet('wpConfigSha256', str_repeat('a', 64));
+});
+
+test('wp-config save on a repo-deployed site warns before writing a file the next deploy replaces', function () {
+    [$user, $site] = makeWpSite();
+    $site->update([
+        'git_repository_url' => 'git@github.com:acme/wp.git',
+        'repository_path' => '/home/dply/wp',
+        'deploy_strategy' => 'simple',
+    ]);
+    fakeWpConfigRead();
+
+    $writer = Mockery::mock(ServerFileBrowserAtomicWriter::class);
+    $writer->shouldReceive('write')->once()->andReturn(new FileBrowserWriteResult(ok: true, conflictReason: null, newSha256: str_repeat('b', 64), newMtime: 1715000100));
+    app()->instance(ServerFileBrowserAtomicWriter::class, $writer);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site->fresh()])
+        ->set('tab', 'config')
+        ->call('loadWpConfig')
+        ->assertSet('wpConfigWillBeOverwrittenOnDeploy', true)
+        ->assertSee('The next deploy will overwrite this file')
+        ->call('saveWpConfig')
+        ->assertSet('wpConfigPendingOverwrite', true)
+        ->call('saveWpConfig', true)
+        ->assertHasNoErrors()
+        ->assertSet('wpConfigSha256', str_repeat('b', 64));
+});
+
+test('viewers cannot open wp-config, which holds the database password', function () {
+    [$viewer, $site] = makeWpProjectViewerSite();
+
+    $reader = Mockery::mock(ServerFileBrowserRemoteReader::class);
+    $reader->shouldReceive('read')->never();
+    app()->instance(ServerFileBrowserRemoteReader::class, $reader);
+
+    Livewire::actingAs($viewer)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('loadWpConfig')
+        ->assertHasErrors('wpconfig')
+        ->assertSet('config_contents', null);
 });

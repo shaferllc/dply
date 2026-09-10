@@ -150,8 +150,12 @@ SH;
     protected function heredoc(string $content): string
     {
         $sentinel = 'DPLY_EOF_'.bin2hex(random_bytes(6));
+        // A heredoc ends every line with a newline, so drop the content's own
+        // final one — otherwise each save appends a blank line, which after a
+        // PHP closing tag is output before headers.
+        $body = str_ends_with($content, "\n") ? substr($content, 0, -1) : $content;
 
-        return "cat > \"\$tmp\" <<'{$sentinel}'\n".$content."\n{$sentinel}";
+        return "cat > \"\$tmp\" <<'{$sentinel}'\n".$body."\n{$sentinel}";
     }
 
     protected function shellQuote(string $s): string

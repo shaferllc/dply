@@ -8,6 +8,7 @@ use App\Jobs\SiteResetPermissionsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\RemoteCliRun;
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\Snapshot;
 use App\Modules\Database\Services\TunnelAccessProvisioner;
@@ -20,19 +21,22 @@ use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use App\Policies\SitePolicy;
+use App\Services\Servers\ServerFileBrowserAtomicWriter;
+use App\Services\Servers\ServerFileBrowserAuditLogger;
+use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\CoreReleases;
 use App\Services\WordPress\PluginDirectory;
 use App\Services\WordPress\ThemeDirectory;
-use App\Support\Servers\InstalledStack;
-use Carbon\CarbonImmutable;
-use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
-use App\Models\ServerDatabase;
 use App\Support\Servers\DatabaseConnectionTarget;
 use App\Support\Servers\DatabaseConnectionTargetResolver;
 use App\Support\Servers\DatabaseJumpHostAccess;
 use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\Servers\FileBrowserPathPolicy;
+use App\Support\Servers\InstalledStack;
+use Carbon\CarbonImmutable;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -277,6 +281,28 @@ class WordPressSection extends Component
     // ── Hardening ────────────────────────────────────────────────────────────
     /** @var list<array{key: string, label: string, status: string, detail: string}>|null */
     public ?array $securityScan = null;
+
+    // ── wp-config.php editor ─────────────────────────────────────────────────
+    /** Editor buffer; the name is what the shared code-editor partial syncs. */
+    public ?string $config_contents = null;
+
+    /** Where the file was found, and its pre-image for the writer's precondition. */
+    #[Locked]
+    public ?string $wpConfigPath = null;
+
+    #[Locked]
+    public ?string $wpConfigSha256 = null;
+
+    #[Locked]
+    public ?int $wpConfigMtime = null;
+
+    #[Locked]
+    public ?int $wpConfigSize = null;
+
+    #[Locked]
+    public bool $wpConfigWillBeOverwrittenOnDeploy = false;
+
+    public bool $wpConfigPendingOverwrite = false;
 
     /**
      * Reset user password, shown exactly once.
@@ -2976,6 +3002,181 @@ class WordPressSection extends Component
         }
 
         return $version !== '' ? $version : null;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // wp-config.php editor.
+    //
+    // Admin/owner only, for reads too: the file holds DB_PASSWORD and the
+    // salts, and whatever is saved runs on every request. Reuses the site file
+    // browser's reader, atomic writer (sha + mtime precondition) and audit log.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    public function loadWpConfig(): void
+    {
+        $this->resetErrorBag('wpconfig');
+
+        $server = $this->site->server;
+        if ($server === null || ! $this->canDestroyHere()) {
+            $this->addError('wpconfig', __('Admin or owner role required to edit wp-config.php.'));
+
+            return;
+        }
+
+        $loginUser = $this->site->effectiveSystemUser($server);
+        $maxBytes = (int) config('server_file_browser.edit_max_bytes', 1_048_576);
+        $read = null;
+        $lastError = '';
+        foreach ($this->wpConfigCandidates() as $candidate) {
+            try {
+                $read = app(ServerFileBrowserRemoteReader::class)->read($server, $candidate, $maxBytes, $loginUser);
+                break;
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+            }
+        }
+
+        if ($read === null) {
+            $this->addError('wpconfig', __('Could not open wp-config.php: :err', ['err' => $lastError]));
+
+            return;
+        }
+
+        if ($read->contentTruncated || $read->isBinary) {
+            $this->addError('wpconfig', __('wp-config.php is too large or not plain text, so it cannot be edited here.'));
+
+            return;
+        }
+
+        $this->wpConfigPath = $read->path;
+        $this->wpConfigSha256 = $read->sha256;
+        $this->wpConfigMtime = $read->mtime;
+        $this->wpConfigSize = $read->size;
+        $this->config_contents = $read->content ?? '';
+        // Only a repo-deployed site is overwritten by a deploy; a scaffolded
+        // install has no repository to push the change to.
+        $this->wpConfigWillBeOverwrittenOnDeploy = filled($this->site->git_repository_url) && FileBrowserPathPolicy::willBeOverwrittenOnDeploy(
+            $read->path,
+            $this->site->effectiveRepositoryPath(),
+            $this->site->isAtomicDeploys(),
+        );
+        $this->wpConfigPendingOverwrite = false;
+
+        app(ServerFileBrowserAuditLogger::class)->recordOpen($server->organization, auth()->user(), $server, $this->site, $read->path, $loginUser);
+    }
+
+    public function saveWpConfig(bool $confirmOverwrite = false): void
+    {
+        $this->resetErrorBag('wpconfig');
+
+        $server = $this->site->server;
+        if ($server === null || ! $this->canDestroyHere()) {
+            $this->addError('wpconfig', __('Admin or owner role required to edit wp-config.php.'));
+
+            return;
+        }
+
+        if ($this->wpConfigPath === null || $this->wpConfigSha256 === null || $this->wpConfigMtime === null) {
+            return;
+        }
+
+        $contents = $this->config_contents ?? '';
+        $syntaxError = $this->wpConfigSyntaxError($contents);
+        if ($syntaxError !== null) {
+            $this->addError('wpconfig', $syntaxError);
+
+            return;
+        }
+
+        if ($this->wpConfigWillBeOverwrittenOnDeploy && ! $confirmOverwrite) {
+            $this->wpConfigPendingOverwrite = true;
+
+            return;
+        }
+        $this->wpConfigPendingOverwrite = false;
+
+        $loginUser = $this->site->effectiveSystemUser($server);
+
+        try {
+            // ponytail: the writer's `mv` replaces a symlinked wp-config.php (e.g. into shared/)
+            // with a regular file, same as the Files page; resolve the link in the writer if that layout appears.
+            $result = app(ServerFileBrowserAtomicWriter::class)->write($server, $this->wpConfigPath, $this->wpConfigSha256, $this->wpConfigMtime, $contents, $loginUser);
+        } catch (\Throwable $e) {
+            $this->addError('wpconfig', __('Save failed: :err', ['err' => $e->getMessage()]));
+
+            return;
+        }
+
+        if ($result->conflict()) {
+            $this->addError('wpconfig', __('wp-config.php changed on the server since you opened it. Reload it and re-apply your edit.'));
+
+            return;
+        }
+
+        if (! $result->ok) {
+            $this->addError('wpconfig', __('Save failed (:reason).', ['reason' => $result->conflictReason ?? 'UNKNOWN']));
+
+            return;
+        }
+
+        app(ServerFileBrowserAuditLogger::class)->recordWrite(
+            $server->organization,
+            auth()->user(),
+            $server,
+            $this->site,
+            $this->wpConfigPath,
+            $this->wpConfigSha256,
+            $result->newSha256,
+            (int) $this->wpConfigSize,
+            strlen($contents),
+            $loginUser,
+            FileBrowserPathPolicy::isInsideReleases($this->wpConfigPath, $this->site->effectiveRepositoryPath()),
+        );
+
+        $this->wpConfigSha256 = $result->newSha256;
+        $this->wpConfigMtime = $result->newMtime;
+        $this->wpConfigSize = strlen($contents);
+
+        $this->toastSuccess(__('wp-config.php saved.'));
+    }
+
+    /**
+     * Where WordPress looks: the install wp-cli targets, then one directory up
+     * — but never above the site root, where a sibling site's file could sit.
+     *
+     * @return list<string>
+     */
+    private function wpConfigCandidates(): array
+    {
+        $wpRoot = FileBrowserPathPolicy::normalize($this->site->document_root ?: $this->site->repository_path ?: '/home/dply/'.$this->site->slug);
+        $candidates = [$wpRoot.'/wp-config.php'];
+
+        $parent = FileBrowserPathPolicy::parent($wpRoot);
+        if ($parent !== $wpRoot && FileBrowserPathPolicy::isInside($parent, $this->site->effectiveRepositoryPath())) {
+            $candidates[] = rtrim($parent, '/').'/wp-config.php';
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * Null when $contents is PHP that parses. Parsed with dply's PHP, not the
+     * site's, so this catches typos rather than version-specific syntax.
+     */
+    private function wpConfigSyntaxError(string $contents): ?string
+    {
+        // Without the opening tag PHP serves the file as plain text — DB password included.
+        if (preg_match('/^(?:\xEF\xBB\xBF)?\s*<\?php(?:\s|$)/', $contents) !== 1) {
+            return __('wp-config.php must start with <?php — without it the file is served as plain text.');
+        }
+
+        try {
+            token_get_all($contents, TOKEN_PARSE);
+        } catch (\ParseError $e) {
+            return __('PHP syntax error on line :line: :msg', ['line' => $e->getLine(), 'msg' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     private function sitePhpVersion(): ?string

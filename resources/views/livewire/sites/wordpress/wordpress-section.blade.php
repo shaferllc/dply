@@ -4,6 +4,10 @@
      space-y-6 between them, which read as three unrelated panels and used
      roughly twice the vertical space of every neighbouring surface. --}}
 <div>
+    {{-- The wp-config tab's editor mounts on a tab-switch morph, where an @vite
+         inside the partial never executes — register the loader on first render. --}}
+    @vite(['resources/js/file-browser-editor-lazy.js'])
+
     <section class="dply-card min-w-0 overflow-hidden p-0">
         <x-workspace-panel-head
             dense
@@ -35,8 +39,10 @@
                 'cron' => ['label' => __('Cron'), 'icon' => 'heroicon-o-clock'],
                 'tools' => ['label' => __('Tools'), 'icon' => 'heroicon-o-wrench-screwdriver'],
                 'hardening' => ['label' => __('Hardening'), 'icon' => 'heroicon-o-shield-check'],
+                'config' => ['label' => __('wp-config.php'), 'icon' => 'heroicon-o-document-text'],
             ] as $key => $meta)
                 @continue($key === 'git' && ! $gitSourcesSupported)
+                @continue($key === 'config' && ! $canDestroy)
                 <x-server-workspace-tab :icon="$meta['icon']" :active="$tab === $key" wire:click="$set('tab', '{{ $key }}')">
                     {{ $meta['label'] }}
                 </x-server-workspace-tab>
@@ -289,6 +295,10 @@
 
     @if ($tab === 'hardening')
         @include('livewire.sites.wordpress.partials.hardening-tab')
+    @endif
+
+    @if ($tab === 'config')
+        @include('livewire.sites.wordpress.partials.config-tab')
     @endif
 
     {{-- Footer strip, matching every other workspace card (see logs.blade.php).
