@@ -14,8 +14,7 @@ use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use App\Modules\RemoteCli\Services\RemoteCliPermissions;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\WpCli;
-use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
-use App\Modules\Snapshots\Services\SnapshotService;
+use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
@@ -224,6 +223,12 @@ class WordPressSection extends Component
 
     // ── Database health ──────────────────────────────────────────────────────
     public ?array $dbHealth = null;
+
+    /** @var list<array{name: string, bytes: int}>|null Tables, biggest first; null until loaded. */
+    public ?array $dbTables = null;
+
+    /** @var array{total: int, count: int, top: list<array{name: string, bytes: int}>}|null */
+    public ?array $autoloadAudit = null;
 
     // ── Core integrity ───────────────────────────────────────────────────────
     public ?string $checksumReport = null;
@@ -1017,7 +1022,7 @@ class WordPressSection extends Component
      * durable backups automatically without changing their click
      * pattern. Admin/owner only.
      */
-    public function takeSnapshot(SnapshotService $snapshots, SnapshotDestinationFactory $destinations): void
+    public function takeSnapshot(): void
     {
         $org = $this->site->organization;
         if ($org === null || ! $org->hasAdminAccess(auth()->user())) {
@@ -1026,16 +1031,10 @@ class WordPressSection extends Component
             return;
         }
 
-        try {
-            $snapshots->take(
-                site: $this->site,
-                destination: $destinations->preferred(),
-                reason: Snapshot::REASON_MANUAL,
-                userId: auth()->id(),
-            );
-        } catch (\Throwable $e) {
-            $this->addError('snapshots', __('Snapshot failed: :err', ['err' => $e->getMessage()]));
-        }
+        // Queued: the dump runs over SSH and can take many minutes. It ran in
+        // the request before, holding it open for the whole mysqldump.
+        TakeSiteSnapshotJob::dispatch((string) $this->site->id, (string) auth()->id());
+        $this->toastSuccess(__('Snapshot started. It appears below and updates when the dump finishes.'));
     }
 
     /**
@@ -1388,6 +1387,198 @@ class WordPressSection extends Component
     {
         $this->wp($wpcli, 'db repair');
         $this->toastSuccess(__('Database repair queued.'));
+    }
+
+    /** WordPress 6.6+ autoloads all of these (wp_autoload_values_to_autoload()); wp-cli's --autoload=on matches only on/yes. */
+    private const AUTOLOAD_VALUES = ['yes', 'on', 'auto-on', 'auto'];
+
+    /** Largest tables — where the weight is, before deciding what to clean. */
+    public function loadDbTables(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('database');
+
+        // `db size --tables` emits table rows only (never the whole-database
+        // row), each Size as "12345 B".
+        $rows = $this->readJsonRows($wpcli, 'db size', ['--tables', '--format=json'], 'database');
+        if ($rows === null) {
+            $this->dbTables = [];
+
+            return;
+        }
+
+        $tables = array_map(static fn (array $row): array => [
+            'name' => (string) ($row['Name'] ?? ''),
+            'bytes' => (int) preg_replace('/\D/', '', (string) ($row['Size'] ?? '0')),
+        ], $rows);
+        usort($tables, static fn (array $a, array $b): int => $b['bytes'] <=> $a['bytes']);
+
+        $this->dbTables = $tables;
+    }
+
+    /**
+     * Autoloaded options load on every request; WordPress Site Health warns past
+     * 800 KB. Behind a button, not wire:init: the full option-name list lands
+     * in the run log each time.
+     */
+    public function loadAutoloadAudit(WpCli $wpcli): void
+    {
+        $this->resetErrorBag('database');
+
+        // ponytail: fetches every option's name+size and filters here, because
+        // --autoload=on misses 6.6's auto/auto-on. Fine into the tens of thousands.
+        $rows = $this->readJsonRows($wpcli, 'option list', ['--fields=option_name,size_bytes,autoload', '--format=json'], 'database');
+        if ($rows === null) {
+            $this->autoloadAudit = null;
+
+            return;
+        }
+
+        $autoloaded = array_values(array_map(
+            static fn (array $row): array => ['name' => (string) ($row['option_name'] ?? ''), 'bytes' => (int) ($row['size_bytes'] ?? 0)],
+            array_filter($rows, static fn (array $row): bool => in_array((string) ($row['autoload'] ?? ''), self::AUTOLOAD_VALUES, true)),
+        ));
+        usort($autoloaded, static fn (array $a, array $b): int => $b['bytes'] <=> $a['bytes']);
+
+        $this->autoloadAudit = [
+            'total' => array_sum(array_column($autoloaded, 'bytes')),
+            'count' => count($autoloaded),
+            'top' => array_slice($autoloaded, 0, 15),
+        ];
+    }
+
+    /**
+     * Stop autoloading one option. It still works — get_option() falls back to
+     * a query — it just stops riding along on every request. `option
+     * set-autoload` runs at the Destructive tier (admin/owner).
+     */
+    public function stopAutoloading(string $option, WpCli $wpcli): void
+    {
+        if (! collect($this->autoloadAudit['top'] ?? [])->contains('name', $option)) {
+            $this->addError('database', __('Pick an option from the list.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'option set-autoload', [$option, 'off'], errorBag: 'database') === null) {
+            return;
+        }
+
+        $this->autoloadAudit['top'] = array_values(array_filter($this->autoloadAudit['top'], static fn (array $o): bool => $o['name'] !== $option));
+        $this->toastSuccess(__('Queued: :option no longer autoloads.', ['option' => $option]));
+    }
+
+    /**
+     * Cleanup jobs. The SQL ones run through `db query`, which wp-cli's gate
+     * rates recoverable — so the destructive check is made here explicitly:
+     * deleted revisions do not come back.
+     *
+     * @return array{title: string, message: string, sql: ?string}|null
+     */
+    private function dbCleanup(string $kind): ?array
+    {
+        $p = $this->wpTablePrefix();
+        $orphanPostmeta = $p === null ? '' : "DELETE pm FROM `{$p}postmeta` pm LEFT JOIN `{$p}posts` p ON p.ID = pm.post_id WHERE p.ID IS NULL;";
+
+        return match ($kind) {
+            'transients' => ['title' => __('Delete expired transients?'), 'message' => __('Removes cached values that have already expired. Nothing live is lost.'), 'sql' => null],
+            'revisions' => ['title' => __('Delete all post revisions?'), 'message' => __('Removes every saved revision and its metadata. Published content is untouched, but the revision history is gone for good.'), 'sql' => $p === null ? null : "DELETE FROM `{$p}posts` WHERE post_type = 'revision'; ".$orphanPostmeta],
+            'drafts' => ['title' => __('Delete auto-drafts?'), 'message' => __('Removes the empty auto-drafts WordPress creates when an editor opens. Real drafts are kept.'), 'sql' => $p === null ? null : "DELETE FROM `{$p}posts` WHERE post_status = 'auto-draft'; ".$orphanPostmeta],
+            'comments' => ['title' => __('Delete spam and trashed comments?'), 'message' => __('Removes comments marked spam or already in the trash, with their metadata. Approved and pending comments are kept.'), 'sql' => $p === null ? null : "DELETE FROM `{$p}comments` WHERE comment_approved IN ('spam', 'trash'); DELETE cm FROM `{$p}commentmeta` cm LEFT JOIN `{$p}comments` c ON c.comment_ID = cm.comment_id WHERE c.comment_ID IS NULL;"],
+            default => null,
+        };
+    }
+
+    public function confirmDbCleanup(string $kind, WpCli $wpcli): void
+    {
+        if ($kind !== 'transients' && ! $this->canDestroyHere()) {
+            $this->addError('database', __('Cleanup needs an admin or owner.'));
+
+            return;
+        }
+
+        // The SQL cleanups need the table prefix, read from the table list.
+        if ($kind !== 'transients' && $this->dbTables === null) {
+            $this->loadDbTables($wpcli);
+        }
+
+        $cleanup = $this->dbCleanup($kind);
+        if ($cleanup === null) {
+            return;
+        }
+        if ($kind !== 'transients' && $cleanup['sql'] === null) {
+            $this->addError('database', __('Could not work out the WordPress table prefix from the table list.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'runDbCleanup',
+            arguments: [$kind],
+            title: $cleanup['title'],
+            message: $cleanup['message'],
+            confirmLabel: __('Delete'),
+            destructive: $kind !== 'transients',
+            warning: $kind !== 'transients' ? __('This cannot be undone. Take a snapshot first if you might want any of it back.') : null,
+        );
+    }
+
+    public function runDbCleanup(string $kind, WpCli $wpcli): void
+    {
+        if ($kind === 'transients') {
+            if ($this->wp($wpcli, 'transient delete', ['--expired'], errorBag: 'database') !== null) {
+                $this->toastSuccess(__('Queued: deleting expired transients.'));
+            }
+
+            return;
+        }
+
+        // Directly callable, so the destructive check is repeated here.
+        if (! $this->canDestroyHere()) {
+            $this->addError('database', __('Cleanup needs an admin or owner.'));
+
+            return;
+        }
+
+        $sql = $this->dbCleanup($kind)['sql'] ?? null;
+        if ($sql === null) {
+            $this->addError('database', __('Could not work out the WordPress table prefix from the table list.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'db query', [$sql], errorBag: 'database') !== null) {
+            $this->toastSuccess(__('Queued: cleanup running. Check the tables again once it finishes.'));
+        }
+    }
+
+    /**
+     * The WordPress table prefix, from the loaded table list: the shortest P
+     * with both P.posts and P.options. Shortest, because multisite adds
+     * wp_2_posts next to wp_posts. Restricted to [A-Za-z0-9_] — it is spliced
+     * into SQL inside backticks.
+     */
+    private function wpTablePrefix(): ?string
+    {
+        $names = array_column($this->dbTables ?? [], 'name');
+        $best = null;
+        foreach ($names as $name) {
+            if (! str_ends_with($name, 'posts')) {
+                continue;
+            }
+            $prefix = substr($name, 0, -5);
+            if (preg_match('/^[A-Za-z0-9_]*$/', $prefix) === 1
+                && in_array($prefix.'options', $names, true)
+                && ($best === null || strlen($prefix) < strlen($best))) {
+                $best = $prefix;
+            }
+        }
+
+        return $best;
+    }
+
+    private function canDestroyHere(): bool
+    {
+        return app(RemoteCliPermissions::class)->can(auth()->user(), $this->site, RiskLevel::Destructive);
     }
 
     /**

@@ -19,6 +19,7 @@ use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Modules\RemoteCli\Services\Kind;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
@@ -1002,4 +1003,101 @@ test('the automatic core update policy writes the wp-config constant', function 
 
     $run = RemoteCliRun::query()->where('command', 'config set')->sole();
     expect($run->args)->toBe(['WP_AUTO_UPDATE_CORE', 'minor', '--type=constant']);
+});
+
+/** Stub one instant wp-cli read: the executor streams $json back as stdout. */
+function fakeWpRead(string $json): void
+{
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->withArgs(function ($s, $name, $bash, callable $cb) use ($json) {
+            $cb('out', $json);
+
+            return true;
+        })
+        ->andReturn(new ProcessOutput($json, 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+}
+
+test('take snapshot queues the dump instead of running it in the request', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('takeSnapshot')
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(TakeSiteSnapshotJob::class);
+});
+
+test('largest tables parse wp-cli byte sizes and sort biggest first', function () {
+    [$user, $site] = makeWpSite();
+    fakeWpRead(json_encode([
+        ['Name' => 'wp_options', 'Size' => '2048 B'],
+        ['Name' => 'wp_postmeta', 'Size' => '9000000 B'],
+        ['Name' => 'wp_posts', 'Size' => '500000 B'],
+    ]));
+
+    $tables = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('loadDbTables')
+        ->get('dbTables');
+
+    expect(array_column($tables, 'name'))->toBe(['wp_postmeta', 'wp_posts', 'wp_options'])
+        ->and($tables[0]['bytes'])->toBe(9000000);
+});
+
+test('revision cleanup targets the main site tables on multisite, after confirming', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('dbTables', [
+            ['name' => 'wp_2_posts', 'bytes' => 1], ['name' => 'wp_2_options', 'bytes' => 1],
+            ['name' => 'wp_posts', 'bytes' => 1], ['name' => 'wp_options', 'bytes' => 1],
+            ['name' => 'wp_postmeta', 'bytes' => 1],
+        ])
+        ->call('confirmDbCleanup', 'revisions')
+        ->assertSet('confirmActionModalMethod', 'runDbCleanup');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+    $component->call('confirmActionModal');
+
+    $sql = RemoteCliRun::query()->where('command', 'db query')->sole()->args[0];
+    expect($sql)->toContain("`wp_posts` WHERE post_type = 'revision'")
+        ->toContain('`wp_postmeta` pm LEFT JOIN `wp_posts`')
+        ->not->toContain('wp_2_');
+});
+
+test('members cannot run the permanent cleanups, even calling the method directly', function () {
+    [$user, $site] = makeWpSite(userRole: 'member');
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('dbTables', [['name' => 'wp_posts', 'bytes' => 1], ['name' => 'wp_options', 'bytes' => 1]])
+        ->call('confirmDbCleanup', 'revisions')
+        ->assertHasErrors('database')
+        ->call('runDbCleanup', 'comments');
+
+    expect(RemoteCliRun::query()->where('command', 'db query')->count())->toBe(0);
+});
+
+test('the autoload audit counts what WordPress actually autoloads', function () {
+    [$user, $site] = makeWpSite();
+    fakeWpRead(json_encode([
+        ['option_name' => 'big_plugin_cache', 'size_bytes' => '500', 'autoload' => 'yes'],
+        ['option_name' => 'new_style', 'size_bytes' => '300', 'autoload' => 'auto'],
+        ['option_name' => 'not_loaded', 'size_bytes' => '900', 'autoload' => 'off'],
+        ['option_name' => 'opted_out', 'size_bytes' => '100', 'autoload' => 'auto-off'],
+    ]));
+
+    $audit = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('loadAutoloadAudit')
+        ->get('autoloadAudit');
+
+    // wp-cli's own --autoload=on would miss the 6.6 "auto" row.
+    expect($audit['total'])->toBe(800)
+        ->and($audit['count'])->toBe(2)
+        ->and($audit['top'][0]['name'])->toBe('big_plugin_cache');
 });
