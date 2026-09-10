@@ -282,9 +282,12 @@ test('the environment file is removed even when the container fails to start', f
 
     // Under `set -e` an uncaptured failure would skip the cleanup and leave a
     // secret-bearing file behind — the one thing that outlives the failure.
+    //
+    // The LAST `rm -f` is the cleanup: the first one is the write block making
+    // sure it creates the env file rather than appending to a stale one.
     expect($out)->toContain('DPLY_RUN_RC');
-    expect(strpos($out, 'docker run'))->toBeLessThan(strpos($out, 'rm -f'));
-    expect(strpos($out, 'rm -f'))->toBeLessThan(strpos($out, 'exit "$DPLY_RUN_RC"'));
+    expect(strpos($out, 'docker run'))->toBeLessThan(strrpos($out, 'rm -f'));
+    expect(strrpos($out, 'rm -f'))->toBeLessThan(strpos($out, 'exit "$DPLY_RUN_RC"'));
 });
 
 test('a value that cannot survive the env-file format is dropped, not truncated', function () {

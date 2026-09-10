@@ -4,8 +4,16 @@
             <h3 class="text-sm font-semibold text-brand-ink">{{ __('Themes') }}</h3>
             <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Live list pulled from `wp theme list`. Activate a theme or push available updates.') }}</p>
         </div>
+        {{-- Themes from their own Git repo: a built surface (SiteGitSource + the
+             WordPress materializers) that nothing linked to, leaving it
+             unreachable from the page whose subject is themes. --}}
+        <a href="{{ route('sites.git-sources', ['server' => $site->server, 'site' => $site]) }}" wire:navigate
+            class="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+            <x-heroicon-o-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
+            {{ __('From Git') }}
+        </a>
         @if ($themesLoaded)
-            <button type="button" wire:click="loadThemes" wire:loading.attr="disabled" wire:target="loadThemes" class="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+            <button type="button" wire:click="loadThemes" wire:loading.attr="disabled" wire:target="loadThemes" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                 <span wire:loading.remove wire:target="loadThemes" class="inline-flex items-center gap-1.5">
                     <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                     {{ __('Refresh') }}

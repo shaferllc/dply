@@ -480,9 +480,29 @@ class ScaffoldWordPressPipeline
      */
     private function siteUrl(Site $site): string
     {
-        $hostname = $site->primaryDomain()?->hostname;
+        // Site::visitUrl() already prefers the testing hostname (the one the
+        // per-server wildcard cert covers) and picks the scheme from live SSL
+        // state. Hard-coding http:// here baked a plain-HTTP siteurl into every
+        // install, which then served mixed content over the site's real HTTPS
+        // hostname — a broken padlock on a perfectly valid certificate.
+        $visit = $site->visitUrl();
+        if (is_string($visit) && trim($visit) !== '') {
+            return rtrim(trim($visit), '/');
+        }
 
-        return 'http://'.(is_string($hostname) && $hostname !== '' ? $hostname : 'localhost');
+        // visitUrl() is null until the site is ready for traffic, which it may
+        // not be mid-install — resolve by hand with the same hostname
+        // preference and the same scheme logic rather than assuming http.
+        $hostname = trim((string) $site->testingHostname());
+        if ($hostname === '') {
+            $hostname = trim((string) ($site->primaryDomain()->hostname ?? ''));
+        }
+
+        if ($hostname === '') {
+            return 'http://localhost';
+        }
+
+        return $site->urlSchemeForHostname($hostname).'://'.$hostname;
     }
 
     private function setMeta(Site $site, string $dottedPath, mixed $value): void

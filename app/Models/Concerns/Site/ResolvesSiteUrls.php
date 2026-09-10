@@ -145,8 +145,13 @@ trait ResolvesSiteUrls
      * links land on the redirect — and an http:// preview opened from the https
      * console reads as broken (mixed-content block / bare nginx error). Fall back
      * to http only while SSL isn't active yet.
+     *
+     * Public because the scaffold pipelines need the same answer. An installer
+     * that assumes http:// bakes a plain-HTTP siteurl into the application it
+     * just installed, which then serves mixed content over the site's real
+     * HTTPS hostname — see ScaffoldWordPressPipeline::siteUrl().
      */
-    protected function urlSchemeForHostname(?string $hostname): string
+    public function urlSchemeForHostname(?string $hostname): string
     {
         $hostname = strtolower(trim((string) $hostname));
         if ($hostname === '') {

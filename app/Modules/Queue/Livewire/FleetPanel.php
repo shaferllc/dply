@@ -6,6 +6,7 @@ namespace App\Modules\Queue\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Jobs\BuildFleetImageJob;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Models\QueueNamespace;
@@ -125,6 +126,7 @@ class FleetPanel extends Component
                     'last_scaled_at' => $fleet->last_scaled_at?->diffForHumans(),
                     'image' => trim((string) ($fleet->image ?: ($fleet->meta['image'] ?? ''))),
                     'registry_username' => (string) ($fleet->registry_username ?? ''),
+                    'build' => is_array($fleet->meta['image_build'] ?? null) ? $fleet->meta['image_build'] : [],
                     'has_registry_auth' => ($fleet->registry_username ?? '') !== '',
                 ];
             })
@@ -196,7 +198,10 @@ class FleetPanel extends Component
 
         $this->editingId = $fleet->id;
         $this->class = $fleet->class;
-        $this->image = (string) ($fleet->image ?? '');
+        // Same fallback the listing uses. Without it a fleet configured before
+        // the column existed opens the form blank, and saving it then fails the
+        // now-required image rule — so an older fleet could not be resized.
+        $this->image = (string) ($fleet->image ?: ($fleet->meta['image'] ?? ''));
         $this->registry_username = (string) ($fleet->registry_username ?? '');
         // Deliberately not loaded — see the property docblock.
         $this->registry_password = '';
@@ -258,6 +263,38 @@ class FleetPanel extends Component
      * Pushes keep landing while paused — the backlog is held, not dropped —
      * and the workers wind down to zero, so nothing is billed while it waits.
      */
+    /**
+     * Build this fleet's image from the site's repository.
+     *
+     * Only for a queue attached to a site dply deploys — an external app has no
+     * repository here to build from, and says so rather than offering a button
+     * that cannot work.
+     */
+    public function buildImage(string $fleetId): void
+    {
+        $fleet = $this->fleet($fleetId);
+        $this->authorize('update', $this->namespace());
+
+        if ($this->namespace()->site_id === null) {
+            $this->toastError(__('This queue is not attached to a site dply deploys. Set a worker image manually.'));
+
+            return;
+        }
+
+        BuildFleetImageJob::dispatch((string) $fleet->id);
+
+        // Written here rather than waiting for the worker, so the panel shows
+        // "building" on the next poll instead of looking like nothing happened
+        // for as long as the job sits in the queue.
+        $meta = is_array($fleet->meta) ? $fleet->meta : [];
+        $meta['image_build'] = ['state' => 'building', 'started_at' => now()->toIso8601String(), 'error' => null];
+        $fleet->forceFill(['meta' => $meta])->save();
+
+        unset($this->fleets);
+
+        $this->toastSuccess(__('Building the image. This takes a few minutes on a first build.'));
+    }
+
     public function togglePause(string $fleetId): void
     {
         $fleet = $this->fleet($fleetId);
@@ -347,6 +384,7 @@ class FleetPanel extends Component
         return view('livewire.queues.fleet-panel', [
             'canManage' => auth()->user()?->can('update', $this->namespace()) ?? false,
             'runtimeConfigured' => (string) config('queue_service.fleets.runtime', 'fake') !== 'fake',
+            'canBuildImage' => $this->namespace()->site_id !== null,
         ]);
     }
 }

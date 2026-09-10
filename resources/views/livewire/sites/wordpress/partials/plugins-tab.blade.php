@@ -5,6 +5,15 @@
             <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('Live list pulled from `wp plugin list`. Each row is cross-checked against Wordfence Intelligence for known CVEs.') }}</p>
         </div>
         <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
+            {{-- Themes and plugins that come from their own Git repos are a
+                 built surface (SiteGitSource + the WordPress materializers) that
+                 nothing linked to — so it was unreachable from the one page
+                 whose whole subject is plugins and themes. --}}
+            <a href="{{ route('sites.git-sources', ['server' => $site->server, 'site' => $site]) }}" wire:navigate
+                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                <x-heroicon-o-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ __('From Git') }}
+            </a>
             @if ($pluginsLoaded && $canMutate && collect($plugins)->where('update', 'available')->isNotEmpty())
                 <button
                     type="button"

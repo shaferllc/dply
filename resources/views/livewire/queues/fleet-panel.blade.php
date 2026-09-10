@@ -58,6 +58,17 @@
 
                     @if ($canManage)
                         <div class="flex shrink-0 flex-wrap items-center gap-1.5">
+                            @if ($canBuildImage)
+                                {{-- Built on the fleet host and never pushed: with one host there is
+                                     nowhere to push it to, and the runtime falls back to a locally
+                                     present image by design. --}}
+                                <button type="button" wire:click="buildImage('{{ $fleet['id'] }}')"
+                                        wire:loading.attr="disabled" wire:target="buildImage('{{ $fleet['id'] }}')"
+                                        @disabled(($fleet['build']['state'] ?? '') === 'building')
+                                        class="{{ $btnOutline }}">
+                                    {{ ($fleet['build']['state'] ?? '') === 'building' ? __('Building…') : ($fleet['image'] === '' ? __('Build image') : __('Rebuild')) }}
+                                </button>
+                            @endif
                             <button type="button" wire:click="edit('{{ $fleet['id'] }}')" class="{{ $btnOutline }}">{{ __('Configure') }}</button>
                             <button type="button" wire:click="togglePause('{{ $fleet['id'] }}')" class="{{ $btnOutline }}">
                                 {{ $fleet['status'] === 'active' ? __('Pause') : __('Resume') }}
@@ -101,8 +112,26 @@
                     @endif
                 </dl>
 
-                @if ($fleet['image'] === '')
-                    <p class="mt-1.5 text-2xs text-amber-800">{{ __('No worker image set for this fleet — nothing will start until one is.') }}</p>
+                @php($build = $fleet['build'] ?? [])
+                @if (($build['state'] ?? '') === 'building')
+                    <p class="mt-1.5 inline-flex items-center gap-1.5 text-2xs text-brand-moss">
+                        <x-spinner class="h-3 w-3" />
+                        {{ __('Building the image from the site’s repository — a first build takes a few minutes.') }}
+                    </p>
+                @elseif (($build['state'] ?? '') === 'failed')
+                    <p class="mt-1.5 text-2xs text-rose-700">
+                        <span class="font-semibold">{{ __('Image build failed.') }}</span>
+                        <span class="font-mono">{{ \Illuminate\Support\Str::limit((string) ($build['error'] ?? ''), 200) }}</span>
+                    </p>
+                @elseif ($fleet['image'] === '')
+                    <p class="mt-1.5 text-2xs text-amber-800">
+                        {{ __('No worker image set for this fleet — nothing will start until one is.') }}
+                        @if ($canBuildImage)
+                            {{ __('Build one from this site’s repository, or set one by hand under Configure.') }}
+                        @endif
+                    </p>
+                @else
+                    <p class="mt-1.5 truncate font-mono text-2xs text-brand-mist" title="{{ $fleet['image'] }}">{{ $fleet['image'] }}</p>
                 @endif
 
                 @if ($editingId === $fleet['id'])

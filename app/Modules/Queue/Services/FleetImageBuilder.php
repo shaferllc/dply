@@ -12,7 +12,7 @@ use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\Runtimes\FleetHostAllocator;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Servers\SshConnectionFactory;
+use App\Services\SshConnectionFactory;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -41,6 +41,13 @@ class FleetImageBuilder
      * Layer cache makes every later build a fraction of this.
      */
     private const BUILD_TIMEOUT = 1800;
+
+    /**
+     * Older images kept per site. More than one so a rebuild that turns out bad
+     * can be rolled back to the previous tag by hand; few enough that a fleet
+     * host's disk is not a customer's problem.
+     */
+    private const KEEP_IMAGES = 3;
 
     public function __construct(
         private readonly FleetHostAllocator $allocator,
@@ -96,9 +103,51 @@ class FleetImageBuilder
             throw new RuntimeException('docker build failed: '.Str::limit(trim($result->buffer), 600));
         }
 
+        $this->prune($host, $site, $emit);
+
         $emit->success(__('Image :tag is ready on :host.', ['tag' => $tag, 'host' => (string) $host->name]), 'image');
 
         return $tag;
+    }
+
+    /**
+     * Drop this site's older worker images from the build host.
+     *
+     * Every build leaves a full app image behind, so without this a busy site
+     * fills a fleet host's disk — and a fleet host that runs out of disk stops
+     * being able to start ANY customer's workers, not just this one's.
+     *
+     * `docker rmi` refuses to remove an image a container is using, so a tag
+     * still backing a running worker survives on its own and needs no
+     * bookkeeping here. Best-effort throughout: a successful build must not be
+     * reported as a failure because cleanup could not run.
+     */
+    private function prune(Server $host, Site $site, ConsoleEmitter $emit): void
+    {
+        $repo = 'dply-fleet-'.$site->id;
+
+        try {
+            $result = $this->remote->runInlineBash(
+                $host,
+                'fleet-image-prune',
+                sprintf(
+                    'docker images %1$s --format "{{.ID}} {{.Repository}}:{{.Tag}}" 2>/dev/null | tail -n +%2$d '
+                    .'| while read -r id ref; do docker rmi "$ref" >/dev/null 2>&1 || true; done; echo pruned',
+                    escapeshellarg($repo),
+                    self::KEEP_IMAGES + 1,
+                ),
+                timeoutSeconds: 300,
+            );
+
+            if ($result->exitCode === 0) {
+                $emit->step('image', __('Older :repo images pruned, keeping the newest :keep.', [
+                    'repo' => $repo,
+                    'keep' => self::KEEP_IMAGES,
+                ]));
+            }
+        } catch (\Throwable $e) {
+            $emit->warn(__('Could not prune older images: :msg', ['msg' => Str::limit($e->getMessage(), 200)]), 'image');
+        }
     }
 
     /**
