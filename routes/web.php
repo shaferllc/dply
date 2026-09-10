@@ -24,6 +24,7 @@ use App\Http\Controllers\Sites\DatabaseConnectionUriController;
 use App\Http\Controllers\Sites\DatabaseConnectLinkController;
 use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
+use App\Http\Controllers\Sites\ServerDatabaseConnectionUriController;
 use App\Http\Controllers\Sites\ServerDatabaseConnectLinkController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteWorkspaceController;
@@ -994,6 +995,11 @@ Route::get('database-tunnels/{session}/install', DatabaseTunnelInstallController
 Route::get('database-connections/{binding}/uri', DatabaseConnectionUriController::class)
     ->middleware('signed')
     ->name('database-connections.uri');
+
+// Same, for a site's own on-box database (a ServerDatabase with no binding).
+Route::get('database-connections/server/{database}/uri', ServerDatabaseConnectionUriController::class)
+    ->middleware('signed')
+    ->name('database-connections.server-uri');
 
 /*
  * Downloadable .command that opens a terminal session on the database. Signed

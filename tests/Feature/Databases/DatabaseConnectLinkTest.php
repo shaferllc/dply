@@ -115,6 +115,33 @@ test('a site database link hands off its stored password on the tunnel port', fu
     $this->actingAs($user)->get($url)->assertNotFound();
 });
 
+test('the site database uri endpoint hands curl the credentialed tunnel uri', function (): void {
+    [, $site] = connectLinkFixture();
+    $db = ServerDatabase::query()->create([
+        'server_id' => $site->server_id,
+        'site_id' => $site->id,
+        'name' => 'dply_blog',
+        'engine' => 'mariadb',
+        'username' => 'dply_blog',
+        'password' => 'wp-secret',
+        'host' => 'localhost',
+    ]);
+    $url = URL::temporarySignedRoute('database-connections.server-uri', now()->addMinutes(2), [
+        'database' => $db->id,
+        'port' => 15432,
+    ]);
+
+    // curl carries no session — the signature alone authorizes it.
+    $this->get($url)
+        ->assertOk()
+        ->assertSee('mysql://dply_blog:wp-secret@127.0.0.1:15432/dply_blog', escape: false);
+
+    $this->get(route('database-connections.server-uri', ['database' => $db->id]))->assertForbidden();
+
+    $db->update(['credentials_known' => false]);
+    $this->get($url)->assertNotFound();
+});
+
 test('the tunnel variant points at the forwarded local port', function (): void {
     [$user, $site, $binding] = connectLinkFixture();
 

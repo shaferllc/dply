@@ -1344,6 +1344,33 @@ test('database tab shows remote access for the site database', function () {
         ->assertDontSee('secret');
 });
 
+test('database tab sets up passwordless tunnel access and a one-paste TablePlus launch', function () {
+    Queue::fake();
+    [$user, $site] = makeWpSite();
+    $db = \App\Models\ServerDatabase::factory()->create([
+        'server_id' => $site->server_id,
+        'name' => 'dply_wptunnel',
+        'username' => 'dply_wptunnel',
+        'password' => 'wp-tunnel-secret',
+        'engine' => 'mariadb',
+        'host' => 'localhost',
+    ]);
+    $site->update(['meta' => ['scaffold' => ['framework' => 'wordpress', 'database' => ['server_database_id' => $db->id]]]]);
+    $site->server->update(['ssh_private_key' => 'test-key']);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site->fresh()])
+        ->set('tab', 'database')
+        ->assertSee('Set up passwordless access')
+        ->call('setUpDbTunnelAccess')
+        ->assertHasNoErrors()
+        ->assertSee('| bash')
+        ->assertSee('open -a TablePlus')
+        ->assertSee('dply-db-')
+        // Only signed URLs reach the page — never the password itself.
+        ->assertDontSee('wp-tunnel-secret');
+});
+
 test('database tab has no remote access card when no database resolves', function () {
     [$user, $site] = makeWpSite();
 

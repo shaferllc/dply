@@ -10,6 +10,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\RemoteCliRun;
 use App\Models\Site;
 use App\Models\Snapshot;
+use App\Modules\Database\Services\TunnelAccessProvisioner;
 use App\Modules\RemoteCli\Services\Kind;
 use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
 use App\Modules\RemoteCli\Services\RemoteCliPermissions;
@@ -59,6 +60,10 @@ class WordPressSection extends Component
     /** Active sub-tab. Persisted as ?wp= in the URL for sharing. */
     #[Url(as: 'wp')]
     public string $tab = 'console';
+
+    /** Tunnel session just minted by setUpDbTunnelAccess(), for its install command. */
+    #[Locked]
+    public string $dbTunnelSessionId = '';
 
     public string $consoleCommand = 'plugin list';
 
@@ -324,9 +329,85 @@ class WordPressSection extends Component
      * so the binding-keyed Connect panel can't address it, and adopting one
      * would take over DB_* at deploy. Null (no card) when nothing resolves.
      *
-     * @return array{target: DatabaseConnectionTarget, ssh: string, tunnel: ?array<string, mixed>}|null
+     * @return array{target: DatabaseConnectionTarget, ssh: string, tunnel: ?array<string, mixed>, openLink: ?string, install: ?string, launch: ?string}|null
      */
     private function remoteDatabaseAccess(): ?array
+    {
+        $server = $this->site->server;
+        $db = $this->siteDatabase();
+        if ($server === null || $db === null) {
+            return null;
+        }
+
+        // defaultPort(), not DatabaseConnectionTarget::defaultPortFor(): engines
+        // are versioned ids (mysql84), which the latter maps to 5432.
+        $target = DatabaseConnectionTarget::fromServerDatabase($db, '127.0.0.1', $db->defaultPort());
+        $reason = app(DatabaseConnectionTargetResolver::class)->tunnelUnavailableReason($target, $server);
+        $port = DatabaseJumpHostAccess::BASE_LOCAL_PORT;
+        $tunnel = $reason === null ? DatabaseJumpHostAccess::tunnelCommandsFor($target, $server, $port) : null;
+
+        // Once tunnel access is set up the tunnel rides the dply-db-* SSH alias
+        // and its forward-only key — the plain `ssh dply@host` form prompts for
+        // a password whenever the operator's own key isn't on the box.
+        $user = auth()->user();
+        $session = $reason === null && $user !== null
+            ? app(TunnelAccessProvisioner::class)->activeFor($server, $user)
+            : null;
+        $alias = $session !== null ? TunnelAccessProvisioner::aliasFor($session) : null;
+        if ($alias !== null && $tunnel !== null) {
+            $tunnel['tunnel'] = sprintf('ssh -f -N -L %d:%s:%d %s', $port, $target->host, $target->port, $alias);
+        }
+
+        // Clients don't prompt for a missing password — they just fail — so the
+        // installer and launch curl a short-lived signed URL for the full URI.
+        $uriUrl = $reason === null && $db->hasUsableCredentials()
+            ? url()->temporarySignedRoute('database-connections.server-uri', now()->addMinutes(30), [
+                'database' => $db->id,
+                'port' => $port,
+            ])
+            : null;
+
+        return [
+            'target' => $target,
+            'ssh' => DatabaseJumpHostAccess::sshUserFor($server).'@'.$server->ip_address,
+            'tunnel' => $tunnel,
+            // One click into TablePlus once that tunnel is up. The link carries
+            // no secret — the controller reads the password server-side.
+            'openLink' => $uriUrl !== null
+                ? url()->temporarySignedRoute('sites.databases.server-connect-link', now()->addMinutes(30), [
+                    'server' => $server->id,
+                    'site' => $this->site->id,
+                    'database' => $db->id,
+                ])
+                : null,
+            // Step 1, run once: installs the key + SSH alias, opens the tunnel
+            // and launches TablePlus with the password filled in.
+            'install' => $this->dbTunnelSessionId !== '' && $uriUrl !== null
+                ? 'curl -fsSL '.escapeshellarg(url()->temporarySignedRoute('database-tunnels.install', now()->addMinutes(30), [
+                    'session' => $this->dbTunnelSessionId,
+                    'host' => $target->host,
+                    'dbport' => $target->port,
+                    'port' => $port,
+                    'uri_url' => $uriUrl,
+                ])).' | bash'
+                : null,
+            // Thereafter: one paste reopens the tunnel if needed and launches TablePlus.
+            'launch' => $alias !== null && $uriUrl !== null
+                ? sprintf(
+                    'nc -z 127.0.0.1 %d 2>/dev/null || ssh -f -N -L %d:%s:%d %s; open -a TablePlus "$(curl -fsSL %s)"',
+                    $port,
+                    $port,
+                    $target->host,
+                    $target->port,
+                    $alias,
+                    escapeshellarg($uriUrl),
+                )
+                : null,
+        ];
+    }
+
+    /** The site's own database: the scaffold's row, else the name the pipeline derives. */
+    private function siteDatabase(): ?ServerDatabase
     {
         $server = $this->site->server;
         if ($server === null) {
@@ -339,31 +420,38 @@ class WordPressSection extends Component
         // Not scaffolded by dply: fall back to the name the pipeline derives.
         $db ??= (clone $databases)->where('name', 'dply_'.Str::slug($this->site->slug, '_'))->first();
 
-        if (! $db instanceof ServerDatabase || DatabaseWorkspaceEngines::family((string) $db->engine) === 'sqlite') {
-            return null;
+        return $db instanceof ServerDatabase && DatabaseWorkspaceEngines::family((string) $db->engine) !== 'sqlite'
+            ? $db
+            : null;
+    }
+
+    /**
+     * Step 1 of passwordless database access: mint a forward-only tunnel key
+     * for this operator (the key reaches the box on the queue, never inline).
+     */
+    public function setUpDbTunnelAccess(TunnelAccessProvisioner $provisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $db = $this->siteDatabase();
+        $user = auth()->user();
+        if ($db === null || $user === null || $this->site->server === null) {
+            return;
         }
 
-        // defaultPort(), not DatabaseConnectionTarget::defaultPortFor(): engines
-        // are versioned ids (mysql84), which the latter maps to 5432.
-        $target = DatabaseConnectionTarget::fromServerDatabase($db, '127.0.0.1', $db->defaultPort());
-        $reason = app(DatabaseConnectionTargetResolver::class)->tunnelUnavailableReason($target, $server);
+        try {
+            $session = $provisioner->provision(
+                $this->site->server,
+                $user,
+                DatabaseConnectionTarget::fromServerDatabase($db, '127.0.0.1', $db->defaultPort()),
+            );
+        } catch (\Throwable $e) {
+            $this->addError('database', $e->getMessage());
 
-        return [
-            'target' => $target,
-            'ssh' => DatabaseJumpHostAccess::sshUserFor($server).'@'.$server->ip_address,
-            'tunnel' => $reason === null
-                ? DatabaseJumpHostAccess::tunnelCommandsFor($target, $server, DatabaseJumpHostAccess::BASE_LOCAL_PORT)
-                : null,
-            // One click into TablePlus once that tunnel is up. The link carries
-            // no secret — the controller reads the password server-side.
-            'openLink' => $reason === null && $db->hasUsableCredentials()
-                ? url()->temporarySignedRoute('sites.databases.server-connect-link', now()->addMinutes(30), [
-                    'server' => $server->id,
-                    'site' => $this->site->id,
-                    'database' => $db->id,
-                ])
-                : null,
-        ];
+            return;
+        }
+
+        $this->dbTunnelSessionId = (string) $session->id;
     }
 
     /**

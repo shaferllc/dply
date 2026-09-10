@@ -34,6 +34,22 @@
                 @endforeach
             </dl>
             @if ($dbRemote['tunnel'])
+                {{-- Passwordless: a forward-only key + SSH alias (Step 1, once),
+                     then one paste that tunnels and opens TablePlus. --}}
+                <div class="mt-2 min-w-0 space-y-2">
+                    @if ($dbRemote['install'] ?? null)
+                        <x-cli-snippet :commands="[['command' => $dbRemote['install']]]" :summary="__('Run once — installs a forward-only key, opens the tunnel and launches TablePlus:')" />
+                        <p class="text-xs text-brand-moss">{{ __('The link works once and expires in 30 minutes. The key reaches the server in the background — give it a few seconds.') }}</p>
+                    @endif
+                    @if ($dbRemote['launch'] ?? null)
+                        <x-cli-snippet :commands="[['command' => $dbRemote['launch']]]" :summary="__('Open in TablePlus — one paste, no passwords:')" />
+                    @elseif (! ($dbRemote['install'] ?? null))
+                        <x-secondary-button size="xs" type="button" wire:click="setUpDbTunnelAccess" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="setUpDbTunnelAccess">{{ __('Set up passwordless access') }}</span>
+                            <span wire:loading wire:target="setUpDbTunnelAccess">{{ __('Generating…') }}</span>
+                        </x-secondary-button>
+                    @endif
+                </div>
                 <div class="mt-2 min-w-0">
                     <x-cli-snippet :commands="[
                         ['label' => __('Tunnel'), 'command' => $dbRemote['tunnel']['tunnel']],
