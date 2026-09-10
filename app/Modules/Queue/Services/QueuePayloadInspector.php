@@ -33,7 +33,8 @@ final class QueuePayloadInspector
      *     job_timeout: ?int,
      *     job_max_tries: ?int,
      *     batch_id: ?string,
-     *     display_name: ?string
+     *     display_name: ?string,
+     *     group_key: ?string
      * }
      */
     public function inspect(string $payload): array

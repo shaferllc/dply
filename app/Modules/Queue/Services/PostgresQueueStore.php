@@ -64,13 +64,13 @@ class PostgresQueueStore implements QueueStore
         $rows = [];
         $ids = [];
 
-        // Both re-indexed: the pairing is positional, and a caller that filtered
-        // one list with array_filter() would otherwise hand us gapped keys and
-        // silently group jobs under the wrong key.
-        $payloads = array_values($payloads);
-        $groupKeys = array_values($groupKeys);
+        // Walked by position rather than by key: the pairing between a payload
+        // and its group key is positional, and reading $payloads' own keys
+        // would mis-group the batch for a caller that handed us a gapped array.
+        $index = -1;
 
-        foreach ($payloads as $index => $payload) {
+        foreach ($payloads as $payload) {
+            $index++;
             $meta = $this->inspector->inspect($payload);
             $id = (string) Str::ulid();
             $ids[] = $id;
