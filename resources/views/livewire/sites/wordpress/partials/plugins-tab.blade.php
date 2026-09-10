@@ -254,10 +254,10 @@
                                 </td>
                             @endif
                             <td class="px-4 py-3 font-mono text-xs text-brand-ink sm:px-6">{{ $plugin['name'] }}</td>
-                            <td class="px-4 py-3 text-brand-moss">v{{ $plugin['version'] }}</td>
+                            <td class="whitespace-nowrap px-4 py-3 text-brand-moss">{{ $plugin['version'] !== '' ? 'v'.$plugin['version'] : '—' }}</td>
                             <td class="px-4 py-3">
                                 <span @class([
-                                    'rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
+                                    'whitespace-nowrap rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide',
                                     'bg-brand-sage/15 text-brand-forest' => $active,
                                     'bg-brand-sand/40 text-brand-moss' => ! $active,
                                 ])>{{ $plugin['status'] }}</span>
@@ -265,7 +265,7 @@
                             <td class="px-4 py-3">
                                 <div class="flex flex-wrap items-center gap-1.5 text-xs">
                                     @if ($plugin['update'] === 'available')
-                                        <span class="rounded-full bg-brand-gold/20 px-2 py-0.5 font-semibold text-brand-ink">{{ __('Update available') }}</span>
+                                        <span class="whitespace-nowrap rounded-full bg-brand-gold/20 px-2 py-0.5 font-semibold text-brand-ink">{{ __('Update available') }}</span>
                                     @endif
                                     @foreach ($plugin['advisories'] as $advisory)
                                         <span
