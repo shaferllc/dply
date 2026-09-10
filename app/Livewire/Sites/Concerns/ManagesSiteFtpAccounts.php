@@ -11,6 +11,7 @@ use App\Models\ConsoleAction;
 use App\Models\SftpAccount;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerSystemUserService;
+use App\Services\Servers\SftpAccountProvisioner;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,6 +26,10 @@ trait ManagesSiteFtpAccounts
     public bool $showFtpCreateModal = false;
 
     public string $ftp_username = '';
+
+    public bool $showFtpAdoptModal = false;
+
+    public string $ftp_adopt_username = '';
 
     public ?string $ftp_error = null;
 
@@ -118,6 +123,105 @@ trait ManagesSiteFtpAccounts
         ]);
     }
 
+    /**
+     * Existing Linux accounts that could be given FTP access.
+     *
+     * Excludes anything already granted, and anything dply logs in as — the
+     * Match block would force every dply SSH command into an SFTP session.
+     *
+     * @return list<string>
+     */
+    public function ftpAdoptableUsernames(): array
+    {
+        $taken = SftpAccount::query()
+            ->where('server_id', $this->server->id)
+            ->pluck('username')
+            ->map(static fn ($u): string => strtolower((string) $u))
+            ->all();
+
+        $provisioner = app(SftpAccountProvisioner::class);
+
+        return collect(app(ServerSystemUserService::class)->storedSystemUsersWithMetadata($this->server))
+            ->pluck('username')
+            ->filter(function ($username) use ($taken, $provisioner): bool {
+                if (in_array(strtolower((string) $username), $taken, true)) {
+                    return false;
+                }
+
+                try {
+                    $provisioner->assertGrantableUsername($this->server, (string) $username);
+                } catch (\Throwable) {
+                    return false;
+                }
+
+                return true;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The deploy user can never join dply-sftp, but it already speaks SFTP over
+     * its existing SSH key — so the panel offers connection details instead of
+     * a button that would have to be refused.
+     */
+    public function ftpDeployUsername(): string
+    {
+        return trim((string) $this->server->ssh_user) ?: 'dply';
+    }
+
+    public function openFtpAdoptModal(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->ftp_error = null;
+        $this->ftp_adopt_username = '';
+        $this->showFtpAdoptModal = true;
+    }
+
+    public function closeFtpAdoptModal(): void
+    {
+        $this->showFtpAdoptModal = false;
+        $this->ftp_error = null;
+    }
+
+    /** Grants FTP access to an account that already exists on the server. */
+    public function adoptFtpAccount(ServerSystemUserService $users): void
+    {
+        $this->authorize('update', $this->site);
+        $this->ftp_error = null;
+
+        try {
+            $username = $users->validatePasswdStyleUsername($this->ftp_adopt_username);
+
+            if (! in_array($username, $this->ftpAdoptableUsernames(), true)) {
+                throw new \RuntimeException(__('That account is not available for FTP access.'));
+            }
+
+            $password = SftpAccount::generatePassword();
+
+            $account = SftpAccount::create([
+                'server_id' => $this->server->id,
+                'site_id' => $this->site->id,
+                'username' => $username,
+                'source' => SftpAccount::SOURCE_ADOPTED,
+                'home_path' => '/home/'.$username,
+                'status' => SftpAccount::STATUS_PENDING,
+                'created_by_user_id' => Auth::id(),
+            ]);
+
+            $run = $this->seedFtpConsoleAction(__('Granting FTP access to :user …', ['user' => $username]));
+            CreateSftpAccountJob::dispatch((string) $account->id, $password, (string) Auth::id(), (string) $run->id);
+
+            $this->ftp_revealed_password = $password;
+            $this->ftp_revealed_username = $username;
+
+            $this->showFtpAdoptModal = false;
+            $this->toastSuccess(__('FTP access queued. The password is shown once — copy it now.'));
+        } catch (\Throwable $e) {
+            $this->ftp_error = $e->getMessage();
+        }
+    }
+
     public function openFtpCreateModal(): void
     {
         $this->authorize('update', $this->site);
@@ -145,6 +249,7 @@ trait ManagesSiteFtpAccounts
             // worker; doing it here is what keeps a reserved name from becoming
             // a database row that fails out of band.
             $users->assertAcceptableCreateUsername($this->server, $username);
+            app(SftpAccountProvisioner::class)->assertGrantableUsername($this->server, $username);
 
             // /etc/passwd is the real namespace — a name free in our table can
             // still be taken on the box by a shell user or a leftover account.

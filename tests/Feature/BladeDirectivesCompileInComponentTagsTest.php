@@ -23,9 +23,14 @@ it('leaves no uncompiled blade directive in any view', function () {
     $leaks = [];
 
     foreach ((new Finder)->files()->in(resource_path('views'))->name('*.blade.php') as $file) {
-        $compiled = $compiler->compileString((string) file_get_contents($file->getRealPath()));
+        $source = (string) file_get_contents($file->getRealPath());
 
-        if (str_contains($compiled, '@js(')) {
+        // Cheap pre-filter: only a view that writes the directive can leak it.
+        if (! str_contains($source, '@js(')) {
+            continue;
+        }
+
+        if (str_contains($compiler->compileString($source), '@js(')) {
             $leaks[] = $file->getRelativePathname();
         }
     }

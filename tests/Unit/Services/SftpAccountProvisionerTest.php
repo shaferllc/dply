@@ -80,7 +80,19 @@ test('grant applies a default ACL to directories and a traverse bit to the paren
     expect($script)
         ->toContain("setfacl -m u:'designer':--x '/home/dply'")
         ->toContain("setfacl -R -m u:'designer':rwX '/home/dply/example.com'")
-        ->toContain("find '/home/dply/example.com' -type d -exec setfacl -m d:u:'designer':rwX {} +");
+        ->toContain("find '/home/dply/example.com' -type d -exec setfacl -m d:u:'designer':rwX");
+});
+
+/**
+ * Files an FTP account uploads are owned by IT, not by the site's system user.
+ * Without a default ACL for that user, the application — and the next deploy —
+ * can be unable to write a file the customer just dragged in.
+ */
+test('grant keeps the site system user writable on uploaded files', function () {
+    $script = makeProvisioner(Mockery::mock(ServerSshConnectionRunner::class))
+        ->grantScript(makeAccount());
+
+    expect($script)->toContain("-m d:u:'dply':rwX");
 });
 
 /** Telling someone "put it in shared/" is a bad sentence when shared/ does not exist. */

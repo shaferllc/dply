@@ -10,6 +10,7 @@ use App\Livewire\Sites\Files;
 use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerSystemUser;
 use App\Models\SftpAccount;
 use App\Models\Site;
 use App\Models\User;
@@ -183,7 +184,105 @@ test('the panel renders its create modal and its atomic-deploy warning', functio
         ->assertSee('This site uses atomic deploys')
         ->call('openFtpCreateModal')
         ->assertSet('showFtpCreateModal', true)
-        ->assertSee('Add FTP account');
+        ->assertSee('New FTP account')
+        ->call('closeFtpCreateModal')
+        ->call('openFtpAdoptModal')
+        ->assertSet('showFtpAdoptModal', true)
+        ->assertSee('Give an existing account FTP access');
+});
+
+/**
+ * The sshd Match block applies ForceCommand internal-sftp to every member of
+ * dply-sftp, and SshConnection connects as the server's ssh_user — so granting
+ * the deploy user would turn every dply command (deploys, provisioning, this
+ * feature) into an SFTP session. It must be unreachable from both paths.
+ */
+test('the deploy user cannot be given FTP access from either path', function (): void {
+    Queue::fake();
+    [$user, $server, $site] = ftpFixture();
+
+    ServerSystemUser::query()->create([
+        'server_id' => $server->id,
+        'username' => 'dply',
+        'uid' => 1000,
+        'home' => '/home/dply',
+        'shell' => '/bin/bash',
+        'groups' => [],
+    ]);
+
+    $component = Livewire::actingAs($user)
+        ->test(Files::class, ['server' => $server, 'site' => $site]);
+
+    // Not offered for adoption...
+    expect($component->instance()->ftpAdoptableUsernames())->not->toContain('dply');
+
+    // ...and not reachable by typing it into the adopt form directly.
+    $component->set('ftp_adopt_username', 'dply')->call('adoptFtpAccount');
+    expect($component->get('ftp_error'))->not->toBeNull();
+
+    expect(SftpAccount::query()->count())->toBe(0);
+    Queue::assertNotPushed(CreateSftpAccountJob::class);
+});
+
+/** Adoption grants the group; it must never run useradd on an existing account. */
+test('adopting an existing account records it as adopted and queues a grant', function (): void {
+    Queue::fake();
+    [$user, $server, $site] = ftpFixture();
+
+    ServerSystemUser::query()->create([
+        'server_id' => $server->id,
+        'username' => 'alice',
+        'uid' => 1001,
+        'home' => '/home/alice',
+        'shell' => '/bin/bash',
+        'groups' => [],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Files::class, ['server' => $server, 'site' => $site])
+        ->set('ftp_adopt_username', 'alice')
+        ->call('adoptFtpAccount')
+        ->assertSet('ftp_error', null);
+
+    $account = SftpAccount::query()->where('username', 'alice')->firstOrFail();
+
+    expect($account->source)->toBe(SftpAccount::SOURCE_ADOPTED)
+        ->and($account->isAdopted())->toBeTrue();
+
+    Queue::assertPushed(CreateSftpAccountJob::class);
+});
+
+/**
+ * Removing access from an account dply did not create must not delete the user —
+ * the operator asked for file transfer to stop, not for their account to vanish.
+ */
+test('tearing down an adopted account drops the group instead of deleting the user', function (): void {
+    $server = Server::factory()->ready()->make(['ssh_private_key' => 'k', 'ssh_user' => 'dply']);
+    $account = SftpAccount::factory()->make([
+        'username' => 'alice',
+        'source' => SftpAccount::SOURCE_ADOPTED,
+        'home_path' => '/home/alice',
+    ]);
+    $account->setRelation('server', $server);
+
+    $commands = [];
+    $ssh = Mockery::mock(SshConnection::class);
+    $ssh->shouldReceive('exec')->andReturnUsing(function (string $cmd) use (&$commands): string {
+        $commands[] = $cmd;
+
+        return "ok\nDPLY_EXIT:0";
+    });
+    $runner = Mockery::mock(ServerSshConnectionRunner::class);
+    $runner->shouldReceive('run')->andReturnUsing(fn ($srv, $cb) => $cb($ssh, 'root'));
+
+    $users = Mockery::mock(ServerSystemUserService::class);
+    $users->shouldNotReceive('deleteUserFromServer');
+
+    (new SftpAccountProvisioner($runner, $users))->destroy($account);
+
+    $all = implode("\n", $commands);
+    expect($all)->toContain("gpasswd -d 'alice' 'dply-sftp'")
+        ->and($all)->not->toContain('rm -rf');
 });
 
 /**

@@ -119,6 +119,8 @@ class Files extends Component
             'ftpRevealedUsername' => $this->revealedFtpUsername(),
             'ftpSyncGroupWarning' => $this->ftpSyncGroupWarning(),
             'ftpConsoleRun' => $this->ftpConsoleRun(),
+            'ftpAdoptable' => $this->ftpAdoptableUsernames(),
+            'ftpDeployUser' => $this->ftpDeployUsername(),
             'editMaxBytes' => (int) config('server_file_browser.edit_max_bytes', 1_048_576),
             'downloadMaxBytes' => (int) config('server_file_browser.download_max_bytes', 26_214_400),
             // Settings shell (sidebar + breadcrumb) — same vars the sibling

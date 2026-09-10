@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
  * @property string $server_id
  * @property ?string $site_id
  * @property string $username
+ * @property string $source
  * @property string $home_path
  * @property string $status
  * @property ?string $last_error
@@ -45,12 +46,19 @@ class SftpAccount extends Model
     /** Supplementary group the sshd Match block keys off. */
     public const GROUP = 'dply-sftp';
 
+    /** dply ran useradd; removal deletes the Linux account. */
+    public const SOURCE_CREATED = 'created';
+
+    /** Pre-existing account dply only added to the group; removal leaves it. */
+    public const SOURCE_ADOPTED = 'adopted';
+
     protected $table = 'sftp_accounts';
 
     protected $fillable = [
         'server_id',
         'site_id',
         'username',
+        'source',
         'home_path',
         'status',
         'last_error',
@@ -78,6 +86,11 @@ class SftpAccount extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function isAdopted(): bool
+    {
+        return $this->source === self::SOURCE_ADOPTED;
     }
 
     public function isServerScoped(): bool

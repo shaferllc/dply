@@ -132,6 +132,37 @@ BASH;
     }
 
     /**
+     * Refuses any account dply itself logs in as.
+     *
+     * The sshd Match block applies `ForceCommand internal-sftp` to every member
+     * of dply-sftp. {@see SshConnection::effectiveUsername()}
+     * connects as the server's ssh_user, so putting that account in the group
+     * turns every remote command dply runs — deploys, provisioning, this very
+     * feature — into an SFTP session. On a self-managed control plane that is
+     * also how dply locks itself out of its own box.
+     *
+     * The deploy user already has SFTP through its SSH key; nothing needs to be
+     * granted for it, which is why this is a hard refusal rather than a warning.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertGrantableUsername(Server $server, string $username): void
+    {
+        $lower = strtolower(trim($username));
+
+        if ($lower === 'root') {
+            throw new \RuntimeException(__('root cannot be given FTP access.'));
+        }
+
+        $deploy = strtolower(trim((string) $server->ssh_user));
+        $configured = strtolower(trim((string) config('server_provision.deploy_ssh_user', 'dply')));
+
+        if (($deploy !== '' && $lower === $deploy) || ($configured !== '' && $lower === $configured) || $lower === 'dply') {
+            throw new \RuntimeException(__('The deploy user cannot be given FTP access — it would force every dply SSH command into an SFTP session and break deploys. It already supports SFTP using the server\'s SSH key.'));
+        }
+    }
+
+    /**
      * Grants one account access to its scope. Public and idempotent because it
      * is also the repair path: {@see ServerSystemUserService::resetSiteFilePermissions()}
      * runs `find -exec chmod`, which squashes the ACL mask, so it re-runs this
@@ -153,11 +184,17 @@ BASH;
         // deploys: every `releases/<hash>` is a brand-new directory, and the
         // kernel copies the default ACL onto it at creation. Applied to
         // directories only — setfacl rejects a default ACL on a regular file.
+        // Files the FTP account uploads are owned by IT, not by the site's
+        // system user — so without a default ACL for that user the application
+        // (and the next deploy) can find itself unable to write a file a
+        // customer just dragged in. Granted alongside, not instead.
+        $siteUser = escapeshellarg($this->siteSystemUser($account));
+
         return <<<BASH
 set -u
 setfacl -m u:{$u}:--x {$parentQ}
 setfacl -R -m u:{$u}:rwX {$targetQ}
-find {$targetQ} -type d -exec setfacl -m d:u:{$u}:rwX {} +
+find {$targetQ} -type d -exec setfacl -m d:u:{$u}:rwX -m d:u:{$siteUser}:rwX {} +
 mkdir -p {$targetQ}/shared
 setfacl -m u:{$u}:rwX -m d:u:{$u}:rwX {$targetQ}/shared
 mkdir -p {$homeQ}
@@ -189,20 +226,35 @@ BASH;
 
         $report = $step ?? static fn (string $m): null => null;
 
+        $this->assertGrantableUsername($server, $account->username);
+
         $report('checking server prerequisites (acl tools, dply-sftp group, sshd policy)');
         $this->ensureServerPrerequisites($server);
 
-        // Delegates username validation, the deploy-user reservation and the
-        // "already exists on the host" check. nologin + dply-sftp is what makes
-        // the sshd Match block apply.
-        $report('creating linux account '.$account->username.' (nologin, group '.SftpAccount::GROUP.')');
-        $this->systemUsers->createUser(
-            $server,
-            $account->username,
-            grantSudo: false,
-            shell: '/usr/sbin/nologin',
-            extraGroups: [SftpAccount::GROUP],
-        );
+        if ($account->isAdopted()) {
+            // The account already exists. Only add the group — do not touch its
+            // shell, its groups, or its home: it may be a shell user someone
+            // relies on, and joining dply-sftp is already enough for the Match
+            // block to jail its SFTP sessions.
+            $report('adding '.$account->username.' to group '.SftpAccount::GROUP);
+            $this->runPrivileged(
+                $server,
+                'gpasswd -a '.escapeshellarg($account->username).' '.escapeshellarg(SftpAccount::GROUP),
+                120,
+            );
+        } else {
+            // Delegates username validation, the deploy-user reservation and the
+            // "already exists on the host" check. nologin + dply-sftp is what
+            // makes the sshd Match block apply.
+            $report('creating linux account '.$account->username.' (nologin, group '.SftpAccount::GROUP.')');
+            $this->systemUsers->createUser(
+                $server,
+                $account->username,
+                grantSudo: false,
+                shell: '/usr/sbin/nologin',
+                extraGroups: [SftpAccount::GROUP],
+            );
+        }
 
         $report('granting access to '.$this->targetPath($account));
         $this->runPrivileged($server, $this->grantScript($account), 600);
@@ -263,13 +315,33 @@ BASH, 120);
         $parentQ = escapeshellarg(rtrim(dirname($target), '/'));
         $homeQ = escapeshellarg(rtrim($account->home_path, '/'));
 
+        // An adopted account's home predates dply and is not ours to delete —
+        // only the symlink we added into it.
+        $homeCleanup = $account->isAdopted()
+            ? 'rm -f '.escapeshellarg(rtrim($account->home_path, '/').'/'.$this->linkName($account))
+            : 'rm -rf '.$homeQ;
+
         $this->runPrivileged($server, <<<BASH
 set -u
 setfacl -R -x u:{$u} {$targetQ} 2>/dev/null || true
 find {$targetQ} -type d -exec setfacl -x d:u:{$u} {} + 2>/dev/null || true
 setfacl -x u:{$u} {$parentQ} 2>/dev/null || true
-rm -rf {$homeQ}
+{$homeCleanup}
 BASH, 600);
+
+        if ($account->isAdopted()) {
+            // dply did not create this account, so removing FTP access must not
+            // remove the user. Dropping the group is what actually revokes
+            // access: without it the sshd Match block no longer applies.
+            $report('removing '.$account->username.' from group '.SftpAccount::GROUP);
+            $this->runPrivileged(
+                $server,
+                'gpasswd -d '.escapeshellarg($account->username).' '.escapeshellarg(SftpAccount::GROUP).' || true',
+                120,
+            );
+
+            return;
+        }
 
         // Plain userdel, never -r — the home holds symlinks into live site
         // trees. Also re-runs the deletion policy guards.
@@ -292,6 +364,21 @@ BASH, 600);
         $deploy = trim((string) $account->server->ssh_user) ?: 'dply';
 
         return '/home/'.$deploy;
+    }
+
+    /** The account the site's files and PHP-FPM pool run as. */
+    private function siteSystemUser(SftpAccount $account): string
+    {
+        $server = $account->server;
+
+        if ($account->site_id !== null && $account->site !== null) {
+            $user = trim($account->site->effectiveSystemUser($server));
+            if ($user !== '') {
+                return $user;
+            }
+        }
+
+        return trim((string) $server->ssh_user) ?: 'dply';
     }
 
     private function linkName(SftpAccount $account): string
