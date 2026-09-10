@@ -251,3 +251,55 @@ test('an image that is neither pullable nor present fails the start', function (
 
     expect($script())->toContain('image not available');
 });
+
+/**
+ * The worker environment is the site's whole .env — APP_KEY, database password,
+ * every third-party token. A `docker run` argument list is readable with `ps`
+ * by anything else on the host, which on a fleet host is another customer's
+ * worker, so it goes in via a private file instead.
+ */
+test('the environment is passed by file, never on the command line', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec(['env' => ['APP_KEY' => 'base64:secret', 'DB_PASSWORD' => 'hunter2']]));
+
+    $out = $script();
+
+    expect($out)
+        ->toContain('--env-file')
+        ->toContain('install -m 600')
+        ->toContain('DB_PASSWORD=hunter2')
+        ->not->toContain('-e DB_PASSWORD')
+        ->not->toContain("-e 'DB_PASSWORD=hunter2'");
+});
+
+test('the environment file is removed even when the container fails to start', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec());
+
+    $out = $script();
+
+    // Under `set -e` an uncaptured failure would skip the cleanup and leave a
+    // secret-bearing file behind — the one thing that outlives the failure.
+    expect($out)->toContain('DPLY_RUN_RC');
+    expect(strpos($out, 'docker run'))->toBeLessThan(strpos($out, 'rm -f'));
+    expect(strpos($out, 'rm -f'))->toBeLessThan(strpos($out, 'exit "$DPLY_RUN_RC"'));
+});
+
+test('a value that cannot survive the env-file format is dropped, not truncated', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec(['env' => [
+        'GOOD' => 'fine',
+        'BAD KEY' => 'x',
+        'MULTILINE' => "a\nb",
+    ]]));
+
+    $out = $script();
+
+    expect($out)
+        ->toContain('GOOD=fine')
+        ->not->toContain('BAD KEY')
+        ->not->toContain('MULTILINE');
+});

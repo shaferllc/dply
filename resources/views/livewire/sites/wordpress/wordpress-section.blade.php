@@ -1,59 +1,50 @@
-<div class="space-y-6">
-
-    {{-- Identity header for the section: one card, sand strip, no floating hero
-         (the workspace shell no longer renders one for this section either). --}}
+{{-- One merged card, dense head, hairline-separated bodies — the same chrome
+     as System users / Files / FTP accounts. This section previously stacked a
+     floating header card, a floating pill nav and a floating body card with
+     space-y-6 between them, which read as three unrelated panels and used
+     roughly twice the vertical space of every neighbouring surface. --}}
+<div>
     <section class="dply-card min-w-0 overflow-hidden p-0">
         <x-workspace-panel-head
+            dense
             class="border-b border-brand-ink/10"
             icon="heroicon-o-globe-alt"
             :title="__('WordPress')"
             :note="__('Run wp-cli commands, update plugins, themes and core, take database snapshots, switch the cron handler, and apply hardening defaults.')"
         />
-    </section>
 
     @if (! $site->isWordPressDetected())
-        <section class="dply-card overflow-hidden">
-            <div class="px-6 py-6 sm:px-7">
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="px-3 py-2.5 sm:px-4">
                 <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when the site is detected as a WordPress install — either from a wp-config.php in the repo or from a successful WordPress scaffold.') }}</p>
             </div>
-        </section>
+        </div>
     @else
 
-    {{-- Sub-tab nav --}}
-    <nav class="flex flex-wrap items-center gap-1 rounded-2xl border border-brand-ink/10 bg-white p-1 shadow-sm">
-        @foreach ([
-            'console' => ['label' => __('Console'), 'enabled' => true],
-            'plugins' => ['label' => __('Plugins'), 'enabled' => true],
-            'themes' => ['label' => __('Themes'), 'enabled' => true],
-            'users' => ['label' => __('Users'), 'enabled' => true],
-            'core' => ['label' => __('Core'), 'enabled' => true],
-            'database' => ['label' => __('Database'), 'enabled' => true],
-            'cron' => ['label' => __('Cron'), 'enabled' => true],
-            'hardening' => ['label' => __('Hardening'), 'enabled' => true],
-        ] as $key => $meta)
-            <button
-                type="button"
-                wire:click="$set('tab', '{{ $key }}')"
-                @if (! $meta['enabled']) disabled @endif
-                @class([
-                    'rounded-xl px-3 py-1.5 text-sm font-medium transition',
-                    'bg-brand-ink text-brand-cream shadow-sm' => $tab === $key,
-                    'text-brand-moss hover:bg-brand-sand/40' => $tab !== $key && $meta['enabled'],
-                    'cursor-not-allowed text-brand-mist' => ! $meta['enabled'],
-                ])
-            >
-                {{ $meta['label'] }}
-                @if (! $meta['enabled'])
-                    <span class="ml-1 text-3xs uppercase tracking-wide">{{ __('soon') }}</span>
-                @endif
-            </button>
-        @endforeach
-    </nav>
+    {{-- Flush tab strip, not a floating pill bar. --}}
+    <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
+        <x-server-workspace-tablist :aria-label="__('WordPress sections')" scroll bare class="!mb-0 w-full">
+            @foreach ([
+                'console' => ['label' => __('Console'), 'icon' => 'heroicon-o-command-line'],
+                'plugins' => ['label' => __('Plugins'), 'icon' => 'heroicon-o-puzzle-piece'],
+                'themes' => ['label' => __('Themes'), 'icon' => 'heroicon-o-paint-brush'],
+                'users' => ['label' => __('Users'), 'icon' => 'heroicon-o-users'],
+                'core' => ['label' => __('Core'), 'icon' => 'heroicon-o-cube'],
+                'database' => ['label' => __('Database'), 'icon' => 'heroicon-o-circle-stack'],
+                'cron' => ['label' => __('Cron'), 'icon' => 'heroicon-o-clock'],
+                'hardening' => ['label' => __('Hardening'), 'icon' => 'heroicon-o-shield-check'],
+            ] as $key => $meta)
+                <x-server-workspace-tab :icon="$meta['icon']" :active="$tab === $key" wire:click="$set('tab', '{{ $key }}')">
+                    {{ $meta['label'] }}
+                </x-server-workspace-tab>
+            @endforeach
+        </x-server-workspace-tablist>
+    </div>
 
     {{-- CONSOLE --}}
     @if ($tab === 'console')
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                 <x-icon-badge>
                     <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -67,7 +58,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-6 sm:px-7">
+            <div class="px-3 py-2.5 sm:px-4">
             <div class="grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
                 <div>
                     <x-input-label for="wp_command" :value="__('Command')" />
@@ -134,7 +125,7 @@
                 </div>
             @endif
             </div>
-        </section>
+        </div>
     @endif
 
     {{-- CRON --}}
@@ -142,8 +133,8 @@
         @php
             $handler = data_get($site->meta, 'wp_cron.handler', 'wp_cron');
         @endphp
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                 <x-icon-badge>
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -154,7 +145,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-6 sm:px-7">
+            <div class="px-3 py-2.5 sm:px-4">
             <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
                 <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Currently') }}</p>
                 <p class="mt-1 text-base font-semibold text-brand-ink">
@@ -185,7 +176,7 @@
                 <p class="mt-4 text-xs text-brand-moss">{{ __('System cron active — switching back to wp-cron lives in the Hardening tab once it ships.') }}</p>
             @endif
             </div>
-        </section>
+        </div>
     @endif
 
     {{-- PLUGINS --}}
@@ -210,8 +201,8 @@
 
     {{-- DATABASE --}}
     @if ($tab === 'database')
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                 <x-icon-badge>
                     <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -234,7 +225,7 @@
                 </button>
             </div>
 
-            <div class="px-6 py-6 sm:px-7">
+            <div class="px-3 py-2.5 sm:px-4">
             <x-input-error :messages="$errors->get('snapshots')" class="mb-3" />
 
             @if ($snapshots->isEmpty())
@@ -262,7 +253,7 @@
                 </ul>
             @endif
             </div>
-        </section>
+        </div>
     @endif
 
     {{-- HARDENING --}}
@@ -287,8 +278,8 @@
                 ],
             ];
         @endphp
-        <section class="dply-card overflow-hidden">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <div class="border-b border-brand-ink/10 last:border-b-0">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 sm:px-4">
                 <x-icon-badge>
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
@@ -299,7 +290,7 @@
                 </div>
             </div>
 
-            <div class="px-6 py-6 sm:px-7">
+            <div class="px-3 py-2.5 sm:px-4">
             <x-input-error :messages="$errors->get('hardening')" class="mb-3" />
 
             <div class="space-y-3">
@@ -336,7 +327,7 @@
                 @endforeach
             </div>
             </div>
-        </section>
+        </div>
     @endif
 
     <x-cli-snippet :commands="[
@@ -352,4 +343,5 @@
 
     @include('livewire.partials.confirm-action-modal')
     @endif
+    </section>
 </div>

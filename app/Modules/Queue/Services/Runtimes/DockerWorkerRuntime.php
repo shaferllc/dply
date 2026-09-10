@@ -34,6 +34,9 @@ class DockerWorkerRuntime implements WorkerRuntime
     /** Docker's own limit is 1024; below that a busy Laravel app can wedge. */
     private const PIDS_LIMIT = 512;
 
+    /** Heredoc terminator for the env file; must not appear in a value. */
+    private const ENV_EOF = 'DPLY_ENV_EOF';
+
     public function __construct(
         private readonly ExecuteRemoteTaskOnServer $remote,
         private readonly FleetHostAllocator $allocator,
@@ -132,10 +135,12 @@ class DockerWorkerRuntime implements WorkerRuntime
         // at one vCPU; a larger pro worker gets proportionally more.
         $cpus = number_format(max(0.25, $memory / 1024), 2, '.', '');
 
-        $env = [];
-        foreach ($spec->env as $key => $value) {
-            $env[] = '-e '.escapeshellarg($key.'='.$value);
-        }
+        // Passed by file, never as `-e` arguments. The worker environment is the
+        // site's whole .env — APP_KEY, database password, every third-party
+        // token — and a `docker run` argument list is readable with `ps` by
+        // anything else on this host, which on a fleet host is another
+        // customer's worker.
+        $envFile = '/tmp/'.$container.'.env';
 
         $flags = [
             '-d',
@@ -154,7 +159,7 @@ class DockerWorkerRuntime implements WorkerRuntime
             '--network bridge',
             '--tmpfs /tmp:rw,noexec,nosuid,size='.$tmpfs.'m',
             '--restart no',
-            ...$env,
+            '--env-file '.escapeshellarg($envFile),
         ];
 
         $command = sprintf(
@@ -165,13 +170,66 @@ class DockerWorkerRuntime implements WorkerRuntime
 
         return implode("\n", array_filter([
             $this->fetchScript($spec),
+            $this->writeEnvFileScript($spec, $envFile),
+            // The run's status is captured so the env file is removed even when
+            // the container fails to start: `runInlineBash` runs under `set -e`,
+            // and a secret-bearing file left on a shared host is the one piece
+            // of this that outlives the failure.
             sprintf(
-                'docker run %s %s %s',
+                'docker run %s %s %s && DPLY_RUN_RC=0 || DPLY_RUN_RC=$?',
                 implode(' ', $flags),
                 escapeshellarg($spec->image),
                 $command,
             ),
+            sprintf('rm -f %s', escapeshellarg($envFile)),
+            'exit "$DPLY_RUN_RC"',
         ]));
+    }
+
+    /**
+     * Write the environment to a private file on the host.
+     *
+     * A quoted heredoc so nothing in a customer's values is expanded by the
+     * shell on the way in — a password containing `$(` is a password, not a
+     * command. Written 0600 before any content reaches it.
+     *
+     * Docker's env-file format is one `KEY=value` per line and has no escaping,
+     * so a value containing a newline cannot be represented; those are dropped
+     * rather than allowed to truncate the file and silently redefine whatever
+     * key follows.
+     */
+    private function writeEnvFileScript(WorkerSpec $spec, string $envFile): string
+    {
+        $lines = [];
+
+        foreach ($spec->env as $key => $value) {
+            $key = (string) $key;
+            $value = (string) $value;
+
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) !== 1) {
+                continue;
+            }
+
+            if (str_contains($value, "\n") || str_contains($value, "\r")) {
+                continue;
+            }
+
+            // Cannot collide with the heredoc terminator below.
+            if (trim($value) === self::ENV_EOF) {
+                continue;
+            }
+
+            $lines[] = $key.'='.$value;
+        }
+
+        $path = escapeshellarg($envFile);
+
+        return implode("\n", [
+            sprintf('rm -f %s && install -m 600 /dev/null %s', $path, $path),
+            sprintf('cat > %s <<\'%s\'', $path, self::ENV_EOF),
+            ...$lines,
+            self::ENV_EOF,
+        ]);
     }
 
     /**

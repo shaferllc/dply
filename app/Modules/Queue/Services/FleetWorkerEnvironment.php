@@ -4,26 +4,32 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Services;
 
-use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Models\ServiceCredential;
+use App\Models\Site;
 use App\Modules\Queue\Actions\MintQueueCredential;
+use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEndpoint;
-use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
 use RuntimeException;
 
 /**
- * The env a managed worker needs to reach its own queue.
+ * The env a managed worker runs with.
  *
- * Deliberately the same four keys a deployed app receives: a dply-owned
- * worker authenticates over the public SQS-compatible endpoint exactly like
- * a customer's own app would. Giving the managed path a private shortcut
- * into the store would mean the endpoint customers depend on is the one
- * dply itself never exercises.
+ * Two layers. The site's own environment, so the app boots the way it does on
+ * its own box — without it the container claims a job and dies on its first
+ * query. Then the queue wiring on top: the same keys a deployed app receives,
+ * because a dply-owned worker authenticates over the public SQS-compatible
+ * endpoint exactly like a customer's app would. Giving the managed path a
+ * private shortcut into the store would mean the endpoint customers depend on
+ * is the one dply itself never exercises.
  */
 class FleetWorkerEnvironment
 {
+    public function __construct(
+        private readonly DotEnvFileParser $parser,
+    ) {}
+
     /**
      * @return array<string, string>
      *
