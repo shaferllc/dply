@@ -314,7 +314,12 @@
         </div>
     @endif
 
-    <x-cli-snippet :commands="[
+    {{-- Footer strip, matching every other workspace card (see logs.blade.php).
+         Rendered bare, the disclosure sat flush against the card edge with no
+         padding and no top rule — it read as escaping the card rather than
+         closing it. --}}
+    <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-3 py-2.5 sm:px-4">
+        <x-cli-snippet :commands="[
         ['label' => __('Run any wp-cli command'), 'command' => 'dply:wp '.$site->slug.' -- option get blogname'],
         ['label' => __('Switch wp-cron mode'), 'command' => 'dply:wp:cron:switch '.$site->slug.' --to=system'],
         ['label' => __('Search/replace in DB'), 'command' => 'dply:wp:search-replace '.$site->slug.' http://old.example.com https://new.example.com --dry-run'],
@@ -323,7 +328,8 @@
         ['label' => __('Snapshot database'), 'command' => 'dply:snapshot:take '.$site->slug.' --reason=manual'],
         ['label' => __('List snapshots'), 'command' => 'dply:snapshot:list '.$site->slug],
         ['label' => __('Restore from snapshot'), 'command' => 'dply:snapshot:restore SNAPSHOT_ID --no-confirm'],
-    ]" />
+        ]" />
+    </div>
 
     @include('livewire.partials.confirm-action-modal')
     @endif
