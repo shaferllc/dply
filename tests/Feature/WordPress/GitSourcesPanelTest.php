@@ -8,6 +8,7 @@ use App\Jobs\ResetSiteToBlankJob;
 use App\Livewire\Sites\GitSources;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\Settings;
+use App\Livewire\Sites\WordPress\WordPressSection;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -295,4 +296,23 @@ test('a site with no app has nothing to reset', function () {
     // Gates the Danger-section block. Covers both shapes an app can take: a
     // connected repo, or a manage-in-place install with no repo at all.
     expect($component->instance()->siteHasResettableApp())->toBeFalse();
+});
+
+test('the old git-sources url lands on the WordPress Git tab', function () {
+    $user = panelUser();
+    $site = panelSite($user);
+
+    $this->actingAs($user)
+        ->get(route('sites.git-sources', ['server' => $site->server, 'site' => $site]))
+        ->assertRedirect(route('sites.show', ['server' => $site->server, 'site' => $site, 'section' => 'wordpress', 'wp' => 'git']));
+});
+
+test('the WordPress Git tab embeds the git sources panel', function () {
+    $user = panelUser();
+    $site = panelSite($user);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('tab', 'git')
+        ->assertSeeLivewire(GitSources::class);
 });

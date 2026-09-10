@@ -28,6 +28,7 @@
                 'console' => ['label' => __('Console'), 'icon' => 'heroicon-o-command-line'],
                 'plugins' => ['label' => __('Plugins'), 'icon' => 'heroicon-o-puzzle-piece'],
                 'themes' => ['label' => __('Themes'), 'icon' => 'heroicon-o-paint-brush'],
+                'git' => ['label' => __('Git'), 'icon' => 'heroicon-o-code-bracket'],
                 'users' => ['label' => __('Users'), 'icon' => 'heroicon-o-users'],
                 'core' => ['label' => __('Core'), 'icon' => 'heroicon-o-cube'],
                 'database' => ['label' => __('Database'), 'icon' => 'heroicon-o-circle-stack'],
@@ -228,6 +229,12 @@
     @endif
 
     {{-- USERS --}}
+    {{-- Themes & plugins from their own repos — its own component (a separate
+         form and job flow), embedded so the WordPress tabs stay one click away. --}}
+    @if ($tab === 'git')
+        @livewire('sites.git-sources', ['server' => $site->server, 'site' => $site], key('wp-git-sources-'.$site->id))
+    @endif
+
     @if ($tab === 'users')
         @include('livewire.sites.wordpress.partials.users-tab')
     @endif
