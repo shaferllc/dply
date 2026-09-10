@@ -33,19 +33,57 @@ final class QueueEndpoint
             return rtrim($configured, '/');
         }
 
-        // Same reachability rule as the serverless log-ingest URL: a function
-        // on DigitalOcean cannot reach a local *.test address, so an unset
-        // public URL means the feature is simply not offered.
-        $public = trim((string) config('dply.public_app_url', ''));
+        // Then the platform's own public address, then APP_URL — the same
+        // preference order `AcmeDnsHook` and `ValidateWebhookSignature` use.
+        // APP_URL is included because on a real deployment it IS the public
+        // address, and requiring a second variable that merely repeats it meant
+        // the entire managed-queue surface silently vanished in production
+        // while the worker fleets, which resolve through here, worked fine.
+        foreach ([config('dply.public_app_url'), config('app.url')] as $candidate) {
+            $base = self::publiclyReachable((string) $candidate);
 
-        if ($public === '') {
+            if ($base !== '') {
+                return $base.'/api/queue/v1';
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * A URL a customer's server could actually resolve, or ''.
+     *
+     * The reachability rule this class exists for: APP_URL is typically a local
+     * `*.test` in development, and a worker on DigitalOcean cannot reach it. An
+     * endpoint that looks configured but is unroutable is worse than none — it
+     * would be written into a customer's .env and fail on every push — so a
+     * local-looking host resolves to '' and the feature is simply not offered.
+     */
+    private static function publiclyReachable(string $candidate): string
+    {
+        $candidate = trim($candidate);
+
+        if ($candidate === '') {
             return '';
         }
 
-        if (preg_match('~^https?://~i', $public) !== 1) {
-            $public = 'https://'.$public;
+        if (preg_match('~^https?://~i', $candidate) !== 1) {
+            $candidate = 'https://'.$candidate;
         }
 
-        return rtrim($public, '/').'/api/queue/v1';
+        $host = strtolower((string) (parse_url($candidate, PHP_URL_HOST) ?: ''));
+
+        if ($host === '') {
+            return '';
+        }
+
+        $isLocal = $host === 'localhost'
+            || str_ends_with($host, '.test')
+            || str_ends_with($host, '.local')
+            || str_ends_with($host, '.localhost')
+            || filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
+            && filter_var($host, FILTER_VALIDATE_IP) !== false;
+
+        return $isLocal ? '' : rtrim($candidate, '/');
     }
 }
