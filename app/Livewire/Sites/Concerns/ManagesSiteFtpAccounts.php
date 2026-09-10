@@ -7,6 +7,7 @@ namespace App\Livewire\Sites\Concerns;
 use App\Jobs\CreateSftpAccountJob;
 use App\Jobs\DeleteSftpAccountJob;
 use App\Jobs\ResetSftpAccountPasswordJob;
+use App\Models\ConsoleAction;
 use App\Models\SftpAccount;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerSystemUserService;
@@ -70,6 +71,53 @@ trait ManagesSiteFtpAccounts
         return $this->site->deploySyncGroups()->exists();
     }
 
+    /**
+     * The in-flight (or most recent) FTP run for this site, rendered by the
+     * shared console-action banner — which also owns the wire:poll that keeps
+     * this component re-rendering until the run goes terminal. That poll is
+     * what flips an account row from "Provisioning…" to "Active" without a
+     * manual refresh, so the banner is load-bearing, not decoration.
+     */
+    public function ftpConsoleRun(): ?ConsoleAction
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'sftp_account')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
+     * Persist a queued run BEFORE dispatch so the banner is on screen the
+     * instant the operator clicks, rather than appearing on the first poll
+     * after a worker picks the job up.
+     *
+     * Supersedes earlier finished runs for this site so the panel shows one
+     * thing — the run just started — instead of stacking stale banners.
+     */
+    protected function seedFtpConsoleAction(string $label): ConsoleAction
+    {
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'sftp_account')
+            ->whereNull('dismissed_at')
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED])
+            ->update(['dismissed_at' => now()]);
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => 'sftp_account',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => Auth::id(),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+    }
+
     public function openFtpCreateModal(): void
     {
         $this->authorize('update', $this->site);
@@ -121,7 +169,8 @@ trait ManagesSiteFtpAccounts
                 'created_by_user_id' => Auth::id(),
             ]);
 
-            CreateSftpAccountJob::dispatch((string) $account->id, $password, (string) Auth::id());
+            $run = $this->seedFtpConsoleAction(__('Creating FTP account :user …', ['user' => $username]));
+            CreateSftpAccountJob::dispatch((string) $account->id, $password, (string) Auth::id(), (string) $run->id);
 
             // Shown in this response only. The job applies it on the box.
             $this->ftp_revealed_password = $password;
@@ -143,7 +192,8 @@ trait ManagesSiteFtpAccounts
             ->findOrFail($accountId);
 
         $password = SftpAccount::generatePassword();
-        ResetSftpAccountPasswordJob::dispatch((string) $account->id, $password, (string) Auth::id());
+        $run = $this->seedFtpConsoleAction(__('Resetting password for :user …', ['user' => $account->username]));
+        ResetSftpAccountPasswordJob::dispatch((string) $account->id, $password, (string) Auth::id(), (string) $run->id);
 
         $this->ftp_revealed_password = $password;
         $this->ftp_revealed_username = $account->username;
@@ -175,7 +225,8 @@ trait ManagesSiteFtpAccounts
             return;
         }
 
-        DeleteSftpAccountJob::dispatch((string) $account->id, (string) Auth::id());
+        $run = $this->seedFtpConsoleAction(__('Removing FTP account :user …', ['user' => $account->username]));
+        DeleteSftpAccountJob::dispatch((string) $account->id, (string) Auth::id(), (string) $run->id);
         $this->toastSuccess(__('FTP account removal queued.'));
     }
 }

@@ -643,7 +643,7 @@
                                     @endif
                                     <div class="mt-3 flex flex-wrap gap-2">
                                         @if (blank($processMember->provider_id))
-                                            <x-primary-button type="button" wire:click="retryFailedWorkerProvision(@js((string) $processMember->id))">{{ __('Retry install') }}</x-primary-button>
+                                            <x-primary-button type="button" wire:click="retryFailedWorkerProvision({!! \Illuminate\Support\Js::from((string) $processMember->id) !!})">{{ __('Retry install') }}</x-primary-button>
                                         @endif
                                         <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50">{{ __('Open credentials') }}</a>
                                     </div>

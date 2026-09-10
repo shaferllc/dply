@@ -7,16 +7,26 @@ namespace Tests\Feature\Sites;
 use App\Jobs\CreateSftpAccountJob;
 use App\Jobs\DeleteSftpAccountJob;
 use App\Livewire\Sites\Files;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\SftpAccount;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Servers\ServerSshConnectionRunner;
+use App\Services\Servers\ServerSystemUserService;
+use App\Services\Servers\SftpAccountProvisioner;
+use App\Services\SshConnection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Mockery;
 
 uses(RefreshDatabase::class);
+
+afterEach(function () {
+    Mockery::close();
+});
 
 function ftpFixture(): array
 {
@@ -174,4 +184,62 @@ test('the panel renders its create modal and its atomic-deploy warning', functio
         ->call('openFtpCreateModal')
         ->assertSet('showFtpCreateModal', true)
         ->assertSee('Add FTP account');
+});
+
+/**
+ * Provisioning is four SSH round-trips that take real seconds. A queued run must
+ * be on screen before the worker touches it, or the operator clicks and watches
+ * a static "Provisioning…" with no way to tell progress from a wedged queue.
+ */
+test('creating an FTP account seeds a console run the banner can render', function (): void {
+    Queue::fake();
+    [$user, $server, $site] = ftpFixture();
+
+    Livewire::actingAs($user)
+        ->test(Files::class, ['server' => $server, 'site' => $site])
+        ->set('ftp_username', 'designer')
+        ->call('createFtpAccount')
+        ->assertSee('Creating FTP account designer');
+
+    $run = ConsoleAction::query()
+        ->where('subject_id', $site->id)
+        ->where('kind', 'sftp_account')
+        ->firstOrFail();
+
+    expect($run->status)->toBe(ConsoleAction::STATUS_QUEUED);
+
+    // The worker must adopt THAT row, not open a second banner beside it.
+    Queue::assertPushed(
+        CreateSftpAccountJob::class,
+        fn (CreateSftpAccountJob $job): bool => $job->seededConsoleRunId === (string) $run->id,
+    );
+});
+
+/** Each phase reports separately, so a failure names the step it died on. */
+test('provisioning streams a step per phase', function (): void {
+    $server = Server::factory()->ready()->make(['ssh_private_key' => 'k', 'ssh_user' => 'dply']);
+    $account = SftpAccount::factory()->make(['username' => 'designer', 'home_path' => '/home/designer']);
+    $account->setRelation('server', $server);
+
+    $ssh = Mockery::mock(SshConnection::class);
+    $ssh->shouldReceive('exec')->andReturn("ok\nDPLY_EXIT:0");
+
+    $runner = Mockery::mock(ServerSshConnectionRunner::class);
+    $runner->shouldReceive('run')->andReturnUsing(fn ($srv, $cb) => $cb($ssh, 'root'));
+
+    $users = Mockery::mock(ServerSystemUserService::class);
+    $users->shouldReceive('createUser')->once();
+
+    $steps = [];
+    (new SftpAccountProvisioner($runner, $users))
+        ->provision($account, str_repeat('a', 24), function (string $m) use (&$steps): void {
+            $steps[] = $m;
+        });
+
+    expect($steps)->toHaveCount(5)
+        ->and($steps[0])->toContain('prerequisites')
+        ->and($steps[1])->toContain('creating linux account designer')
+        ->and($steps[2])->toContain('granting access to /home/dply')
+        ->and($steps[3])->toContain('password')
+        ->and($steps[4])->toContain('port 22');
 });

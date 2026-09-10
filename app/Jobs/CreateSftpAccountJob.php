@@ -44,6 +44,7 @@ class CreateSftpAccountJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQ
         public string $accountId,
         public string $password,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {
         $this->onQueue('dply-control');
     }
@@ -79,11 +80,18 @@ class CreateSftpAccountJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQ
             return;
         }
 
+        // Pin the worker to the row the UI seeded at dispatch so the banner
+        // the operator is already watching fills in, rather than a second one.
+        $this->bindConsoleRunId($this->seededConsoleRunId);
+
         $emit = $this->beginConsoleAction();
 
         try {
-            $emit->step('sftp_account', 'creating '.$account->username);
-            $provisioner->provision($account, $this->password);
+            $provisioner->provision(
+                $account,
+                $this->password,
+                fn (string $message) => $emit->step('sftp_account', $message),
+            );
 
             $account->update([
                 'status' => SftpAccount::STATUS_ACTIVE,

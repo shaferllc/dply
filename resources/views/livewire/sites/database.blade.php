@@ -516,7 +516,7 @@
                             size="xs"
                             type="button"
                             class="shrink-0"
-                            x-on:click="navigator.clipboard.writeText(@js($share_link_url)); copied = true; setTimeout(() => copied = false, 2000)"
+                            x-on:click="navigator.clipboard.writeText({!! \Illuminate\Support\Js::from($share_link_url) !!}); copied = true; setTimeout(() => copied = false, 2000)"
                         >
                             <span x-show="!copied">{{ __('Copy') }}</span>
                             <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>

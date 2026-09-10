@@ -63,7 +63,7 @@
                     <div class="mt-1 flex items-start gap-2">
                         <code class="min-w-0 flex-1 break-all rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-3 py-2 font-mono text-xs text-brand-ink">{{ $row['value'] }}</code>
                         <x-secondary-button size="xs" type="button" class="shrink-0"
-                            x-on:click="navigator.clipboard.writeText(@js($row['value'])); copied = true; setTimeout(() => copied = false, 2000)">
+                            x-on:click="navigator.clipboard.writeText({!! \Illuminate\Support\Js::from($row['value']) !!}); copied = true; setTimeout(() => copied = false, 2000)">
                             <span x-show="!copied">{{ __('Copy') }}</span>
                             <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                         </x-secondary-button>

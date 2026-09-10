@@ -279,20 +279,20 @@
                         @can('update', $site)
                             @php($isPaused = in_array($queueName, $this->pausedQueues(), true))
                             <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                <x-secondary-button size="xs" type="button" wire:click="inspectQueue(@js($queueName))">{{ __('Inspect') }}</x-secondary-button>
+                                <x-secondary-button size="xs" type="button" wire:click="inspectQueue({!! \Illuminate\Support\Js::from($queueName) !!})">{{ __('Inspect') }}</x-secondary-button>
                                 @if ($isPaused)
                                     {{-- Resume restores the worker's ORIGINAL command, so a
                                          queue that was paused out of a multi-queue worker goes
                                          back with every flag it had. --}}
-                                    <x-secondary-button size="xs" type="button" wire:click="resumeQueue(@js($queueName))">{{ __('Resume') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="resumeQueue({!! \Illuminate\Support\Js::from($queueName) !!})">{{ __('Resume') }}</x-secondary-button>
                                     <span class="text-2xs font-semibold text-amber-800">{{ __('paused — jobs are piling up') }}</span>
                                 @else
-                                    <x-secondary-button size="xs" type="button" wire:click="pauseQueue(@js($queueName))">{{ __('Pause') }}</x-secondary-button>
+                                    <x-secondary-button size="xs" type="button" wire:click="pauseQueue({!! \Illuminate\Support\Js::from($queueName) !!})">{{ __('Pause') }}</x-secondary-button>
                                 @endif
-                                <x-secondary-button size="xs" type="button" wire:click="editAlerts(@js($queueName))">
+                                <x-secondary-button size="xs" type="button" wire:click="editAlerts({!! \Illuminate\Support\Js::from($queueName) !!})">
                                     {{ in_array($queueName, $this->overriddenAlertQueues(), true) ? __('Alerts ·') : __('Alerts') }}
                                 </x-secondary-button>
-                                <x-danger-button size="xs" type="button" wire:click="confirmPurge(@js($queueName))">{{ __('Purge') }}</x-danger-button>
+                                <x-danger-button size="xs" type="button" wire:click="confirmPurge({!! \Illuminate\Support\Js::from($queueName) !!})">{{ __('Purge') }}</x-danger-button>
                             </div>
                         @endcan
                     </li>
@@ -565,8 +565,8 @@
                                     </div>
                                     @can('update', $site)
                                         <div class="flex shrink-0 items-center gap-2">
-                                            <x-secondary-button size="xs" type="button" wire:click="retryFailed(@js($job['uuid']))">{{ __('Retry') }}</x-secondary-button>
-                                            <x-secondary-button size="xs" type="button" wire:click="forgetFailed(@js($job['uuid']))">{{ __('Delete') }}</x-secondary-button>
+                                            <x-secondary-button size="xs" type="button" wire:click="retryFailed({!! \Illuminate\Support\Js::from($job['uuid']) !!})">{{ __('Retry') }}</x-secondary-button>
+                                            <x-secondary-button size="xs" type="button" wire:click="forgetFailed({!! \Illuminate\Support\Js::from($job['uuid']) !!})">{{ __('Delete') }}</x-secondary-button>
                                         </div>
                                     @endcan
                                 </div>
@@ -699,7 +699,7 @@
                         @endif
                     </p>
                     @if ($inspect_queue !== '')
-                        <x-secondary-button size="xs" type="button" wire:click="inspectQueue(@js($inspect_queue))">{{ __('Re-read') }}</x-secondary-button>
+                        <x-secondary-button size="xs" type="button" wire:click="inspectQueue({!! \Illuminate\Support\Js::from($inspect_queue) !!})">{{ __('Re-read') }}</x-secondary-button>
                     @endif
                 </div>
 
@@ -752,7 +752,7 @@
                                             @if ($job->uuid)
                                                 {{-- Arguments are NOT in the list: they are read from
                                                      the box on this click, for this job only. --}}
-                                                <x-secondary-button size="xs" type="button" wire:click="revealPayload(@js($job->uuid))">
+                                                <x-secondary-button size="xs" type="button" wire:click="revealPayload({!! \Illuminate\Support\Js::from($job->uuid) !!})">
                                                     {{ $payload_uuid === $job->uuid ? __('Hide') : __('Payload') }}
                                                 </x-secondary-button>
                                             @endif
@@ -858,7 +858,7 @@
                                             {{-- The confirm lives in the modal below: this runs real
                                                  production work, and the browser's own dialog cannot
                                                  carry the argument field that decision needs. --}}
-                                            <x-secondary-button size="xs" type="button" wire:click="confirmDispatch(@js($job['class']))">
+                                            <x-secondary-button size="xs" type="button" wire:click="confirmDispatch({!! \Illuminate\Support\Js::from($job['class']) !!})">
                                                 {{ $needsArgs ? __('Run…') : __('Run') }}
                                             </x-secondary-button>
                                         @endif
@@ -950,7 +950,7 @@
                     <div class="mt-1.5 flex items-center gap-2" x-data="{ copied: false }">
                         <input type="text" readonly value="{{ $managed_token }}" class="dply-input w-full font-mono text-2xs" />
                         <x-secondary-button size="xs" type="button" class="shrink-0"
-                            x-on:click="navigator.clipboard.writeText(@js($managed_token)); copied = true; setTimeout(() => copied = false, 2000)">
+                            x-on:click="navigator.clipboard.writeText({!! \Illuminate\Support\Js::from($managed_token) !!}); copied = true; setTimeout(() => copied = false, 2000)">
                             <span x-show="!copied">{{ __('Copy') }}</span>
                             <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                         </x-secondary-button>
@@ -1150,7 +1150,7 @@ DPLY_QUEUE_TOKEN=•••</pre>
 
             <div class="mt-5 flex justify-end gap-2">
                 <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-dispatch-confirm')">{{ __('Cancel') }}</x-secondary-button>
-                <x-primary-button size="sm" type="button" wire:click="dispatchTestJob(@js($confirm_class))" wire:loading.attr="disabled">
+                <x-primary-button size="sm" type="button" wire:click="dispatchTestJob({!! \Illuminate\Support\Js::from($confirm_class) !!})" wire:loading.attr="disabled">
                     {{ __('Run it') }}
                 </x-primary-button>
             </div>

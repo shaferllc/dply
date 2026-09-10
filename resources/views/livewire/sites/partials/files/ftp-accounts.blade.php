@@ -15,6 +15,19 @@
         class="border-b border-brand-ink/10"
     />
 
+    {{-- Shared console-action banner: live status, the steps the job streams,
+         and the wire:poll that re-renders this component until the run goes
+         terminal — which is what flips a row from "Provisioning…" to "Active"
+         and surfaces the failure text when provisioning goes wrong. --}}
+    @if ($ftpConsoleRun)
+        <div class="border-b border-brand-ink/10 px-5 py-3 sm:px-6">
+            @include('livewire.partials.console-action-banner-static', [
+                'run' => $ftpConsoleRun,
+                'kindLabels' => (array) config('console_actions.kinds', []),
+            ])
+        </div>
+    @endif
+
     {{-- Reveal-once. Held in a protected property, so it is gone on the next
          interaction and never reaches the DOM snapshot or the database. --}}
     @if ($ftpRevealedPassword)

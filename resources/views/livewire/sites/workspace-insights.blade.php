@@ -153,7 +153,7 @@
                                 @include('livewire.partials.insight-correlation', ['finding' => $f])
                             </div>
                             @if ($canFix)
-                                <x-secondary-button size="sm" type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="shrink-0">
+                                <x-secondary-button size="sm" type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], {!! \Illuminate\Support\Js::from(__('Apply suggested fix')) !!}, {!! \Illuminate\Support\Js::from(__('Apply the suggested fix on the server?')) !!}, {!! \Illuminate\Support\Js::from(__('Apply fix')) !!}, true)" class="shrink-0">
                                     {{ __('Apply fix') }}
                                 </x-secondary-button>
                             @endif

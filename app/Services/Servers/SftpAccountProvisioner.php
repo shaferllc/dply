@@ -171,19 +171,31 @@ BASH;
     /**
      * Creates the Linux account and grants it. Password is applied last so a
      * failed grant never leaves a loginable account with no access.
+     *
+     * Each phase is a separate SSH round-trip that can take real seconds (the
+     * prerequisites step may apt-install acl and reload sshd), so `$step` is
+     * reported per phase rather than once at the top — a single "creating…"
+     * for the whole run tells the operator nothing about where it is or which
+     * part failed.
+     *
+     * @param  ?callable(string): void  $step
      */
-    public function provision(SftpAccount $account, string $password): void
+    public function provision(SftpAccount $account, string $password, ?callable $step = null): void
     {
         $server = $account->server;
         if ($server === null) {
             throw new \RuntimeException(__('Account is not attached to a server.'));
         }
 
+        $report = $step ?? static fn (string $m): null => null;
+
+        $report('checking server prerequisites (acl tools, dply-sftp group, sshd policy)');
         $this->ensureServerPrerequisites($server);
 
         // Delegates username validation, the deploy-user reservation and the
         // "already exists on the host" check. nologin + dply-sftp is what makes
         // the sshd Match block apply.
+        $report('creating linux account '.$account->username.' (nologin, group '.SftpAccount::GROUP.')');
         $this->systemUsers->createUser(
             $server,
             $account->username,
@@ -192,8 +204,13 @@ BASH;
             extraGroups: [SftpAccount::GROUP],
         );
 
+        $report('granting access to '.$this->targetPath($account));
         $this->runPrivileged($server, $this->grantScript($account), 600);
+
+        $report('setting password');
         $this->setPassword($account, $password);
+
+        $report('done — connect over sftp on port 22');
     }
 
     /**
@@ -230,12 +247,15 @@ BASH, 120);
      * Afterwards the entries would linger as bare numeric UIDs, and the next
      * account that reuses that UID would silently inherit access to the site.
      */
-    public function destroy(SftpAccount $account): void
+    public function destroy(SftpAccount $account, ?callable $step = null): void
     {
         $server = $account->server;
         if ($server === null) {
             return;
         }
+
+        $report = $step ?? static fn (string $m): null => null;
+        $report('removing access grants');
 
         $target = $this->targetPath($account);
         $u = escapeshellarg($account->username);
@@ -253,6 +273,7 @@ BASH, 600);
 
         // Plain userdel, never -r — the home holds symlinks into live site
         // trees. Also re-runs the deletion policy guards.
+        $report('deleting linux account '.$account->username);
         $this->systemUsers->deleteUserFromServer($server, $account->username);
     }
 

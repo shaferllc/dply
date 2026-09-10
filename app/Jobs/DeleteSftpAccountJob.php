@@ -39,6 +39,7 @@ class DeleteSftpAccountJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $accountId,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {
         $this->onQueue('dply-control');
     }
@@ -74,12 +75,18 @@ class DeleteSftpAccountJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // Pin the worker to the row the UI seeded at dispatch so the banner
+        // the operator is already watching fills in, rather than a second one.
+        $this->bindConsoleRunId($this->seededConsoleRunId);
+
         $emit = $this->beginConsoleAction();
         $username = $account->username;
 
         try {
-            $emit->step('sftp_account', 'removing '.$username);
-            $provisioner->destroy($account);
+            $provisioner->destroy(
+                $account,
+                fn (string $message) => $emit->step('sftp_account', $message),
+            );
 
             $account->delete();
 

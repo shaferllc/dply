@@ -408,11 +408,11 @@
         <div class="flex justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
             @if (is_array($bi) && filled($bi['id'] ?? null) && method_exists($this, 'openDetachBindingConfirmModal'))
                 @if (! empty($bi['can_delete_resource']) && method_exists($this, 'openDetachAndDeleteBindingConfirmModal'))
-                    <x-danger-button type="button" wire:click="openDetachAndDeleteBindingConfirmModal(@js((string) $bi['id']))">
+                    <x-danger-button type="button" wire:click="openDetachAndDeleteBindingConfirmModal({!! \Illuminate\Support\Js::from((string) $bi['id']) !!})">
                         {{ __('Detach & delete') }}
                     </x-danger-button>
                 @endif
-                <x-secondary-button type="button" wire:click="openDetachBindingConfirmModal(@js((string) $bi['id']))">
+                <x-secondary-button type="button" wire:click="openDetachBindingConfirmModal({!! \Illuminate\Support\Js::from((string) $bi['id']) !!})">
                     {{ __('Detach') }}
                 </x-secondary-button>
             @endif

@@ -39,6 +39,7 @@ class ResetSftpAccountPasswordJob implements ShouldBeEncrypted, ShouldBeUnique, 
         public string $accountId,
         public string $password,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {
         $this->onQueue('dply-control');
     }
@@ -73,6 +74,10 @@ class ResetSftpAccountPasswordJob implements ShouldBeEncrypted, ShouldBeUnique, 
         if (! $account) {
             return;
         }
+
+        // Pin the worker to the row the UI seeded at dispatch so the banner
+        // the operator is already watching fills in, rather than a second one.
+        $this->bindConsoleRunId($this->seededConsoleRunId);
 
         $emit = $this->beginConsoleAction();
 
