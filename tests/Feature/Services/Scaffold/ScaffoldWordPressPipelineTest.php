@@ -86,7 +86,8 @@ test('happy path walks every step', function () {
     expect($result['ok'])->toBeTrue();
 
     $site->refresh();
-    expect($site->status)->toBe(Site::STATUS_PENDING);
+    // Live on completion, not parked at PENDING — which nothing would ever move.
+    expect($site->status)->toBe(Site::activeStatusForWebserver($site->webserver()));
 
     $steps = collect($site->meta['scaffold']['steps']);
 

@@ -2,6 +2,8 @@
 
 namespace App\Services\Servers;
 
+use App\Support\Servers\InstalledStack;
+
 class ServerInventoryProbeScript
 {
     /** Watched systemd units (for the Services tab + Overview). PHP-FPM units discovered separately at runtime. */
@@ -309,7 +311,7 @@ SH;
      * Parse the probe output and merge the extracted state into a fresh meta array.
      * Caller passes existing meta; returns the new meta to persist.
      *
-     * @param  array<string, mixed> $existingMeta
+     * @param  array<string, mixed>  $existingMeta
      * @return array<string, mixed>
      */
     public function parse(string $out, array $existingMeta, int $maxPreviewBytes, int $maxExtBytes): array
@@ -715,7 +717,7 @@ SH;
      * flat-list-of-records ([{name, version, …}, …]) variants mise has emitted
      * across releases.
      *
-     * @param  array<string, mixed> $decoded
+     * @param  array<string, mixed>  $decoded
      * @param  array<string, array{versions: list<string>, active: ?string}>  $shape
      */
     private function ingestMiseLsJson(array $decoded, array &$shape): void
@@ -801,7 +803,7 @@ SH;
      */
     private function refreshInstalledStack(array $meta): array
     {
-        $key = \App\Support\Servers\InstalledStack::META_KEY;
+        $key = InstalledStack::META_KEY;
 
         $existing = is_array($meta[$key] ?? null) ? $meta[$key] : [];
 
@@ -817,8 +819,18 @@ SH;
             $database = 'postgres';
             $databaseVersion = self::versionNumber((string) ($meta['manage_postgres']['version'] ?? ''));
         } elseif ($present('manage_mysql')) {
-            $database = ! empty($meta['manage_mysql']['mariadb_present']) ? 'mariadb' : 'mysql';
-            $databaseVersion = self::versionNumber((string) ($meta['manage_mysql']['version'] ?? ''));
+            $isMariadb = ! empty($meta['manage_mysql']['mariadb_present']);
+            $database = $isMariadb ? 'mariadb' : 'mysql';
+
+            // Prefer `mariadb --version` on a MariaDB box. The `mysql` binary
+            // there is a compat shim whose output leads with the CLIENT
+            // protocol version, and reading it is half of why a MariaDB 11.4
+            // server got reported as "15.1".
+            $raw = $isMariadb
+                ? (string) ($meta['manage_mysql']['mariadb_version'] ?? $meta['manage_mysql']['version'] ?? '')
+                : (string) ($meta['manage_mysql']['version'] ?? '');
+
+            $databaseVersion = self::databaseVersionNumber($raw);
         } elseif ($present('manage_sqlite')) {
             $database = 'sqlite3';
             $databaseVersion = self::versionNumber((string) ($meta['manage_sqlite']['version'] ?? ''));
@@ -870,5 +882,39 @@ SH;
     private static function versionNumber(string $raw): ?string
     {
         return preg_match('/(\d+(?:\.\d+)+)/', $raw, $m) === 1 ? $m[1] : null;
+    }
+
+    /**
+     * Server version out of a MySQL/MariaDB client banner.
+     *
+     * "First number in the string" is wrong for MariaDB, whose clients lead
+     * with their own protocol version:
+     *
+     *   mysql    Ver 15.1 Distrib 10.11.14-MariaDB, for debian-linux-gnu
+     *   mariadb  Ver 15.1 Distrib 11.4.8-MariaDB, for debian-linux-gnu
+     *
+     * Taking the first match yields 15.1 in both cases, which is not a MariaDB
+     * release at all — and the requested-vs-installed banner then reported a
+     * correctly provisioned 11.4 server as "mariadb 15.1".
+     *
+     * MariaDB 11.4+ also ships a second banner shape with no `Distrib` at all:
+     *
+     *   mariadb from 11.4.8-MariaDB, client 15.2 for debian-linux-gnu
+     *
+     * So: prefer the version after `Distrib`, then the `<client> from <version>`
+     * form, and only fall back to the first-number rule — which stays correct
+     * for MySQL ("mysql Ver 8.0.39 for Linux") and Postgres.
+     */
+    private static function databaseVersionNumber(string $raw): ?string
+    {
+        if (preg_match('/\bDistrib\s+(\d+(?:\.\d+)+)/i', $raw, $m) === 1) {
+            return $m[1];
+        }
+
+        if (preg_match('/\bfrom\s+(\d+(?:\.\d+)+)/i', $raw, $m) === 1) {
+            return $m[1];
+        }
+
+        return self::versionNumber($raw);
     }
 }

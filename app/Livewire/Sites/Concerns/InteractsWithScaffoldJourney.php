@@ -191,7 +191,15 @@ trait InteractsWithScaffoldJourney
 
     private function scaffoldIsCompleted(): bool
     {
-        return $this->site->status === Site::STATUS_PENDING
+        // PENDING is where the Laravel/Composer pipelines park a finished
+        // scaffold (their apps still need a first deploy). WordPress ends at the
+        // webserver's active status because it is live on completion. This flag
+        // gates the one-time admin password reveal, so matching PENDING alone
+        // would hide the password from every finished WordPress install.
+        $finished = $this->site->status === Site::STATUS_PENDING
+            || in_array($this->site->status, Site::webserverActiveStatuses(), true);
+
+        return $finished
             && collect($this->scaffoldSteps())->every(fn ($s) => ($s['state'] ?? null) === ScaffoldStep::STATE_COMPLETED);
     }
 

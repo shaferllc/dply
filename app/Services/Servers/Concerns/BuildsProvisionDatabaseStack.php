@@ -271,8 +271,20 @@ trait BuildsProvisionDatabaseStack
                 // drift banner — i.e. it would hide exactly the mismatch this
                 // probe exists to surface.
                 '  mariadb*)',
-                '    DPLY_INSTALLED_DATABASE_VERSION=$( (mariadb --version 2>/dev/null || mysqladmin --version 2>/dev/null) \\',
-                '      | sed -n \'s/.*Distrib \([0-9.]*\).*/\1/p\' | head -n1)',
+                // Two banner shapes, and neither yields to "first number in the
+                // line" — MariaDB clients lead with their own protocol version:
+                //   mariadb  Ver 15.1 Distrib 11.4.8-MariaDB, for ...
+                //   mariadb from 11.4.8-MariaDB, client 15.2 for ...
+                // Reading 15.1 is what made a correct 11.4 box report as 15.1.
+                // Try Distrib first, then the `from <version>` form.
+                '    DPLY_MARIADB_BANNER=$( (mariadb --version 2>/dev/null || mysqladmin --version 2>/dev/null) | head -n1)',
+                '    DPLY_INSTALLED_DATABASE_VERSION=$(printf \'%s\' "$DPLY_MARIADB_BANNER" \\',
+                '      | sed -n \'s/.*Distrib \([0-9.][0-9.]*\).*/\1/p\' | head -n1)',
+                '    if [ -z "$DPLY_INSTALLED_DATABASE_VERSION" ]; then',
+                '      DPLY_INSTALLED_DATABASE_VERSION=$(printf \'%s\' "$DPLY_MARIADB_BANNER" \\',
+                '        | sed -n \'s/.*[Ff]rom \([0-9.][0-9.]*\).*/\1/p\' | head -n1)',
+                '    fi',
+                '    DPLY_INSTALLED_DATABASE_VERSION=${DPLY_INSTALLED_DATABASE_VERSION%.}',
                 '    ;;',
                 '  mysql*)',
                 '    DPLY_INSTALLED_DATABASE_VERSION=$(mysqladmin --version 2>/dev/null \\',

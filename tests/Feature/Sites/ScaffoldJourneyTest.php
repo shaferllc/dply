@@ -215,6 +215,25 @@ test('completed state renders password reveal', function () {
 
     expect(json_encode($component->instance()->all()))->not->toContain('hunter2!hunter2');
 });
+/**
+ * A finished WordPress install now ends at the webserver's active status, not
+ * PENDING. scaffoldIsCompleted() used to match PENDING only, so the one-time
+ * admin password reveal would have vanished from every live WordPress site.
+ */
+test('completed state renders password reveal on a live site', function () {
+    [$user, $server, $site] = makeSite(Site::STATUS_NGINX_ACTIVE, [
+        'admin_password' => encrypt('hunter2!hunter2'),
+        'steps' => [
+            ['key' => 'prereqs', 'state' => ScaffoldStep::STATE_COMPLETED],
+            ['key' => 'db_create', 'state' => ScaffoldStep::STATE_COMPLETED],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Install complete')
+        ->assertSee('Reveal password');
+});
 test('member role cannot reveal password', function () {
     [$user, $server, $site] = makeSite(Site::STATUS_PENDING, [
         'admin_password' => encrypt('not-for-members'),

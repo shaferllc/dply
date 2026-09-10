@@ -105,7 +105,21 @@ class ScaffoldWordPressPipeline
             }
         }
 
-        $site->status = Site::STATUS_PENDING;
+        // A classic WordPress install is served the moment wp core install
+        // returns: the vhost root IS the install directory, and nothing ever
+        // "deploys" a manage-in-place site. Ending at PENDING — "app chosen,
+        // provisioning queued" — parked every finished install there for good,
+        // because the only things that flip a site active are a deploy, a
+        // webserver switch, or a headless provision. Same self-heal rule as
+        // RunSiteDeploymentJob: move to the webserver's active status unless
+        // the site already holds a healthy one.
+        //
+        // The Laravel and Composer pipelines deliberately stay at PENDING: their
+        // apps are not served until a first deploy wires them up.
+        $site = $site->fresh() ?? $site;
+        if (! in_array($site->status, Site::webserverActiveStatuses(), true)) {
+            $site->status = Site::activeStatusForWebserver($site->webserver());
+        }
         $site->save();
 
         $this->audit->record(

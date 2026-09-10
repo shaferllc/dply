@@ -43,7 +43,14 @@ class FleetWorkerEnvironment
             throw new RuntimeException('Fleet '.$fleet->id.' has no namespace.');
         }
 
-        $endpoint = QueueEndpoint::forNamespace($namespace);
+        // The API base, NOT the per-namespace URL. The agent posts to
+        // `$url . '/' . $queue` and identifies the namespace by its bearer
+        // token, so a URL carrying the namespace id produces
+        // `/api/queue/v1/<namespace>/<queue>` — two segments where the route
+        // takes one. It does not 404 loudly either: the worker just polls a
+        // path that never returns messages and drains nothing, silently.
+        // ManagedQueueConnector writes the base for exactly this reason.
+        $endpoint = QueueEndpoint::base();
 
         if ($endpoint === '') {
             // A worker with no endpoint would boot, fail every claim, and look
@@ -62,7 +69,23 @@ class FleetWorkerEnvironment
         // same environment the site's own workers run with.
         return array_merge($this->siteEnvironment($namespace), [
             'QUEUE_CONNECTION' => 'dply',
+            // Failures go where the jobs go — the same line
+            // ManagedQueueConnector writes into a deployed site's .env. Without
+            // it Laravel falls back to the `database` failed-job driver, so a
+            // worker whose app cannot reach a database dies on the FIRST failed
+            // job instead of recording it, and any failure that does record
+            // lands somewhere the dply Failed jobs tab cannot read.
+            'QUEUE_FAILED_DRIVER' => 'dply',
             'DPLY_QUEUE_URL' => $endpoint,
+            // The name the agent package actually reads, and the same one
+            // ManagedQueueConnector writes into a deployed site's .env. Without
+            // it the provider still registers the connection — it only checks
+            // DPLY_QUEUE_URL — and then authenticates with an empty token, so
+            // the worker runs, logs nothing, and drains nothing. A silent
+            // no-op is the worst shape this failure could have taken.
+            'DPLY_QUEUE_TOKEN' => $credential['secret'],
+            // Kept for the SigV4 surface: the SQS-compatible endpoint signs
+            // with a key/secret pair rather than a bearer token.
             'DPLY_QUEUE_KEY' => $credential['access_key_id'],
             'DPLY_QUEUE_SECRET' => $credential['secret'],
         ]);

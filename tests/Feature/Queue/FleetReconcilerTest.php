@@ -206,8 +206,17 @@ test('workers are handed the namespace endpoint and a live credential', function
 
     $env = app(FleetWorkerEnvironment::class)->for($this->fleet->fresh());
 
+    // The API BASE, not the per-namespace URL: the agent posts to
+    // `$url . '/' . $queue` and identifies the namespace by its bearer token,
+    // so a URL carrying the namespace id yields two path segments where the
+    // route takes one — and the worker then polls a path that never returns
+    // messages, silently. ManagedQueueConnector writes the base for a deployed
+    // site; these two must not disagree.
     expect($env['QUEUE_CONNECTION'])->toBe('dply')
-        ->and($env['DPLY_QUEUE_URL'])->toBe('https://queue.dply.test/api/queue/v1/'.$this->namespace->id)
+        ->and($env['DPLY_QUEUE_URL'])->toBe('https://queue.dply.test/api/queue/v1')
+        ->and($env['QUEUE_FAILED_DRIVER'])->toBe('dply')
+        // The name the agent package actually reads.
+        ->and($env['DPLY_QUEUE_TOKEN'])->not->toBe('')
         ->and($env['DPLY_QUEUE_KEY'])->not->toBe('')
         ->and($env['DPLY_QUEUE_SECRET'])->not->toBe('');
 });
