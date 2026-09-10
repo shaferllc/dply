@@ -18,6 +18,34 @@ use Illuminate\Support\Facades\Gate;
  */
 trait ManagesSiteAppReset
 {
+    /**
+     * Confirmation step, using the same in-app modal every other danger action
+     * uses rather than `wire:confirm`.
+     *
+     * The native dialog was wrong twice over: unstyled browser chrome in the
+     * middle of a designed danger zone, and routing the copy through an HTML
+     * attribute double-escaped the apostrophe — the operator was asked to wipe
+     * "this site&#039;s application".
+     */
+    public function confirmResetSiteApp(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'resetSiteApp',
+            [],
+            __('Reset app and start over'),
+            __('Wipes the deployed application and its env from the server, then reopens the app picker. The server, domains, testing URL, certificates and resource bindings are kept.'),
+            __('Reset app'),
+            true,
+            null,
+            null,
+            '',
+            false,
+            __('This cannot be undone.'),
+        );
+    }
+
     public function resetSiteApp(ResetSiteApp $reset): void
     {
         Gate::authorize('update', $this->site);

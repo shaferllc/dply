@@ -69,9 +69,11 @@
                 @can('update', $site)
                     <x-spinner-button
                         variant="danger"
-                        wire:click="resetSiteApp"
-                        wire:target="resetSiteApp"
-                        wire:confirm="{{ __('Wipe this site\'s application and pick again? Domains, certificates and bindings are kept. This cannot be undone.') }}"
+                        {{-- Confirms through the shared danger modal, as Suspend
+                             and Delete do. wire:confirm rendered raw browser
+                             chrome, and double-escaped the apostrophe in its copy. --}}
+                        wire:click="confirmResetSiteApp"
+                        wire:target="confirmResetSiteApp"
                         class="shrink-0"
                     >
                         {{ __('Reset app') }}
