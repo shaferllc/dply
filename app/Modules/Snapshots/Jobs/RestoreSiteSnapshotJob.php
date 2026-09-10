@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Snapshots\Jobs;
 
-use App\Modules\Snapshots\Console\SnapshotRestoreCommand;
 use App\Models\Snapshot;
+use App\Modules\Snapshots\Console\SnapshotRestoreCommand;
 use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
 use App\Modules\Snapshots\Services\SnapshotService;
 use Illuminate\Contracts\Queue\ShouldQueue;

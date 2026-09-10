@@ -107,7 +107,7 @@ class S3Destination implements SnapshotDestination
         return $snapshot;
     }
 
-    public function restore(Snapshot $snapshot): void
+    public function restore(Snapshot $snapshot, string $sink): void
     {
         if ($snapshot->s3_bucket === null || $snapshot->s3_key === null) {
             throw new \RuntimeException('Snapshot has no S3 location — cannot restore from S3.');
@@ -123,13 +123,10 @@ class S3Destination implements SnapshotDestination
         $presignedUrl = (string) $getRequest->getUri();
 
         // Stream the dump back through gunzip into the live DB. We use
-        // --fail-with-body to surface 4xx/5xx as a non-zero exit,
-        // | gunzip -c to decompress, then pipe to the right client
-        // per engine.
-        $restorePipe = match ($snapshot->engine) {
-            'postgres', 'postgres17', 'postgres18' => '| gunzip -c | psql',
-            default => '| gunzip -c | mysql',
-        };
+        // --fail-with-body to surface 4xx/5xx as a non-zero exit, then
+        // pipe into the sink — the authenticated client aimed at the
+        // site's database, built by SnapshotService.
+        $restorePipe = '| gunzip -c | '.$sink;
 
         $cmd = sprintf(
             'curl --silent --show-error --fail-with-body %s %s',

@@ -130,46 +130,51 @@
     {{-- CRON --}}
     @if ($tab === 'cron')
         @php
-            $handler = data_get($site->meta, 'wp_cron.handler', 'wp_cron');
+            $cronState = (array) data_get($site->meta, 'wp_cron', []);
+            $handler = $cronState['handler'] ?? 'wp_cron';
+            $switchingTo = $cronState['switching_to'] ?? null;
+            $cronError = $cronState['error'] ?? null;
         @endphp
-        <div class="border-b border-brand-ink/10 last:border-b-0">
-            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
+        <div class="border-b border-brand-ink/10 last:border-b-0" @if ($switchingTo) wire:poll.5s @endif>
+            <div class="flex flex-wrap items-start justify-between gap-3 bg-brand-sand/[0.18] px-3 py-2.5 sm:px-4">
                 <div class="min-w-0">
                     <h3 class="text-sm font-semibold text-brand-ink">{{ __('Cron handler') }}</h3>
-                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on every page load — fine for low-traffic sites, awful for performance once you grow. Switch to system cron and dply runs `wp cron event run --due-now` every minute via a real crontab entry.') }}</p>
+                    <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-brand-moss">{{ __('WordPress\'s built-in wp-cron runs on page loads — fine for quiet sites, unreliable and slow once you grow. System cron runs `wp cron event run --due-now` every minute from a real crontab entry instead.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span @class([
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1',
+                        'bg-emerald-50 text-emerald-800 ring-emerald-200' => $handler === 'system_cron' && ! $switchingTo,
+                        'bg-brand-sand/40 text-brand-ink ring-brand-ink/10' => $handler !== 'system_cron' && ! $switchingTo,
+                        'bg-amber-50 text-amber-800 ring-amber-200' => (bool) $switchingTo,
+                    ])>
+                        @if ($switchingTo)
+                            <x-spinner size="sm" /> {{ __('switching…') }}
+                        @else
+                            {{ $handler === 'system_cron' ? __('system cron') : __('wp-cron (HTTP)') }}
+                        @endif
+                    </span>
+                    @unless ($switchingTo)
+                        @if ($handler === 'system_cron')
+                            <x-spinner-button size="xs" variant="secondary" type="button" target="switchToWpCron" wire:click="switchToWpCron">{{ __('Switch back to wp-cron') }}</x-spinner-button>
+                        @else
+                            <x-spinner-button size="xs" variant="primary" type="button" icon="heroicon-o-bolt" target="switchToSystemCron" wire:click="switchToSystemCron">{{ __('Switch to system cron') }}</x-spinner-button>
+                        @endif
+                    @endunless
                 </div>
             </div>
-
-            <div class="px-3 py-2.5 sm:px-4">
-            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Currently') }}</p>
-                <p class="mt-1 text-base font-semibold text-brand-ink">
+            <div class="px-3 py-2 sm:px-4">
+                <p class="text-xs text-brand-moss">
                     @if ($handler === 'system_cron')
-                        {{ __('System cron (recommended)') }}
+                        {{ __('System cron (recommended) — a managed crontab entry runs due events every minute; wp-cron is disabled.') }}
                     @else
-                        {{ __('wp-cron via HTTP (default)') }}
+                        {{ __('wp-cron via HTTP (default) — events run when someone visits the site.') }}
                     @endif
                 </p>
-            </div>
-
-            @if ($handler !== 'system_cron')
-                <div class="mt-5">
-                    <button
-                        type="button"
-                        wire:click="switchToSystemCron"
-                        wire:loading.attr="disabled"
-                        wire:target="switchToSystemCron"
-                        class="inline-flex h-10 items-center gap-2 rounded-xl bg-brand-ink px-5 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
-                    >
-                        <x-heroicon-o-bolt class="h-4 w-4" />
-                        <span wire:loading.remove wire:target="switchToSystemCron">{{ __('Switch to system cron') }}</span>
-                        <span wire:loading wire:target="switchToSystemCron">{{ __('Switching…') }}</span>
-                    </button>
-                    <x-input-error :messages="$errors->get('cron')" class="mt-2" />
-                </div>
-            @else
-                <p class="mt-4 text-xs text-brand-moss">{{ __('System cron active — switching back to wp-cron lives in the Hardening tab once it ships.') }}</p>
-            @endif
+                @if ($cronError)
+                    <p class="mt-1.5 rounded bg-rose-50 px-2 py-1 text-xs text-rose-800">{{ __('Last switch failed: :err', ['err' => $cronError]) }}</p>
+                @endif
+                <x-input-error :messages="$errors->get('cron')" class="mt-1.5" />
             </div>
         </div>
     @endif

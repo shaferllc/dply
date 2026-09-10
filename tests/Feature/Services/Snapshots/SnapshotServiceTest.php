@@ -10,11 +10,11 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
 use App\Models\User;
-use App\Modules\TaskRunner\ProcessOutput;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Modules\Snapshots\Services\LocalDiskDestination;
 use App\Modules\Snapshots\Services\SnapshotService;
+use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 
@@ -161,7 +161,8 @@ test('restore runs gunzip pipe and audits destructive action', function () {
         ->withArgs(function ($s, string $name, string $bash) {
             expect($name)->toBe('snapshot:local-restore');
             $this->assertStringContainsString('gunzip', $bash);
-            $this->assertStringContainsString('| mysql', $bash);
+            // Aimed at the site's database — the dump itself names none.
+            $this->assertStringContainsString("mysql 'dply_shopco_custom'", $bash);
 
             return true;
         })
@@ -173,4 +174,48 @@ test('restore runs gunzip pipe and audits destructive action', function () {
     $event = SiteAuditEvent::query()->where('action', 'snapshot_restored')->sole();
     expect($event->payload['snapshot_id'])->toBe($snapshot->id);
     expect($event->risk->value)->toBe('destructive');
+});
+
+test('a failed local restore throws and is audited as a failure', function () {
+    $site = makeSite();
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->once()->andReturn(new ProcessOutput('ERROR 1046 (3D000): No database selected', 1, false));
+
+    $snapshot = Snapshot::factory()->create([
+        'site_id' => $site->id,
+        'destination' => Snapshot::DESTINATION_LOCAL_DISK,
+        'local_path' => '/home/dply/snapshots/shopco/abcd.sql.gz',
+        'engine' => 'mysql84',
+    ]);
+
+    $service = new SnapshotService($executor, app(SiteAuditWriter::class));
+
+    expect(fn () => $service->restore($snapshot, new LocalDiskDestination($executor)))->toThrow(\RuntimeException::class);
+    expect(SiteAuditEvent::query()->where('action', 'snapshot_restored')->count())->toBe(0)
+        ->and(SiteAuditEvent::query()->where('action', 'snapshot_restore_failed')->count())->toBe(1);
+});
+
+test('a postgres restore runs as the database owner and stops on the first error', function () {
+    $site = makeSite(serverEngine: 'postgres17');
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')
+        ->once()
+        ->withArgs(function ($s, string $name, string $bash) {
+            $this->assertStringContainsString('SET ROLE', $bash);
+            $this->assertStringContainsString('ON_ERROR_STOP=1 --single-transaction', $bash);
+            $this->assertStringContainsString("-d 'dply_shopco_custom'", $bash);
+            $this->assertStringContainsString('sudo -u postgres psql', $bash);
+
+            return true;
+        })
+        ->andReturn(new ProcessOutput('', 0, false));
+
+    $snapshot = Snapshot::factory()->create([
+        'site_id' => $site->id,
+        'destination' => Snapshot::DESTINATION_LOCAL_DISK,
+        'local_path' => '/home/dply/snapshots/shopco/abcd.sql.gz',
+        'engine' => 'postgres17',
+    ]);
+
+    (new SnapshotService($executor, app(SiteAuditWriter::class)))->restore($snapshot, new LocalDiskDestination($executor));
 });

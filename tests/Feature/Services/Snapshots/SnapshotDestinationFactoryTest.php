@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Services\Snapshots\SnapshotDestinationFactoryTest;
 
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Modules\Snapshots\Services\LocalDiskDestination;
 use App\Modules\Snapshots\Services\S3Destination;
 use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Mockery;
 
 afterEach(function () {

@@ -8,10 +8,11 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
 use App\Models\User;
-use App\Notifications\SnapshotStatusNotification;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
+use App\Notifications\SnapshotStatusNotification;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -33,10 +34,18 @@ use Throwable;
  */
 class SnapshotService
 {
+    private const POSTGRES_ENGINES = ['postgres', 'postgres17', 'postgres18'];
+
     public function __construct(
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
+        private readonly ?ServerDatabaseRemoteExec $databases = null,
     ) {}
+
+    private function databases(): ServerDatabaseRemoteExec
+    {
+        return $this->databases ?? app(ServerDatabaseRemoteExec::class);
+    }
 
     /**
      * Take a snapshot. The destination decides where it lands.
@@ -51,7 +60,7 @@ class SnapshotService
         $tmpPath = sprintf('/tmp/dply-snapshot-%s-%s.sql.gz', $site->slug, Str::random(8));
         $dbName = $this->databaseNameFor($site);
 
-        $dumpCmd = $this->buildDumpCommand($engine, $dbName, $tmpPath);
+        $dumpCmd = $this->buildDumpCommand($site, $engine, $dbName, $tmpPath);
 
         // Create the row up front in 'pending' so the Snapshots → Databases tab
         // shows the snapshot the instant it's queued and polls it to completion,
@@ -191,8 +200,17 @@ class SnapshotService
      */
     public function restore(Snapshot $snapshot, SnapshotDestination $destination, ?string $userId = null): void
     {
+        $site = $snapshot->site;
+
         try {
-            $destination->restore($snapshot);
+            // The dump names no database (no USE / \connect), so the restore
+            // must aim at the site's database itself — the same name it was
+            // dumped from. Before, both destinations piped into a bare client.
+            $destination->restore($snapshot, $this->restoreSink(
+                $site,
+                (string) ($snapshot->engine ?: $this->engineFor($site)),
+                $this->databaseNameFor($site),
+            ));
         } catch (Throwable $e) {
             $this->audit->record(
                 site: $snapshot->site,
@@ -224,26 +242,59 @@ class SnapshotService
      * --quick / --routines flags so callers don't get bitten by MyISAM
      * locks (mysqldump) or transaction-boundary issues (pg_dump).
      */
-    private function buildDumpCommand(string $engine, string $dbName, string $outputPath): string
+    private function buildDumpCommand(Site $site, string $engine, string $dbName, string $outputPath): string
     {
         $escapedDb = escapeshellarg($dbName);
         $escapedOut = escapeshellarg($outputPath);
 
-        return match ($engine) {
-            'postgres', 'postgres17', 'postgres18' => sprintf(
-                'pg_dump --no-owner --no-privileges --quote-all-identifiers --format=plain %s | gzip > %s',
+        // Admin-authenticated, as the backup exporter is: a bare mysqldump /
+        // pg_dump ran as the SSH user with no credentials at all.
+        return in_array($engine, self::POSTGRES_ENGINES, true)
+            ? sprintf(
+                // --clean --if-exists: a restore replaces existing objects
+                // instead of failing on "already exists".
+                '%s --no-owner --no-privileges --clean --if-exists --quote-all-identifiers --format=plain %s | gzip > %s',
+                $this->databases()->adminClient($site->server, 'pg_dump'),
                 $escapedDb,
                 $escapedOut,
-            ),
-            default => sprintf(
+            )
+            : sprintf(
                 // --single-transaction: consistent on InnoDB; --quick: stream
                 // huge tables instead of buffering; --routines + --triggers:
                 // capture the schema people forget to back up.
-                'mysqldump --single-transaction --quick --routines --triggers %s | gzip > %s',
+                '%s --single-transaction --quick --routines --triggers %s | gzip > %s',
+                $this->databases()->adminClient($site->server, 'mysqldump'),
                 $escapedDb,
                 $escapedOut,
-            ),
-        };
+            );
+    }
+
+    /**
+     * The shell command a destination pipes the decompressed dump into.
+     *
+     * Postgres dumps are --no-owner: restored as the superuser, every table
+     * would belong to postgres and the app's own role would lose access. So the
+     * restore SET ROLEs to the database's owner first, and runs in one
+     * transaction with ON_ERROR_STOP — a failure rolls back instead of leaving
+     * a half-restored database. (Snapshots taken before --clean was added fail
+     * that way on a populated database rather than merging into it.)
+     */
+    private function restoreSink(Site $site, string $engine, string $dbName): string
+    {
+        $db = escapeshellarg($dbName);
+
+        if (in_array($engine, self::POSTGRES_ENGINES, true)) {
+            $psql = $this->databases()->adminClient($site->server, 'psql');
+
+            return sprintf(
+                '( owner=$(%1$s -d %2$s -tAc %3$s); { printf \'SET ROLE "%%s";\n\' "$owner"; cat; } | %1$s -v ON_ERROR_STOP=1 --single-transaction -d %2$s )',
+                $psql,
+                $db,
+                escapeshellarg('SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database()'),
+            );
+        }
+
+        return $this->databases()->adminClient($site->server, 'mysql').' '.$db;
     }
 
     private function engineFor(Site $site): string

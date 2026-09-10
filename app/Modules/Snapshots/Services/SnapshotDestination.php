@@ -42,6 +42,11 @@ interface SnapshotDestination
      * Stream the snapshot back into the live database. Idempotent in
      * the sense that the same Snapshot row can drive multiple restores
      * (the operator might roll back, then forward, then back again).
+     *
+     * @param  string  $sink  shell command the decompressed dump is piped into —
+     *                        the engine client, authenticated and aimed at the
+     *                        site's database ({@see SnapshotService::restore()}).
+     *                        Engine and auth live there; destinations only stream.
      */
-    public function restore(Snapshot $snapshot): void;
+    public function restore(Snapshot $snapshot, string $sink): void;
 }

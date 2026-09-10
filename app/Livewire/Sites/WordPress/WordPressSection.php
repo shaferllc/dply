@@ -15,6 +15,7 @@ use App\Modules\RemoteCli\Services\RemoteCliPermissions;
 use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\WpCli;
 use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
+use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
@@ -329,27 +330,44 @@ class WordPressSection extends Component
      * delete-the-crontab + wp config delete; left to PR 10's hardening
      * tab to expose as a toggle.
      */
-    public function switchToSystemCron(WpCli $wpcli): void
+    public function switchToSystemCron(): void
+    {
+        $this->switchCronHandler('system');
+    }
+
+    public function switchToWpCron(): void
+    {
+        $this->switchCronHandler('wp-cron');
+    }
+
+    /**
+     * Queued: installing the crontab entry is SSH work, and the job orders the
+     * entry and DISABLE_WP_CRON so the site is never left with neither.
+     */
+    private function switchCronHandler(string $to): void
     {
         $this->authorize('update', $this->site);
 
-        try {
-            $wpcli->run(
-                site: $this->site,
-                command: 'config set',
-                args: ['DISABLE_WP_CRON', 'true', '--raw', '--type=constant'],
-                queuedBy: auth()->user(),
-            );
-        } catch (RemoteCliPermissionDeniedException $e) {
+        // `config set` / `config delete` run at the Destructive tier.
+        if (! $this->canDestroyHere()) {
             $this->addError('cron', __('Admin or owner role required to switch cron handler.'));
 
             return;
         }
+        if ($this->site->server === null) {
+            return;
+        }
+
+        SwitchWordPressCronHandlerJob::dispatch((string) $this->site->id, $to, (string) auth()->id());
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['wp_cron'] = ['handler' => 'system_cron', 'switched_at' => now()->toISOString()];
+        $meta['wp_cron'] = array_merge(is_array($meta['wp_cron'] ?? null) ? $meta['wp_cron'] : [], ['switching_to' => $to, 'error' => null]);
         $this->site->meta = $meta;
         $this->site->save();
+
+        $this->toastSuccess($to === 'system'
+            ? __('Switching to system cron — installing the crontab entry first.')
+            : __('Switching back to wp-cron.'));
     }
 
     /**

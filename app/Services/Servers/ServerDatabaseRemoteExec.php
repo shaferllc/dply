@@ -748,6 +748,36 @@ BASH;
     }
 
     /**
+     * Admin-authenticated client invocation for a local engine binary, with the
+     * same auth the dump helpers here use: MySQL via the stored root credential,
+     * else `sudo` (root over the unix socket); Postgres via `sudo -u postgres`
+     * or the stored superuser over 127.0.0.1. Returns a command prefix — the
+     * caller appends arguments. Like {@see mysqldumpAdminToPath()}, a stored
+     * password rides in the env of an inline script that is not persisted.
+     */
+    public function adminClient(Server $server, string $binary): string
+    {
+        $cred = $this->adminCredential($server);
+
+        if (in_array($binary, ['mysql', 'mysqldump'], true)) {
+            return $cred && $cred->mysql_root_password
+                ? 'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' '.$binary.' -u '.escapeshellarg($cred->mysql_root_username ?: 'root')
+                : 'sudo '.$binary;
+        }
+
+        if (in_array($binary, ['psql', 'pg_dump'], true)) {
+            if (! $cred || $cred->postgres_use_sudo) {
+                return 'sudo -u postgres '.$binary;
+            }
+            $env = $cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '';
+
+            return $env.$binary.' -h 127.0.0.1 -U '.escapeshellarg($cred->postgres_superuser ?: 'postgres');
+        }
+
+        throw new \InvalidArgumentException("No admin client for [{$binary}].");
+    }
+
+    /**
      * pg_dump using dply's stored superuser credentials (or `sudo -u postgres`
      * when that's how the box is configured) — the postgres counterpart to
      * {@see mysqldumpAdminToPath}. Always usable: with no stored credential it

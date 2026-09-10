@@ -62,29 +62,22 @@ class LocalDiskDestination implements SnapshotDestination
         return $snapshot;
     }
 
-    public function restore(Snapshot $snapshot): void
+    public function restore(Snapshot $snapshot, string $sink): void
     {
         if ($snapshot->local_path === null) {
             throw new \RuntimeException('Snapshot has no local_path — cannot restore from local disk.');
         }
 
-        // Stream back through gunzip into mysql/psql per engine.
-        $cmd = match ($snapshot->engine) {
-            'postgres', 'postgres17', 'postgres18' => sprintf(
-                'gunzip -c %s | psql',
-                escapeshellarg($snapshot->local_path),
-            ),
-            default => sprintf(
-                'gunzip -c %s | mysql',
-                escapeshellarg($snapshot->local_path),
-            ),
-        };
-
-        $this->executor->runInlineBash(
+        $out = $this->executor->runInlineBash(
             server: $snapshot->site->server,
             name: 'snapshot:local-restore',
-            inlineBash: $cmd,
-            timeoutSeconds: 600,
+            inlineBash: sprintf('gunzip -c %s | %s', escapeshellarg($snapshot->local_path), $sink),
+            timeoutSeconds: 1800,
         );
+
+        // Checked now: a failed restore used to be audited as snapshot_restored.
+        if ($out->getExitCode() !== 0) {
+            throw new \RuntimeException('Restore exited '.var_export($out->getExitCode(), true).': '.mb_substr($out->getBuffer(), 0, 800));
+        }
     }
 }

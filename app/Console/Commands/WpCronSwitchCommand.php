@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\ResolvesSiteForCliCommand;
-use App\Modules\RemoteCli\Services\RemoteCliPermissionDeniedException;
-use App\Modules\RemoteCli\Services\WpCli;
+use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use Illuminate\Console\Command;
 
 /**
@@ -26,7 +25,7 @@ class WpCronSwitchCommand extends Command
 
     protected $description = 'Flip a WordPress site between system cron and HTTP-driven wp-cron.';
 
-    public function handle(WpCli $wpcli): int
+    public function handle(): int
     {
         $site = $this->resolveSite((string) $this->argument('site'));
         if ($site === null) {
@@ -44,32 +43,17 @@ class WpCronSwitchCommand extends Command
 
         $caller = $this->resolveActingUser($site, $this->option('user'));
 
-        try {
-            if ($target === 'system') {
-                $wpcli->run(
-                    site: $site,
-                    command: 'config set',
-                    args: ['DISABLE_WP_CRON', 'true', '--raw', '--type=constant'],
-                    queuedBy: $caller,
-                );
-            } else {
-                $wpcli->run(
-                    site: $site,
-                    command: 'config delete',
-                    args: ['DISABLE_WP_CRON', '--type=constant'],
-                    queuedBy: $caller,
-                );
-            }
-        } catch (RemoteCliPermissionDeniedException $e) {
-            $this->error($e->getMessage());
+        // Same job as the Cron tab, run inline: it installs the crontab entry
+        // before disabling wp-cron. Flipping only DISABLE_WP_CRON, as this
+        // command used to, silently stopped every scheduled task.
+        SwitchWordPressCronHandlerJob::dispatchSync((string) $site->id, $target, $caller?->id !== null ? (string) $caller->id : null);
+
+        $error = data_get($site->fresh()?->meta, 'wp_cron.error');
+        if (is_string($error) && $error !== '') {
+            $this->error('Cron switch failed: '.$error);
 
             return self::FAILURE;
         }
-
-        $meta = $site->meta;
-        $meta['wp_cron'] = ['handler' => $target === 'system' ? 'system_cron' : 'wp_cron', 'switched_at' => now()->toISOString()];
-        $site->meta = $meta;
-        $site->save();
 
         $this->info("Cron handler switched to {$target}.");
 

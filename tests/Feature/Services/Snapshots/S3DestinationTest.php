@@ -9,9 +9,9 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\Snapshot;
 use App\Models\User;
+use App\Modules\Snapshots\Services\S3Destination;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Modules\Snapshots\Services\S3Destination;
 use Aws\Command;
 use Aws\S3\S3Client;
 use GuzzleHttp\Psr7\Request;
@@ -160,15 +160,15 @@ test('restore streams via presigned get url into engine client', function () {
             expect($name)->toBe('snapshot:s3-restore');
             $this->assertStringContainsString('curl', $bash);
             $this->assertStringContainsString('https://example.com/get', $bash);
-            $this->assertStringContainsString('| gunzip -c | mysql', $bash);
+            $this->assertStringContainsString("| gunzip -c | sudo mysql 'dply_shopco'", $bash);
 
             return true;
         })
         ->andReturn(new ProcessOutput('', 0, false));
 
-    (new S3Destination($executor, mockS3Client(), 'dply-backups'))->restore($snapshot);
+    (new S3Destination($executor, mockS3Client(), 'dply-backups'))->restore($snapshot, "sudo mysql 'dply_shopco'");
 });
-test('restore uses psql for postgres engines', function () {
+test('restore streams into whatever sink the service hands it', function () {
     $site = makeSite();
     $snapshot = Snapshot::factory()->s3()->create([
         'site_id' => $site->id,
@@ -186,7 +186,7 @@ test('restore uses psql for postgres engines', function () {
         })
         ->andReturn(new ProcessOutput('', 0, false));
 
-    (new S3Destination($executor, mockS3Client(), 'b'))->restore($snapshot);
+    (new S3Destination($executor, mockS3Client(), 'b'))->restore($snapshot, 'psql -d app');
 });
 test('restore throws when snapshot has no s3 location', function () {
     $site = makeSite();
@@ -201,5 +201,5 @@ test('restore throws when snapshot has no s3 location', function () {
     $executor->shouldNotReceive('runInlineBash');
 
     $this->expectExceptionMessage('no S3 location');
-    (new S3Destination($executor, mockS3Client(), 'b'))->restore($snapshot);
+    (new S3Destination($executor, mockS3Client(), 'b'))->restore($snapshot, 'mysql');
 });

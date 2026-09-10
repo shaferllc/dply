@@ -21,6 +21,7 @@ use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Modules\Snapshots\Jobs\TakeSiteSnapshotJob;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Modules\WordPress\Jobs\SwitchWordPressCronHandlerJob;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
@@ -743,10 +744,14 @@ test('switch to system cron records handler on meta', function () {
     Livewire::actingAs($user)
         ->test(WordPressSection::class, ['site' => $site])
         ->set('tab', 'cron')
-        ->call('switchToSystemCron');
+        ->call('switchToSystemCron')
+        ->assertHasNoErrors();
 
+    // The switch is queued: the job installs the crontab entry before it
+    // disables wp-cron (see SwitchWordPressCronHandlerJobTest).
+    Queue::assertPushed(SwitchWordPressCronHandlerJob::class, fn ($job) => $job->to === 'system');
     $site->refresh();
-    expect($site->meta['wp_cron']['handler'])->toBe('system_cron');
+    expect($site->meta['wp_cron']['switching_to'])->toBe('system');
 });
 
 test('installing a theme from the directory pins the version and does not activate unless asked', function () {
