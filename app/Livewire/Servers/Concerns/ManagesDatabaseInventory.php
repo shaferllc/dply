@@ -115,9 +115,11 @@ trait ManagesDatabaseInventory
         ], auth()->user());
 
         $this->refreshInventoryLists($inventory);
-        $this->toastSuccess(__('Now tracking :name. dply does not hold its password — rotate it to enable environment wiring.', [
-            'name' => $db->name,
-        ]));
+        $this->toastSuccess($db->credentials_known
+            ? __('Now tracking :name — credentials read from wp-config.php.', ['name' => $db->name])
+            : __('Now tracking :name. dply does not hold its password — rotate it to enable environment wiring.', [
+                'name' => $db->name,
+            ]));
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Modules\Deploy\Services\SiteBindingManager;
 use App\Services\Servers\ServerDatabaseInventory;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -143,6 +144,32 @@ test('adopting records the database with credentials marked unknown', function (
         ->and($db->credentials_known)->toBeFalse()
         ->and($db->hasUsableCredentials())->toBeFalse()
         ->and($db->site_id)->toBeNull();
+});
+
+test('adopting a mariadb database reads its credentials from a wordpress wp-config.php', function () {
+    $server = inventoryServer();
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'organization_id' => $server->organization_id,
+        'document_root' => '/home/dply/blog.test',
+    ]);
+
+    $this->mock(ServerDatabaseRemoteExec::class, function ($mock): void {
+        $mock->shouldReceive('shellRunWithExit')->once()->andReturn([
+            "==> /home/dply/blog.test/wp-config.php\n"
+            ."define( 'DB_NAME', 'wp_blog' );\n"
+            ."define( 'DB_USER', 'wp_user' );\n"
+            ."define( 'DB_PASSWORD', 'p\\'w\\\\d' );\n",
+            0,
+        ]);
+    });
+
+    $db = app(ServerDatabaseInventory::class)->adopt($server, 'mariadb', 'wp_blog');
+
+    expect($db->username)->toBe('wp_user')
+        ->and($db->password)->toBe("p'w\\d")
+        ->and($db->credentials_known)->toBeTrue()
+        ->and($db->site_id)->toBe($site->id);
 });
 
 test('adopting with a site links by site_id and creates no binding', function () {

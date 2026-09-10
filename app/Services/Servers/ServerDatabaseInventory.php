@@ -164,6 +164,8 @@ final class ServerDatabaseInventory
      * `credentials_known` is false: dply did not create this database and holds
      * no password for it. Admin-path operations still work; .env wiring and the
      * credential link stay gated until the operator supplies or rotates one.
+     * Exception: a MySQL-family database named by a site's wp-config.php — its
+     * DB_USER / DB_PASSWORD are recorded and the row is usable straight away.
      *
      * When $site is given the row is linked by `site_id` ONLY — no SiteBinding.
      * A binding owns DB_* and injects at deploy, and injecting an empty
@@ -174,19 +176,96 @@ final class ServerDatabaseInventory
     {
         $engine = DatabaseWorkspaceEngines::family($engine);
 
+        // A WordPress site on this box holds the password dply never had.
+        $wp = DatabaseWorkspaceEngines::isMysqlFamily($engine)
+            ? $this->credentialsFromWpConfig($server, $name)
+            : null;
+
         return ServerDatabase::query()->create([
             'server_id' => $server->id,
-            'site_id' => $site?->id,
+            'site_id' => $site?->id ?? $wp['site_id'] ?? null,
             'name' => $name,
             'engine' => $engine,
-            'username' => $this->discoverOwner($server, $engine, $name),
-            'password' => '',
-            'credentials_known' => false,
+            'username' => $wp['username'] ?? $this->discoverOwner($server, $engine, $name),
+            'password' => $wp['password'] ?? '',
+            'credentials_known' => $wp !== null,
             'host' => '127.0.0.1',
-            'description' => __('Adopted from :engine on this server', [
-                'engine' => DatabaseWorkspaceEngines::label($engine),
-            ]),
+            'description' => $wp !== null
+                ? __('Adopted from :engine — credentials read from wp-config.php', [
+                    'engine' => DatabaseWorkspaceEngines::label($engine),
+                ])
+                : __('Adopted from :engine on this server', [
+                    'engine' => DatabaseWorkspaceEngines::label($engine),
+                ]),
         ]);
+    }
+
+    /**
+     * DB_USER / DB_PASSWORD from the wp-config.php of a site on this server
+     * whose DB_NAME is this database. One SSH round-trip greps only the DB_*
+     * defines (never the salts) from every site's web root. Best-effort: any
+     * failure reads as "not found" and adoption proceeds without credentials.
+     *
+     * @return array{site_id: string, username: string, password: string}|null
+     */
+    private function credentialsFromWpConfig(Server $server, string $name): ?array
+    {
+        $candidates = [];
+        foreach ($server->sites()->get(['id', 'slug', 'document_root', 'repository_path']) as $site) {
+            $root = rtrim((string) ($site->document_root ?: $site->repository_path ?: '/home/dply/'.$site->slug), '/');
+            $candidates[$root.'/wp-config.php'] ??= (string) $site->id;
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        $script = 'for f in '.implode(' ', array_map(escapeshellarg(...), array_keys($candidates))).'; do '
+            .'[ -r "$f" ] && { echo "==> $f"; grep -E "define\(\s*.DB_(NAME|USER|PASSWORD)." "$f"; }; done; true';
+
+        try {
+            [$raw] = $this->remote->shellRunWithExit($server, $script, 30);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        foreach (preg_split('/^==> /m', (string) $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $chunk) {
+            [$path, $body] = array_pad(explode("\n", $chunk, 2), 2, '');
+            $c = self::wpConfigConstants($body);
+
+            if (isset($candidates[trim($path)], $c['DB_USER'], $c['DB_PASSWORD'])
+                && ($c['DB_NAME'] ?? null) === $name
+                && $c['DB_USER'] !== '') {
+                return ['site_id' => $candidates[trim($path)], 'username' => $c['DB_USER'], 'password' => $c['DB_PASSWORD']];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Literal `define('DB_*', '…')` values from wp-config.php. getenv()-style
+     * configs (Bedrock keeps DB_* in .env) don't match and are skipped.
+     *
+     * @return array<string, string>
+     */
+    private static function wpConfigConstants(string $php): array
+    {
+        preg_match_all(
+            '/define\(\s*[\'"](DB_[A-Z]+)[\'"]\s*,\s*(?:\'((?:[^\'\\\\]|\\\\.)*)\'|"((?:[^"\\\\]|\\\\.)*)")\s*\)/',
+            $php,
+            $matches,
+            PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL,
+        );
+
+        $out = [];
+        foreach ($matches as $m) {
+            $out[$m[1]] = $m[2] !== null
+                ? strtr($m[2], ['\\\\' => '\\', "\\'" => "'"])
+                : stripcslashes((string) $m[3]);
+        }
+
+        return $out;
     }
 
     /**

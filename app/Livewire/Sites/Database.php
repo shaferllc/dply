@@ -535,9 +535,11 @@ class Database extends Component
 
         $this->link_database_id = '';
         unset($this->linkedDatabases, $this->linkableDatabases, $this->adoptableDatabases);
-        $this->toastSuccess(__('Now tracking :name and linked it to this site. dply does not hold its password — rotate it to enable environment wiring.', [
-            'name' => $db->name,
-        ]));
+        $this->toastSuccess($db->credentials_known
+            ? __('Now tracking :name and linked it to this site — credentials read from wp-config.php.', ['name' => $db->name])
+            : __('Now tracking :name and linked it to this site. dply does not hold its password — rotate it to enable environment wiring.', [
+                'name' => $db->name,
+            ]));
     }
 
     public function unlinkDatabase(string $id): void
