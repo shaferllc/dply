@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Services\ConsoleActions\ConsoleEmitter;
@@ -17,6 +18,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -59,10 +61,21 @@ class SetUpSiteQueueingJob implements ShouldQueue
         DotEnvFileWriter $writer,
     ): void {
         $emit = new ConsoleEmitter($this->consoleActionId);
+
+        // Leave `queued` immediately. A row still queued after 45s is what the
+        // banner calls "queue worker did not pick this up" — so without this the
+        // work below is judged by a clock that only measures pickup, and a setup
+        // whose SSH steps take longer than that false-alarms while still running.
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => DB::raw('coalesce(started_at, now())'),
+            'updated_at' => now(),
+        ]);
+
         $site = Site::query()->with('server')->find($this->siteId);
 
         if ($site === null || $site->server === null) {
-            $emit->error(__('This site has no server to set queueing up on.'), 'setup');
+            $this->fail($emit, __('This site has no server to set queueing up on.'));
 
             return;
         }
@@ -95,7 +108,7 @@ class SetUpSiteQueueingJob implements ShouldQueue
             // container instead.
             app()->call([app(PushSiteEnvJob::class, ['siteId' => $this->siteId, 'userId' => $this->userId]), 'handle']);
         } catch (\Throwable $e) {
-            $emit->error(__('Could not push the .env: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'setup');
+            $this->fail($emit, __('Could not push the .env: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -116,7 +129,7 @@ class SetUpSiteQueueingJob implements ShouldQueue
                 asRoot: false,
             );
         } catch (\Throwable $e) {
-            $emit->error(__('Could not clear the config cache: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'setup');
+            $this->fail($emit, __('Could not clear the config cache: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
             return;
         }
@@ -149,7 +162,7 @@ class SetUpSiteQueueingJob implements ShouldQueue
             try {
                 $provisioner->syncProgram($site->server->fresh(), (string) $program->id);
             } catch (\Throwable $e) {
-                $emit->error(__('Worker saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]), 'setup');
+                $this->fail($emit, __('Worker saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
                 return;
             }
@@ -161,6 +174,45 @@ class SetUpSiteQueueingJob implements ShouldQueue
             $emit->step('setup', __('Deploys will now restart the workers.'));
         }
 
-        $emit->success(__('Queueing is set up. Dispatch a job and it will be picked up.'), 'setup');
+        $this->succeed($emit, __('Queueing is set up. Dispatch a job and it will be picked up.'));
+    }
+
+    /**
+     * A throw the steps did not catch — or the 300s timeout — still has to close
+     * the row. Otherwise the run sits in `running` until the reaper marks it
+     * failed, and the operator reads a banner about worker pickup for a job the
+     * worker demonstrably picked up.
+     */
+    public function failed(\Throwable $e): void
+    {
+        $this->complete(failed: true, error: Str::limit($e->getMessage(), 500));
+    }
+
+    /**
+     * Terminal states are written to the row, not just emitted: the banner and
+     * the Livewire outcome watcher both read `console_actions.status`, and a row
+     * left `queued` reports "no queue worker picked this up" no matter what the
+     * console output says.
+     */
+    private function fail(ConsoleEmitter $emit, string $message): void
+    {
+        $emit->error($message, 'setup');
+        $this->complete(failed: true, error: Str::limit($message, 500));
+    }
+
+    private function succeed(ConsoleEmitter $emit, string $message): void
+    {
+        $emit->success($message, 'setup');
+        $this->complete(failed: false);
+    }
+
+    private function complete(bool $failed, ?string $error = null): void
+    {
+        DB::table('console_actions')->where('id', $this->consoleActionId)->update([
+            'status' => $failed ? ConsoleAction::STATUS_FAILED : ConsoleAction::STATUS_COMPLETED,
+            'finished_at' => now(),
+            'error' => $failed ? $error : null,
+            'updated_at' => now(),
+        ]);
     }
 }

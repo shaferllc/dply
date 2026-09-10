@@ -6,7 +6,7 @@
     POSIX ACL. dply never stores the password — it is shown once here and then
     only resettable.
 --}}
-<section class="dply-card min-w-0 overflow-hidden p-0" id="ftp-accounts">
+<section class="dply-card mt-6 min-w-0 overflow-hidden p-0" id="ftp-accounts">
     <x-workspace-panel-head
         dense
         icon="heroicon-o-arrow-up-tray"
