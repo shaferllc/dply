@@ -122,6 +122,7 @@ class Files extends Component
             'ftpAdoptable' => $this->ftpAdoptableUsernames(),
             'ftpDeployUser' => $this->ftpDeployUsername(),
             'ftpAccountKeys' => $this->ftpAccountKeys(),
+            'ftpDeployUserKeys' => $this->ftpDeployUserKeys(),
             'ftpProfileKeys' => $this->ftpProfileKeys(),
             'ftpEnabled' => $this->ftpEnabled(),
             'ftpDeployUserHasPassword' => $this->deployUserHasFtpPassword(),

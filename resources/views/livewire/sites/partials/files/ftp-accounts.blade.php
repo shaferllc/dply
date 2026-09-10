@@ -253,9 +253,28 @@
             <div class="min-w-0 text-sm text-brand-moss">
                 <p class="font-semibold text-brand-ink">{{ __('Uploading as the deploy user') }}</p>
                 <p class="mt-0.5">
-                    {{ __('The :user account already supports SFTP using this server\'s SSH key — point your client at it with key auth, no password needed.', ['user' => $ftpDeployUser]) }}
+                    {{ __('The :user account speaks SFTP over SSH keys. Add your own key below and point your client at it — no password needed.', ['user' => $ftpDeployUser]) }}
                 </p>
                 <x-sftp-connection class="mt-2" :user="$ftpDeployUser" :host="$ftpHost" />
+
+                {{-- The same server_authorized_keys rows the server's SSH keys
+                     screen manages for this user. dply's own key is not among
+                     them (the synchronizer always keeps it), so nothing here
+                     can lock dply out. --}}
+                <div class="mt-3">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        @forelse ($ftpDeployUserKeys as $key)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-2xs text-brand-moss ring-1 ring-brand-ink/10" wire:key="deploy-key-{{ $key->id }}">
+                                <x-heroicon-m-key class="h-3 w-3" aria-hidden="true" />
+                                <span class="max-w-[16rem] truncate">{{ $key->name }}</span>
+                                <button type="button" class="font-semibold text-rose-600 hover:text-rose-800" wire:click="removeFtpKey('{{ $key->id }}')" wire:confirm="{{ __('Remove this key from :user? Anyone using it loses SSH and SFTP access.', ['user' => $ftpDeployUser]) }}" title="{{ __('Remove this key') }}">&times;</button>
+                            </span>
+                        @empty
+                            <span class="text-xs text-brand-mist">{{ __('No personal keys yet — only dply\'s own.') }}</span>
+                        @endforelse
+                        <x-spinner-button size="xs" variant="secondary" type="button" icon="heroicon-o-key" target="openFtpKeyModal" wire:click="openFtpKeyModal('{{ \App\Livewire\Sites\Files::FTP_DEPLOY_KEY_TARGET }}')">{{ __('Add SSH key') }}</x-spinner-button>
+                    </div>
+                </div>
 
                 <div class="mt-3 flex flex-wrap items-center gap-2">
                     @if ($ftpDeployUserHasPassword)
@@ -367,9 +386,16 @@
     <x-modal name="site-ftp-key" :show="true" max-width="lg">
         <div class="space-y-4 p-6">
             <div>
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Add an SSH key') }}</p>
+                @php $deployKeyTarget = $ftp_key_account_id === \App\Livewire\Sites\Files::FTP_DEPLOY_KEY_TARGET; @endphp
+                <p class="text-sm font-semibold text-brand-ink">
+                    {{ $deployKeyTarget ? __('Add an SSH key for :user', ['user' => $ftpDeployUser]) : __('Add an SSH key') }}
+                </p>
                 <p class="mt-1 text-sm text-brand-moss">
-                    {{ __('Lets this account connect with a key instead of the password. Both keep working — a client set up with a key simply never uses the password.') }}
+                    @if ($deployKeyTarget)
+                        {{ __('Gives this key full SSH and SFTP as :user — the account dply deploys with, which can sudo. Add only keys you control.', ['user' => $ftpDeployUser]) }}
+                    @else
+                        {{ __('Lets this account connect with a key instead of the password. Both keep working — a client set up with a key simply never uses the password.') }}
+                    @endif
                 </p>
             </div>
 

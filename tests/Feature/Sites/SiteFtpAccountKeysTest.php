@@ -102,8 +102,8 @@ test('a malformed public key is rejected before anything is written', function (
 });
 
 /**
- * The site surface must never reach a key belonging to the deploy user or a
- * shell account — removal is scoped to this site's own FTP accounts.
+ * The site surface must never reach another shell account's key — removal is
+ * scoped to this site's own FTP accounts plus the deploy user.
  */
 test('removing a key cannot touch a key outside this site FTP accounts', function (): void {
     Queue::fake();
@@ -111,8 +111,8 @@ test('removing a key cannot touch a key outside this site FTP accounts', functio
 
     $foreign = ServerAuthorizedKey::query()->create([
         'server_id' => $server->id,
-        'target_linux_user' => 'dply',
-        'name' => 'Deploy user key',
+        'target_linux_user' => 'alice',
+        'name' => 'Another shell user key',
         'public_key' => FTP_TEST_KEY,
     ]);
 
@@ -163,6 +163,50 @@ test('the connection string renders a real host, not escaped blade braces', func
         ->test(Files::class, ['server' => $server->fresh(), 'site' => $site])
         ->html();
 
-    expect($html)->toContain('sftp://designer@203.0.113.10:22')
+    // User, host and port render as separately copyable buttons, so the full
+    // URI only exists inside the copy-all button's JSON payload.
+    expect($html)->toContain('>designer</button>')
+        ->and($html)->toContain('>203.0.113.10</button>')
         ->and($html)->not->toContain('ftpHost }}');
+});
+
+/**
+ * The deploy user already speaks SFTP over SSH keys; letting operators add
+ * their own key there is the whole "upload as dply" story. Same rows, same
+ * reconcile as the server SSH keys screen.
+ */
+test('a key can be added to the deploy user and is synced like any other', function (): void {
+    Queue::fake();
+    [$user, $server, $site] = ftpKeyFixture();
+
+    Livewire::actingAs($user)
+        ->test(Files::class, ['server' => $server, 'site' => $site])
+        ->call('openFtpKeyModal', Files::FTP_DEPLOY_KEY_TARGET)
+        ->set('ftp_key_public', FTP_TEST_KEY)
+        ->call('addFtpKey')
+        ->assertSet('ftp_error', null);
+
+    $key = ServerAuthorizedKey::query()->sole();
+    expect($key->target_linux_user)->toBe('dply')
+        ->and($key->name)->toBe('SSH key for dply');
+    Queue::assertPushed(SyncAuthorizedKeysJob::class);
+});
+
+test('a deploy user key can be removed from the site page', function (): void {
+    Queue::fake();
+    [$user, $server, $site] = ftpKeyFixture();
+
+    $key = ServerAuthorizedKey::query()->create([
+        'server_id' => $server->id,
+        'target_linux_user' => 'dply',
+        'name' => 'My laptop',
+        'public_key' => FTP_TEST_KEY,
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Files::class, ['server' => $server, 'site' => $site])
+        ->call('removeFtpKey', (string) $key->id);
+
+    expect(ServerAuthorizedKey::query()->find($key->id))->toBeNull();
+    Queue::assertPushed(SyncAuthorizedKeysJob::class);
 });

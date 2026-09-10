@@ -184,6 +184,27 @@ trait ManagesSiteFtpAccounts
         return trim((string) $this->server->ssh_user) ?: 'dply';
     }
 
+    /** Key-modal target meaning "the deploy user" rather than an SftpAccount id. */
+    public const FTP_DEPLOY_KEY_TARGET = 'deploy-user';
+
+    /**
+     * Keys dply manages for the deploy user — the same server_authorized_keys
+     * rows the server's SSH keys screen writes (it targets ssh_user by default).
+     * dply's own operational key is never one of these rows: the synchronizer
+     * always re-adds it for the connection user, so removing a key here can
+     * never lock dply out.
+     *
+     * @return \Illuminate\Support\Collection<int, ServerAuthorizedKey>
+     */
+    public function ftpDeployUserKeys()
+    {
+        return ServerAuthorizedKey::query()
+            ->where('server_id', $this->server->id)
+            ->where('target_linux_user', $this->ftpDeployUsername())
+            ->orderBy('name')
+            ->get();
+    }
+
     /** Site-wide kill switch. Accounts and grants survive it, so it is reversible. */
     public function ftpEnabled(): bool
     {
@@ -415,9 +436,10 @@ trait ManagesSiteFtpAccounts
         $this->ftp_error = null;
 
         try {
-            $account = SftpAccount::query()
-                ->where('site_id', $this->site->id)
-                ->findOrFail($this->ftp_key_account_id);
+            // Either one of this site's FTP accounts, or the deploy user.
+            $username = $this->ftp_key_account_id === self::FTP_DEPLOY_KEY_TARGET
+                ? $this->ftpDeployUsername()
+                : SftpAccount::query()->where('site_id', $this->site->id)->findOrFail($this->ftp_key_account_id)->username;
 
             if ($this->ftp_key_profile_id !== '') {
                 // One of the operator's own saved keys. Recorded as managed by
@@ -433,7 +455,7 @@ trait ManagesSiteFtpAccounts
                         'server_id' => $this->server->id,
                         'managed_key_type' => UserSshKey::class,
                         'managed_key_id' => $profileKey->id,
-                        'target_linux_user' => $account->username,
+                        'target_linux_user' => $username,
                     ],
                     [
                         'name' => trim($this->ftp_key_name) !== '' ? trim($this->ftp_key_name) : $profileKey->name,
@@ -447,11 +469,11 @@ trait ManagesSiteFtpAccounts
 
                 $name = trim($this->ftp_key_name) !== ''
                     ? trim($this->ftp_key_name)
-                    : __('FTP key for :user', ['user' => $account->username]);
+                    : __('SSH key for :user', ['user' => $username]);
 
                 ServerAuthorizedKey::query()->create([
                     'server_id' => $this->server->id,
-                    'target_linux_user' => $account->username,
+                    'target_linux_user' => $username,
                     'name' => $name,
                     'public_key' => trim($this->ftp_key_public),
                 ]);
@@ -467,7 +489,7 @@ trait ManagesSiteFtpAccounts
             );
 
             $this->ftp_key_account_id = null;
-            $this->toastSuccess(__('SSH key queued for :user.', ['user' => $account->username]));
+            $this->toastSuccess(__('SSH key queued for :user.', ['user' => $username]));
         } catch (\Throwable $e) {
             $this->ftp_error = $e->getMessage();
         }
@@ -477,13 +499,15 @@ trait ManagesSiteFtpAccounts
     {
         $this->authorize('update', $this->site);
 
+        // Scoped to this site's FTP accounts plus the deploy user, so the site
+        // surface can never delete another shell user's key. The deploy user's
+        // rows are safe to drop: dply's own operational key is not a row.
         $usernames = SftpAccount::query()
             ->where('site_id', $this->site->id)
             ->pluck('username')
+            ->push($this->ftpDeployUsername())
             ->all();
 
-        // Scoped to this site's FTP accounts so the site surface can never
-        // delete a key belonging to a shell user or to the deploy account.
         $key = ServerAuthorizedKey::query()
             ->where('server_id', $this->server->id)
             ->whereIn('target_linux_user', $usernames)
