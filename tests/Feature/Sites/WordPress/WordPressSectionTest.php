@@ -24,6 +24,7 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -453,6 +454,7 @@ test('load users runs wp user list and populates rows', function () {
     expect($users[0]['roles'])->toBe('administrator');
 });
 test('load core reports installed version and update availability', function () {
+    fakeCoreReleases();
     [$user, $site] = makeWpSite();
 
     // Two sync reads: `core version` then `core check-update --format=json`.
@@ -912,4 +914,92 @@ test('the user list filters by role and search text', function () {
 
     $component->set('userRoleFilter', '')->set('userFilter', 'ADMIN@');
     expect(array_column($component->instance()->filteredUsers(), 'login'))->toBe(['admin']);
+});
+
+/** WordPress.org core APIs, as captured live (2026-09-10). */
+function fakeCoreReleases(): void
+{
+    Http::fake([
+        'api.wordpress.org/core/version-check/*' => Http::response(['offers' => [
+            ['current' => '7.1', 'php_version' => '7.4'],
+            ['current' => '6.8.8', 'php_version' => '7.2.24'],
+        ]]),
+        'api.wordpress.org/core/stable-check/*' => Http::response(['7.1' => 'latest', '6.8.8' => 'outdated']),
+    ]);
+}
+
+test('downgrading core warns that the database schema stays newer, then pins the version', function () {
+    [$user, $site] = makeWpSite();
+    fakeCoreReleases();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('core', ['version' => '7.1', 'update_available' => false, 'latest' => null])
+        ->set('coreTargetVersion', '6.8.8')
+        ->call('confirmCoreVersionChange')
+        ->assertSet('confirmActionModalMethod', 'changeCoreVersion');
+
+    expect($component->get('confirmActionModalWarning'))->toContain('schema');
+
+    $component->call('confirmActionModal');
+
+    $run = RemoteCliRun::query()->where('command', 'core update')->sole();
+    expect($run->args)->toBe(['--version=6.8.8', '--force']);
+});
+
+test('a core version outside the branch list is refused', function () {
+    [$user, $site] = makeWpSite();
+    fakeCoreReleases();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('changeCoreVersion', '5.0')
+        ->assertHasErrors('core');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+
+test('bedrock sites refuse core file changes even when called directly', function () {
+    [$user, $site] = makeWpSite();
+    $site->update(['meta' => ['scaffold' => ['framework' => 'wordpress', 'layout' => 'bedrock']]]);
+    fakeCoreReleases();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('core', ['version' => '7.1', 'update_available' => true, 'latest' => '7.1'])
+        ->call('changeCoreVersion', '7.1')
+        ->assertHasErrors('core')
+        ->call('repairCore', '7.1')
+        ->call('updateCore')
+        ->call('setCoreAutoUpdate', 'minor');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+
+test('repair re-lays only the installed version, core files only', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('core', ['version' => '7.1', 'update_available' => false, 'latest' => null])
+        ->call('repairCore', '6.8.8')
+        ->assertHasErrors('core');
+    expect(RemoteCliRun::query()->count())->toBe(0);
+
+    $component->call('repairCore', '7.1');
+
+    $run = RemoteCliRun::query()->where('command', 'core download')->sole();
+    expect($run->args)->toBe(['--version=7.1', '--force', '--skip-content']);
+});
+
+test('the automatic core update policy writes the wp-config constant', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('setCoreAutoUpdate', 'minor')
+        ->assertSet('coreAutoUpdate', 'minor');
+
+    $run = RemoteCliRun::query()->where('command', 'config set')->sole();
+    expect($run->args)->toBe(['WP_AUTO_UPDATE_CORE', 'minor', '--type=constant']);
 });

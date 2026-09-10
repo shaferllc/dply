@@ -19,6 +19,7 @@ use App\Modules\Snapshots\Services\SnapshotService;
 use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
+use App\Services\WordPress\CoreReleases;
 use App\Services\WordPress\PluginDirectory;
 use App\Services\WordPress\ThemeDirectory;
 use App\Support\Servers\InstalledStack;
@@ -180,11 +181,31 @@ class WordPressSection extends Component
      * Core-tab cache. Populated by loadCore() from `wp core version`
      * plus `wp core check-update`.
      *
-     * @var array{version: ?string, update_available: bool, latest: ?string}|null
+     * @var array{version: ?string, update_available: bool, latest: ?string, updates?: list<array{version: string, type: string}>, status?: ?string}|null
      */
     public ?array $core = null;
 
     public bool $coreLoaded = false;
+
+    /** Version-picker target: one of CoreReleases::branches(). */
+    public string $coreTargetVersion = '';
+
+    /** @var list<array{version: string, php: string, mysql: string}> */
+    public array $coreBranches = [];
+
+    /**
+     * WP_AUTO_UPDATE_CORE as read from wp-config: 'default' (constant absent —
+     * WordPress's own minor-only behaviour), 'off', 'minor' or 'all'. Null
+     * until read, or when the read failed.
+     */
+    public ?string $coreAutoUpdate = null;
+
+    /** @var list<array{code: string, name: string, native: string, status: string}> */
+    public array $coreLanguages = [];
+
+    public bool $coreLanguagesLoaded = false;
+
+    public string $coreLanguageInstall = '';
 
     // ── Tools tab ────────────────────────────────────────────────────────────
     /** Live wp maintenance-mode status; null until probed. */
@@ -251,6 +272,7 @@ class WordPressSection extends Component
             // Narrower than isWordPressDetected() on purpose: a git-deployed WordPress
             // would have its cloned themes overwritten by the next deploy.
             'gitSourcesSupported' => app(GitSourceMaterializerFactory::class)->supports($this->site),
+            'coreManagedByComposer' => $this->coreManagedByComposer(),
         ]);
     }
 
@@ -612,25 +634,278 @@ class WordPressSection extends Component
         // array (or "Success: WordPress is at the latest version.") means
         // up to date.
         $updates = $this->readJsonRows($wpcli, 'core check-update', ['--format=json'], 'core') ?? [];
-        $latest = null;
-        foreach ($updates as $row) {
-            if (isset($row['version'])) {
-                $latest = (string) $row['version'];
-                break;
-            }
-        }
 
+        // One row per available release; "minor" rows are the security and
+        // maintenance path within the installed branch.
+        $rows = array_values(array_filter(array_map(static fn (array $row): array => [
+            'version' => (string) ($row['version'] ?? ''),
+            'type' => (string) ($row['update_type'] ?? ''),
+        ], $updates), static fn (array $row): bool => $row['version'] !== ''));
+        usort($rows, static fn (array $a, array $b): int => version_compare($b['version'], $a['version']));
+
+        $releases = app(CoreReleases::class);
         $this->core = [
             'version' => $installed,
-            'update_available' => $updates !== [],
-            'latest' => $latest,
+            'update_available' => $rows !== [],
+            'latest' => $rows[0]['version'] ?? null,
+            'updates' => $rows,
+            'status' => $releases->status($installed),
         ];
+        $this->coreBranches = $releases->branches();
         $this->coreLoaded = true;
     }
 
     public function updateCore(WpCli $wpcli): void
     {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
         $this->runWpAction($wpcli, 'core update', null, 'core');
+    }
+
+    /** Stay on the installed branch: security and maintenance releases only. */
+    public function updateCoreMinor(WpCli $wpcli): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $this->runWpAction($wpcli, 'core update', null, 'core', ['--minor']);
+    }
+
+    /**
+     * Run WordPress's database upgrade routine. After a core update WordPress
+     * only runs it on the next wp-admin visit; this does it now.
+     */
+    public function updateCoreDatabase(WpCli $wpcli): void
+    {
+        $this->runWpAction($wpcli, 'core update-db', null, 'core');
+    }
+
+    /**
+     * Switch to another branch release. Upgrades are routine; going below the
+     * installed version is flagged loudly, because WordPress never downgrades
+     * the database schema.
+     */
+    public function confirmCoreVersionChange(): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $release = $this->coreRelease($this->coreTargetVersion);
+        if ($release === null) {
+            $this->addError('core', __('Pick a version from the list.'));
+
+            return;
+        }
+
+        $installed = (string) ($this->core['version'] ?? '');
+        $compat = CoreReleases::compatibility($release, $installed ?: null, $this->sitePhpVersion());
+        if ($compat['blockers'] !== []) {
+            $this->addError('core', implode(' ', $compat['blockers']));
+
+            return;
+        }
+
+        $downgrade = $installed !== '' && version_compare($release['version'], $installed, '<');
+
+        $this->openConfirmActionModal(
+            method: 'changeCoreVersion',
+            arguments: [$release['version']],
+            title: $downgrade
+                ? __('Downgrade WordPress to :v?', ['v' => $release['version']])
+                : __('Switch WordPress to :v?', ['v' => $release['version']]),
+            message: __('Replaces the WordPress core files with :v. Themes, plugins, uploads and wp-config.php are left alone.', ['v' => $release['version']]),
+            confirmLabel: __('Install :v', ['v' => $release['version']]),
+            destructive: $downgrade,
+            details: [
+                ['label' => __('Installed'), 'value' => $installed ?: '?', 'mono' => true],
+                ['label' => __('New'), 'value' => $release['version'], 'mono' => true],
+            ],
+            warning: $downgrade
+                ? __('The database stays at the newer schema — WordPress never downgrades it, and going back down is not a supported WordPress path. Take a snapshot in the Database tab first.')
+                : ($compat['warnings'] !== [] ? implode(' ', $compat['warnings']) : null),
+        );
+    }
+
+    public function changeCoreVersion(string $version, WpCli $wpcli): void
+    {
+        // Directly callable, not only through the modal: re-check everything.
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $release = $this->coreRelease($version);
+        if ($release === null) {
+            $this->addError('core', __('Pick a version from the list.'));
+
+            return;
+        }
+
+        $compat = CoreReleases::compatibility($release, $this->core['version'] ?? null, $this->sitePhpVersion());
+        if ($compat['blockers'] !== []) {
+            $this->addError('core', implode(' ', $compat['blockers']));
+
+            return;
+        }
+
+        $this->runWpAction($wpcli, 'core update', null, 'core', ['--version='.$release['version'], '--force']);
+    }
+
+    /**
+     * Read WP_AUTO_UPDATE_CORE. `config get` is instant; a missing constant
+     * errors with "…is not defined…", which is distinct from a failed read.
+     */
+    public function loadCoreAutoUpdate(WpCli $wpcli): void
+    {
+        try {
+            $result = $wpcli->run($this->site, 'config get', ['WP_AUTO_UPDATE_CORE', '--type=constant', '--format=json'], auth()->user());
+        } catch (\Throwable) {
+            $this->coreAutoUpdate = null;
+
+            return;
+        }
+
+        if ($result->isFailed()) {
+            $this->coreAutoUpdate = str_contains($result->stderr(), 'is not defined') ? 'default' : null;
+
+            return;
+        }
+
+        // Viewers get "********" (masked config read) — decodes to null, never a value.
+        $this->coreAutoUpdate = match (json_decode(trim($result->stdout()), true)) {
+            true => 'all',
+            false => 'off',
+            'minor' => 'minor',
+            default => null,
+        };
+    }
+
+    /** `config set` runs at the Destructive tier (admin/owner); the view gates the same way. */
+    public function setCoreAutoUpdate(string $mode, WpCli $wpcli): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $args = match ($mode) {
+            'off' => ['WP_AUTO_UPDATE_CORE', 'false', '--raw', '--type=constant'],
+            'minor' => ['WP_AUTO_UPDATE_CORE', 'minor', '--type=constant'],
+            'all' => ['WP_AUTO_UPDATE_CORE', 'true', '--raw', '--type=constant'],
+            default => null,
+        };
+        if ($args === null) {
+            $this->addError('core', __('Unknown update policy.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'config set', $args, errorBag: 'core') === null) {
+            return;
+        }
+
+        $this->coreAutoUpdate = $mode;
+        $this->toastSuccess(__('Queued: automatic core updates set to :mode.', ['mode' => $mode]));
+    }
+
+    /** Restore the official files for the installed version — the fix when Verify flags changed core files. */
+    public function confirmRepairCore(): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        $version = (string) ($this->core['version'] ?? '');
+        if (preg_match('/^\d+\.\d+(\.\d+)?$/', $version) !== 1) {
+            $this->addError('core', __('Check the installed version first.'));
+
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            method: 'repairCore',
+            arguments: [$version],
+            title: __('Reinstall WordPress :v core files?', ['v' => $version]),
+            message: __('Downloads the official :v package and writes it over the core files, restoring anything that was modified. wp-content — themes, plugins, uploads — and wp-config.php are not touched.', ['v' => $version]),
+            confirmLabel: __('Reinstall core files'),
+        );
+    }
+
+    public function repairCore(string $version, WpCli $wpcli): void
+    {
+        if ($this->refuseComposerCore()) {
+            return;
+        }
+
+        // Repair only ever re-lays the installed version; changing versions is
+        // changeCoreVersion's job, with its own checks.
+        if ($version === '' || $version !== (string) ($this->core['version'] ?? '')) {
+            $this->addError('core', __('Check the installed version first.'));
+
+            return;
+        }
+
+        // --skip-content: core files only. `core download --force` copies over
+        // the install without deleting anything, and skipping content keeps it
+        // from reverting updated bundled themes/plugins to the package's copies.
+        $this->runWpAction($wpcli, 'core download', null, 'core', ['--version='.$version, '--force', '--skip-content']);
+    }
+
+    public function loadCoreLanguages(WpCli $wpcli): void
+    {
+        $rows = $this->readJsonRows($wpcli, 'language core list', ['--fields=language,english_name,native_name,status', '--format=json'], 'core');
+
+        $this->coreLanguages = $rows === null ? [] : array_map(static fn (array $row): array => [
+            'code' => (string) ($row['language'] ?? ''),
+            'name' => (string) ($row['english_name'] ?? ''),
+            'native' => (string) ($row['native_name'] ?? ''),
+            'status' => (string) ($row['status'] ?? ''),
+        ], $rows);
+        $this->coreLanguagesLoaded = true;
+    }
+
+    /** Install (if needed) and activate a site language — wp-cli activates an already-installed one too. */
+    public function installCoreLanguage(WpCli $wpcli): void
+    {
+        $code = trim($this->coreLanguageInstall);
+        if (preg_match('/^[a-z]{2,3}(_[A-Z]{2})?(_[a-z0-9]+)?$/', $code) !== 1
+            || ($this->coreLanguagesLoaded && ! collect($this->coreLanguages)->contains('code', $code))) {
+            $this->addError('core', __('Pick a language from the list.'));
+
+            return;
+        }
+
+        $this->runWpAction($wpcli, 'language core install', $code, 'core', ['--activate']);
+        $this->coreLanguageInstall = '';
+    }
+
+    /**
+     * Bedrock pins core in composer.json: wp-cli rewriting web/wp would drift
+     * from composer.lock and be undone by the next composer install.
+     */
+    private function coreManagedByComposer(): bool
+    {
+        return app(GitSourceMaterializerFactory::class)->layoutOf($this->site) === 'bedrock';
+    }
+
+    /** Refused in the method as well as hidden in the view: these are callable directly. */
+    private function refuseComposerCore(): bool
+    {
+        if (! $this->coreManagedByComposer()) {
+            return false;
+        }
+
+        $this->addError('core', __('This is a Bedrock site: WordPress core is a Composer dependency. Change roots/wordpress in composer.json and deploy instead.'));
+
+        return true;
+    }
+
+    /** @return array{version: string, php: string, mysql: string}|null */
+    private function coreRelease(string $version): ?array
+    {
+        return collect(app(CoreReleases::class)->branches())->firstWhere('version', trim($version));
     }
 
     /**
