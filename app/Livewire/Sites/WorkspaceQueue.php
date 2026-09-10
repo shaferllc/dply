@@ -1298,6 +1298,48 @@ class WorkspaceQueue extends Component
         $this->dispatch('open-modal', 'managed-queue-token');
     }
 
+    /**
+     * Point this site back at its own queue.
+     *
+     * The namespace and everything in it survive: undoing the connection is a
+     * different decision from destroying the jobs, and the namespace page owns
+     * the second one. Reconnecting later mints a fresh credential rather than
+     * reusing the old namespace, so the confirm copy says so.
+     */
+    public function disconnectManagedQueue(ManagedQueueConnector $connector): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($connector->namespaceFor($this->site) === null) {
+            $this->toastError(__('This site is not on a managed queue.'));
+
+            return;
+        }
+
+        $connector->disconnect($this->site);
+        $this->site->refresh();
+
+        $this->toastSuccess(__('Back on this site’s own queue. Deploy or push the .env to apply it on the server.'));
+    }
+
+    /**
+     * What reverting would strand.
+     *
+     * A job sitting in dply is only reachable through the dply connection, so
+     * switching away leaves it there with nothing looking for it. The number is
+     * the whole reason the confirm exists.
+     */
+    public function managedQueuePendingTotal(): int
+    {
+        $total = 0;
+
+        foreach ($this->managedQueueDepths() as $depth) {
+            $total += $depth['pending'] + $depth['delayed'] + $depth['reserved'];
+        }
+
+        return $total;
+    }
+
     public function managedQueueNamespace(): ?QueueNamespace
     {
         return app(ManagedQueueConnector::class)->namespaceFor($this->site);

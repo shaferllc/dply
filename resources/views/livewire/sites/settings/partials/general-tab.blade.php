@@ -38,9 +38,23 @@
         </div>
         <a href="{{ route('sites.scaffold-journey', ['server' => $server, 'site' => $site]) }}" wire:navigate
             class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border bg-white px-2.5 text-2xs font-semibold shadow-sm transition {{ $scaffoldDidFail ? 'border-rose-300 text-rose-700 hover:bg-rose-50' : 'border-brand-ink/15 text-brand-ink hover:bg-brand-sand/40' }}">
-            {{ $scaffoldDidFail ? __('Open timeline') : __('View progress') }}
+            {{ $scaffoldDidFail ? __('Open timeline') : __('Open full page') }}
             <x-heroicon-m-arrow-right class="h-3 w-3" aria-hidden="true" />
         </a>
+    </div>
+
+    {{-- The steps themselves, inline.
+
+         This used to be a signpost to a page nobody could find: the operator is
+         already watching the install on the page that says "App install
+         running", so sending them elsewhere to learn which step is running is
+         the wrong answer. Settings extends Show, which already uses
+         InteractsWithScaffoldJourney, so the data is one method call away — and
+         the partial carries its own wire:poll.3s, so rows advance live with
+         nothing extra here. The full-page link stays for the focused
+         retry / start-over view. --}}
+    <div class="border-b border-brand-ink/10 px-3 py-4 sm:px-4">
+        @include('livewire.sites.partials.show.scaffold-install-journey', $this->scaffoldJourneyData())
     </div>
 @endif
 

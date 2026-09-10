@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEndpoint;
+use App\Support\Sites\SiteQueueConfiguration;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -54,12 +55,19 @@ final class ManagedQueueConnector
         $result = $this->create->handle($organization, $this->nameFor($site), $site, $userId);
         $namespace = $result['namespace'];
 
+        // Read BEFORE the write, so the revert path restores what this site
+        // actually ran on rather than guessing from its bindings. Without this
+        // recorded, disconnecting a site whose Redis binding was since removed
+        // would silently drop it to `sync` and run every job inline.
+        $previous = $this->currentQueueVariables($site);
+
         $this->writeEnvironment($site, $result['plaintext']);
 
         $meta = is_array($site->meta) ? $site->meta : [];
         $meta['managed_queue'] = [
             'namespace_id' => (string) $namespace->id,
             'connected_at' => now()->toIso8601String(),
+            'previous' => $previous,
         ];
 
         // The package registers the connection, so the site needs it installed.
@@ -78,6 +86,91 @@ final class ManagedQueueConnector
         $site->forceFill(['meta' => $meta])->save();
 
         return ['namespace' => $namespace, 'token' => $result['plaintext']];
+    }
+
+    /**
+     * Point the site back at its own queue.
+     *
+     * The namespace is deliberately left alone. Deleting it would discard
+     * whatever is still queued, and "undo the connection" is a different
+     * decision from "destroy the jobs" — the namespace page already offers the
+     * second one, with the depth in front of you when you confirm it.
+     *
+     * Anything still pending in dply is stranded by this: the workers stop
+     * looking there. That is the caller's warning to give, which is why this
+     * returns the depth it is walking away from.
+     */
+    public function disconnect(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $previous = (array) data_get($meta, 'managed_queue.previous', []);
+
+        $this->restoreEnvironment($site, $previous);
+
+        unset($meta['managed_queue']);
+        // The panel would otherwise keep reporting the connection this site
+        // just left, exactly as it does on the way in.
+        unset($meta['queue_observed']);
+
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * What this site's env says about queueing right now.
+     *
+     * @return array<string, string>
+     */
+    private function currentQueueVariables(Site $site): array
+    {
+        $variables = $this->parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+
+        $kept = [];
+        foreach (['QUEUE_CONNECTION', 'QUEUE_FAILED_DRIVER'] as $key) {
+            if (isset($variables[$key]) && $variables[$key] !== '' && $variables[$key] !== 'dply') {
+                $kept[$key] = (string) $variables[$key];
+            }
+        }
+
+        return $kept;
+    }
+
+    /**
+     * Undo {@see writeEnvironment()}.
+     *
+     * The dply-specific variables are removed rather than blanked: a stale
+     * `DPLY_QUEUE_TOKEN` left behind is a live credential sitting in a file for
+     * no reason, and an empty one reads like a broken config.
+     *
+     * @param  array<string, string>  $previous  as recorded at connect time
+     */
+    private function restoreEnvironment(Site $site, array $previous): void
+    {
+        $existing = $this->parser->parse((string) ($site->env_file_content ?? ''));
+        $variables = $existing['variables'];
+
+        unset($variables['DPLY_QUEUE_URL'], $variables['DPLY_QUEUE_TOKEN']);
+
+        // Nothing recorded means this site was connected before the revert path
+        // existed. Fall back to what it has attached, and to `sync` only as the
+        // last resort — a site with no queue resource genuinely has nowhere
+        // else to run jobs.
+        $connection = $previous['QUEUE_CONNECTION']
+            ?? SiteQueueConfiguration::suggestedDriverFor($site)
+            ?? 'sync';
+
+        $variables['QUEUE_CONNECTION'] = $connection;
+
+        if (isset($previous['QUEUE_FAILED_DRIVER'])) {
+            $variables['QUEUE_FAILED_DRIVER'] = $previous['QUEUE_FAILED_DRIVER'];
+        } else {
+            // It only exists because the connection wrote it.
+            unset($variables['QUEUE_FAILED_DRIVER']);
+        }
+
+        $site->forceFill([
+            'env_file_content' => $this->writer->render($variables, $existing['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
     }
 
     /** The namespace serving this site, if it has one. */

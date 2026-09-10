@@ -189,8 +189,24 @@
                 </div>
                 @can('update', $site)
                     @if ($managedNamespace)
-                        <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
-                           class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
+                        <div class="flex shrink-0 items-center gap-3">
+                            <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
+                               class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
+                            {{-- Reverting is not destructive to the namespace, but it does
+                                 strand anything still queued there: the workers stop looking
+                                 at dply. The count goes in the confirm, not behind it. --}}
+                            @php($strandedJobs = $this->managedQueuePendingTotal())
+                            <button type="button"
+                                    wire:click="disconnectManagedQueue"
+                                    wire:confirm="{{ $strandedJobs > 0
+                                        ? __('There are :count job(s) still in dply. Reverting leaves them there with nothing draining them — drain or purge first if you need them. Revert anyway?', ['count' => $strandedJobs])
+                                        : __('Point this site back at its own queue? The dply namespace and its history are kept; reconnecting later mints a new credential.') }}"
+                                    wire:loading.attr="disabled" wire:target="disconnectManagedQueue"
+                                    class="text-xs font-semibold text-brand-moss hover:text-rose-700 hover:underline">
+                                <span wire:loading.remove wire:target="disconnectManagedQueue">{{ __('Revert') }}</span>
+                                <span wire:loading wire:target="disconnectManagedQueue">{{ __('Reverting…') }}</span>
+                            </button>
+                        </div>
                     @elseif ($this->managedQueueEntitled())
                         <x-primary-button size="xs" type="button" class="shrink-0" wire:click="upgradeToManagedQueue" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
                             <span wire:loading.remove wire:target="upgradeToManagedQueue">{{ __('Use managed queue') }}</span>

@@ -175,49 +175,58 @@ class DockerWorkerRuntime implements WorkerRuntime
     }
 
     /**
-     * Authenticate if needed, then pull.
+     * Refresh the image if we can, then require it to be present.
      *
-     * Without this the run only works for an image already cached on whichever
-     * host the allocator happened to pick — which is nondeterministic, so the
-     * same fleet would start on one machine and fail on the next.
+     * "Pull, and fail the start if the pull failed" is the obvious shape and the
+     * wrong one twice over. It makes a registry mandatory — so an image built on
+     * the fleet host itself can never run, which is exactly the setup worth
+     * proving the stack with before buying registry infrastructure. And it turns
+     * a momentary registry outage into a failed scale-up on a host that already
+     * has the image sitting in its daemon.
      *
-     * The password is written to a shell variable and piped to
-     * `--password-stdin`, never passed as an argument: `docker login -p` puts
-     * the credential in the process table, where every other tenant's `ps` can
-     * read it. `set +x` guards against the script being traced, and the logout
-     * runs regardless so the host does not accumulate one customer's registry
-     * session for the next one to inherit.
+     * So the pull is best-effort and presence is the gate. A tag that moves
+     * (`:latest`) still refreshes on every start; a tag that cannot be pulled
+     * runs if it is already here and fails cleanly if it is not.
      */
     private function fetchScript(WorkerSpec $spec): string
     {
-        $pull = sprintf('docker pull %s', escapeshellarg($spec->image));
+        $image = escapeshellarg($spec->image);
 
-        if (($spec->registryUsername ?? '') === '' || ($spec->registryPassword ?? '') === '') {
-            return $pull;
+        $lines = [];
+
+        if (($spec->registryUsername ?? '') !== '' && ($spec->registryPassword ?? '') !== '') {
+            $registry = self::registryHostFor($spec->image);
+            $logoutTarget = $registry === '' ? '' : escapeshellarg($registry);
+
+            $lines = [
+                // `set +x` so a traced script cannot echo the credential, and
+                // --password-stdin so it never reaches the process table, where
+                // every other tenant on this host could read it out of `ps`.
+                'set +x',
+                'DPLY_REGISTRY_PASSWORD='.escapeshellarg((string) $spec->registryPassword),
+                sprintf(
+                    'printf %%s "$DPLY_REGISTRY_PASSWORD" | docker login %s-u %s --password-stdin >/dev/null || true',
+                    $registry === '' ? '' : escapeshellarg($registry).' ',
+                    escapeshellarg((string) $spec->registryUsername),
+                ),
+                'unset DPLY_REGISTRY_PASSWORD',
+                sprintf('docker pull %s || true', $image),
+                // Unconditional: the login must not outlive this start, or one
+                // customer's registry session is left for the next tenant on
+                // this host to inherit.
+                sprintf('docker logout %s >/dev/null 2>&1 || true', $logoutTarget),
+            ];
+        } else {
+            $lines[] = sprintf('docker pull %s || true', $image);
         }
 
-        $registry = self::registryHostFor($spec->image);
+        $lines[] = sprintf(
+            'docker image inspect %s >/dev/null 2>&1 || { echo "image not available: %s"; exit 1; }',
+            $image,
+            $spec->image,
+        );
 
-        $logoutTarget = $registry === '' ? '' : escapeshellarg($registry);
-
-        return implode("\n", [
-            'set +x',
-            'DPLY_REGISTRY_PASSWORD='.escapeshellarg((string) $spec->registryPassword),
-            sprintf(
-                'printf %%s "$DPLY_REGISTRY_PASSWORD" | docker login %s-u %s --password-stdin >/dev/null',
-                $registry === '' ? '' : escapeshellarg($registry).' ',
-                escapeshellarg((string) $spec->registryUsername),
-            ),
-            'unset DPLY_REGISTRY_PASSWORD',
-            // The pull's status is captured rather than allowed to abort the
-            // script: `runInlineBash` runs under `set -e`, so a failed pull
-            // would skip the logout below and leave one customer's registry
-            // session on a shared host for the next tenant to inherit. Logout
-            // first, then fail with the pull's own code.
-            $pull.' && DPLY_PULL_RC=0 || DPLY_PULL_RC=$?',
-            sprintf('docker logout %s >/dev/null 2>&1 || true', $logoutTarget),
-            '[ "$DPLY_PULL_RC" -eq 0 ] || exit "$DPLY_PULL_RC"',
-        ]);
+        return implode("\n", $lines);
     }
 
     /**

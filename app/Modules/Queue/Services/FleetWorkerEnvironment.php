@@ -9,6 +9,8 @@ use App\Models\ServiceCredential;
 use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEndpoint;
+use App\Models\Site;
+use App\Services\Sites\DotEnvFileParser;
 use RuntimeException;
 
 /**
@@ -45,12 +47,55 @@ class FleetWorkerEnvironment
 
         $credential = $this->credential($namespace);
 
-        return [
+        // The app's own configuration first, dply's queue wiring on top.
+        //
+        // Four variables alone boot the customer's app with no database
+        // connection and no APP_KEY, so the container starts, connects to the
+        // queue, claims a job and dies on its first query — which reads as a
+        // broken queue rather than a missing environment. The worker needs the
+        // same environment the site's own workers run with.
+        return array_merge($this->siteEnvironment($namespace), [
             'QUEUE_CONNECTION' => 'dply',
             'DPLY_QUEUE_URL' => $endpoint,
             'DPLY_QUEUE_KEY' => $credential['access_key_id'],
             'DPLY_QUEUE_SECRET' => $credential['secret'],
-        ];
+        ]);
+    }
+
+    /**
+     * The site's own environment, as dply holds it.
+     *
+     * Only for a namespace dply deploys — an externally hosted app keeps its
+     * environment to itself, and dply has nothing to inject.
+     *
+     * `QUEUE_*` is dropped rather than overridden one key at a time: a site that
+     * was on Redis carries `REDIS_QUEUE` and friends, and a worker that quietly
+     * honoured one of them would drain the wrong queue while looking healthy.
+     *
+     * @return array<string, string>
+     */
+    private function siteEnvironment(QueueNamespace $namespace): array
+    {
+        $site = $namespace->site;
+
+        if (! $site instanceof Site) {
+            return [];
+        }
+
+        $variables = $this->parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+
+        $out = [];
+        foreach ($variables as $key => $value) {
+            $key = (string) $key;
+
+            if (str_starts_with($key, 'QUEUE_') || str_starts_with($key, 'DPLY_QUEUE_')) {
+                continue;
+            }
+
+            $out[$key] = (string) $value;
+        }
+
+        return $out;
     }
 
     /**

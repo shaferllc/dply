@@ -203,11 +203,11 @@ test('a private image logs in with the token off the command line', function () 
 });
 
 /**
- * `runInlineBash` runs under `set -e`. A pull that aborted the script would
- * skip the logout and leave one customer's registry session on a shared host
- * for the next tenant to inherit.
+ * `runInlineBash` runs under `set -e`, so the logout must not sit behind
+ * anything that can abort. Leaving one customer's registry session on a shared
+ * host is the next tenant's problem.
  */
-test('a failed pull still logs out, then fails the start', function () {
+test('the registry session is closed whatever the pull does', function () {
     $script = captureScript($this);
 
     $this->runtime->start(spec([
@@ -218,6 +218,36 @@ test('a failed pull still logs out, then fails the start', function () {
 
     $out = $script();
 
-    expect($out)->toContain('DPLY_PULL_RC');
-    expect(strpos($out, 'docker logout'))->toBeLessThan(strpos($out, 'exit "$DPLY_PULL_RC"'));
+    expect($out)->toContain('docker logout');
+    expect(strpos($out, 'docker pull'))->toBeLessThan(strpos($out, 'docker logout'));
+});
+
+/**
+ * Presence is the gate, not the pull. An image already in this host's daemon —
+ * one built here, or one whose registry is briefly unreachable — still runs;
+ * the start only fails when the image genuinely is not there.
+ */
+test('a pull failure does not fail a start when the image is already present', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec(['image' => 'dply-site-abc:20260909120000']));
+
+    $out = $script();
+
+    expect($out)
+        ->toContain("docker pull 'dply-site-abc:20260909120000' || true")
+        ->toContain("docker image inspect 'dply-site-abc:20260909120000'");
+
+    // The check has to come after the attempt to refresh, or a moving tag never
+    // updates.
+    expect(strpos($out, 'docker pull'))->toBeLessThan(strpos($out, 'docker image inspect'));
+    expect(strpos($out, 'docker image inspect'))->toBeLessThan(strpos($out, 'docker run'));
+});
+
+test('an image that is neither pullable nor present fails the start', function () {
+    $script = captureScript($this);
+
+    $this->runtime->start(spec());
+
+    expect($script())->toContain('image not available');
 });
