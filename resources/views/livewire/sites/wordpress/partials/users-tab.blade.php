@@ -43,7 +43,7 @@
         <p class="border-b border-rose-200/70 bg-rose-50/60 px-3 py-2 text-xs text-rose-700 sm:px-4">{{ $message }}</p>
     @enderror
 
-    @if ($this->revealedUserPassword())
+    @if ($this->revealedUserPassword() && $resettingPasswordLogin === null)
         <div class="border-b border-emerald-200/70 bg-emerald-50/50 px-3 py-3 sm:px-4">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">{{ __('Copy this now') }}</p>
             <p class="mt-0.5 text-xs text-emerald-800/80">{{ __('Shown once and never stored. It takes effect when the queued command finishes — if that fails, this password was never set.') }}</p>
@@ -172,6 +172,35 @@
                                     </form>
                                 </td>
                             </tr>
+                        @elseif ($resettingPasswordLogin === $wpUser['login'])
+                            <tr wire:key="wp-user-pass-{{ $wpUser['id'] }}" class="bg-brand-sand/20">
+                                <td colspan="4" class="px-4 py-3 sm:px-6">
+                                    @if ($this->revealedUserPassword() && $this->revealedUserLogin() === $wpUser['login'])
+                                        <div class="flex flex-wrap items-end gap-3">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-xs font-semibold text-emerald-800">{{ __('New password for :login — copy it now', ['login' => $wpUser['login']]) }}</p>
+                                                <p class="mt-0.5 text-xs text-emerald-800/80">{{ __('Shown once and never stored. It takes effect when the queued command finishes — if that fails, this password was never set.') }}</p>
+                                                <div class="mt-2">
+                                                    <x-copy-value plain :label="__('Password')" :value="$this->revealedUserPassword()" />
+                                                </div>
+                                            </div>
+                                            <button type="button" wire:click="cancelResetUserPassword" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Done') }}</button>
+                                        </div>
+                                    @else
+                                        <form wire:submit="resetUserPassword(@js($wpUser['login']))" class="flex flex-wrap items-end gap-3">
+                                            <p class="w-full font-mono text-xs text-brand-ink sm:w-auto sm:self-center">{{ $wpUser['login'] }}</p>
+                                            <div class="min-w-0 flex-1">
+                                                <label for="wp_reset_pass" class="{{ $labelCls }}">{{ __('New password') }}</label>
+                                                <input id="wp_reset_pass" type="password" autocomplete="new-password" wire:model="resetPasswordValue" placeholder="{{ __('Leave blank to generate one') }}" class="{{ $inputCls }}" />
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <button type="button" wire:click="cancelResetUserPassword" class="text-xs text-brand-moss underline hover:text-brand-ink">{{ __('Cancel') }}</button>
+                                                <x-spinner-button size="xs" variant="primary" type="submit" target="resetUserPassword">{{ __('Set password') }}</x-spinner-button>
+                                            </div>
+                                        </form>
+                                    @endif
+                                </td>
+                            </tr>
                         @else
                             <tr wire:key="wp-user-{{ $wpUser['id'] }}">
                                 <td class="px-4 py-3 sm:px-6">
@@ -202,7 +231,7 @@
                                                 @endforeach
                                             </select>
                                             <button type="button" wire:click="startEditUser(@js($wpUser['id']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Edit') }}</button>
-                                            <x-spinner-button size="xs" variant="secondary" type="button" target="resetUserPassword" wire:click="resetUserPassword(@js($wpUser['login']))">{{ __('Reset password') }}</x-spinner-button>
+                                            <button type="button" wire:click="startResetUserPassword(@js($wpUser['login']))" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Reset password') }}</button>
                                             {{-- Admin/owner: session destroy and delete run at the Destructive tier. --}}
                                             @if ($canDestroy)
                                                 <button type="button" wire:click="logoutUserEverywhere(@js($wpUser['id']))" title="{{ __('Ends every login session for this user') }}" class="rounded-md border border-brand-ink/15 px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Sign out everywhere') }}</button>

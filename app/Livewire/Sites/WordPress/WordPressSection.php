@@ -179,6 +179,15 @@ class WordPressSection extends Component
     /** Who inherits the deleted user's posts and pages. */
     public string $deleteReassignTo = '';
 
+    /** Login whose inline "set password" row is open. */
+    public ?string $resettingPasswordLogin = null;
+
+    /**
+     * Typed password (blank = generate one). Public only so wire:model can bind
+     * it; cleared the moment it's read so it stops riding the DOM snapshot.
+     */
+    public string $resetPasswordValue = '';
+
     /**
      * Core-tab cache. Populated by loadCore() from `wp core version`
      * plus `wp core check-update`.
@@ -2136,15 +2145,43 @@ class WordPressSection extends Component
      * operator actually needs — lock someone out, or get back in — meant
      * dropping to the console.
      */
+    public function startResetUserPassword(string $login): void
+    {
+        if (! $this->isValidUserLogin($login)) {
+            return;
+        }
+
+        $this->resettingPasswordLogin = $login;
+        $this->resetPasswordValue = '';
+        $this->editingUserId = null;
+        $this->deletingUserId = null;
+    }
+
+    public function cancelResetUserPassword(): void
+    {
+        $this->resettingPasswordLogin = null;
+        $this->resetPasswordValue = '';
+    }
+
     public function resetUserPassword(string $login, WpCli $wpcli): void
     {
+        $typed = $this->resetPasswordValue;
+        $this->resetPasswordValue = '';
+        $this->resetErrorBag('users');
+
         if (! $this->isValidUserLogin($login)) {
             $this->addError('users', __('Unknown user.'));
 
             return;
         }
 
-        $password = Str::password(24, letters: true, numbers: true, symbols: false, spaces: false);
+        if ($typed !== '' && (mb_strlen($typed) < 8 || preg_match('/[\x00-\x1F\x7F]/', $typed) === 1)) {
+            $this->addError('users', __('Use at least 8 characters, on one line — or leave it blank to generate one.'));
+
+            return;
+        }
+
+        $password = $typed !== '' ? $typed : Str::password(24, letters: true, numbers: true, symbols: false, spaces: false);
 
         // A secret, not an arg: args are stored in the run row and audit log.
         // Revealed only once the command is queued — never for a failed call.
@@ -2152,7 +2189,16 @@ class WordPressSection extends Component
             return;
         }
 
-        // Shown once, like every other generated credential in dply.
+        // Typed: they already know it — never echo it back.
+        if ($typed !== '') {
+            $this->resettingPasswordLogin = null;
+            $this->toastSuccess(__('Queued: new password for :login.', ['login' => $login]));
+
+            return;
+        }
+
+        // Generated: shown once, in the row they clicked, like every other
+        // generated credential in dply.
         $this->revealedUserPassword = $password;
         $this->revealedUserLogin = $login;
         $this->toastSuccess(__('Password reset for :login — copy it now.', ['login' => $login]));
@@ -2241,6 +2287,7 @@ class WordPressSection extends Component
         $this->editUserEmail = $user['email'];
         $this->editUserDisplayName = $user['name'];
         $this->deletingUserId = null;
+        $this->resettingPasswordLogin = null;
     }
 
     public function cancelEditUser(): void

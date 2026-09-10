@@ -1278,3 +1278,44 @@ test('hardening quick fixes queue the right work, and wp-cron is left to the Cro
         ->and(RemoteCliRun::query()->where('command', 'config set')->sole()->args)->toBe(['DISALLOW_FILE_MODS', 'true', '--raw', '--type=constant']);
     Queue::assertPushed(SiteResetPermissionsJob::class);
 });
+
+test('reset password takes a typed password as a secret and never echoes it back', function () {
+    [$user, $site] = makeWpSite();
+    $typed = 'my own pa$$"word';
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->call('startResetUserPassword', 'jo')
+        ->assertSet('resettingPasswordLogin', 'jo')
+        ->set('resetPasswordValue', $typed)
+        ->call('resetUserPassword', 'jo')
+        ->assertHasNoErrors()
+        ->assertSet('resetPasswordValue', '')
+        ->assertSet('resettingPasswordLogin', null);
+
+    expect($component->instance()->revealedUserPassword())->toBeNull();
+
+    $run = RemoteCliRun::query()->where('command', 'user update')->sole();
+    expect($run->args)->toBe(['jo', '--skip-email', '--user_pass=[redacted]'])
+        ->and(Queue::pushed(RunRemoteCliInBackgroundJob::class)->sole()->secrets)->toBe(['user_pass' => $typed]);
+});
+
+test('reset password rejects a short typed password and a blank one generates', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->call('startResetUserPassword', 'jo')
+        ->set('resetPasswordValue', 'short')
+        ->call('resetUserPassword', 'jo')
+        ->assertHasErrors('users');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+
+    $component->call('resetUserPassword', 'jo')->assertHasNoErrors();
+
+    expect($component->instance()->revealedUserPassword())->toBeString()->not->toBe('')
+        ->and($component->get('resettingPasswordLogin'))->toBe('jo');
+});
