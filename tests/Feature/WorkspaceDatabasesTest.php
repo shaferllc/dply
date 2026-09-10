@@ -935,3 +935,33 @@ test('project viewer cannot open a credentials modal by setting the locked id', 
         ->test(WorkspaceDatabases::class, ['server' => $server])
         ->assertDontSee('super-secret-pw');
 });
+
+test('credentials modal shows placeholders for an adopted database instead of blank credentials', function () {
+    $owner = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($owner->id, ['role' => 'owner']);
+    $workspace = Workspace::factory()->create(['organization_id' => $org->id]);
+    $server = Server::factory()->create([
+        'user_id' => $owner->id,
+        'organization_id' => $org->id,
+        'workspace_id' => $workspace->id,
+        'status' => Server::STATUS_READY,
+    ]);
+    $db = ServerDatabase::query()->create([
+        'server_id' => $server->id,
+        'name' => 'adopteddb',
+        'engine' => 'mysql',
+        'username' => '',
+        'password' => '',
+        'credentials_known' => false,
+        'status' => 'ready',
+    ]);
+    session(['current_organization_id' => $org->id]);
+
+    Livewire::actingAs($owner)
+        ->test(WorkspaceDatabases::class, ['server' => $server])
+        ->call('openCredentialsModal', $db->id)
+        ->assertSee('Not held by dply')
+        ->assertSee('mysql://USER:PASSWORD@127.0.0.1:3306/adopteddb')
+        ->assertDontSee('mysql://:@');
+});

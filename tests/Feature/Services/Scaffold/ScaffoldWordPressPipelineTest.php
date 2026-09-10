@@ -129,6 +129,22 @@ test('falls back to mysql when server engine is postgres', function () {
     $db = ServerDatabase::query()->sole();
     expect($db->engine)->toBe('mysql84', 'Pipeline must fall back to mysql84 when server engine is incompatible');
 });
+test('keeps a bare mariadb engine instead of filing it as mysql84', function () {
+    $site = makeScaffoldingSite(serverEngine: 'mariadb');
+
+    $prereqs = Mockery::mock(ScaffoldPrerequisites::class);
+    $prereqs->shouldReceive('ensureWpCli')->andReturn(PrerequisiteResult::alreadyPresent('wp-cli'));
+
+    $dbProvisioner = Mockery::mock(ServerDatabaseProvisioner::class);
+    $dbProvisioner->shouldReceive('createOnServer')->andReturn('ok');
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
+
+    (new ScaffoldWordPressPipeline($prereqs, $dbProvisioner, $executor, app(SiteAuditWriter::class), placeholderDnsAlwaysAssigns()))->run($site);
+
+    expect(ServerDatabase::query()->sole()->engine)->toBe('mariadb');
+});
 test('failed wp install marks failed and audits', function () {
     $site = makeScaffoldingSite();
 

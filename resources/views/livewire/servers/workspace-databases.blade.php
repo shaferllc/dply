@@ -215,8 +215,11 @@
             @php
                 $cDb = $credentialsModalDatabase;
                 $cPort = $cDb->defaultPort();
-                $cUser = rawurlencode((string) $cDb->username);
-                $cPass = rawurlencode((string) $cDb->password);
+                // Adopted databases hold no password (and often no owner) — show
+                // placeholders in the URLs rather than a broken `mysql://:@…`.
+                $cKnown = $cDb->hasUsableCredentials();
+                $cUser = rawurlencode((string) $cDb->username) ?: 'USER';
+                $cPass = $cKnown ? rawurlencode((string) $cDb->password) : 'PASSWORD';
                 $cName = $cDb->name;
                 $cEngine = $cDb->engine;
 
@@ -268,17 +271,28 @@
                         <div class="max-h-[65vh] divide-y divide-brand-ink/5 overflow-y-auto">
 
                             {{-- Core credentials --}}
+                            @unless ($cKnown)
+                                <div class="px-6 pt-5">
+                                    <div class="flex items-start gap-2 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                                        <span>{{ __('This database was adopted from the server, so dply does not hold its credentials. The URLs below use USER / PASSWORD placeholders — or rotate the password to let dply manage it.') }}</span>
+                                    </div>
+                                </div>
+                            @endunless
                             <div class="grid gap-3 px-6 py-5 sm:grid-cols-2">
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
                                     <div class="flex items-center justify-between">
                                         <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
-                                        <button class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->username), 'user')">
-                                            <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
-                                            <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
-                                        </button>
+                                        @if (filled($cDb->username))
+                                            <button class="text-xs font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->username), 'user')">
+                                                <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        @endif
                                     </div>
-                                    <p class="mt-0.5 font-mono text-sm text-brand-ink">{{ $cDb->username }}</p>
+                                    <p class="mt-0.5 font-mono text-sm text-brand-ink">{{ $cDb->username ?: '—' }}</p>
                                 </div>
+                                @if ($cKnown)
                                 <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3" x-data="{ showPw: false }">
                                     <div class="flex items-center justify-between">
                                         <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
@@ -297,6 +311,12 @@
                                         :title="showPw ? '' : 'Click to reveal'"
                                     >{{ $cDb->password }}</p>
                                 </div>
+                                @else
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                        <p class="text-2xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
+                                        <p class="mt-0.5 text-sm text-brand-mist">{{ __('Not held by dply') }}</p>
+                                    </div>
+                                @endif
                             </div>
 
                             {{-- Local connection --}}

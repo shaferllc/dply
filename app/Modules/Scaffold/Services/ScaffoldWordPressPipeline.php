@@ -14,6 +14,7 @@ use App\Modules\RemoteCli\Services\WpCli;
 use App\Notifications\SiteDatabaseCredentialsNotification;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -216,7 +217,10 @@ class ScaffoldWordPressPipeline
         // declared engine is something else (the v1 wizard tile is
         // disabled on Postgres-only hosts so we shouldn't reach here
         // with an incompatible engine).
-        if (! in_array($engine, ['mysql84', 'mysql80', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
+        // Family check, not an id allowlist: InstalledStack reports plain
+        // `mariadb` on some hosts, and forcing that to mysql84 filed the row
+        // under the wrong engine — the MariaDB scan then saw it as untracked.
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($engine)) {
             $engine = 'mysql84';
         }
 
