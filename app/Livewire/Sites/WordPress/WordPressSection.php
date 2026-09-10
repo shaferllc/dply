@@ -354,6 +354,15 @@ class WordPressSection extends Component
             'tunnel' => $reason === null
                 ? DatabaseJumpHostAccess::tunnelCommandsFor($target, $server, DatabaseJumpHostAccess::BASE_LOCAL_PORT)
                 : null,
+            // One click into TablePlus once that tunnel is up. The link carries
+            // no secret — the controller reads the password server-side.
+            'openLink' => $reason === null && $db->hasUsableCredentials()
+                ? url()->temporarySignedRoute('sites.databases.server-connect-link', now()->addMinutes(30), [
+                    'server' => $server->id,
+                    'site' => $this->site->id,
+                    'database' => $db->id,
+                ])
+                : null,
         ];
     }
 

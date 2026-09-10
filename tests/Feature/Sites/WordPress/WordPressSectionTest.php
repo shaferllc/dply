@@ -1339,6 +1339,7 @@ test('database tab shows remote access for the site database', function () {
         ->assertSee('Remote access')
         ->assertSee('dply_wpremote')
         ->assertSeeHtml(':127.0.0.1:3306')
+        ->assertSee('Open in TablePlus')
         // The password never reaches the page.
         ->assertDontSee('secret');
 });

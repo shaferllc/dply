@@ -100,7 +100,8 @@ test('happy path walks every step', function () {
     expect($site->meta['scaffold']['hardening'])->toHaveCount(6);
 
     $db = ServerDatabase::query()->sole();
-    expect($db->engine)->toBe('mariadb114');
+    expect($db->engine)->toBe('mariadb114')
+        ->and($db->site_id)->toBe($site->id);
 
     // Each opinion writes its own audit row.
     $opinionAudits = SiteAuditEvent::query()->where('action', 'scaffold_default_applied')->get();

@@ -231,6 +231,7 @@ class ScaffoldLaravelPipeline
             // but recording the row gives operators a way to manage it.
             $db = new ServerDatabase([
                 'server_id' => $site->server->id,
+                'site_id' => $site->id,
                 'name' => 'dply_'.Str::slug($site->slug, '_'),
                 'username' => '',
                 'password' => '',
@@ -277,6 +278,8 @@ class ScaffoldLaravelPipeline
         ]);
         if (! $db->exists) {
             $db->fill([
+                // Without site_id the site's Database tab never lists it.
+                'site_id' => $site->id,
                 'username' => $username,
                 'password' => Str::password(24, symbols: false),
                 'engine' => $engine,

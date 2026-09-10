@@ -41,6 +41,15 @@
                         ['label' => __('Terminal client'), 'command' => $dbRemote['tunnel']['connect']],
                     ]" :summary="__('Tunnel commands')" />
                 </div>
+                @if ($dbRemote['openLink'] ?? null)
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <a href="{{ $dbRemote['openLink'] }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-forest/90">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
+                            {{ __('Open in TablePlus') }}
+                        </a>
+                        <span class="text-xs text-brand-moss">{{ __('Password included — start the tunnel first.') }}</span>
+                    </div>
+                @endif
             @else
                 <p class="mt-2 text-xs text-brand-moss">{{ __('The site’s server is not ready for SSH, so a tunnel cannot be built yet.') }}</p>
             @endif

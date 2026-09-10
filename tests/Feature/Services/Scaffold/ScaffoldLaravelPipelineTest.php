@@ -113,6 +113,7 @@ test('happy path walks all steps and settles pending', function () {
     $db = ServerDatabase::query()->sole();
     expect($db->name)->toBe('dply_my_laravel_app');
     expect($db->engine)->toBe('mysql84');
+    expect($db->site_id)->toBe($site->id);
 
     // Audit event for the success.
     $event = SiteAuditEvent::query()->where('action', 'scaffold_completed')->sole();

@@ -24,6 +24,7 @@ use App\Http\Controllers\Sites\DatabaseConnectionUriController;
 use App\Http\Controllers\Sites\DatabaseConnectLinkController;
 use App\Http\Controllers\Sites\DatabaseTerminalScriptController;
 use App\Http\Controllers\Sites\DatabaseTunnelInstallController;
+use App\Http\Controllers\Sites\ServerDatabaseConnectLinkController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
@@ -723,6 +724,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/databases/{binding}/connect-link', DatabaseConnectLinkController::class)
         ->middleware('signed')
         ->name('sites.databases.connect-link');
+    // Same, for a site's own on-box database (a ServerDatabase with no binding).
+    Route::get('servers/{server}/sites/{site}/databases/server/{database}/connect-link', ServerDatabaseConnectLinkController::class)
+        ->middleware('signed')
+        ->name('sites.databases.server-connect-link');
     // Quick downloads now queue + stage to the download bucket; this signed,
     // login-gated route streams the staged artifact once then deletes it.
     Route::get('quick-downloads/{quickDownload}/fetch', [QuickDownloadController::class, 'fetch'])

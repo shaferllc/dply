@@ -8,6 +8,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudDatabaseTrustedSource;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
@@ -84,6 +85,34 @@ test('an authorized operator gets a hand-off carrying the credential', function 
     $cacheControl = $response->headers->get('Cache-Control') ?? '';
     expect($cacheControl)->toContain('no-store')
         ->and($cacheControl)->toContain('private');
+});
+
+test('a site database link hands off its stored password on the tunnel port', function (): void {
+    [$user, $site] = connectLinkFixture();
+    $db = ServerDatabase::query()->create([
+        'server_id' => $site->server_id,
+        'site_id' => $site->id,
+        'name' => 'dply_blog',
+        'engine' => 'mariadb',
+        'username' => 'dply_blog',
+        'password' => 'wp-secret',
+        'host' => 'localhost',
+    ]);
+    $url = URL::temporarySignedRoute('sites.databases.server-connect-link', now()->addMinutes(2), [
+        'server' => $site->server_id,
+        'site' => $site->id,
+        'database' => $db->id,
+    ]);
+
+    $this->actingAs($user)->get($url)
+        ->assertOk()
+        ->assertSee('wp-secret', escape: false)
+        ->assertSee('127.0.0.1:15432', escape: false)
+        ->assertHeader('Referrer-Policy', 'no-referrer');
+
+    // dply no longer holds the password (e.g. adopted) → nothing to hand off.
+    $db->update(['credentials_known' => false]);
+    $this->actingAs($user)->get($url)->assertNotFound();
 });
 
 test('the tunnel variant points at the forwarded local port', function (): void {
