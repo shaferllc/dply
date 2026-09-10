@@ -36,6 +36,7 @@
                 'tools' => ['label' => __('Tools'), 'icon' => 'heroicon-o-wrench-screwdriver'],
                 'hardening' => ['label' => __('Hardening'), 'icon' => 'heroicon-o-shield-check'],
             ] as $key => $meta)
+                @continue($key === 'git' && ! $gitSourcesSupported)
                 <x-server-workspace-tab :icon="$meta['icon']" :active="$tab === $key" wire:click="$set('tab', '{{ $key }}')">
                     {{ $meta['label'] }}
                 </x-server-workspace-tab>
@@ -231,7 +232,7 @@
     {{-- USERS --}}
     {{-- Themes & plugins from their own repos — its own component (a separate
          form and job flow), embedded so the WordPress tabs stay one click away. --}}
-    @if ($tab === 'git')
+    @if ($tab === 'git' && $gitSourcesSupported)
         @livewire('sites.git-sources', ['server' => $site->server, 'site' => $site], key('wp-git-sources-'.$site->id))
     @endif
 

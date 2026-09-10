@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites;
 
 use App\Jobs\ProvisionSiteJob;
+use App\Jobs\RestartSiteProvisioningJob;
 use App\Livewire\Sites\Show;
 use App\Models\Organization;
 use App\Models\Server;
@@ -42,7 +43,7 @@ test('restart fresh delegates cleanup and requeues provisioning', function (): v
         ->call('restartProvisioningFresh')
         ->assertHasNoErrors();
 
-    Queue::assertPushed(\App\Jobs\RestartSiteProvisioningJob::class, function (\App\Jobs\RestartSiteProvisioningJob $job) use ($site): bool {
+    Queue::assertPushed(RestartSiteProvisioningJob::class, function (RestartSiteProvisioningJob $job) use ($site): bool {
         return $job->siteId === (string) $site->id;
     });
 });

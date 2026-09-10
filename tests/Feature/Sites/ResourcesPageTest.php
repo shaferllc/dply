@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\ResourcesPageTest;
 
 use App\Enums\SiteType;
-use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
-use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
 use App\Livewire\Sites\Resources;
 use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
@@ -16,6 +14,8 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\Cloud\Backends\CloudRouter;
+use App\Modules\Cloud\Jobs\SyncCloudWorkersJob;
+use App\Modules\Database\Jobs\AttachCloudDatabaseJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;

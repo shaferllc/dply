@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\RemoteCli\Services;
 
+use App\Policies\SitePolicy;
+
 /**
  * Risk classification applied to every wp-cli / artisan command before
  * dispatch. Drives the permission gate (Q17): read requires site view;
@@ -20,7 +22,7 @@ enum RiskLevel: string
     /**
      * Changes state but the change is straightforward to back out
      * (install a plugin → uninstall it; migrate forward → migrate
-     * back). Requires {@see \App\Policies\SitePolicy::update}.
+     * back). Requires {@see SitePolicy::update}.
      */
     case MutatingRecoverable = 'mutating_recoverable';
 

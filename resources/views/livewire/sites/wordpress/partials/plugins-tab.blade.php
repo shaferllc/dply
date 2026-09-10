@@ -6,11 +6,13 @@
         </div>
         <div class="ml-auto flex shrink-0 flex-wrap items-center gap-2">
             {{-- Shortcut to the Git tab, where plugins from their own repos live. --}}
+            @if ($gitSourcesSupported)
             <button type="button" wire:click="$set('tab', 'git')"
                 class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                 <x-heroicon-o-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
                 {{ __('From Git') }}
             </button>
+            @endif
             @if ($pluginsLoaded && $canMutate && collect($plugins)->where('update', 'available')->isNotEmpty())
                 <button
                     type="button"

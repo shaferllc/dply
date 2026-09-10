@@ -10,16 +10,21 @@ use App\Models\Organization;
 use App\Models\RemoteCliRun;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceMember;
+use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
 use App\Modules\RemoteCli\Services\Kind;
+use App\Modules\RemoteCli\Services\RiskLevel;
+use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WordPress\Advisories\Advisory;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Mockery;
@@ -739,4 +744,172 @@ test('switch to system cron records handler on meta', function () {
 
     $site->refresh();
     expect($site->meta['wp_cron']['handler'])->toBe('system_cron');
+});
+
+test('installing a theme from the directory pins the version and does not activate unless asked', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('themeDetail', [
+            'slug' => 'twentytwentyfive', 'versions' => ['1.5', '1.4'],
+            'compatibility' => ['blockers' => [], 'warnings' => []],
+        ])
+        ->set('themeDetailVersion', '1.4')
+        ->call('installThemeFromDirectory')
+        ->assertSet('themeDetail', null);
+
+    $run = RemoteCliRun::query()->where('command', 'theme install')->sole();
+    expect($run->args)->toBe(['twentytwentyfive', '--version=1.4', '--force']);
+});
+
+test('child theme scaffolds from an installed parent without activating it', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('themes', [['name' => 'twentytwentyfour', 'title' => 'Twenty Twenty-Four', 'status' => 'active', 'version' => '1.6', 'update' => 'none', 'auto_update' => 'off']])
+        ->call('createChildTheme', 'twentytwentyfour')
+        ->assertHasNoErrors();
+
+    $run = RemoteCliRun::query()->where('command', 'scaffold child-theme')->sole();
+    expect($run->args)->toBe(['twentytwentyfour-child', '--parent_theme=twentytwentyfour', '--theme_name=Twenty Twenty-Four Child']);
+});
+
+test('child theme is refused for a theme that is not installed', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->call('createChildTheme', 'not-here')
+        ->assertHasErrors('themes');
+
+    expect(RemoteCliRun::query()->count())->toBe(0);
+});
+
+/** Users tab rows as loadUsers() shapes them. */
+function wpUsersFixture(): array
+{
+    return [
+        ['id' => '1', 'login' => 'admin', 'name' => 'Site Admin', 'email' => 'admin@example.com', 'roles' => 'administrator'],
+        ['id' => '2', 'login' => 'jo', 'name' => 'Jo Writer', 'email' => 'jo@example.com', 'roles' => 'editor'],
+    ];
+}
+
+test('creating a user sends the password to the box but never stores it', function () {
+    [$user, $site] = makeWpSite();
+
+    $shell = [];
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')
+        ->andReturnUsing(function ($server, $name, $bash) use (&$shell) {
+            $shell[] = $bash;
+
+            return new ProcessOutput('3', 0, false);
+        });
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->set('newUserLogin', 'newbie')
+        ->set('newUserEmail', 'newbie@example.com')
+        ->set('newUserRole', 'author')
+        ->call('createUser')
+        ->assertHasNoErrors();
+
+    $password = $component->instance()->revealedUserPassword();
+    expect($password)->toBeString()->not->toBe('');
+
+    $run = RemoteCliRun::query()->where('command', 'user create')->sole();
+    expect($run->args)->toBe(['newbie', 'newbie@example.com', '--role=author', '--porcelain', '--user_pass=[redacted]']);
+
+    // The queue is faked in this file: the real value rides only in the
+    // (encrypted) job payload. Run that job to prove the box gets it…
+    $job = Queue::pushed(RunRemoteCliInBackgroundJob::class)->sole();
+    expect($job->secrets)->toBe(['user_pass' => $password]);
+    $job->handle(app(ExecuteRemoteTaskOnServer::class), app(SiteAuditWriter::class));
+
+    expect(implode("\n", $shell))->toContain('--user_pass='.$password)
+        // …while the run row and the audit event (written by the job) never hold it.
+        ->and(RemoteCliRun::query()->get()->toJson())->not->toContain($password)
+        ->and(SiteAuditEvent::query()->get()->toJson())->not->toContain($password)
+        ->and(SiteAuditEvent::query()->count())->toBeGreaterThan(0);
+});
+
+test('a queued run whose secret is missing fails closed instead of running the placeholder', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldNotReceive('runInlineBashWithOutputCallback');
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    $run = RemoteCliRun::query()->create([
+        'site_id' => $site->id,
+        'kind' => Kind::Wp,
+        'command' => 'user update',
+        'args' => ['admin', '--skip-email', '--user_pass=[redacted]'],
+        'risk' => RiskLevel::MutatingRecoverable,
+        'mode' => RemoteCliRun::MODE_ASYNC,
+        'status' => RemoteCliRun::STATUS_QUEUED,
+        'queued_by_user_id' => $user->id,
+    ]);
+
+    // No secrets in the payload.
+    (new RunRemoteCliInBackgroundJob($run->id))
+        ->handle($executor, app(SiteAuditWriter::class));
+
+    expect($run->fresh()->status)->toBe(RemoteCliRun::STATUS_FAILED);
+});
+
+test('the only administrator cannot be deleted', function () {
+    [$user, $site] = makeWpSite();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->call('startDeleteUser', '1')
+        ->assertHasErrors('users')
+        ->assertSet('deletingUserId', null);
+});
+
+test('deleting a user hands their content to the chosen heir', function () {
+    [$user, $site] = makeWpSite();
+
+    $executor = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $executor->shouldReceive('runInlineBashWithOutputCallback')->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $executor);
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->call('startDeleteUser', '2')
+        // Defaults to another administrator.
+        ->assertSet('deleteReassignTo', '1')
+        ->call('deleteUser')
+        ->assertSet('deletingUserId', null);
+
+    $run = RemoteCliRun::query()->where('command', 'user delete')->sole();
+    expect($run->args)->toBe(['2', '--reassign=1', '--yes']);
+});
+
+test('the user list filters by role and search text', function () {
+    [$user, $site] = makeWpSite();
+
+    $component = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('users', wpUsersFixture())
+        ->set('userRoleFilter', 'editor');
+    expect(array_column($component->instance()->filteredUsers(), 'login'))->toBe(['jo']);
+
+    $component->set('userRoleFilter', '')->set('userFilter', 'ADMIN@');
+    expect(array_column($component->instance()->filteredUsers(), 'login'))->toBe(['admin']);
 });

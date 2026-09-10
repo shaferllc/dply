@@ -16,9 +16,11 @@ use App\Modules\RemoteCli\Services\RiskLevel;
 use App\Modules\RemoteCli\Services\WpCli;
 use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
 use App\Modules\Snapshots\Services\SnapshotService;
+use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\PluginDirectory;
+use App\Services\WordPress\ThemeDirectory;
 use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -97,11 +99,39 @@ class WordPressSection extends Component
     /** Slug typed into the "Install theme" box. */
     public string $themeInstallSlug = '';
 
+    /** Term for the WordPress.org theme search (debounced autocomplete). */
+    public string $themeSearch = '';
+
+    /** @var list<array<string, mixed>> */
+    public array $themeSuggestions = [];
+
+    /** @var list<array<string, mixed>> Popular/featured/new picks not already installed. */
+    public array $themeRecommendations = [];
+
+    public string $themeRecommendationList = 'popular';
+
+    public bool $themeRecommendationsLoaded = false;
+
+    /** @var array<string, mixed>|null WordPress.org details for the theme being considered. */
+    public ?array $themeDetail = null;
+
+    /** Empty = latest. A pinned version doubles as rollback for an installed theme. */
+    public string $themeDetailVersion = '';
+
+    /**
+     * Off by default: activating swaps the live front end at once, and
+     * customizer settings and menu locations are stored per theme.
+     */
+    public bool $themeDetailActivate = false;
+
+    /** @var list<string> Installed theme slugs ticked for a bulk action. */
+    public array $selectedThemes = [];
+
     /**
      * Themes-tab cache. Populated by loadThemes() from
      * `wp theme list --format=json`.
      *
-     * @var list<array{name: string, status: string, version: string, update: string}>
+     * @var list<array{name: string, title: string, status: string, version: string, update: string, auto_update: string}>
      */
     public array $themes = [];
 
@@ -116,6 +146,35 @@ class WordPressSection extends Component
     public array $users = [];
 
     public bool $usersLoaded = false;
+
+    // ── Users tab: filter, create, edit, delete ─────────────────────────────
+    public string $userFilter = '';
+
+    public string $userRoleFilter = '';
+
+    public bool $showCreateUser = false;
+
+    public string $newUserLogin = '';
+
+    public string $newUserEmail = '';
+
+    public string $newUserDisplayName = '';
+
+    public string $newUserRole = 'editor';
+
+    /** Let WordPress email the new user their account details too. */
+    public bool $newUserSendEmail = false;
+
+    public ?string $editingUserId = null;
+
+    public string $editUserEmail = '';
+
+    public string $editUserDisplayName = '';
+
+    public ?string $deletingUserId = null;
+
+    /** Who inherits the deleted user's posts and pages. */
+    public string $deleteReassignTo = '';
 
     /**
      * Core-tab cache. Populated by loadCore() from `wp core version`
@@ -163,6 +222,8 @@ class WordPressSection extends Component
 
     protected ?string $revealedUserLogin = null;
 
+    private const WP_ROLES = ['administrator', 'editor', 'author', 'contributor', 'subscriber'];
+
     public function mount(Site $site): void
     {
         $this->authorize('view', $site);
@@ -187,6 +248,9 @@ class WordPressSection extends Component
             'snapshots' => $this->snapshots(),
             'canMutate' => $permissions->can($user, $this->site, RiskLevel::MutatingRecoverable),
             'canDestroy' => $permissions->can($user, $this->site, RiskLevel::Destructive),
+            // Narrower than isWordPressDetected() on purpose: a git-deployed WordPress
+            // would have its cloned themes overwritten by the next deploy.
+            'gitSourcesSupported' => app(GitSourceMaterializerFactory::class)->supports($this->site),
         ]);
     }
 
@@ -418,7 +482,8 @@ class WordPressSection extends Component
     public function loadThemes(WpCli $wpcli): void
     {
         $this->resetErrorBag('themes');
-        $rows = $this->readJsonRows($wpcli, 'theme list', ['--format=json'], 'themes');
+        // `title` names child themes after their parent's real display name.
+        $rows = $this->readJsonRows($wpcli, 'theme list', ['--fields=name,title,status,version,update,auto_update', '--format=json'], 'themes');
         if ($rows === null) {
             $this->themes = [];
             $this->themesLoaded = true;
@@ -428,6 +493,7 @@ class WordPressSection extends Component
 
         $this->themes = array_map(static fn (array $row): array => [
             'name' => (string) ($row['name'] ?? ''),
+            'title' => (string) ($row['title'] ?? ''),
             'status' => (string) ($row['status'] ?? ''),
             'version' => (string) ($row['version'] ?? ''),
             'update' => (string) ($row['update'] ?? 'none'),
@@ -856,7 +922,8 @@ class WordPressSection extends Component
         return $this->revealedUserLogin;
     }
 
-    private function wp(WpCli $wpcli, string $command, array $args = [], bool $mutating = true, string $errorBag = 'tools'): ?string
+    /** @param  array<string, string>  $secrets  Passed to the box, redacted in the run row and audit log. */
+    private function wp(WpCli $wpcli, string $command, array $args = [], bool $mutating = true, string $errorBag = 'tools', array $secrets = []): ?string
     {
         if ($mutating) {
             $this->authorize('update', $this->site);
@@ -868,6 +935,7 @@ class WordPressSection extends Component
                 command: $command,
                 args: $args,
                 queuedBy: auth()->user(),
+                secrets: $secrets,
             )->stdout());
         } catch (RemoteCliPermissionDeniedException) {
             $this->addError($errorBag, __('Your role can\'t run that on this site.'));
@@ -1104,9 +1172,19 @@ class WordPressSection extends Component
      */
     public function resetUserPassword(string $login, WpCli $wpcli): void
     {
+        if (! $this->isValidUserLogin($login)) {
+            $this->addError('users', __('Unknown user.'));
+
+            return;
+        }
+
         $password = Str::password(24, letters: true, numbers: true, symbols: false, spaces: false);
 
-        $this->wp($wpcli, 'user update', [$login, '--user_pass='.$password, '--skip-email']);
+        // A secret, not an arg: args are stored in the run row and audit log.
+        // Revealed only once the command is queued — never for a failed call.
+        if ($this->wp($wpcli, 'user update', [$login, '--skip-email'], errorBag: 'users', secrets: ['user_pass' => $password]) === null) {
+            return;
+        }
 
         // Shown once, like every other generated credential in dply.
         $this->revealedUserPassword = $password;
@@ -1116,15 +1194,259 @@ class WordPressSection extends Component
 
     public function changeUserRole(string $login, string $role, WpCli $wpcli): void
     {
-        $allowed = ['administrator', 'editor', 'author', 'contributor', 'subscriber'];
-        if (! in_array($role, $allowed, true)) {
+        if (! in_array($role, self::WP_ROLES, true) || ! $this->isValidUserLogin($login)) {
             $this->addError('users', __('Unknown role.'));
 
             return;
         }
 
-        $this->wp($wpcli, 'user set-role', [$login, $role]);
+        if ($this->wp($wpcli, 'user set-role', [$login, $role], errorBag: 'users') === null) {
+            return;
+        }
         $this->toastSuccess(__(':login is now :role.', ['login' => $login, 'role' => $role]));
+    }
+
+    /**
+     * Create a WordPress user with a generated password, shown once. The
+     * password travels as a RemoteCli secret, so the run row and audit log
+     * record `--user_pass=[redacted]`.
+     */
+    public function createUser(WpCli $wpcli): void
+    {
+        $login = trim($this->newUserLogin);
+        $email = trim($this->newUserEmail);
+        $name = trim($this->newUserDisplayName);
+
+        // Positional args: a leading dash would be read by wp-cli as a flag,
+        // escaping or not — the login pattern and the email check both refuse it.
+        if (preg_match('/^[A-Za-z0-9][A-Za-z0-9._@-]{0,59}$/', $login) !== 1) {
+            $this->addError('users', __('Use letters, numbers, dots, dashes, underscores or @ for the username.'));
+
+            return;
+        }
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || str_starts_with($email, '-')) {
+            $this->addError('users', __('Enter a valid email address.'));
+
+            return;
+        }
+        if (! in_array($this->newUserRole, self::WP_ROLES, true)) {
+            $this->addError('users', __('Unknown role.'));
+
+            return;
+        }
+        if (! $this->isValidDisplayName($name)) {
+            $this->addError('users', __('Keep the display name under 250 characters, on one line.'));
+
+            return;
+        }
+        if (collect($this->users)->contains(fn (array $u): bool => strcasecmp($u['login'], $login) === 0 || strcasecmp($u['email'], $email) === 0)) {
+            $this->addError('users', __('A user with that username or email already exists.'));
+
+            return;
+        }
+
+        $args = [$login, $email, '--role='.$this->newUserRole, '--porcelain'];
+        if ($name !== '') {
+            $args[] = '--display_name='.$name;
+        }
+        if ($this->newUserSendEmail) {
+            $args[] = '--send-email';
+        }
+
+        $password = Str::password(24, letters: true, numbers: true, symbols: false, spaces: false);
+        if ($this->wp($wpcli, 'user create', $args, errorBag: 'users', secrets: ['user_pass' => $password]) === null) {
+            return;
+        }
+
+        $this->revealedUserPassword = $password;
+        $this->revealedUserLogin = $login;
+        $this->reset('newUserLogin', 'newUserEmail', 'newUserDisplayName', 'newUserRole', 'newUserSendEmail', 'showCreateUser');
+        $this->toastSuccess(__('Queued: creating :login — copy the password now.', ['login' => $login]));
+    }
+
+    public function startEditUser(string $id): void
+    {
+        $user = $this->findWpUser($id);
+        if ($user === null) {
+            return;
+        }
+
+        $this->editingUserId = $user['id'];
+        $this->editUserEmail = $user['email'];
+        $this->editUserDisplayName = $user['name'];
+        $this->deletingUserId = null;
+    }
+
+    public function cancelEditUser(): void
+    {
+        $this->editingUserId = null;
+    }
+
+    public function saveUser(WpCli $wpcli): void
+    {
+        $user = $this->findWpUser((string) $this->editingUserId);
+        if ($user === null) {
+            return;
+        }
+
+        $email = trim($this->editUserEmail);
+        $name = trim($this->editUserDisplayName);
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            $this->addError('users', __('Enter a valid email address.'));
+
+            return;
+        }
+        if (! $this->isValidDisplayName($name)) {
+            $this->addError('users', __('Keep the display name under 250 characters, on one line.'));
+
+            return;
+        }
+
+        $args = [$user['id']];
+        if ($email !== $user['email']) {
+            $args[] = '--user_email='.$email;
+        }
+        if ($name !== $user['name']) {
+            $args[] = '--display_name='.$name;
+        }
+
+        if (count($args) > 1) {
+            // --skip-email: no "your email changed" notice from a dashboard edit.
+            $args[] = '--skip-email';
+            if ($this->wp($wpcli, 'user update', $args, errorBag: 'users') === null) {
+                return;
+            }
+            $this->toastSuccess(__('Queued: updating :login.', ['login' => $user['login']]));
+        }
+
+        $this->editingUserId = null;
+    }
+
+    public function startDeleteUser(string $id): void
+    {
+        $user = $this->findWpUser($id);
+        if ($user === null) {
+            return;
+        }
+
+        if ($this->isLastAdministrator($user)) {
+            $this->addError('users', __(':login is the only administrator — make someone else an administrator first.', ['login' => $user['login']]));
+
+            return;
+        }
+
+        // Default heir: another administrator, else anyone else.
+        $others = collect($this->users)->reject(fn (array $u): bool => $u['id'] === $user['id']);
+        $heir = $others->first(fn (array $u): bool => $this->hasRole($u, 'administrator')) ?? $others->first();
+
+        $this->deletingUserId = $user['id'];
+        $this->deleteReassignTo = (string) ($heir['id'] ?? '');
+        $this->editingUserId = null;
+    }
+
+    public function cancelDeleteUser(): void
+    {
+        $this->deletingUserId = null;
+    }
+
+    /**
+     * Delete a user, handing their posts and pages to someone else — never
+     * deleting content along with the account. The last-administrator check is
+     * a guard against accidents, not a control: $users is client state.
+     */
+    public function deleteUser(WpCli $wpcli): void
+    {
+        $user = $this->findWpUser((string) $this->deletingUserId);
+        if ($user === null) {
+            return;
+        }
+
+        if ($this->isLastAdministrator($user)) {
+            $this->addError('users', __(':login is the only administrator — make someone else an administrator first.', ['login' => $user['login']]));
+
+            return;
+        }
+
+        $heir = $this->findWpUser($this->deleteReassignTo);
+        if ($heir === null || $heir['id'] === $user['id']) {
+            $this->addError('users', __('Pick who gets their posts and pages.'));
+
+            return;
+        }
+
+        if ($this->wp($wpcli, 'user delete', [$user['id'], '--reassign='.$heir['id'], '--yes'], errorBag: 'users') === null) {
+            return;
+        }
+
+        $this->deletingUserId = null;
+        $this->toastSuccess(__('Queued: deleting :login. Their content goes to :heir.', ['login' => $user['login'], 'heir' => $heir['login']]));
+    }
+
+    /** Ends every session — the step after a leaked password or a departing admin. */
+    public function logoutUserEverywhere(string $id, WpCli $wpcli): void
+    {
+        $user = $this->findWpUser($id);
+        if ($user === null) {
+            return;
+        }
+
+        if ($this->wp($wpcli, 'user session destroy', [$user['id'], '--all'], errorBag: 'users') === null) {
+            return;
+        }
+        $this->toastSuccess(__('Queued: signing :login out everywhere.', ['login' => $user['login']]));
+    }
+
+    /**
+     * Users matching the search box and role filter. Filtering the loaded list
+     * costs nothing on the box.
+     *
+     * @return list<array{id: string, login: string, name: string, email: string, roles: string}>
+     */
+    public function filteredUsers(): array
+    {
+        $needle = mb_strtolower(trim($this->userFilter));
+
+        return array_values(array_filter($this->users, function (array $u) use ($needle): bool {
+            if ($this->userRoleFilter !== '' && ! $this->hasRole($u, $this->userRoleFilter)) {
+                return false;
+            }
+
+            return $needle === '' || str_contains(mb_strtolower($u['login'].' '.$u['name'].' '.$u['email']), $needle);
+        }));
+    }
+
+    /** @return array{id: string, login: string, name: string, email: string, roles: string}|null */
+    private function findWpUser(string $id): ?array
+    {
+        if ($id === '' || ! ctype_digit($id)) {
+            return null;
+        }
+
+        return collect($this->users)->firstWhere('id', $id);
+    }
+
+    /** @param  array{roles: string}  $user */
+    private function hasRole(array $user, string $role): bool
+    {
+        return in_array($role, array_map('trim', explode(',', $user['roles'])), true);
+    }
+
+    /** @param  array{roles: string}  $user */
+    private function isLastAdministrator(array $user): bool
+    {
+        return $this->hasRole($user, 'administrator')
+            && collect($this->users)->filter(fn (array $u): bool => $this->hasRole($u, 'administrator'))->count() <= 1;
+    }
+
+    /** WordPress logins may hold spaces; never a leading dash (wp-cli would read a flag). */
+    private function isValidUserLogin(string $login): bool
+    {
+        return preg_match('/^[A-Za-z0-9_.@][A-Za-z0-9 _.@-]{0,59}$/', $login) === 1;
+    }
+
+    private function isValidDisplayName(string $name): bool
+    {
+        return mb_strlen($name) <= 250 && preg_match('/[\x00-\x1F\x7F]/', $name) !== 1;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -1142,7 +1464,7 @@ class WordPressSection extends Component
 
         $this->pluginSuggestions = mb_strlen($term) < 2
             ? []
-            : $this->markInstalled(app(PluginDirectory::class)->search($term, 8));
+            : $this->markInstalled(app(PluginDirectory::class)->search($term, 8), $this->plugins);
     }
 
     /** 2. Recommendations: popular or featured, minus what is already installed. */
@@ -1152,7 +1474,7 @@ class WordPressSection extends Component
 
         // Fetch extra so hiding installed plugins still fills the row.
         $picks = array_filter(
-            $this->markInstalled(app(PluginDirectory::class)->browse($list, 16)),
+            $this->markInstalled(app(PluginDirectory::class)->browse($list, 16), $this->plugins),
             static fn (array $p): bool => ! $p['installed'],
         );
 
@@ -1280,16 +1602,202 @@ class WordPressSection extends Component
         $this->selectedPlugins = count($this->selectedPlugins) === count($all) ? [] : $all;
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // Theme directory: the plugin set, adapted — search, recommendations,
+    // details, versions, bulk — plus child themes. Same rule: directory reads
+    // run on the control plane; only installs touch the box.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** 1. Autocomplete, fired by the debounced search input. */
+    public function updatedThemeSearch(): void
+    {
+        $term = trim($this->themeSearch);
+
+        $this->themeSuggestions = mb_strlen($term) < 2
+            ? []
+            : $this->markInstalled(app(ThemeDirectory::class)->search($term, 8), $this->themes);
+    }
+
+    /** 2. Recommendations: popular, featured or new, minus what is already installed. */
+    public function loadThemeRecommendations(): void
+    {
+        $list = match ($this->themeRecommendationList) {
+            'featured' => 'featured',
+            'new' => 'new',
+            default => 'popular',
+        };
+
+        $picks = array_filter(
+            $this->markInstalled(app(ThemeDirectory::class)->browse($list, 12), $this->themes),
+            static fn (array $t): bool => ! $t['installed'],
+        );
+
+        $this->themeRecommendations = array_slice(array_values($picks), 0, 8);
+        $this->themeRecommendationsLoaded = true;
+    }
+
+    public function setThemeRecommendationList(string $list): void
+    {
+        $this->themeRecommendationList = in_array($list, ['featured', 'new'], true) ? $list : 'popular';
+        $this->loadThemeRecommendations();
+    }
+
+    /** 3. Details, screenshot, live demo and a compatibility check before install. */
+    public function showThemeDetail(string $slug, WpCli $wpcli): void
+    {
+        $info = app(ThemeDirectory::class)->info(strtolower(trim($slug)));
+        if ($info === null) {
+            $this->addError('themes', __('Could not load :slug from WordPress.org.', ['slug' => $slug]));
+
+            return;
+        }
+
+        $info['installed'] = $this->isThemeInstalled((string) $info['slug']);
+        $info['compatibility'] = PluginDirectory::compatibility(
+            $info,
+            $this->siteWordPressVersion($wpcli),
+            $this->sitePhpVersion(),
+        );
+
+        $this->themeDetail = $info;
+        $this->themeDetailVersion = '';
+        $this->themeDetailActivate = false;
+        $this->themeSuggestions = [];
+    }
+
+    public function closeThemeDetail(): void
+    {
+        $this->themeDetail = null;
+        $this->themeDetailVersion = '';
+    }
+
     /**
-     * @param  list<array<string, mixed>>  $plugins
+     * 4. Install from the detail card — latest or a pinned version, activated
+     * only when asked. A pinned version with --force rolls back a bad update.
+     */
+    public function installThemeFromDirectory(WpCli $wpcli): void
+    {
+        $slug = (string) ($this->themeDetail['slug'] ?? '');
+        if ($slug === '') {
+            return;
+        }
+
+        $blockers = (array) ($this->themeDetail['compatibility']['blockers'] ?? []);
+        if ($blockers !== []) {
+            $this->addError('themes', implode(' ', $blockers));
+
+            return;
+        }
+
+        $args = $this->themeDetailActivate ? ['--activate'] : [];
+        $version = trim($this->themeDetailVersion);
+        if ($version !== '') {
+            if (! in_array($version, (array) ($this->themeDetail['versions'] ?? []), true)) {
+                $this->addError('themes', __('Pick a version from the list.'));
+
+                return;
+            }
+            $args[] = '--version='.$version;
+            $args[] = '--force';
+        }
+
+        $this->runWpAction($wpcli, 'theme install', $slug, 'themes', $args);
+
+        $this->themeDetail = null;
+        $this->themeDetailVersion = '';
+        $this->themeSearch = '';
+    }
+
+    /**
+     * 5. One action across every ticked theme, as one wp-cli call. Activate is
+     * absent (only one theme can be active) and so is delete (per-row confirm).
+     */
+    public function bulkThemeAction(string $action, WpCli $wpcli): void
+    {
+        $command = match ($action) {
+            'update' => 'theme update',
+            'auto-on' => 'theme auto-updates enable',
+            'auto-off' => 'theme auto-updates disable',
+            default => null,
+        };
+
+        $slugs = array_values(array_filter(
+            $this->selectedThemes,
+            fn (string $slug): bool => $this->isValidSlug($slug) && $this->isThemeInstalled($slug),
+        ));
+
+        if ($command === null || $slugs === []) {
+            return;
+        }
+
+        if ($this->wp($wpcli, $command, $slugs, mutating: true, errorBag: 'themes') === null) {
+            return;
+        }
+
+        $this->selectedThemes = [];
+        $this->toastSuccess(trans_choice('{1} 1 theme queued.|[2,*] :count themes queued.', count($slugs), ['count' => count($slugs)]));
+    }
+
+    public function toggleSelectAllThemes(): void
+    {
+        $all = array_map(static fn (array $t): string => (string) $t['name'], $this->themes);
+        $this->selectedThemes = count($this->selectedThemes) === count($all) ? [] : $all;
+    }
+
+    /**
+     * 6. Child theme — where customizations belong, so a parent update can't
+     * overwrite them.
+     *
+     * Not activated: theme mods (customizer, menu locations) are stored per
+     * theme, so switching would silently reset them. `scaffold` is not on
+     * WpCli's recoverable allowlist, so this runs at the Destructive tier
+     * (admin/owner) — the view gates the button the same way.
+     */
+    public function createChildTheme(string $parent, WpCli $wpcli): void
+    {
+        if (! $this->isValidSlug($parent) || ! $this->isThemeInstalled($parent)) {
+            $this->addError('themes', __('Pick an installed theme.'));
+
+            return;
+        }
+
+        $child = $parent.'-child';
+        if ($this->isThemeInstalled($child)) {
+            $this->addError('themes', __(':child already exists.', ['child' => $child]));
+
+            return;
+        }
+
+        $title = (string) (collect($this->themes)->firstWhere('name', $parent)['title'] ?? '');
+        $args = [$child, '--parent_theme='.$parent, '--theme_name='.($title !== '' ? $title : Str::headline($parent)).' Child'];
+        if ($this->wp($wpcli, 'scaffold child-theme', $args, mutating: true, errorBag: 'themes') === null) {
+            return;
+        }
+
+        $this->toastSuccess(__('Queued: child theme :child. Activate it once it appears — it starts with empty customizer settings.', ['child' => $child]));
+    }
+
+    /**
+     * Tag directory rows with whether the site already has them; wp-cli's
+     * list commands report the slug as `name`.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @param  list<array<string, mixed>>  $installed
      * @return list<array<string, mixed>>
      */
-    private function markInstalled(array $plugins): array
+    private function markInstalled(array $items, array $installed): array
     {
+        $slugs = array_column($installed, 'name');
+
         return array_map(
-            fn (array $p): array => $p + ['installed' => $this->isPluginInstalled((string) ($p['slug'] ?? ''))],
-            $plugins,
+            static fn (array $p): array => $p + ['installed' => in_array((string) ($p['slug'] ?? ''), $slugs, true)],
+            $items,
         );
+    }
+
+    private function isThemeInstalled(string $slug): bool
+    {
+        return $slug !== '' && collect($this->themes)->contains('name', $slug);
     }
 
     /** `wp plugin list` reports the slug as `name`. */

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\CreateContainerModeTest;
 
 use App\Enums\SiteType;
-use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use App\Livewire\Sites\Create as SiteCreate;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Modules\Deploy\Services\LocalRepositoryInspector;
+use App\Modules\Launch\Jobs\FinalizeContainerCloudLaunchJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;

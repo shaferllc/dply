@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\DeployHubFixCardsTest;
 
 use App\Livewire\Sites\DeploymentsList;
+use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -80,11 +81,11 @@ test('fixer output renders inside the fix card not below the timeline', function
         'log_output' => 'psql: command not found',
     ]);
 
-    \App\Models\ConsoleAction::query()->create([
+    ConsoleAction::query()->create([
         'subject_type' => $site->getMorphClass(),
         'subject_id' => $site->id,
         'kind' => 'site_remediate',
-        'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+        'status' => ConsoleAction::STATUS_COMPLETED,
         'label' => 'Install the Postgres client (psql)',
         'output' => [
             'v' => 1,

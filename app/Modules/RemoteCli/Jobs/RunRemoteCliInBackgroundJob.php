@@ -14,6 +14,7 @@ use App\Modules\RemoteCli\Services\SiteAuditWriter;
 use App\Modules\RemoteCli\Services\WpCli;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -32,7 +33,7 @@ use Throwable;
  * Dispatched from {@see RemoteCli::run()} when the requested command
  * isn't on the kind's INSTANT allowlist.
  */
-class RunRemoteCliInBackgroundJob implements ShouldQueue
+class RunRemoteCliInBackgroundJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -44,7 +45,15 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public int $remoteCliRunId) {}
+    /**
+     * @param  array<string, string>  $secrets  Values for the run's `--flag=[redacted]`
+     *                                          args. They live only in this payload
+     *                                          (encrypted at rest in the queue), never
+     *                                          in the run row or the audit log. A retry
+     *                                          re-reads the same payload, so raising
+     *                                          $tries keeps them.
+     */
+    public function __construct(public int $remoteCliRunId, public array $secrets = []) {}
 
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
@@ -72,8 +81,21 @@ class RunRemoteCliInBackgroundJob implements ShouldQueue
             return;
         }
 
+        // Fail closed: a placeholder that survives substitution means its secret
+        // was lost, and running anyway would e.g. set a password to "[redacted]".
+        $args = RemoteCli::withSecrets($run->args ?? [], $this->secrets);
+        if (RemoteCli::hasUnresolvedSecret($args)) {
+            $run->fill([
+                'status' => RemoteCliRun::STATUS_FAILED,
+                'stderr' => 'A secret argument was not available to the worker; refusing to run with a placeholder.',
+                'finished_at' => now(),
+            ])->save();
+
+            return;
+        }
+
         $cli = $this->resolveCli($run->kind, $executor);
-        $shellCommand = $cli->buildShellForRun($site, $run->command, $run->args ?? []);
+        $shellCommand = $cli->buildShellForRun($site, $run->command, $args);
 
         $run->fill([
             'status' => RemoteCliRun::STATUS_RUNNING,

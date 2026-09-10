@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\DelayedDeployTest;
 
 use App\Actions\Sites\ScheduleSiteDeploy;
-use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use App\Models\Organization;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\Deploy\Jobs\RunSiteDeploymentJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 

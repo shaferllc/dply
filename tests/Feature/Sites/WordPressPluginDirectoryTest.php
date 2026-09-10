@@ -95,3 +95,34 @@ test('bulk actions ignore slugs that are not installed', function (): void {
         // Nothing valid to act on, so nothing ran and the selection stands.
         ->assertSet('selectedPlugins', ['not-installed']);
 });
+
+test('typing in the theme search fills suggestions and flags installed themes', function (): void {
+    Http::fake(['api.wordpress.org/themes/*' => Http::response(['themes' => [
+        ['slug' => 'astra', 'name' => 'Astra', 'screenshot_url' => '//ts.w.org/astra.png'],
+    ]])]);
+    [$user, $site] = wpDirectoryFixture();
+
+    $suggestions = Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('themes', [['name' => 'astra', 'status' => 'inactive', 'version' => '4.0', 'update' => 'none', 'auto_update' => 'off']])
+        ->set('themeSearch', 'astra')
+        ->get('themeSuggestions');
+
+    expect($suggestions[0]['installed'])->toBeTrue()
+        ->and($suggestions[0]['screenshot'])->toBe('https://ts.w.org/astra.png');
+});
+
+test('a theme requiring a newer wordpress than the site cannot be installed', function (): void {
+    Http::fake(['api.wordpress.org/themes/*' => Http::response([
+        'slug' => 'needs-new-wp', 'name' => 'Needs New WP', 'version' => '2.0', 'requires' => '6.9',
+        'versions' => ['2.0' => 'x'],
+    ])]);
+    [$user, $site] = wpDirectoryFixture();
+
+    Livewire::actingAs($user)
+        ->test(WordPressSection::class, ['site' => $site])
+        ->set('core', ['version' => '6.6.1', 'update_available' => false, 'latest' => null])
+        ->call('showThemeDetail', 'needs-new-wp')
+        ->call('installThemeFromDirectory')
+        ->assertHasErrors('themes');
+});

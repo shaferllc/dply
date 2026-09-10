@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\User;
 use App\Modules\RemoteCli\Jobs\RunRemoteCliInBackgroundJob;
+use App\Policies\SitePolicy;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -22,7 +23,7 @@ use Throwable;
  *      subclass's static lookup table; unknown commands fall through
  *      to {@see RiskLevel::Destructive} as the failsafe (Q17).
  *   2. Permission gate — {@see RemoteCliPermissions} consults
- *      {@see \App\Policies\SitePolicy}. Read requires view;
+ *      {@see SitePolicy}. Read requires view;
  *      MutatingRecoverable requires update; Destructive requires
  *      update plus org admin/owner. System-triggered runs
  *      ($queuedBy === null) bypass the gate.
@@ -83,10 +84,20 @@ abstract class RemoteCli
         return $this->buildShellCommand($site, $command, $args);
     }
 
+    /** What a secret arg looks like in the run row and the audit log. */
+    public const REDACTED = '[redacted]';
+
     /**
      * Run a command against the given site.
      *
+     * $secrets are flag => value pairs (e.g. ['user_pass' => '…']) passed as
+     * `--flag=value` on the box but stored as `--flag=[redacted]`: run rows and
+     * audit events are readable by every site viewer, so a password in $args
+     * would be a password in the database. The real values reach the worker only
+     * through its encrypted job payload.
+     *
      * @param  list<string>  $args
+     * @param  array<string, string>  $secrets
      *
      * @throws RemoteCliPermissionDeniedException When $queuedBy lacks
      *                                            the role for the command's risk level.
@@ -96,6 +107,7 @@ abstract class RemoteCli
         string $command,
         array $args = [],
         ?User $queuedBy = null,
+        array $secrets = [],
     ): RemoteCliResult {
         $command = trim($command);
         if ($command === '') {
@@ -108,6 +120,16 @@ abstract class RemoteCli
         $this->permissions->ensureCan($queuedBy, $site, $risk, $command);
 
         $mode = $this->isInstant($command) ? RemoteCliRun::MODE_SYNC : RemoteCliRun::MODE_ASYNC;
+
+        foreach (array_keys($secrets) as $flag) {
+            if (preg_match('/^[a-z][a-z_]*$/', (string) $flag) !== 1) {
+                throw new \InvalidArgumentException('RemoteCli secret flags must be lowercase words.');
+            }
+        }
+        $args = array_merge($args, array_map(
+            static fn (string|int $flag): string => '--'.$flag.'='.self::REDACTED,
+            array_keys($secrets),
+        ));
 
         $run = new RemoteCliRun([
             'site_id' => $site->getKey(),
@@ -125,12 +147,12 @@ abstract class RemoteCli
         $run->save();
 
         if ($mode === RemoteCliRun::MODE_SYNC) {
-            return $this->executeSync($site, $run, $args, $queuedBy);
+            return $this->executeSync($site, $run, self::withSecrets($args, $secrets), $queuedBy);
         }
 
         // Async — dispatch the worker. The worker writes the audit row
         // on completion; we record nothing here besides the queued status.
-        RunRemoteCliInBackgroundJob::dispatch($run->id);
+        RunRemoteCliInBackgroundJob::dispatch($run->id, $secrets);
 
         return new RemoteCliResult($run);
     }
@@ -227,6 +249,44 @@ abstract class RemoteCli
         );
     }
 
+    /**
+     * Swap each `--flag=[redacted]` placeholder for its real value.
+     *
+     * @param  list<string>  $args
+     * @param  array<string, string>  $secrets
+     * @return list<string>
+     */
+    public static function withSecrets(array $args, array $secrets): array
+    {
+        return array_map(static function (string $arg) use ($secrets): string {
+            foreach ($secrets as $flag => $value) {
+                if ($arg === '--'.$flag.'='.self::REDACTED) {
+                    return '--'.$flag.'='.$value;
+                }
+            }
+
+            return $arg;
+        }, $args);
+    }
+
+    /**
+     * True when a placeholder survived substitution — its secret was lost. The
+     * caller must refuse to run: `--user_pass=[redacted]` would otherwise set a
+     * password to that literal string.
+     *
+     * @param  list<string>  $args
+     */
+    public static function hasUnresolvedSecret(array $args): bool
+    {
+        foreach ($args as $arg) {
+            if (str_ends_with($arg, '='.self::REDACTED)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function isInstant(string $command): bool
     {
         $command = trim($command);
@@ -260,9 +320,6 @@ abstract class RemoteCli
         return $stdout;
     }
 
-    /**
-     * @return string|null
-     */
     protected function nullablePersistedStdout(Site $site, ?User $user, RemoteCliRun $run, string $stdout): ?string
     {
         if ($stdout === '') {

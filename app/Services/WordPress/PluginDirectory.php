@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Read-only client for the WordPress.org plugin directory.
+ * Read-only client for the WordPress.org plugin directory — and, through
+ * {@see ThemeDirectory}, the theme directory. Both APIs share one shape
+ * (`/{kind}s/info/1.2/`, `query_{kind}s`, `{kind}_information`); only the
+ * fields and the row normalization differ.
  *
  * Called from the control plane, never from the customer's server: a site must
  * not need outbound access to wordpress.org for its dashboard to work, and the
@@ -20,11 +23,12 @@ use Illuminate\Support\Facades\Log;
  * the Plugins tab. Failures are also never cached: a blip would otherwise blank
  * recommendations for the whole TTL.
  */
-final class PluginDirectory
+class PluginDirectory
 {
-    private const ENDPOINT = 'https://api.wordpress.org/plugins/info/1.2/';
+    /** Also keys the cache, so plugin and theme answers can never cross. */
+    protected const KIND = 'plugin';
 
-    private const FIELDS = [
+    protected const FIELDS = [
         'short_description', 'rating', 'num_ratings', 'active_installs',
         'requires', 'requires_php', 'tested', 'last_updated', 'icons', 'version', 'author',
     ];
@@ -62,12 +66,12 @@ final class PluginDirectory
         }
 
         try {
-            return Cache::remember('wporg:plugin:info:'.$slug, 3600, function () use ($slug): array {
+            return Cache::remember('wporg:'.static::KIND.':info:'.$slug, 3600, function () use ($slug): array {
                 $row = $this->fetch([
-                    'action' => 'plugin_information',
+                    'action' => static::KIND.'_information',
                     'request' => [
                         'slug' => $slug,
-                        'fields' => array_fill_keys(self::FIELDS, true) + ['versions' => true, 'sections' => false],
+                        'fields' => array_fill_keys(static::FIELDS, true) + ['versions' => true, 'sections' => false],
                     ],
                 ]);
 
@@ -84,7 +88,7 @@ final class PluginDirectory
                 return $plugin;
             });
         } catch (\Throwable $e) {
-            Log::info('PluginDirectory info failed', ['slug' => $slug, 'error' => $e->getMessage()]);
+            Log::info(static::class.' info failed', ['slug' => $slug, 'error' => $e->getMessage()]);
 
             return null;
         }
@@ -133,19 +137,19 @@ final class PluginDirectory
     private function query(array $request, string $cacheKey, int $ttl): array
     {
         try {
-            return Cache::remember('wporg:plugins:'.$cacheKey, $ttl, function () use ($request): array {
+            return Cache::remember('wporg:'.static::KIND.'s:'.$cacheKey, $ttl, function () use ($request): array {
                 $body = $this->fetch([
-                    'action' => 'query_plugins',
-                    'request' => $request + ['fields' => array_fill_keys(self::FIELDS, true)],
+                    'action' => 'query_'.static::KIND.'s',
+                    'request' => $request + ['fields' => array_fill_keys(static::FIELDS, true)],
                 ]);
 
                 return array_values(array_map(
                     fn (array $p): array => $this->normalize($p),
-                    array_filter((array) ($body['plugins'] ?? []), 'is_array'),
+                    array_filter((array) ($body[static::KIND.'s'] ?? []), 'is_array'),
                 ));
             });
         } catch (\Throwable $e) {
-            Log::info('PluginDirectory query failed', ['request' => $request, 'error' => $e->getMessage()]);
+            Log::info(static::class.' query failed', ['request' => $request, 'error' => $e->getMessage()]);
 
             return [];
         }
@@ -159,7 +163,7 @@ final class PluginDirectory
      */
     private function fetch(array $params): array
     {
-        $response = Http::acceptJson()->timeout(8)->get(self::ENDPOINT, $params);
+        $response = Http::acceptJson()->timeout(8)->get('https://api.wordpress.org/'.static::KIND.'s/info/1.2/', $params);
 
         if (! $response->ok()) {
             throw new \RuntimeException('wordpress.org returned HTTP '.$response->status());
@@ -177,7 +181,7 @@ final class PluginDirectory
      * @param  array<string, mixed>  $p
      * @return array<string, mixed>
      */
-    private function normalize(array $p): array
+    protected function normalize(array $p): array
     {
         $icons = (array) ($p['icons'] ?? []);
         $text = static fn (mixed $v): string => trim(html_entity_decode(strip_tags((string) $v), ENT_QUOTES | ENT_HTML5));
