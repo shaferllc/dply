@@ -41,36 +41,37 @@
                     :title="__('Themes & plugins from Git')"
                     :description="$bedrock
                         ? __('This is a Bedrock site, so each one is added as a Composer dependency from its repository.')
-                        : __('Each one is cloned into wp-content from its own repository, with its own deploy key.')"
+                        : __('Each one is cloned into wp-content from its own repository — with your connected account, or a per-source deploy key for a pasted URL.')"
                 />
 
                 <div class="space-y-6 p-6 sm:p-7">
                     <form wire:submit="add" class="space-y-5">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div>
-                                <label for="gs-kind" class="{{ $labelCls }}">{{ __('Type') }}</label>
-                                <select id="gs-kind" wire:model="kind" class="{{ $inputCls }}">
-                                    <option value="theme">{{ __('Theme') }}</option>
-                                    <option value="plugin">{{ __('Plugin') }}</option>
-                                </select>
-                                <x-input-error :messages="$errors->get('kind')" class="mt-2" />
-                            </div>
+                        <div>
+                            <label for="gs-kind" class="{{ $labelCls }}">{{ __('Type') }}</label>
+                            <select id="gs-kind" wire:model="kind" class="{{ $inputCls }}">
+                                <option value="theme">{{ __('Theme') }}</option>
+                                <option value="plugin">{{ __('Plugin') }}</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('kind')" class="mt-2" />
+                        </div>
 
-                            <div>
-                                <label for="gs-branch" class="{{ $labelCls }}">{{ __('Branch') }}</label>
-                                <input id="gs-branch" type="text" wire:model="git_branch" class="{{ $inputCls }}" />
-                                <x-input-error :messages="$errors->get('git_branch')" class="mt-2" />
-                            </div>
+                        {{-- The same connected-account repo picker as every other repo field in
+                             dply. A repo picked here clones with that account's access, so there
+                             is no deploy key to install; a pasted URL still gets one. The repo
+                             list is a provider API call, so it loads on wire:init, not mount(). --}}
+                        <div wire:init="primeGitSourceRepositories" class="space-y-3">
+                            @include('livewire.sites.partials._git-repository-configurator', [
+                                'idPrefix' => 'gs',
+                                'reposLoading' => ! $gitSourceReposPrimed,
+                            ])
+                            <x-input-error :messages="$errors->get('git_repository_url')" class="mt-2" />
                         </div>
 
                         <div>
-                            <label for="gs-url" class="{{ $labelCls }}">{{ __('Repository URL') }}</label>
-                            <input id="gs-url" type="text" wire:model.blur="repository_url"
-                                placeholder="git@github.com:acme/my-theme.git" class="{{ $inputCls }}" />
-                            <p class="mt-1.5 text-xs text-brand-moss">
-                                {{ __('An SSH URL lets dply use a per-source deploy key. Public HTTPS URLs work too.') }}
-                            </p>
-                            <x-input-error :messages="$errors->get('repository_url')" class="mt-2" />
+                            <label for="gs-branch" class="{{ $labelCls }}">{{ __('Branch') }}</label>
+                            <input id="gs-branch" type="text" wire:model="git_branch" class="{{ $inputCls }}" />
+                            <p class="mt-1.5 text-xs text-brand-moss">{{ __('Picking a repository fills in its default branch.') }}</p>
+                            <x-input-error :messages="$errors->get('git_branch')" class="mt-2" />
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">

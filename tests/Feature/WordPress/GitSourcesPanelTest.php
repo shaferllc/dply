@@ -16,10 +16,14 @@ use App\Models\User;
 use App\Modules\WordPress\Jobs\SyncSiteGitSourceJob;
 use App\Modules\WordPress\Materializers\GitSourceMaterializerFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
+
+// Setting a repo URL now runs the shared picker's public-repo scan; keep it offline.
+beforeEach(fn () => Http::fake());
 
 function panelUser(string $role = 'owner'): User
 {
@@ -54,7 +58,7 @@ test('adding a theme repo stores it and queues the sync', function () {
         ->test(GitSources::class, ['server' => $site->server, 'site' => $site])
         ->set('kind', 'theme')
         ->set('slug', 'my-theme')
-        ->set('repository_url', 'git@github.com:acme/my-theme.git')
+        ->set('git_repository_url', 'git@github.com:acme/my-theme.git')
         ->call('add')
         ->assertHasNoErrors();
 
@@ -77,12 +81,12 @@ test('the slug is guessed from the repository url but never overwrites one', fun
 
     $component = Livewire::actingAs($user)
         ->test(GitSources::class, ['server' => $site->server, 'site' => $site])
-        ->set('repository_url', 'git@github.com:acme/fancy-theme.git');
+        ->set('git_repository_url', 'git@github.com:acme/fancy-theme.git');
 
     $component->assertSet('slug', 'fancy-theme');
 
     $component->set('slug', 'kept')
-        ->set('repository_url', 'git@github.com:acme/other.git')
+        ->set('git_repository_url', 'git@github.com:acme/other.git')
         ->assertSet('slug', 'kept');
 });
 
@@ -94,7 +98,7 @@ test('a directory-unsafe slug is rejected', function () {
     Livewire::actingAs($user)
         ->test(GitSources::class, ['server' => $site->server, 'site' => $site])
         ->set('slug', '../escape')
-        ->set('repository_url', 'git@github.com:acme/my-theme.git')
+        ->set('git_repository_url', 'git@github.com:acme/my-theme.git')
         ->call('add')
         ->assertHasErrors('slug');
 
@@ -119,7 +123,7 @@ test('two sources cannot share a kind and slug', function () {
         ->test(GitSources::class, ['server' => $site->server, 'site' => $site])
         ->set('kind', 'theme')
         ->set('slug', 'my-theme')
-        ->set('repository_url', 'git@github.com:acme/other.git')
+        ->set('git_repository_url', 'git@github.com:acme/other.git')
         ->call('add')
         ->assertHasErrors('slug');
 

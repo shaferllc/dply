@@ -42,22 +42,163 @@
     </div>
 
     @if ($canMutate)
-        <div class="flex flex-wrap items-end gap-2 border-b border-brand-ink/10 bg-white px-6 py-3">
-            <div class="min-w-0 flex-1">
-                <x-input-label for="wp_plugin_install" :value="__('Install plugin (wp.org slug)')" class="text-xs" />
-                <x-text-input id="wp_plugin_install" wire:model="pluginInstallSlug" wire:keydown.enter="installPlugin" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="wordpress-seo" />
+        {{-- 1. Search WordPress.org. Suggestions come from a globally cached query
+             on the control plane — typing costs nothing on the customer's server.
+             Enter opens the details for whatever slug is typed. --}}
+        <div class="relative border-b border-brand-ink/10 bg-white px-3 py-3 sm:px-4" x-data="{ open: true }" @click.outside="open = false">
+            <x-input-label for="wp_plugin_search" :value="__('Add a plugin')" class="text-xs" />
+            <div class="relative mt-1">
+                <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" aria-hidden="true" />
+                <x-text-input
+                    id="wp_plugin_search"
+                    type="search"
+                    autocomplete="off"
+                    wire:model.live.debounce.300ms="pluginSearch"
+                    @focus="open = true"
+                    @keydown.enter.prevent="$wire.pluginSearch.trim() && $wire.showPluginDetail($wire.pluginSearch.trim())"
+                    @keydown.escape="open = false"
+                    class="block w-full pl-9 text-sm"
+                    placeholder="{{ __('Search WordPress.org — try seo, forms, cache…') }}"
+                />
+                <span wire:loading wire:target="pluginSearch" class="absolute right-3 top-1/2 -translate-y-1/2"><x-spinner size="sm" /></span>
             </div>
-            <button
-                type="button"
-                wire:click="installPlugin"
-                wire:loading.attr="disabled"
-                wire:target="installPlugin"
-                class="inline-flex h-10 items-center gap-1.5 rounded-md bg-brand-forest px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-brand-ink disabled:opacity-60"
-            >
-                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
-                <span wire:loading.remove wire:target="installPlugin">{{ __('Install & activate') }}</span>
-                <span wire:loading wire:target="installPlugin">{{ __('Queueing…') }}</span>
-            </button>
+
+            @if ($pluginSuggestions !== [])
+                <ul x-show="open" role="listbox" class="absolute left-3 right-3 z-20 mt-1 max-h-80 overflow-auto rounded-lg border border-brand-ink/10 bg-white shadow-lg sm:left-4 sm:right-4">
+                    @foreach ($pluginSuggestions as $suggestion)
+                        <li wire:key="wp-sugg-{{ $suggestion['slug'] }}" role="option">
+                            <button type="button" wire:click="showPluginDetail(@js($suggestion['slug']))" class="flex w-full items-start gap-3 px-3 py-2 text-left hover:bg-brand-sand/40">
+                                @if ($suggestion['icon'] !== '')
+                                    <img src="{{ $suggestion['icon'] }}" alt="" class="h-8 w-8 shrink-0 rounded" loading="lazy" />
+                                @else
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-brand-sand/60"><x-heroicon-o-puzzle-piece class="h-4 w-4 text-brand-moss" aria-hidden="true" /></span>
+                                @endif
+                                <span class="min-w-0 flex-1">
+                                    <span class="flex items-center gap-2">
+                                        <span class="truncate text-sm font-semibold text-brand-ink">{{ $suggestion['name'] }}</span>
+                                        @if ($suggestion['installed'])
+                                            <span class="shrink-0 rounded-full bg-emerald-50 px-1.5 text-2xs font-semibold text-emerald-800 ring-1 ring-emerald-200">{{ __('installed') }}</span>
+                                        @endif
+                                    </span>
+                                    <span class="block truncate text-xs text-brand-moss">{{ $suggestion['description'] }}</span>
+                                    <span class="mt-0.5 block text-2xs text-brand-mist">
+                                        {{ number_format($suggestion['active_installs']) }}+ {{ __('installs') }} · ★ {{ number_format($suggestion['rating'] / 20, 1) }} · <span class="font-mono">{{ $suggestion['slug'] }}</span>
+                                    </span>
+                                </span>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            @elseif (mb_strlen(trim($pluginSearch)) >= 2)
+                <p wire:loading.remove wire:target="pluginSearch" class="mt-2 text-xs text-brand-moss">{{ __('No matches on WordPress.org. Press Enter to look up the exact slug.') }}</p>
+            @endif
+        </div>
+
+        {{-- 2 + 3 + 4. What you are about to install, whether it fits this site, and
+             which version. A pinned version on an installed plugin is a rollback. --}}
+        @if ($pluginDetail)
+            @php
+                $detail = $pluginDetail;
+                $compat = $detail['compatibility'] ?? ['blockers' => [], 'warnings' => []];
+            @endphp
+            <div class="border-b border-brand-ink/10 bg-brand-sand/[0.18] px-3 py-3 sm:px-4" wire:key="wp-detail-{{ $detail['slug'] }}">
+                <div class="flex items-start gap-3">
+                    @if ($detail['icon'] !== '')
+                        <img src="{{ $detail['icon'] }}" alt="" class="h-12 w-12 shrink-0 rounded-lg ring-1 ring-brand-ink/10" />
+                    @endif
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="text-sm font-semibold text-brand-ink">{{ $detail['name'] }}</p>
+                            <span class="font-mono text-2xs text-brand-mist">{{ $detail['slug'] }}</span>
+                            @if ($detail['installed'])
+                                <span class="rounded-full bg-emerald-50 px-1.5 text-2xs font-semibold text-emerald-800 ring-1 ring-emerald-200">{{ __('installed') }}</span>
+                            @endif
+                        </div>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ $detail['description'] }}</p>
+
+                        <dl class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-brand-moss">
+                            <div><dt class="inline font-semibold">{{ __('By') }}</dt> <dd class="inline">{{ $detail['author'] ?: '—' }}</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Latest') }}</dt> <dd class="inline font-mono">{{ $detail['version'] ?: '—' }}</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Installs') }}</dt> <dd class="inline">{{ number_format($detail['active_installs']) }}+</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Rating') }}</dt> <dd class="inline">★ {{ number_format($detail['rating'] / 20, 1) }} ({{ number_format($detail['num_ratings']) }})</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Updated') }}</dt> <dd class="inline">{{ $detail['last_updated'] ?: '—' }}</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Requires') }}</dt> <dd class="inline">WP {{ $detail['requires'] ?: '?' }} · PHP {{ $detail['requires_php'] ?: '?' }}</dd></div>
+                            <div><dt class="inline font-semibold">{{ __('Tested to') }}</dt> <dd class="inline">{{ $detail['tested'] ?: '?' }}</dd></div>
+                        </dl>
+
+                        @foreach ($compat['blockers'] as $blocker)
+                            <p class="mt-2 rounded-md bg-rose-50 px-2 py-1 text-xs text-rose-800 ring-1 ring-rose-200">{{ $blocker }}</p>
+                        @endforeach
+                        @foreach ($compat['warnings'] as $warning)
+                            <p class="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900 ring-1 ring-amber-200">{{ $warning }}</p>
+                        @endforeach
+                        @if ($compat['blockers'] === [] && $compat['warnings'] === [])
+                            <p class="mt-2 text-xs text-emerald-700">✓ {{ __('Compatible with this site.') }}</p>
+                        @endif
+                    </div>
+                    <button type="button" wire:click="closePluginDetail" class="text-brand-mist hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                        <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
+                    </button>
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    @if (! empty($detail['versions']))
+                        <select wire:model="pluginDetailVersion" aria-label="{{ __('Version') }}" class="rounded-md border-brand-ink/15 py-1 text-xs shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                            <option value="">{{ __('Latest (:v)', ['v' => $detail['version']]) }}</option>
+                            @foreach ($detail['versions'] as $v)
+                                @if ($v !== $detail['version'])
+                                    <option value="{{ $v }}">{{ $v }}</option>
+                                @endif
+                            @endforeach
+                        </select>
+                    @endif
+                    <x-spinner-button size="xs" variant="primary" type="button" target="installFromDirectory" wire:click="installFromDirectory" :disabled="$compat['blockers'] !== []">
+                        {{ $detail['installed'] ? __('Reinstall / switch version') : __('Install & activate') }}
+                    </x-spinner-button>
+                    <a href="https://wordpress.org/plugins/{{ $detail['slug'] }}/" target="_blank" rel="noopener" class="text-xs text-brand-moss underline hover:text-brand-ink">{{ __('View on WordPress.org') }}</a>
+                </div>
+            </div>
+        @endif
+
+        {{-- Recommendations from WordPress.org, minus what is already installed. --}}
+        <div class="border-b border-brand-ink/10 px-3 py-3 sm:px-4" wire:init="loadPluginRecommendations">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-moss">{{ __('Recommended from WordPress.org') }}</p>
+                <div class="inline-flex rounded-md border border-brand-ink/10 p-0.5">
+                    @foreach (['popular' => __('Popular'), 'featured' => __('Featured')] as $listKey => $listLabel)
+                        <button type="button" wire:click="setPluginRecommendationList('{{ $listKey }}')" @class([
+                            'rounded px-2 py-0.5 text-2xs font-semibold',
+                            'bg-brand-ink text-brand-cream' => $pluginRecommendationList === $listKey,
+                            'text-brand-moss hover:bg-brand-sand/40' => $pluginRecommendationList !== $listKey,
+                        ])>{{ $listLabel }}</button>
+                    @endforeach
+                </div>
+            </div>
+
+            @if (! $pluginRecommendationsLoaded)
+                <p class="mt-2 flex items-center gap-2 text-xs text-brand-moss"><x-spinner size="sm" /> {{ __('Loading suggestions…') }}</p>
+            @elseif ($pluginRecommendations === [])
+                <p class="mt-2 text-xs text-brand-moss">{{ __('No suggestions right now — WordPress.org may be unreachable.') }}</p>
+            @else
+                <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    @foreach ($pluginRecommendations as $pick)
+                        {{-- Re-checked here: recommendations can load before the
+                             installed list does. --}}
+                        @continue(collect($plugins)->contains('name', $pick['slug']))
+                        <button type="button" wire:key="wp-rec-{{ $pick['slug'] }}" wire:click="showPluginDetail(@js($pick['slug']))" class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-white p-2 text-left transition hover:border-brand-ink/20 hover:bg-brand-sand/30">
+                            @if ($pick['icon'] !== '')
+                                <img src="{{ $pick['icon'] }}" alt="" class="h-8 w-8 shrink-0 rounded" loading="lazy" />
+                            @else
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-brand-sand/60"><x-heroicon-o-puzzle-piece class="h-4 w-4 text-brand-moss" aria-hidden="true" /></span>
+                            @endif
+                            <span class="min-w-0">
+                                <span class="block truncate text-xs font-semibold text-brand-ink">{{ $pick['name'] }}</span>
+                                <span class="block text-2xs text-brand-mist">{{ number_format($pick['active_installs']) }}+ {{ __('installs') }} · ★ {{ number_format($pick['rating'] / 20, 1) }}</span>
+                            </span>
+                        </button>
+                    @endforeach
+                </div>
+            @endif
         </div>
     @endif
 
@@ -69,10 +210,34 @@
     @elseif (empty($plugins))
         <p class="px-6 py-8 text-sm text-brand-moss">{{ __('No plugins installed.') }}</p>
     @else
+        {{-- 5. Bulk actions: one wp-cli call across every ticked plugin. Delete
+             is not offered here — it is irreversible and keeps its per-row
+             confirmation. --}}
+        @if ($canMutate && $selectedPlugins !== [])
+            <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/30 px-3 py-2 sm:px-4">
+                <span class="text-xs font-semibold text-brand-ink">{{ trans_choice('{1} 1 selected|[2,*] :count selected', count($selectedPlugins), ['count' => count($selectedPlugins)]) }}</span>
+                @foreach ([
+                    'activate' => __('Activate'),
+                    'deactivate' => __('Deactivate'),
+                    'update' => __('Update'),
+                    'auto-on' => __('Auto-updates on'),
+                    'auto-off' => __('Auto-updates off'),
+                ] as $bulkKey => $bulkLabel)
+                    <x-spinner-button size="xs" variant="secondary" type="button" target="bulkPluginAction" wire:click="bulkPluginAction('{{ $bulkKey }}')">{{ $bulkLabel }}</x-spinner-button>
+                @endforeach
+                <button type="button" wire:click="$set('selectedPlugins', [])" class="ml-auto text-xs text-brand-moss underline hover:text-brand-ink">{{ __('Clear') }}</button>
+            </div>
+        @endif
+
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                 <thead class="bg-brand-sand/30 text-left text-2xs font-semibold uppercase tracking-wide text-brand-mist">
                     <tr>
+                        @if ($canMutate)
+                            <th class="w-8 py-3 pl-4 sm:pl-6">
+                                <input type="checkbox" wire:click="toggleSelectAllPlugins" @checked(count($selectedPlugins) > 0 && count($selectedPlugins) === count($plugins)) aria-label="{{ __('Select all plugins') }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
+                            </th>
+                        @endif
                         <th class="px-4 py-3 sm:px-6">{{ __('Plugin') }}</th>
                         <th class="px-4 py-3">{{ __('Version') }}</th>
                         <th class="px-4 py-3">{{ __('Status') }}</th>
@@ -84,6 +249,11 @@
                     @foreach ($plugins as $plugin)
                         @php $active = $plugin['status'] === 'active'; @endphp
                         <tr wire:key="wp-plugin-{{ $plugin['name'] }}">
+                            @if ($canMutate)
+                                <td class="w-8 py-3 pl-4 sm:pl-6">
+                                    <input type="checkbox" wire:model.live="selectedPlugins" value="{{ $plugin['name'] }}" aria-label="{{ __('Select :name', ['name' => $plugin['name']]) }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-forest" />
+                                </td>
+                            @endif
                             <td class="px-4 py-3 font-mono text-xs text-brand-ink sm:px-6">{{ $plugin['name'] }}</td>
                             <td class="px-4 py-3 text-brand-moss">v{{ $plugin['version'] }}</td>
                             <td class="px-4 py-3">

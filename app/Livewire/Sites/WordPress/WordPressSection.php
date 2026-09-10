@@ -18,6 +18,8 @@ use App\Modules\Snapshots\Services\SnapshotDestinationFactory;
 use App\Modules\Snapshots\Services\SnapshotService;
 use App\Policies\SitePolicy;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
+use App\Services\WordPress\PluginDirectory;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -69,6 +71,28 @@ class WordPressSection extends Component
 
     /** Slug typed into the "Install plugin" box (wp.org slug or zip URL host). */
     public string $pluginInstallSlug = '';
+
+    /** Term for the WordPress.org directory search (debounced autocomplete). */
+    public string $pluginSearch = '';
+
+    /** @var list<array<string, mixed>> */
+    public array $pluginSuggestions = [];
+
+    /** @var list<array<string, mixed>> Popular/featured picks not already installed. */
+    public array $pluginRecommendations = [];
+
+    public string $pluginRecommendationList = 'popular';
+
+    public bool $pluginRecommendationsLoaded = false;
+
+    /** @var array<string, mixed>|null WordPress.org details for the plugin being considered. */
+    public ?array $pluginDetail = null;
+
+    /** Empty = latest. A pinned version doubles as rollback for an installed plugin. */
+    public string $pluginDetailVersion = '';
+
+    /** @var list<string> Installed plugin slugs ticked for a bulk action. */
+    public array $selectedPlugins = [];
 
     /** Slug typed into the "Install theme" box. */
     public string $themeInstallSlug = '';
@@ -832,7 +856,7 @@ class WordPressSection extends Component
         return $this->revealedUserLogin;
     }
 
-    private function wp(WpCli $wpcli, string $command, array $args = [], bool $mutating = true): ?string
+    private function wp(WpCli $wpcli, string $command, array $args = [], bool $mutating = true, string $errorBag = 'tools'): ?string
     {
         if ($mutating) {
             $this->authorize('update', $this->site);
@@ -846,11 +870,11 @@ class WordPressSection extends Component
                 queuedBy: auth()->user(),
             )->stdout());
         } catch (RemoteCliPermissionDeniedException) {
-            $this->addError('tools', __('Your role can\'t run that on this site.'));
+            $this->addError($errorBag, __('Your role can\'t run that on this site.'));
 
             return null;
         } catch (\Throwable $e) {
-            $this->addError('tools', $e->getMessage());
+            $this->addError($errorBag, $e->getMessage());
 
             return null;
         }
@@ -1101,5 +1125,199 @@ class WordPressSection extends Component
 
         $this->wp($wpcli, 'user set-role', [$login, $role]);
         $this->toastSuccess(__(':login is now :role.', ['login' => $login, 'role' => $role]));
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Plugin directory: search, recommendations, details, versions, bulk.
+    //
+    // Directory reads go to WordPress.org from the control plane, cached
+    // globally (PluginDirectory) — typing in the search box costs nothing on the
+    // customer's server. Only the install itself runs wp-cli on the box.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /** 1. Autocomplete, fired by the debounced search input. */
+    public function updatedPluginSearch(): void
+    {
+        $term = trim($this->pluginSearch);
+
+        $this->pluginSuggestions = mb_strlen($term) < 2
+            ? []
+            : $this->markInstalled(app(PluginDirectory::class)->search($term, 8));
+    }
+
+    /** 2. Recommendations: popular or featured, minus what is already installed. */
+    public function loadPluginRecommendations(): void
+    {
+        $list = $this->pluginRecommendationList === 'featured' ? 'featured' : 'popular';
+
+        // Fetch extra so hiding installed plugins still fills the row.
+        $picks = array_filter(
+            $this->markInstalled(app(PluginDirectory::class)->browse($list, 16)),
+            static fn (array $p): bool => ! $p['installed'],
+        );
+
+        $this->pluginRecommendations = array_slice(array_values($picks), 0, 8);
+        $this->pluginRecommendationsLoaded = true;
+    }
+
+    public function setPluginRecommendationList(string $list): void
+    {
+        $this->pluginRecommendationList = $list === 'featured' ? 'featured' : 'popular';
+        $this->loadPluginRecommendations();
+    }
+
+    /**
+     * 3. Details + compatibility before anything touches the site.
+     *
+     * wp.org accepts any install; WordPress then refuses to activate a plugin
+     * whose declared WP/PHP minimums the site misses. Checking here turns a
+     * confusing half-installed state into a clear "this won't run here".
+     */
+    public function showPluginDetail(string $slug, WpCli $wpcli): void
+    {
+        $info = app(PluginDirectory::class)->info(strtolower(trim($slug)));
+        if ($info === null) {
+            $this->addError('plugins', __('Could not load :slug from WordPress.org.', ['slug' => $slug]));
+
+            return;
+        }
+
+        $info['installed'] = $this->isPluginInstalled((string) $info['slug']);
+        $info['compatibility'] = PluginDirectory::compatibility(
+            $info,
+            $this->siteWordPressVersion($wpcli),
+            $this->sitePhpVersion(),
+        );
+
+        $this->pluginDetail = $info;
+        $this->pluginDetailVersion = '';
+        $this->pluginSuggestions = [];
+    }
+
+    public function closePluginDetail(): void
+    {
+        $this->pluginDetail = null;
+        $this->pluginDetailVersion = '';
+    }
+
+    /**
+     * 4. Install from the detail card — latest, or a pinned version.
+     *
+     * A pinned version with --force is also how you roll back a bad update:
+     * wp-cli replaces the files in place, settings and data untouched.
+     */
+    public function installFromDirectory(WpCli $wpcli): void
+    {
+        $slug = (string) ($this->pluginDetail['slug'] ?? '');
+        if ($slug === '') {
+            return;
+        }
+
+        $blockers = (array) ($this->pluginDetail['compatibility']['blockers'] ?? []);
+        if ($blockers !== []) {
+            $this->addError('plugins', implode(' ', $blockers));
+
+            return;
+        }
+
+        $args = ['--activate'];
+        $version = trim($this->pluginDetailVersion);
+        if ($version !== '') {
+            if (! in_array($version, (array) ($this->pluginDetail['versions'] ?? []), true)) {
+                $this->addError('plugins', __('Pick a version from the list.'));
+
+                return;
+            }
+            $args[] = '--version='.$version;
+            $args[] = '--force';
+        }
+
+        $this->runWpAction($wpcli, 'plugin install', $slug, 'plugins', $args);
+
+        $this->pluginDetail = null;
+        $this->pluginDetailVersion = '';
+        $this->pluginSearch = '';
+    }
+
+    /**
+     * 5. One action across every ticked plugin, as ONE wp-cli call (wp-cli takes
+     * many slugs) — one queued command and one audit entry, not N.
+     *
+     * Delete is deliberately absent: it is irreversible and already has a
+     * per-row confirmation.
+     */
+    public function bulkPluginAction(string $action, WpCli $wpcli): void
+    {
+        $command = match ($action) {
+            'activate' => 'plugin activate',
+            'deactivate' => 'plugin deactivate',
+            'update' => 'plugin update',
+            'auto-on' => 'plugin auto-updates enable',
+            'auto-off' => 'plugin auto-updates disable',
+            default => null,
+        };
+
+        $slugs = array_values(array_filter(
+            $this->selectedPlugins,
+            fn (string $slug): bool => $this->isValidSlug($slug) && $this->isPluginInstalled($slug),
+        ));
+
+        if ($command === null || $slugs === []) {
+            return;
+        }
+
+        if ($this->wp($wpcli, $command, $slugs, mutating: true, errorBag: 'plugins') === null) {
+            return;
+        }
+
+        $this->selectedPlugins = [];
+        $this->toastSuccess(trans_choice('{1} 1 plugin queued.|[2,*] :count plugins queued.', count($slugs), ['count' => count($slugs)]));
+    }
+
+    public function toggleSelectAllPlugins(): void
+    {
+        $all = array_map(static fn (array $p): string => (string) $p['name'], $this->plugins);
+        $this->selectedPlugins = count($this->selectedPlugins) === count($all) ? [] : $all;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $plugins
+     * @return list<array<string, mixed>>
+     */
+    private function markInstalled(array $plugins): array
+    {
+        return array_map(
+            fn (array $p): array => $p + ['installed' => $this->isPluginInstalled((string) ($p['slug'] ?? ''))],
+            $plugins,
+        );
+    }
+
+    /** `wp plugin list` reports the slug as `name`. */
+    private function isPluginInstalled(string $slug): bool
+    {
+        return $slug !== '' && collect($this->plugins)->contains('name', $slug);
+    }
+
+    /** Core tab's version when loaded, else one cheap instant `wp core version`. */
+    private function siteWordPressVersion(WpCli $wpcli): ?string
+    {
+        if (is_string($this->core['version'] ?? null) && $this->core['version'] !== '') {
+            return $this->core['version'];
+        }
+
+        try {
+            $version = trim($wpcli->run($this->site, 'core version', [], auth()->user())->stdout());
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $version !== '' ? $version : null;
+    }
+
+    private function sitePhpVersion(): ?string
+    {
+        $server = $this->site->server;
+
+        return $server !== null ? InstalledStack::fromMeta($server)->phpVersion : null;
     }
 }

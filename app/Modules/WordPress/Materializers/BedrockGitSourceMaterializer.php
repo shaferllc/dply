@@ -6,6 +6,7 @@ namespace App\Modules\WordPress\Materializers;
 
 use App\Models\SiteGitSource;
 use App\Modules\WordPress\Contracts\GitSourceMaterializer;
+use App\Modules\WordPress\Services\GitSourceCredentials;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Str;
 
@@ -26,7 +27,10 @@ use Illuminate\Support\Str;
  */
 class BedrockGitSourceMaterializer implements GitSourceMaterializer
 {
-    public function __construct(private readonly ExecuteRemoteTaskOnServer $executor) {}
+    public function __construct(
+        private readonly ExecuteRemoteTaskOnServer $executor,
+        private readonly GitSourceCredentials $credentials,
+    ) {}
 
     public function layout(): string
     {
@@ -36,28 +40,57 @@ class BedrockGitSourceMaterializer implements GitSourceMaterializer
     public function sync(SiteGitSource $source): void
     {
         $deployPath = $this->deployPath($source);
-        $keyPath = $this->writeDeployKey($source);
+        $identity = $this->credentials->identityFor($source);
+        $keyPath = null;
 
-        // Composer shells out to git for a vcs repository, so the deploy key
-        // reaches it the same way the classic materializer passes it to git.
-        $sshCommand = 'ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new';
+        if ($identity !== null) {
+            // Connected account. Composer reads credentials from COMPOSER_AUTH
+            // for this one command — never `composer config http-basic`, which
+            // would write the token into auth.json on the box.
+            $composerAuth = $this->credentials->composerAuth($source, $identity);
+            if ($composerAuth === null) {
+                throw new \RuntimeException(__('The connected account has no usable access token for this repository. Reconnect it.'));
+            }
+
+            $authLine = 'export COMPOSER_AUTH='.escapeshellarg($composerAuth);
+            $repositoryUrl = GitSourceCredentials::httpsUrl((string) $source->repository_url);
+
+            // no-api: without it Composer talks to the GitHub/GitLab/Bitbucket
+            // API, which expects provider-specific OAuth keys rather than the
+            // http-basic pair above, and 404s on a private repo. With it,
+            // Composer clones through git, which does use http-basic.
+            $repoConfig = escapeshellarg(json_encode(
+                ['type' => 'vcs', 'url' => $repositoryUrl, 'no-api' => true],
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES,
+            ));
+        } else {
+            $keyPath = $this->writeDeployKey($source);
+
+            // Composer shells out to git for a vcs repository, so the deploy key
+            // reaches it the same way the classic materializer passes it to git.
+            $authLine = 'export GIT_SSH_COMMAND='.escapeshellarg(
+                'ssh -i '.$keyPath.' -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
+            );
+            $repoConfig = 'vcs '.escapeshellarg((string) $source->repository_url);
+        }
 
         $script = sprintf(
             <<<'BASH'
             set -euo pipefail
             cd %1$s
-            export GIT_SSH_COMMAND=%2$s
+            %2$s
             export COMPOSER_NO_INTERACTION=1
-            composer config repositories.%3$s vcs %4$s
+            composer config repositories.%3$s %4$s
             composer require %5$s:%6$s --no-scripts --update-with-dependencies
             composer show %5$s | awk '/^source/ {print $3}'
             BASH,
             escapeshellarg($deployPath),
-            escapeshellarg($sshCommand),
+            $authLine,
             // Repository keys become composer.json object keys, so keep them to
             // a safe slug rather than passing a raw package name through.
             escapeshellarg($this->repositoryKey($source)),
-            escapeshellarg($source->repository_url),
+            // Only ever the plain URL: this lands in composer.json.
+            $repoConfig,
             escapeshellarg($this->packageName($source)),
             escapeshellarg('dev-'.$source->git_branch),
         );
@@ -69,7 +102,9 @@ class BedrockGitSourceMaterializer implements GitSourceMaterializer
             timeoutSeconds: 600,
         );
 
-        $this->shredDeployKey($source, $keyPath);
+        if ($keyPath !== null) {
+            $this->shredDeployKey($source, $keyPath);
+        }
 
         if ($out->getExitCode() !== 0) {
             throw new \RuntimeException('composer require failed: '.$out->getBuffer());

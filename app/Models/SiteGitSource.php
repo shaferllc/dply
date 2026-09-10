@@ -55,6 +55,8 @@ class SiteGitSource extends Model
         'repository_url',
         'git_branch',
         'composer_package',
+        'source_control_account_id',
+        'connected_by_user_id',
         'deploy_key_private',
         'deploy_key_public',
         'status',
@@ -131,5 +133,14 @@ class SiteGitSource extends Model
             // in the column, so keep the actionable head of it.
             'last_error' => mb_substr($error, 0, 2000),
         ])->save();
+    }
+
+    /**
+     * Picked through a connected source-control account: clones with that
+     * account's access, so it has no deploy key and never needs one installed.
+     */
+    public function isConnected(): bool
+    {
+        return trim((string) ($this->source_control_account_id ?? '')) !== '';
     }
 }
