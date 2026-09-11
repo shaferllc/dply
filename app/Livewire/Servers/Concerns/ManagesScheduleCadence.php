@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Livewire\Servers\WorkspaceCron;
+use App\Modules\RemoteCli\Services\WpCli;
 use App\Services\Servers\CronExpressionValidator;
+use App\Services\Servers\SchedulerWrapperScript;
 use App\Services\Servers\ServerCronSynchronizer;
+use Throwable;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -15,8 +18,6 @@ use App\Services\Servers\ServerCronSynchronizer;
  */
 trait ManagesScheduleCadence
 {
-
-
     /**
      * Pause or resume a wrapper-managed scheduler. Mirrors WorkspaceCron's
      * pause/resume — flip `enabled` and push the regenerated crontab so the
@@ -63,7 +64,7 @@ trait ManagesScheduleCadence
 
         try {
             $synchronizer->sync($this->server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError(__('Scheduler state updated but pushing to crontab failed: :err', ['err' => $e->getMessage()]));
 
             return;
@@ -134,7 +135,7 @@ trait ManagesScheduleCadence
 
         try {
             $synchronizer->sync($this->server);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->toastError(__('Cadence updated but pushing to crontab failed: :err', ['err' => $e->getMessage()]));
 
             return;
@@ -148,10 +149,9 @@ trait ManagesScheduleCadence
      *  - Pause: scheduler stops firing, we keep tracking.
      *  - Disable Monitoring: scheduler keeps firing, we stop tracking.
      *
-     * v2B implementation: drops the heartbeat row. v2C will additionally
-     * rewrite the cron line to remove the wrapper invocation (this prerequisite
-     * doesn't exist yet — wrapper-invoking cron lines are only created by 2C).
-     * Per Q20 (c), this is symmetric with Enable creating one.
+     * Drops the heartbeat row and unwraps the cron line back to the bare
+     * command. Both halves matter: a still-wrapped line keeps pushing ticks,
+     * and the ingest recreates the heartbeat within a minute.
      */
     public function openDisableMonitoringModal(string $heartbeatId): void
     {
@@ -201,8 +201,84 @@ trait ManagesScheduleCadence
             ],
         );
 
+        if ($cron !== null) {
+            $cron->update(['command' => SchedulerWrapperScript::unwrap((string) $cron->command), 'is_synced' => false]);
+            try {
+                app(ServerCronSynchronizer::class)->sync($this->server);
+            } catch (Throwable $e) {
+                $this->toastError(__('Could not push the unwrapped line to the crontab: :err', ['err' => $e->getMessage()]));
+
+                return;
+            }
+        }
+
         $heartbeat->delete();
 
-        $this->toastSuccess(__('Monitoring stopped. The scheduler keeps running; we won\'t track or alert on it anymore. Re-enable from the same site to start over.'));
+        $this->toastSuccess(__('Monitoring stopped. The scheduler keeps running; we won\'t track or alert on it anymore. Enable monitoring on the same row to start over.'));
+    }
+
+    /**
+     * Turn a scheduler off: its cron entry and heartbeat go. A WordPress site
+     * gets its HTTP wp-cron back first, so it is never left with neither.
+     */
+    public function disableScheduler(string $heartbeatId, ServerCronSynchronizer $synchronizer, WpCli $wpcli): void
+    {
+        $this->authorize('update', $this->server);
+
+        [$heartbeat, $cron] = $this->resolveHeartbeatAndCron($heartbeatId);
+        if ($heartbeat === null) {
+            $this->toastError(__('Scheduler not found.'));
+
+            return;
+        }
+
+        $site = $heartbeat->site;
+        if ($site !== null && $cron !== null && str_contains((string) $cron->command, 'cron event run')) {
+            try {
+                $wpcli->run($site, 'config delete', ['DISABLE_WP_CRON', '--type=constant'], auth()->user());
+            } catch (Throwable $e) {
+                $this->toastError(__('Could not turn wp-cron back on, so the scheduler stays: :err', ['err' => $e->getMessage()]));
+
+                return;
+            }
+
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta['wp_cron'] = array_merge(
+                is_array($meta['wp_cron'] ?? null) ? $meta['wp_cron'] : [],
+                ['handler' => 'wp_cron', 'switched_at' => now()->toISOString(), 'error' => null],
+            );
+            $site->forceFill(['meta' => $meta])->save();
+        }
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.scheduler.disabled',
+            $this->server,
+            null,
+            [
+                'heartbeat_id' => $heartbeat->id,
+                'cron_job_id' => $cron?->id,
+                'scheduler_kind' => $heartbeat->scheduler_kind,
+            ],
+        );
+
+        if ($cron !== null) {
+            // Disable, sync, then delete: sync() returns early when a server
+            // has no jobs left, which would leave the old line in place.
+            $cron->update(['enabled' => false, 'is_synced' => false]);
+            try {
+                $synchronizer->sync($this->server);
+            } catch (Throwable $e) {
+                $this->toastError(__('Scheduler disabled in dply but pushing to crontab failed: :err', ['err' => $e->getMessage()]));
+
+                return;
+            }
+            $cron->delete();
+        }
+
+        $heartbeat->delete();
+
+        $this->emitPanelEvent(__('Scheduler disabled — its cron entry is gone.'), [], 'completed');
     }
 }

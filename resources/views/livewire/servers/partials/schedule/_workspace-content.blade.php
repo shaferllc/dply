@@ -55,11 +55,6 @@
         'input',
         'chipForHealth',
         'hasStale',
-        'enableTargetSite',
-        'showLaravelSchedulerEnable',
-        'showRailsSchedulerEnable',
-        'showCustomSchedulerEnable',
-        'preflight_results',
         'auditLogs',
         'logSchedulers',
         'logSelectedHeartbeat',
@@ -130,9 +125,9 @@
         <div
             @class(['border-b border-brand-ink/10 px-3 py-2 sm:px-4', 'hidden' => ! $scheduleBannerVisible])
             wire:loading.class.remove="hidden"
-            wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow"
+            wire:target="enableScheduler,disableScheduler,disableMonitoring,togglePause,saveCadence,runNow"
         >
-            <div wire:loading.block wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow">
+            <div wire:loading.block wire:target="enableScheduler,disableScheduler,disableMonitoring,togglePause,saveCadence,runNow">
                 <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
             </div>
             @if ($scheduler_run_busy)
@@ -145,7 +140,7 @@
                     />
                 </div>
             @elseif ($panel_event_message !== '')
-                <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun">
+                <div wire:loading.remove wire:target="enableScheduler,disableScheduler,disableMonitoring,togglePause,saveCadence,runNow,pollSchedulerRun">
                     <x-workspace-console-banner
                         :status="$panel_event_status"
                         :message="$panel_event_message"
@@ -223,11 +218,6 @@
                 </x-server-workspace-tab-panel>
             @endif
         </div>
-
-        {{-- Enable scheduler modal (replaces the old Enable tab; opened from the Schedulers header). --}}
-        <x-modal name="schedule-enable" maxWidth="2xl">
-            @include('livewire.servers.partials.schedule._enable-modal-body', $scheduleTabContext)
-        </x-modal>
     @else
         <div class="px-3 py-4 sm:px-4">
             @include('livewire.servers.partials.workspace-ops-not-ready')
@@ -239,15 +229,10 @@
             $scheduleCliCommands = [
                 ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
             ];
-            if ($enableTargetSite?->isLaravelFrameworkDetected()) {
+            if (\App\Support\Servers\SchedulerRecipe::for($contextSiteModel)?->key === \App\Support\Servers\SchedulerRecipe::KEY_LARAVEL) {
                 $scheduleCliCommands[] = [
                     'label' => __('Add a schedule:run cron entry for this site'),
                     'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\'',
-                ];
-            } elseif ($enableTargetSite?->isRailsFrameworkDetected()) {
-                $scheduleCliCommands[] = [
-                    'label' => __('Add a whenever cron entry for this site'),
-                    'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'bundle exec whenever --update-crontab\'',
                 ];
             } else {
                 $scheduleCliCommands[] = [

@@ -11,20 +11,9 @@
         icon="heroicon-o-clock"
         :title="$contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server')"
         :count="$schedulersTotal > 0 ? (string) $schedulersFiltered : null"
-        :note="__('Monitor tick health, run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.')"
+        :note="__('One click per site — dply picks the scheduler from the detected stack and tracks every tick.')"
         class="border-b border-brand-ink/10"
-    >
-        <x-slot:actions>
-            <button
-                type="button"
-                wire:click="openEnableSchedulerModal"
-                class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
-            >
-                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {{ __('Enable scheduler') }}
-            </button>
-        </x-slot:actions>
-    </x-workspace-panel-head>
+    />
 
     @if ($contextSiteModel && ! ($scheduleSiteRouteLocked ?? false))
         <div class="flex flex-wrap items-center gap-2.5 border-b border-brand-ink/10 bg-brand-sand/15 px-3 py-2 sm:px-4">
@@ -58,18 +47,8 @@
                         {{ __('No schedulers yet.') }}
                     @endif
                 </span>
-                {{ __('Enable monitoring to wrap the scheduler command and track tick health.') }}
+                {{ __('Add a site and its scheduler shows up here.') }}
             </p>
-            @if ($sites->isNotEmpty())
-                <button
-                    type="button"
-                    wire:click="openEnableSchedulerModal"
-                    class="inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
-                >
-                    <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {{ __('Enable scheduler') }}
-                </button>
-            @endif
         </div>
     @else
         <ul class="divide-y divide-brand-ink/10">
@@ -83,6 +62,7 @@
                     $isEditing = $heartbeatId !== null && array_key_exists($heartbeatId, $editing_cadence);
                     $isPaused = $state === 'paused';
                     $runInFlight = $heartbeatId !== null && in_array($heartbeatId, $run_now_in_flight, true);
+                    $rowButton = 'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md bg-brand-ink px-2.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-40';
                 @endphp
                 <li id="scheduler-{{ $site->id }}-{{ $cardData['kind'] ?? 'none' }}" class="relative flex flex-col scroll-mt-24 sm:flex-row" wire:key="card-{{ $site->id }}-{{ $cardData['kind'] ?? 'none' }}">
                     <span
@@ -90,7 +70,7 @@
                             'absolute bottom-0 left-0 top-0 w-1',
                             'bg-brand-forest' => $isActive,
                             'bg-amber-500' => in_array($state, ['detected_unmonitored', 'no_scheduler'], true) || in_array($cardData['health'] ?? null, [\App\Services\Servers\SchedulerHealthEvaluator::STATE_AMBER, \App\Services\Servers\SchedulerHealthEvaluator::STATE_RED], true),
-                            'bg-brand-mist' => $isPaused || $state === 'no_scheduler',
+                            'bg-brand-mist' => $isPaused || in_array($state, ['no_scheduler', 'daemon'], true),
                         ])
                         aria-hidden="true"
                     ></span>
@@ -99,8 +79,8 @@
                             @if (! $siteDedicatedContext || $schedulers_list_scope === 'all')
                                 <p class="text-sm font-semibold text-brand-ink">{{ $site->name }}</p>
                             @endif
-                            @if ($cardData['kind'])
-                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['kind'] }}</span>
+                            @if ($cardData['label'] ?? $cardData['kind'])
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-brand-moss">{{ $cardData['label'] ?? $cardData['kind'] }}</span>
                             @endif
                             @if ($cardData['health'] !== null)
                                 <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide ring-1 {{ $chip['classes'] }}">{{ $chip['label'] }}</span>
@@ -108,7 +88,19 @@
                         </div>
 
                         @if ($state === 'no_scheduler')
-                            <p class="mt-0.5 text-xs text-brand-mist italic">{{ __('No scheduler enabled.') }}</p>
+                            <p class="mt-0.5 text-xs text-brand-mist">
+                                @if ($cardData['recipe'])
+                                    {{ __('Not running.') }}
+                                    <span class="font-mono">{{ $cardData['recipe']->summary }}</span>
+                                    · {{ cron_describe($cardData['recipe']->cronExpression) ?: $cardData['recipe']->cronExpression }}
+                                @elseif ($cardData['deploy_first'])
+                                    {{ __('Deploy the site first — dply picks its scheduler from the detected stack.') }}
+                                @else
+                                    {{ __('No scheduler detected for this stack — set the command to run.') }}
+                                @endif
+                            </p>
+                        @elseif ($state === 'daemon')
+                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Runs as a schedule:work daemon — manage it on Workers.') }}</p>
                         @elseif ($state === 'detected_unmonitored')
                             <p class="mt-0.5 text-xs text-amber-900">{{ __('Detected in crontab but not monitored — enable monitoring to wrap it.') }}</p>
                         @else
@@ -139,6 +131,36 @@
                                 <x-secondary-button size="sm" type="button" wire:click="saveCadence('{{ $heartbeatId }}')">{{ __('Save') }}</x-secondary-button>
                                 <button type="button" wire:click="cancelEditCadence('{{ $heartbeatId }}')" class="text-xs text-brand-moss hover:underline">{{ __('Cancel') }}</button>
                             </div>
+                        @endif
+
+                        @if ($custom_command_site_id === $site->id)
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <input
+                                    type="text"
+                                    wire:model="custom_command"
+                                    wire:keydown.enter="enableScheduler('{{ $site->id }}')"
+                                    class="block min-w-0 flex-1 rounded-lg border border-brand-ink/20 bg-white px-2 py-1 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30"
+                                    placeholder="cd {{ $site->effectiveEnvDirectory() }} && ./bin/cron"
+                                    aria-label="{{ __('Command to run every minute') }}"
+                                />
+                                <x-secondary-button size="sm" type="button" wire:click="enableScheduler('{{ $site->id }}')">{{ __('Enable') }}</x-secondary-button>
+                                <button type="button" wire:click="cancelCustomCommand" class="text-xs text-brand-moss hover:underline">{{ __('Cancel') }}</button>
+                            </div>
+                        @endif
+
+                        @if (! empty($enable_failures[$site->id]))
+                            <ul class="mt-2 space-y-1 rounded-lg border border-red-200 bg-red-50/60 px-2.5 py-2">
+                                @foreach ($enable_failures[$site->id] as $check)
+                                    <li class="flex flex-wrap items-baseline gap-1.5 text-xs">
+                                        <span @class([
+                                            'text-2xs font-semibold uppercase tracking-wide',
+                                            'text-amber-800' => $check['status'] === 'warn',
+                                            'text-red-700' => $check['status'] !== 'warn',
+                                        ])>{{ $check['status'] }}</span>
+                                        <span class="text-brand-ink">{{ $check['message'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
                         @endif
                     </div>
 
@@ -184,19 +206,35 @@
                             <button
                                 type="button"
                                 wire:click="openDisableMonitoringModal('{{ $heartbeatId }}')"
-                                class="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                                class="rounded-md p-1.5 text-brand-moss hover:bg-white"
                                 title="{{ __('Stop monitoring') }}"
                             >
                                 <x-heroicon-o-eye-slash class="h-4 w-4" />
                             </button>
-                        @elseif ($state === 'detected_unmonitored' || $state === 'no_scheduler')
                             <button
                                 type="button"
-                                wire:click="openEnableSchedulerModal"
-                                class="rounded-md p-1.5 text-brand-forest hover:bg-emerald-50"
-                                title="{{ __('Enable scheduler') }}"
+                                wire:click="disableScheduler('{{ $heartbeatId }}')"
+                                wire:confirm="{{ __('Disable this scheduler? Its cron entry is removed from the server.') }}"
+                                class="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                                title="{{ __('Disable scheduler') }}"
                             >
-                                <x-heroicon-o-plus-circle class="h-4 w-4" />
+                                <x-heroicon-o-trash class="h-4 w-4" />
+                            </button>
+                        @elseif ($enabling_site_id === $site->id)
+                            <span class="inline-flex items-center gap-1.5 px-1.5 text-xs text-brand-moss">
+                                <x-spinner size="sm" /> {{ __('Enabling…') }}
+                            </span>
+                        @elseif ($state === 'detected_unmonitored')
+                            <button type="button" wire:click="enableScheduler('{{ $site->id }}')" @disabled($scheduler_run_busy) class="{{ $rowButton }}">
+                                {{ __('Enable monitoring') }}
+                            </button>
+                        @elseif ($state === 'no_scheduler' && ! $cardData['deploy_first'] && $custom_command_site_id !== $site->id)
+                            <button type="button" wire:click="enableScheduler('{{ $site->id }}')" @disabled($scheduler_run_busy) class="{{ $rowButton }}">
+                                @if ($cardData['recipe'])
+                                    {{ isset($enable_failures[$site->id]) ? __('Retry') : __('Enable :label', ['label' => $cardData['recipe']->label]) }}
+                                @else
+                                    {{ __('Set command…') }}
+                                @endif
                             </button>
                         @endif
                     </div>
@@ -204,7 +242,7 @@
             @endforeach
         </ul>
         <p class="border-t border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss sm:px-4">
-            {{ __('Stop monitoring keeps the cron entry on the server but removes heartbeat tracking. Pause disables the cron line until you resume.') }}
+            {{ __('Pause stops the cron line until you resume. Stop monitoring keeps the scheduler running without tick tracking. Disable removes it.') }}
         </p>
     @endif
 </section>

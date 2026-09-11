@@ -336,7 +336,7 @@ trait ResolvesSiteRuntime
         return $lang !== '' && $lang !== 'unknown';
     }
 
-    private function resolvedRuntimeFrameworkKey(): string
+    public function resolvedRuntimeFrameworkKey(): string
     {
         $resolved = $this->resolvedRuntimeAppDetection();
 

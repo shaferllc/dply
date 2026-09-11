@@ -8,6 +8,8 @@ use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
+use App\Models\SiteProcess;
+use App\Support\Servers\SchedulerRecipe;
 use Carbon\Carbon;
 use Cron\CronExpression;
 use Illuminate\Support\Str;
@@ -27,6 +29,7 @@ use Illuminate\Support\Str;
  *  - `paused`              — wrapper-managed cron with enabled=false
  *  - `detected_unmonitored` — scheduler-shaped cron line, no wrapper, no heartbeat
  *  - `no_scheduler`        — site exists, no scheduler at all
+ *  - `daemon`              — covered by a schedule:work daemon (SiteProcess)
  *
  * Summary counts on the returned array drive the Q11 top strip
  * ("3 schedulers tracked · 2 healthy · 1 stale").
@@ -46,6 +49,8 @@ final class SchedulerCardsBuilder
         'rake schedule' => ServerSchedulerHeartbeat::KIND_RAILS,
         'celery beat' => ServerSchedulerHeartbeat::KIND_GENERIC,
         'celerybeat' => ServerSchedulerHeartbeat::KIND_GENERIC,
+        'wp cron event run' => ServerSchedulerHeartbeat::KIND_GENERIC,
+        'drush cron' => ServerSchedulerHeartbeat::KIND_GENERIC,
     ];
 
     public function __construct(
@@ -85,11 +90,22 @@ final class SchedulerCardsBuilder
             ->where('server_id', $server->id)
             ->get();
 
+        // Sites whose scheduler runs as a schedule:work daemon (the VM systemd
+        // path, and what imports create). Offering Enable there would start a
+        // second scheduler beside the daemon.
+        $daemonSiteIds = SiteProcess::query()
+            ->whereIn('site_id', $sites->modelKeys())
+            ->where('is_active', true)
+            ->where(fn ($query) => $query->where('type', SiteProcess::TYPE_SCHEDULER)
+                ->orWhere('command', 'like', '%schedule:work%'))
+            ->pluck('site_id')
+            ->all();
+
         // Bucket scheduler-shaped cron jobs by (site_id, kind) so each card
         // can pick the relevant row in O(1). Non-scheduler crons are ignored.
         $cronBySite = [];
         foreach ($cronJobs as $cron) {
-            $kind = $this->kindForCommand((string) $cron->command);
+            $kind = self::kindForCommand((string) $cron->command);
             if ($kind === null) {
                 continue;
             }
@@ -132,6 +148,12 @@ final class SchedulerCardsBuilder
             }
 
             if ($keysForSite === []) {
+                if (in_array($site->id, $daemonSiteIds, true)) {
+                    $cards[] = array_merge($this->emptyCard($site), ['state' => 'daemon', 'recipe' => null]);
+
+                    continue;
+                }
+
                 $cards[] = $this->emptyCard($site);
                 $stats['no_scheduler_sites']++;
 
@@ -152,6 +174,7 @@ final class SchedulerCardsBuilder
                         'cron_job' => $cron,
                         'heartbeat' => $hb,
                         'kind' => $hb->scheduler_kind,
+                        'label' => $this->labelFor($site, $hb->scheduler_kind),
                         'cron_expression' => (string) $hb->cron_expression,
                         'last_tick_at' => $hb->last_tick_at,
                         'next_run_at' => $this->nextRunAt((string) $hb->cron_expression, $now),
@@ -174,6 +197,7 @@ final class SchedulerCardsBuilder
                     'cron_job' => $cron,
                     'heartbeat' => null,
                     'kind' => $kind,
+                    'label' => $this->labelFor($site, $kind),
                     'cron_expression' => (string) ($cron->cron_expression ?? ''),
                     'last_tick_at' => null,
                     'next_run_at' => $this->nextRunAt((string) ($cron->cron_expression ?? ''), $now),
@@ -190,6 +214,8 @@ final class SchedulerCardsBuilder
      */
     private function emptyCard(Site $site): array
     {
+        $recipe = SchedulerRecipe::for($site);
+
         return [
             'site' => $site,
             'state' => 'no_scheduler',
@@ -197,6 +223,15 @@ final class SchedulerCardsBuilder
             'cron_job' => null,
             'heartbeat' => null,
             'kind' => null,
+            'label' => $recipe?->name,
+            'recipe' => $recipe,
+            // Nothing detected and never deployed: "Set command…" would be a
+            // guess, so the row asks for a deploy. Manage-in-place CMSes never
+            // deploy, so they are exempt.
+            'deploy_first' => $recipe === null
+                && $site->last_deploy_at === null
+                && $site->resolvedRuntimeAppDetection() === null
+                && ! $site->isManageInPlaceCms(),
             'cron_expression' => null,
             'last_tick_at' => null,
             'next_run_at' => null,
@@ -215,8 +250,18 @@ final class SchedulerCardsBuilder
         };
     }
 
-    private function kindForCommand(string $command): ?string
+    /**
+     * The scheduler kind a cron command runs, or null for a non-scheduler line.
+     * A wrapped line names its own kind — the only signal for a custom command
+     * that matches no known pattern.
+     */
+    public static function kindForCommand(string $command): ?string
     {
+        $wrappedKind = SchedulerWrapperScript::wrappedKind($command);
+        if ($wrappedKind !== null) {
+            return $wrappedKind;
+        }
+
         $lc = Str::lower($command);
         foreach (self::SCHEDULER_PATTERNS as $needle => $kind) {
             if (str_contains($lc, $needle)) {
@@ -225,6 +270,37 @@ final class SchedulerCardsBuilder
         }
 
         return null;
+    }
+
+    /** The scheduler-shaped cron entry a site already has, wrapped or not. */
+    public static function schedulerEntryFor(Site $site): ?ServerCronJob
+    {
+        return ServerCronJob::query()
+            ->where('server_id', $site->server_id)
+            ->where('site_id', $site->id)
+            ->get()
+            ->first(fn (ServerCronJob $job): bool => self::kindForCommand((string) $job->command) !== null);
+    }
+
+    /** The cron entry behind a heartbeat — what Pause, cadence and Run now act on. */
+    public static function cronFor(ServerSchedulerHeartbeat $heartbeat): ?ServerCronJob
+    {
+        return ServerCronJob::query()
+            ->where('server_id', $heartbeat->server_id)
+            ->where('site_id', $heartbeat->site_id)
+            ->get()
+            ->first(fn (ServerCronJob $job): bool => self::kindForCommand((string) $job->command) === $heartbeat->scheduler_kind);
+    }
+
+    /** A row's chip: the recipe's name for its kind, else the raw kind. */
+    private function labelFor(Site $site, string $kind): string
+    {
+        $recipe = SchedulerRecipe::for($site);
+        if ($recipe !== null && $recipe->kind === $kind) {
+            return $recipe->name;
+        }
+
+        return $kind === ServerSchedulerHeartbeat::KIND_GENERIC ? __('Custom') : $kind;
     }
 
     private function key(string $siteId, string $kind): string

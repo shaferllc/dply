@@ -13,8 +13,6 @@ use App\Services\Servers\SchedulerHealthEvaluator;
  */
 trait BuildsScheduleStats
 {
-
-
     /**
      * @param  list<array<string, mixed>>  $cards
      * @return array{total: int, healthy: int, attention: int, paused: int}
@@ -28,6 +26,11 @@ trait BuildsScheduleStats
 
         foreach ($cards as $card) {
             $state = (string) ($card['state'] ?? '');
+            // Covered by a schedule:work daemon: neither tracked nor missing.
+            if ($state === 'daemon') {
+                continue;
+            }
+
             if ($state === 'no_scheduler') {
                 $attention++;
 

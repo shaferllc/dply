@@ -12,9 +12,13 @@ use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Models\User;
+use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\SchedulerWrapperScript;
 use App\Services\Servers\ServerCronSynchronizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Mockery;
@@ -132,8 +136,10 @@ test('save cadence rejects invalid expression', function () {
 
     expect($cron->fresh()->cron_expression)->toBe('* * * * *', 'Invalid expression must not persist.');
 });
-test('disable monitoring deletes heartbeat and audits', function () {
-    [$user, $server, , $cron, $hb] = setupWithScheduler();
+test('stop monitoring unwraps the line and deletes the heartbeat', function () {
+    stubSynchronizer();
+    [$user, $server, $site, $cron, $hb] = setupWithScheduler();
+    $cron->update(['command' => SchedulerWrapperScript::wrap($site->id, 'laravel', 'php artisan schedule:run')]);
     $heartbeatId = $hb->id;
 
     Livewire::actingAs($user)
@@ -142,8 +148,54 @@ test('disable monitoring deletes heartbeat and audits', function () {
         ->assertHasNoErrors();
 
     expect(ServerSchedulerHeartbeat::find($heartbeatId))->toBeNull();
-    expect($cron->fresh())->not->toBeNull('Disable monitoring must NOT delete the cron entry — scheduler keeps running.');
+    expect($cron->fresh())->not->toBeNull('Stop monitoring must NOT delete the cron entry — scheduler keeps running.');
+    // A still-wrapped line keeps pushing ticks, and the ingest would recreate the heartbeat.
+    expect($cron->fresh()->command)->toBe('php artisan schedule:run');
     $this->assertDatabaseHas('audit_logs', ['action' => 'server.scheduler.monitoring_disabled']);
+});
+
+test('disable scheduler removes the entry and the heartbeat', function () {
+    stubSynchronizer();
+    [$user, $server, , $cron, $hb] = setupWithScheduler();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->call('disableScheduler', $hb->id)
+        ->assertHasNoErrors();
+
+    expect(ServerCronJob::find($cron->id))->toBeNull()
+        ->and(ServerSchedulerHeartbeat::find($hb->id))->toBeNull();
+    $this->assertDatabaseHas('audit_logs', ['action' => 'server.scheduler.disabled']);
+});
+
+test('pause finds a wrapped custom scheduler by the kind its line declares', function () {
+    stubSynchronizer();
+    [$user, $server, $site, $cron, $hb] = setupWithScheduler();
+    $cron->update(['command' => SchedulerWrapperScript::wrap($site->id, 'generic', './bin/cron')]);
+    $hb->update(['scheduler_kind' => 'generic']);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSchedule::class, ['server' => $server])
+        ->call('togglePause', $hb->id)
+        ->assertHasNoErrors();
+
+    expect($cron->fresh()->enabled)->toBeFalse();
+});
+
+test('run now runs the stored command for any kind', function () {
+    [, $server, $site, $cron, $hb] = setupWithScheduler();
+    $cron->update(['command' => SchedulerWrapperScript::wrap($site->id, 'generic', './bin/cron')]);
+    $hb->update(['scheduler_kind' => 'generic']);
+
+    $remote = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $remote->shouldReceive('runInlineBash')
+        ->once()
+        ->withArgs(fn ($server, string $name, string $bash): bool => $bash === SchedulerWrapperScript::wrap($site->id, 'generic', './bin/cron'))
+        ->andReturn(new ProcessOutput('ran', 0, false));
+
+    (new RunSchedulerNowJob($server->id, $hb->id, null, 'run-generic'))->handle($remote);
+
+    expect(Cache::get(RunSchedulerNowJob::cacheKey('run-generic'))['status'])->toBe('done');
 });
 test('run now dispatches job and refuses second click', function () {
     Bus::fake();

@@ -47,6 +47,58 @@ class SchedulerWrapperScript
     }
 
     /**
+     * The cron command that runs $command under the tick wrapper.
+     *
+     * The wrapper execs its arguments with no shell, and cron's own shell
+     * splits `cd /app && php artisan schedule:run` at the `&&` — so only `cd`
+     * would run inside the wrapper. The command travels as one `sh -c` arg.
+     */
+    public static function wrap(string $siteId, string $kind, string $command): string
+    {
+        return sprintf(
+            '%s %s %s -- /bin/sh -c %s',
+            self::REMOTE_PATH,
+            escapeshellarg($siteId),
+            escapeshellarg($kind),
+            escapeshellarg($command),
+        );
+    }
+
+    /**
+     * The bare command inside a wrapped cron line, or the line itself when it
+     * is not wrapped. Reads the `sh -c '…'` form and the older unquoted tail.
+     */
+    public static function unwrap(string $line): string
+    {
+        return self::parseWrapped($line)['command'] ?? $line;
+    }
+
+    /** The scheduler kind a wrapped line declares, or null when unwrapped. */
+    public static function wrappedKind(string $line): ?string
+    {
+        return self::parseWrapped($line)['kind'] ?? null;
+    }
+
+    /**
+     * @return array{site_id: string, kind: string, command: string}|null
+     */
+    private static function parseWrapped(string $line): ?array
+    {
+        $pattern = '#^'.preg_quote(self::REMOTE_PATH, '#')."\\s+'([^']*)'\\s+'([^']*)'\\s+--\\s+(.*)$#s";
+        if (preg_match($pattern, trim($line), $m) !== 1) {
+            return null;
+        }
+
+        $command = $m[3];
+        // Undo escapeshellarg: strip the outer quotes, restore each '\''.
+        if (preg_match("#^/bin/sh -c '(.*)'$#s", $command, $quoted) === 1) {
+            $command = str_replace("'\\''", "'", $quoted[1]);
+        }
+
+        return ['site_id' => $m[1], 'kind' => $m[2], 'command' => $command];
+    }
+
+    /**
      * Bash fragment that (1) creates the data directories under /var/lib/dply/
      * owned by $deployUser, (2) base64-decodes the wrapper into the system
      * binary path with mode 0755, (3) verifies SHA-256 against the bundled
