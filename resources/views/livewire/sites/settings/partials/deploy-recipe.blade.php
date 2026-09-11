@@ -462,7 +462,7 @@
                 // restart when the site has no Supervisor programs, and the Nginx
                 // snippet on non-Nginx engines. Header copy names only what's shown.
                 $drIsNginx = $site->webserver() === 'nginx';
-                $drShowScheduler = $site->supportsLaravelScheduler();
+                $drShowScheduler = $site->supportsVmManagedCron();
                 $drShowSupervisor = $site->hasRestartableSupervisorPrograms();
                 $drParts = [__('releases to keep'), __('environment group')];
                 if ($drShowScheduler) { $drParts[] = __('scheduler'); }
@@ -491,15 +491,10 @@
             @if ($drShowScheduler || $drShowSupervisor || $drIsNginx)
             <div class="grid gap-3">
                 @if ($drShowScheduler)
-                <div>
-                    <label class="flex items-center gap-2 text-sm text-brand-ink">
-                        <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-brand-ink/15">
-                        {{ $site->runtimeSchedulerRolloutFormLabel() }}
-                    </label>
-                    @if ($site->runtimeSchedulerCheckboxHelp())
-                        <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
-                    @endif
-                </div>
+                <p class="text-sm text-brand-moss">
+                    {{ __('Scheduler') }} ·
+                    <a href="{{ route('sites.schedule', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('manage →') }}</a>
+                </p>
                 @endif
                 @if ($drShowSupervisor)
                 <label class="flex items-center gap-2 text-sm text-brand-ink">

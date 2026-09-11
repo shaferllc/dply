@@ -93,10 +93,10 @@ function passingChecks(): array
  *
  * @param  list<array{key: string, status: string, message: string}>  $checks
  */
-function fakeBox(array $checks, ?Closure $onSync = null, int $wrapperInstallExit = 0): void
+function fakeBox(array $checks, ?Closure $onSync = null, int $wrapperInstallExit = 0, ?Closure $onBash = null): void
 {
     $remote = Mockery::mock(ExecuteRemoteTaskOnServer::class);
-    $remote->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('wrapper install', $wrapperInstallExit, false));
+    $remote->shouldReceive('runInlineBash')->andReturnUsing($onBash ?? fn (): ProcessOutput => new ProcessOutput('wrapper install', $wrapperInstallExit, false));
     $remote->shouldReceive('runInlineBashWithOutputCallback')->andReturn(new ProcessOutput('ok', 0, false));
     app()->instance(ExecuteRemoteTaskOnServer::class, $remote);
 
@@ -125,6 +125,50 @@ function clickEnable(User $user, Server $server, Site $site, string $customComma
 
     return $component->call('pollSchedulerRun');
 }
+
+test('drupal enables drush cron every 15 minutes, requiring drush first', function () {
+    [$user, $server, $site] = setupServerWithSite(['meta' => ['scaffold' => ['framework' => 'drupal']]]);
+    $ran = [];
+    fakeBox(passingChecks(), onBash: function ($server, string $name) use (&$ran): ProcessOutput {
+        $ran[] = $name;
+
+        return new ProcessOutput('', 0, false);
+    });
+
+    clickEnable($user, $server, $site)->assertSet('enable_failures', []);
+
+    $cron = ServerCronJob::query()->where('site_id', $site->id)->sole();
+    expect($cron->command)->toBe(SchedulerWrapperScript::wrap($site->id, 'generic', 'cd '.$site->effectiveEnvDirectory().' && vendor/bin/drush cron'))
+        ->and($cron->cron_expression)->toBe('*/15 * * * *')
+        ->and($ran)->toBe(['scheduler-drush-require', 'scheduler-wrapper-install']);
+});
+
+test('drupal says to require drush by hand when composer cannot', function () {
+    [$user, $server, $site] = setupServerWithSite(['meta' => ['scaffold' => ['framework' => 'drupal']]]);
+    fakeBox(passingChecks(), onBash: fn ($server, string $name): ProcessOutput => new ProcessOutput(
+        'Your requirements could not be resolved',
+        $name === 'scheduler-drush-require' ? 2 : 0,
+        false,
+    ));
+
+    $component = clickEnable($user, $server, $site);
+
+    expect(ServerCronJob::query()->count())->toBe(0)
+        ->and($component->get('enable_failures')[$site->id][0]['message'])->toContain('composer require drush/drush');
+});
+
+test('enabling clears the legacy scheduler flag so its bare line stops', function () {
+    [$user, $server, $site] = setupServerWithSite(['laravel_scheduler' => true]);
+    $site = siteWithDetectedFramework($site, 'laravel');
+    fakeBox(passingChecks(), onSync: function () use ($site): string {
+        // The sync that writes the wrapped line must not also write the bare one.
+        expect($site->fresh()->laravel_scheduler)->toBeFalse();
+
+        return "ok\nDPLY_CRON_EXIT:0";
+    });
+
+    clickEnable($user, $server, $site)->assertSet('enable_failures', []);
+});
 
 test('one click enables the laravel scheduler: wrapped entry, waiting heartbeat, synced crontab', function () {
     [$user, $server, $site] = setupServerWithSite();

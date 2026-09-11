@@ -1089,7 +1089,6 @@ test('vm site pipeline can save rollout settings', function () {
         ->set('releases_to_keep', 8)
         ->set('deployment_environment', 'staging')
         ->set('octane_port', '8080')
-        ->set('laravel_scheduler', true)
         ->set('restart_supervisor_programs_after_deploy', true)
         ->set('nginx_extra_raw', 'location /health { return 200; }')
         ->call('saveDeploymentSettings')
@@ -1108,7 +1107,6 @@ test('vm site pipeline can save rollout settings', function () {
     expect($site->releases_to_keep)->toBe(8);
     expect($site->deployment_environment)->toBe('staging');
     expect($site->octane_port)->toBe(8080);
-    expect($site->laravel_scheduler)->toBeTrue();
     expect($site->restart_supervisor_programs_after_deploy)->toBeTrue();
     expect($site->nginx_extra_raw)->toBe('location /health { return 200; }');
 });

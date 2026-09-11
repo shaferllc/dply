@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\WordPress\Jobs;
 
-use App\Models\ServerCronJob;
+use App\Jobs\EnableSchedulerJob;
+use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Models\User;
 use App\Modules\RemoteCli\Services\WpCli;
+use App\Services\Servers\SchedulerCardsBuilder;
 use App\Services\Servers\ServerCronSynchronizer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -15,23 +17,25 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 /**
  * Switch a WordPress site between HTTP wp-cron and a real system crontab.
  *
- * "System cron" used to mean only DISABLE_WP_CRON — nothing ever installed the
- * crontab entry that was meant to replace it, so switching silently stopped
- * scheduled posts and every plugin's background jobs. This installs a managed
- * ServerCronJob, and orders the two halves so there is never a moment with
- * neither: entry first, then disable wp-cron; on the way back, re-enable
- * wp-cron first, then remove the entry.
+ * "System cron" is the Schedule page's WordPress scheduler: a wrapped, monitored
+ * cron entry, installed by {@see EnableSchedulerJob}. The two halves are ordered
+ * so there is never a moment with neither: entry first, then disable wp-cron; on
+ * the way back, re-enable wp-cron first, then remove the entry.
  */
 final class SwitchWordPressCronHandlerJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /** Bare entries from before the one-click enable; MigrateLegacySchedulersJob wraps them. */
     public const DESCRIPTION = 'dply: WordPress system cron';
 
     public int $tries = 1;
@@ -71,36 +75,27 @@ final class SwitchWordPressCronHandlerJob implements ShouldBeUnique, ShouldQueue
         }
 
         $user = $this->userId !== null ? User::query()->find($this->userId) : null;
-        $entry = ServerCronJob::query()->where('server_id', $server->id)->where('site_id', $site->id)->where('description', self::DESCRIPTION);
 
         try {
             if ($this->to === 'system') {
-                ServerCronJob::query()->updateOrCreate(
-                    ['server_id' => $server->id, 'site_id' => $site->id, 'description' => self::DESCRIPTION],
-                    [
-                        'cron_expression' => '* * * * *',
-                        'command' => self::command($site),
-                        // The SSH user: the same user every dply wp-cli call runs
-                        // as, so the line needs no sudo wrapper that could fail
-                        // silently once a minute.
-                        'user' => (string) $server->ssh_user,
-                        'enabled' => true,
-                        'overlap_policy' => ServerCronJob::OVERLAP_SKIP_IF_RUNNING,
-                        'is_synced' => false,
-                    ],
-                );
-                $crontab->sync($server->fresh());
-
-                // Only now that the entry is live.
-                $wpcli->run($site, 'config set', ['DISABLE_WP_CRON', 'true', '--raw', '--type=constant'], $user);
+                $runId = (string) Str::uuid();
+                app()->call([new EnableSchedulerJob((string) $server->id, (string) $site->id, $runId, null, $this->userId), 'handle']);
+                $result = Cache::pull(EnableSchedulerJob::cacheKey($runId));
+                if (($result['status'] ?? null) !== 'done' || data_get($site->fresh()?->meta, 'wp_cron.handler') !== 'system_cron') {
+                    throw new RuntimeException((string) ($result['output'] ?? 'Enabling system cron failed.'));
+                }
             } else {
                 $wpcli->run($site, 'config delete', ['DISABLE_WP_CRON', '--type=constant'], $user);
 
                 // Disable, sync, then delete: sync() returns early when a server
                 // has no jobs left, which would leave the old line in place.
-                $entry->update(['enabled' => false]);
-                $crontab->sync($server->fresh());
-                $entry->delete();
+                $entry = SchedulerCardsBuilder::schedulerEntryFor($site);
+                if ($entry !== null) {
+                    $entry->update(['enabled' => false, 'is_synced' => false]);
+                    $crontab->sync($server->fresh());
+                    $entry->delete();
+                }
+                ServerSchedulerHeartbeat::query()->where('site_id', $site->id)->delete();
             }
 
             $this->recordOutcome($site, handler: $this->to === 'system' ? 'system_cron' : 'wp_cron', error: null);

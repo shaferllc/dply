@@ -23,6 +23,8 @@ final class SchedulerRecipe
 
     public const KEY_WORDPRESS = 'wordpress';
 
+    public const KEY_DRUPAL = 'drupal';
+
     public const KEY_CUSTOM = 'custom';
 
     public function __construct(
@@ -51,6 +53,23 @@ final class SchedulerRecipe
                 command: SwitchWordPressCronHandlerJob::command($site),
                 cronExpression: '* * * * *',
                 user: (string) $site->server?->ssh_user,
+                overlapPolicy: ServerCronJob::OVERLAP_SKIP_IF_RUNNING,
+            );
+        }
+
+        // Drupal's own cron is poor-man's cron on page views; drush runs it
+        // properly. Enabling requires drush first — see EnableSchedulerJob.
+        $scaffolded = strtolower((string) ($site->meta['scaffold']['framework'] ?? ''));
+        if ($scaffolded === 'drupal' || $site->resolvedRuntimeFrameworkKey() === 'drupal') {
+            return new self(
+                key: self::KEY_DRUPAL,
+                name: 'Drupal',
+                label: __('Drupal cron'),
+                summary: 'drush cron',
+                kind: ServerSchedulerHeartbeat::KIND_GENERIC,
+                command: 'cd '.$site->effectiveEnvDirectory().' && vendor/bin/drush cron',
+                cronExpression: '*/15 * * * *',
+                user: (string) $site->effectiveSystemUser($site->server),
                 overlapPolicy: ServerCronJob::OVERLAP_SKIP_IF_RUNNING,
             );
         }

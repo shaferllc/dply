@@ -41,7 +41,8 @@ class EnableSchedulerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 240;
+    /** A Drupal enable may `composer require drush/drush` first. */
+    public int $timeout = 900;
 
     public int $tries = 1;
 
@@ -113,6 +114,16 @@ class EnableSchedulerJob implements ShouldQueue
             return;
         }
 
+        // drupal/recommended-project doesn't ship drush; require it once, in place.
+        if ($existing === null && $recipe->key === SchedulerRecipe::KEY_DRUPAL) {
+            $missing = $this->requireDrush($remote, $server, $site, $recipe->user ?: (string) $server->ssh_user);
+            if ($missing !== null) {
+                $this->store('failed', $missing, $checks);
+
+                return;
+            }
+        }
+
         // Nothing upgrades the wrapper after provision, and older servers
         // predate it: a wrapped line with no wrapper fails every minute.
         try {
@@ -162,6 +173,12 @@ class EnableSchedulerJob implements ShouldQueue
             'output_capture_enabled' => true,
         ]);
 
+        // The legacy per-site flag writes its own bare schedule:run line, which
+        // would run alongside this one.
+        if ($site->laravel_scheduler) {
+            $site->forceFill(['laravel_scheduler' => false])->save();
+        }
+
         // sync() reports a rejected crontab in its output rather than throwing.
         try {
             $synced = preg_match('/DPLY_CRON_EXIT:0\s*$/', $crontab->sync($server->fresh())) === 1;
@@ -205,13 +222,36 @@ class EnableSchedulerJob implements ShouldQueue
         $this->store('failed', $exception?->getMessage() ?? 'Enabling the scheduler failed.');
     }
 
+    /**
+     * Run as the site user, like every other composer call on the box.
+     *
+     * @return string|null why drush is still missing, or null once it's there
+     */
+    private function requireDrush(ExecuteRemoteTaskOnServer $remote, Server $server, Site $site, string $user): ?string
+    {
+        $dir = escapeshellarg(rtrim($site->effectiveEnvDirectory(), '/'));
+        $inner = "cd {$dir} && { [ -x vendor/bin/drush ] || composer require drush/drush --no-interaction --no-audit 2>&1; } && [ -x vendor/bin/drush ]";
+
+        try {
+            $out = $remote->runInlineBash($server, 'scheduler-drush-require', 'sudo -u '.escapeshellarg($user).' -H bash -lc '.escapeshellarg($inner), 600, false);
+            if ($out->getExitCode() === 0) {
+                return null;
+            }
+            $detail = trim(mb_substr((string) $out->getBuffer(), -500));
+        } catch (Throwable $e) {
+            $detail = $e->getMessage();
+        }
+
+        return 'Drush is not installed, and `composer require drush/drush` failed — run it in the site, then retry. '.$detail;
+    }
+
     private function user(): ?User
     {
         return $this->userId !== null ? User::query()->find($this->userId) : null;
     }
 
     /** The wrapper's data directories are owned by the deploy user. */
-    private static function deployUser(): string
+    public static function deployUser(): string
     {
         $user = (string) config('server_provision.deploy_ssh_user', 'dply');
 
