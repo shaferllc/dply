@@ -79,8 +79,9 @@ class PreflightSchedulerOnSite
 
     protected function buildLaravelScript(Site $site): string
     {
-        $repoPath = rtrim($site->effectiveRepositoryPath(), '/');
-        $currentDir = $repoPath.'/current';
+        // The directory the scheduler runs in: `current/` only under atomic
+        // deploys. Simple deploys and scaffolded WordPress have no `current/`.
+        $currentDir = rtrim($site->effectiveEnvDirectory(), '/');
         $deployUser = $site->effectiveSystemUser($site->server) ?: 'dply';
 
         $repo = escapeshellarg($currentDir);
@@ -149,8 +150,9 @@ BASH;
 
     protected function buildMinimalScript(Site $site): string
     {
-        $repoPath = rtrim($site->effectiveRepositoryPath(), '/');
-        $currentDir = $repoPath.'/current';
+        // The directory the scheduler runs in: `current/` only under atomic
+        // deploys. Simple deploys and scaffolded WordPress have no `current/`.
+        $currentDir = rtrim($site->effectiveEnvDirectory(), '/');
         $deployUser = $site->effectiveSystemUser($site->server) ?: 'dply';
 
         $repo = escapeshellarg($currentDir);
@@ -216,11 +218,11 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $results
+     * @param  array<string, mixed>  $results
      * @return list<array<string, string>>
      */
     /**
-     * @param  array<string, mixed> $results
+     * @param  array<string, mixed>  $results
      */
     public function structuralFailures(array $results, string $kind = ServerSchedulerHeartbeat::KIND_LARAVEL): array
     {
@@ -233,11 +235,11 @@ BASH;
     }
 
     /**
-     * @param  array<string, mixed> $results
+     * @param  array<string, mixed>  $results
      * @return list
      */
     /**
-     * @param  array<string, mixed> $results
+     * @param  array<string, mixed>  $results
      */
     public function advisoryWarnings(array $results): array
     {

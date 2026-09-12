@@ -6,6 +6,7 @@ use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Servers\SchedulerRecipe;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -70,7 +71,7 @@ test('runtime php process section title matches detected framework', function ()
     $this->assertStringNotContainsString('WordPress', $wordpress->runtimePhpProcessSectionTitle());
 });
 
-test('runtime scheduler label uses laravel only when laravel detected', function () {
+test('the scheduler recipe is laravel only when laravel is detected', function () {
     $user = User::factory()->create();
     $org = Organization::factory()->create();
     $org->users()->attach($user->id, ['role' => 'owner']);
@@ -89,7 +90,7 @@ test('runtime scheduler label uses laravel only when laravel detected', function
             ],
         ],
     ]);
-    $this->assertStringContainsString('Laravel', $laravel->runtimeSchedulerCheckboxLabel());
+    expect(SchedulerRecipe::for($laravel)?->name)->toBe('Laravel');
 
     $symfony = Site::factory()->create([
         'server_id' => $server->id,
@@ -101,6 +102,6 @@ test('runtime scheduler label uses laravel only when laravel detected', function
             ],
         ],
     ]);
-    $this->assertStringNotContainsString('Laravel', $symfony->runtimeSchedulerCheckboxLabel());
-    expect($symfony->runtimeSchedulerCheckboxHelp())->not->toBeNull();
+    // No recipe: the Schedule page asks for the command instead.
+    expect(SchedulerRecipe::for($symfony))->toBeNull();
 });

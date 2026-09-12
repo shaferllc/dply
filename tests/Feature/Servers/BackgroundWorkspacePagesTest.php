@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Servers\BackgroundWorkspacePagesTest;
 
+use App\Jobs\EnableSchedulerJob;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
@@ -27,8 +28,11 @@ use App\Modules\Backups\Jobs\ExportServerDatabaseBackupJob;
 use App\Modules\Backups\Jobs\ExportSiteFileBackupJob;
 use App\Modules\Backups\Jobs\StageBackupDownloadJob;
 use App\Modules\Backups\Models\SiteFileBackup;
+use App\Modules\TaskRunner\ProcessOutput;
 use App\Notifications\BackupFailureNotification;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\PreflightSchedulerOnSite;
+use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -554,6 +558,14 @@ function stubAllPreflightChecksPass(): void
     $stub->shouldReceive('structuralFailures')->andReturn([]);
     $stub->shouldReceive('advisoryWarnings')->andReturn([]);
     app()->instance(PreflightSchedulerOnSite::class, $stub);
+
+    // Enable also installs the tick wrapper and syncs the crontab over SSH.
+    $remote = \Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $remote->shouldReceive('runInlineBash')->andReturn(new ProcessOutput('ok', 0, false));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $remote);
+    $synchronizer = \Mockery::mock(ServerCronSynchronizer::class);
+    $synchronizer->shouldReceive('sync')->andReturn("ok\nDPLY_CRON_EXIT:0");
+    app()->instance(ServerCronSynchronizer::class, $synchronizer);
 }
 test('enable scheduler for site creates laravel wrapper cron entry', function () {
     stubAllPreflightChecksPass();
@@ -572,9 +584,11 @@ test('enable scheduler for site creates laravel wrapper cron entry', function ()
 
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
-        ->set('enable_site_id', $site->id)
-        ->set('enable_cron_expression', '* * * * *')
-        ->call('enableSchedulerForSite');
+        ->call('enableScheduler', $site->id);
+
+    // The queue is faked for feature tests; run the enable job as a worker would.
+    Queue::pushed(EnableSchedulerJob::class)
+        ->each(fn ($job) => app()->call([$job, 'handle']));
 
     $entry = ServerCronJob::query()
         ->where('server_id', $server->id)
@@ -589,7 +603,7 @@ test('enable scheduler for site creates laravel wrapper cron entry', function ()
     $this->assertStringContainsString('schedule:run', $entry->command);
     expect($entry->cron_expression)->toBe('* * * * *');
 });
-test('enable scheduler for site creates rails wrapper cron entry', function () {
+test('rails sites get the command field instead of a recipe', function () {
     stubAllPreflightChecksPass();
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -604,19 +618,14 @@ test('enable scheduler for site creates rails wrapper cron entry', function () {
         ],
     ]);
 
+    // Rails has no standard scheduler — `whenever --update-crontab` rewrites
+    // the crontab rather than running jobs — so it asks for the command.
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
-        ->set('enable_site_id', $site->id)
-        ->set('enable_cron_expression', '0 * * * *')
-        ->call('enableSchedulerForSite');
+        ->call('enableScheduler', $site->id)
+        ->assertSet('custom_command_site_id', $site->id);
 
-    $entry = ServerCronJob::query()
-        ->where('server_id', $server->id)
-        ->where('site_id', $site->id)
-        ->first();
-    expect($entry)->not->toBeNull();
-    $this->assertStringContainsString('/usr/local/bin/dply-scheduler-tick', $entry->command);
-    $this->assertStringContainsString('whenever', $entry->command);
+    expect(ServerCronJob::query()->where('server_id', $server->id)->count())->toBe(0);
 });
 test('enable scheduler rejects missing site', function () {
     $user = actingOrgUser();
@@ -624,8 +633,7 @@ test('enable scheduler rejects missing site', function () {
 
     Livewire::actingAs($user)
         ->test(WorkspaceSchedule::class, ['server' => $server])
-        ->set('enable_site_id', '')
-        ->call('enableSchedulerForSite');
+        ->call('enableScheduler', 'not-a-site');
 
     expect(ServerCronJob::query()->where('server_id', $server->id)->count())->toBe(0);
 });
@@ -1240,7 +1248,6 @@ test('schedule site query param filters cron and daemon lists', function () {
     expect($cards)->toHaveCount(1, 'Context filter should narrow to the requested site only.');
     expect($cards[0]['site']->id)->toBe($site->id);
     expect($cards[0]['state'])->toBe('detected_unmonitored');
-    expect($component->get('enable_site_id'))->toBe($site->id, 'Enable scheduler form pre-fills site id.');
 });
 test('activity mount honors category query param', function () {
     $user = actingOrgUser();

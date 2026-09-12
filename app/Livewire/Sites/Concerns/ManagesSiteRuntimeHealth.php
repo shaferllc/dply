@@ -476,7 +476,6 @@ trait ManagesSiteRuntimeHealth
         $rules = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
-            $rules['laravel_scheduler'] = 'boolean';
             if (! $this->shouldShowSystemUserPanel()) {
                 $rules['php_fpm_user'] = 'nullable|string|max:64';
             }
@@ -504,7 +503,6 @@ trait ManagesSiteRuntimeHealth
         $update = [];
 
         if ($this->shouldShowRuntimePhpRolloutFields()) {
-            $update['laravel_scheduler'] = $this->laravel_scheduler;
             if (! $this->shouldShowSystemUserPanel()) {
                 $update['php_fpm_user'] = $this->php_fpm_user !== '' ? $this->php_fpm_user : null;
             }

@@ -138,7 +138,7 @@ trait ManagesSiteDeploymentSettings
 
     /**
      * Persist the chosen {@see DeploymentMethod}. A flat→atomic switch queues
-     * {@see \App\Services\Sites\SiteAtomicLayoutRequester} (column flips after
+     * {@see SiteAtomicLayoutRequester} (column flips after
      * convert). Atomic→flat is armed for the next deploy.
      */
     public function saveDeploymentMethod(): void
@@ -275,7 +275,6 @@ trait ManagesSiteDeploymentSettings
         $rules = [
             'releases_to_keep' => 'required|integer|min:1|max:50',
             'nginx_extra_raw' => 'nullable|string|max:16000',
-            'laravel_scheduler' => 'boolean',
             'restart_supervisor_programs_after_deploy' => 'boolean',
             'deployment_environment' => 'required|string|max:32',
             'deploy_health_enabled' => 'boolean',
@@ -358,7 +357,6 @@ trait ManagesSiteDeploymentSettings
         $update = [
             'releases_to_keep' => $this->releases_to_keep,
             'nginx_extra_raw' => $this->nginx_extra_raw !== '' ? $this->nginx_extra_raw : null,
-            'laravel_scheduler' => $this->laravel_scheduler,
             'restart_supervisor_programs_after_deploy' => $this->restart_supervisor_programs_after_deploy,
             'deployment_environment' => $this->deployment_environment,
             'meta' => $meta,

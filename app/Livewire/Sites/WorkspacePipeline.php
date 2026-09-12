@@ -10,8 +10,8 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Modules\Deploy\Services\DeployPipelineTemplateCatalog;
 use App\Modules\Deploy\Services\SiteDeployPipelineManager;
-use App\Services\Sites\PipelineAnchorScriptRunner;
 use App\Modules\Docs\Support\ContextualDocResolver;
+use App\Services\Sites\PipelineAnchorScriptRunner;
 use App\Support\Sites\DeployPipelineAdvisor;
 use App\Support\Sites\DeployPipelineIssueFixResolver;
 use App\Support\Sites\DeployPipelinePalette;
@@ -211,7 +211,6 @@ class WorkspacePipeline extends Show
             'zero_downtime_enabled',
             'releases_to_keep',
             'deployment_environment',
-            'laravel_scheduler',
             'restart_supervisor_programs_after_deploy',
             'nginx_extra_raw',
             'deploy_health_enabled',

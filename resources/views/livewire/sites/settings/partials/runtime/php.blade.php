@@ -317,15 +317,12 @@
                         <x-input-error :messages="$errors->get('php_fpm_user')" class="mt-1" />
                     </div>
                 @endif
-                @if ($site->supportsLaravelScheduler())
+                @if ($site->supportsVmManagedCron())
                     <div class="flex flex-col justify-end">
-                        <label class="flex items-center gap-2 text-xs text-brand-ink">
-                            <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-brand-ink/15 text-brand-forest shadow-sm focus:ring-brand-forest">
-                            {{ $site->runtimeSchedulerCheckboxLabel() }}
-                        </label>
-                        @if ($site->runtimeSchedulerCheckboxHelp())
-                            <p class="{{ $fieldHelp }} pl-6">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
-                        @endif
+                        <p class="text-xs text-brand-moss">
+                            {{ __('Scheduler') }} ·
+                            <a href="{{ route('sites.schedule', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('manage →') }}</a>
+                        </p>
                     </div>
                 @endif
             </div>

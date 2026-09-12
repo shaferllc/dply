@@ -336,7 +336,7 @@ trait ResolvesSiteRuntime
         return $lang !== '' && $lang !== 'unknown';
     }
 
-    private function resolvedRuntimeFrameworkKey(): string
+    public function resolvedRuntimeFrameworkKey(): string
     {
         $resolved = $this->resolvedRuntimeAppDetection();
 
@@ -587,42 +587,6 @@ trait ResolvesSiteRuntime
             '' => __('PHP process'),
             default => __('PHP process (:stack)', ['stack' => (string) str($fw)->replace('_', ' ')->title()]),
         };
-    }
-
-    /**
-     * Label for the per-minute cron / scheduler checkbox (word "Laravel" only when detection says Laravel).
-     */
-    public function runtimeSchedulerCheckboxLabel(): string
-    {
-        $fw = $this->resolvedRuntimeFrameworkKey();
-
-        return $fw === 'laravel'
-            ? __('Laravel scheduler (cron)')
-            : __('Per-minute cron task');
-    }
-
-    /**
-     * Helper text when Laravel is not the detected framework but the cron option is still shown (PHP site).
-     */
-    public function runtimeSchedulerCheckboxHelp(): ?string
-    {
-        $fw = $this->resolvedRuntimeFrameworkKey();
-
-        return $fw === 'laravel'
-            ? null
-            : __('Adds `php artisan schedule:run` each minute. Enable only for Laravel apps that use the scheduler; leave off for Symfony, WordPress, and other stacks.');
-    }
-
-    /**
-     * Full single-line label for the scheduler checkbox on Deploy → Rollout (includes schedule:run hint for Laravel).
-     */
-    public function runtimeSchedulerRolloutFormLabel(): string
-    {
-        $fw = $this->resolvedRuntimeFrameworkKey();
-
-        return $fw === 'laravel'
-            ? __('Laravel scheduler (schedule:run every minute via server crontab)')
-            : __('Per-minute cron task (via server crontab)');
     }
 
     /**

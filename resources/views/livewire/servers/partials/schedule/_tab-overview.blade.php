@@ -86,11 +86,6 @@
             <x-secondary-button size="sm" type="button" wire:click="setScheduleWorkspaceTab('schedulers')">
                 {{ __('View all') }}
             </x-secondary-button>
-            @if ($sites->isNotEmpty())
-                <x-secondary-button size="sm" type="button" wire:click="openEnableSchedulerModal">
-                    {{ __('Enable') }}
-                </x-secondary-button>
-            @endif
         </div>
     @endif
 </section>

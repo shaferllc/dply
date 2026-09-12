@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\SchedulerCardsBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -21,8 +22,6 @@ use Illuminate\Support\Str;
  */
 trait ManagesScheduleRuns
 {
-
-
     /**
      * Top-level Run-now — fires `schedule:run` once via SSH. Per Q15:
      *  - Refuses a second click while one is in flight (Q15 (e))
@@ -112,6 +111,21 @@ trait ManagesScheduleRuns
         $this->scheduler_run_id = null;
         $this->scheduler_run_cache_key = null;
         $this->run_now_in_flight = [];
+
+        // An enable reports per row: its failed checks render under the site.
+        $siteId = $payload['site_id'] ?? null;
+        if (is_string($siteId)) {
+            $this->enabling_site_id = null;
+            if ($status === 'failed') {
+                $checks = array_values(array_filter(
+                    (array) ($payload['checks'] ?? []),
+                    fn ($check): bool => is_array($check) && ($check['status'] ?? '') !== 'pass',
+                ));
+                $this->enable_failures[$siteId] = $checks !== []
+                    ? $checks
+                    : [['key' => 'error', 'status' => 'fail', 'message' => $output]];
+            }
+        }
 
         $this->emitPanelEvent(
             $status === 'done' ? __('Done.') : __('Operation failed.'),
@@ -215,30 +229,8 @@ trait ManagesScheduleRuns
             return [null, null];
         }
 
-        // Pick the scheduler-shaped cron row associated with this heartbeat.
-        // Same string-match the cards builder uses so the page + actions
-        // operate on the same row.
-        $cron = ServerCronJob::query()
-            ->where('server_id', $this->server->id)
-            ->where('site_id', $hb->site_id)
-            ->get()
-            ->first(function (ServerCronJob $job) use ($hb): bool {
-                $cmd = strtolower((string) $job->command);
-                $needles = match ($hb->scheduler_kind) {
-                    ServerSchedulerHeartbeat::KIND_LARAVEL => ['schedule:run', 'schedule:work'],
-                    ServerSchedulerHeartbeat::KIND_RAILS => ['whenever', 'rake schedule', 'bin/rails runner'],
-                    ServerSchedulerHeartbeat::KIND_GENERIC => ['celery beat', 'celerybeat'],
-                    default => [],
-                };
-                foreach ($needles as $n) {
-                    if (str_contains($cmd, $n)) {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
-
-        return [$hb, $cron];
+        // Same match the cards builder uses, so the page and the actions work
+        // on the same row — wrapped custom commands included.
+        return [$hb, SchedulerCardsBuilder::cronFor($hb)];
     }
 }

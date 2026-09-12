@@ -9,6 +9,8 @@ use App\Models\Server;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\SchedulerCardsBuilder;
+use App\Services\Servers\SchedulerWrapperScript;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -98,10 +100,11 @@ class RunSchedulerNowJob implements ShouldQueue
             return;
         }
 
-        $directory = $site->effectiveEnvDirectory();
-        $command = $this->commandFor($heartbeat->scheduler_kind, $directory);
-        if ($command === null) {
-            $this->store('failed', 'No canonical run command for this scheduler kind. Use a long-running worker instead.');
+        // Run exactly what the scheduler's cron entry runs. A per-kind command
+        // table left WordPress and custom schedulers with no Run now at all.
+        $cron = SchedulerCardsBuilder::cronFor($heartbeat);
+        if ($cron === null) {
+            $this->store('failed', 'No cron entry found for this scheduler.');
 
             return;
         }
@@ -110,11 +113,10 @@ class RunSchedulerNowJob implements ShouldQueue
         // path is shared with real ticks. Caller's audit_log already recorded
         // intent — this job logs only execution outcome (success / timeout /
         // wrapper missing).
-        $wrapperCmd = sprintf(
-            '/usr/local/bin/dply-scheduler-tick %s %s -- %s',
-            escapeshellarg($heartbeat->site_id),
-            escapeshellarg($heartbeat->scheduler_kind),
-            $command,
+        $wrapperCmd = SchedulerWrapperScript::wrap(
+            $heartbeat->site_id,
+            $heartbeat->scheduler_kind,
+            SchedulerWrapperScript::unwrap((string) $cron->command),
         );
 
         try {
@@ -164,17 +166,5 @@ class RunSchedulerNowJob implements ShouldQueue
             return;
         }
         Cache::put(self::cacheKey($this->runId), compact('status', 'output'), now()->addMinutes(10));
-    }
-
-    private function commandFor(string $kind, string $directory): ?string
-    {
-        return match ($kind) {
-            ServerSchedulerHeartbeat::KIND_LARAVEL => 'cd '.escapeshellarg($directory).' && php artisan schedule:run',
-            ServerSchedulerHeartbeat::KIND_RAILS => 'cd '.escapeshellarg($directory).' && bundle exec whenever --update-crontab',
-            // Generic schedulers don't have a single canonical command;
-            // operators wanting Run-now on generic schedulers should add a
-            // command via a follow-up affordance.
-            default => null,
-        };
     }
 }

@@ -6,12 +6,12 @@
     $fieldHelp = 'mt-1 text-xs text-brand-moss';
     $isNginx = $site->webserver() === 'nginx';
 
-    $showScheduler = $site->supportsLaravelScheduler();
     $showSupervisor = $site->hasRestartableSupervisorPrograms();
     $vmManagedCron = $site->supportsVmManagedCron();
-    $schedulerCronLink = ! $showScheduler && $vmManagedCron;
+    // Every stack's scheduler is enabled on the Schedule page.
+    $showScheduler = $vmManagedCron;
     $supervisorDaemonsLink = ! $showSupervisor && $vmManagedCron;
-    $showPostActivate = $showScheduler || $showSupervisor || $schedulerCronLink || $supervisorDaemonsLink;
+    $showPostActivate = $showScheduler || $showSupervisor || $supervisorDaemonsLink;
 
     $rolloutSummaryParts = [__('Release retention'), __('deploy environment group')];
     if ($showScheduler) { $rolloutSummaryParts[] = __('scheduler'); }
@@ -162,19 +162,9 @@
                     <div class="space-y-2.5 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                         <p class="text-2xs font-semibold uppercase tracking-[0.12em] text-brand-mist">{{ __('Post-activate') }}</p>
                         @if ($showScheduler)
-                            <label class="flex items-start gap-2.5">
-                                <input type="checkbox" wire:model="laravel_scheduler" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                                <span class="min-w-0">
-                                    <span class="block text-xs font-semibold text-brand-ink">{{ $site->runtimeSchedulerRolloutFormLabel() }}</span>
-                                    @if ($site->runtimeSchedulerCheckboxHelp())
-                                        <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</span>
-                                    @endif
-                                </span>
-                            </label>
-                        @elseif ($schedulerCronLink)
                             <p class="text-xs leading-relaxed text-brand-moss">
-                                {{ __('Need a recurring task for this stack?') }}
-                                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Set one up in Cron →') }}</a>
+                                {{ __('Scheduler') }} ·
+                                <a href="{{ route('sites.schedule', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('manage →') }}</a>
                             </p>
                         @endif
 

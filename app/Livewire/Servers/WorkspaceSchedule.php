@@ -2,32 +2,25 @@
 
 namespace App\Livewire\Servers;
 
-use App\Jobs\RunSchedulerNowJob;
-use App\Jobs\SetSchedulerOutputCaptureJob;
+use App\Jobs\EnableSchedulerJob;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Concerns\RequiresFeature;
-use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\BuildsScheduleStats;
+use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesScheduleCadence;
-use App\Livewire\Servers\Concerns\ManagesScheduleRuns;
 use App\Livewire\Servers\Concerns\ManagesSchedulerEnable;
+use App\Livewire\Servers\Concerns\ManagesScheduleRuns;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\AuditLog;
 use App\Models\Server;
-use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
-use App\Services\Servers\CronExpressionValidator;
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Servers\PreflightSchedulerOnSite;
 use App\Services\Servers\SchedulerCardsBuilder;
-use App\Services\Servers\SchedulerHealthEvaluator;
-use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\SchedulerRecipe;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
@@ -42,8 +35,9 @@ use Livewire\WithPagination;
  *  - On render, {@see SchedulerCardsBuilder} pivots heartbeats +
  *    scheduler-shaped cron rows into per-site cards. Stats roll up into the
  *    Q11 summary strip.
- *  - The Enable form remains as it was today (creates a bare cron entry);
- *    preflight + wrapper-invocation generation land in milestone 2C.
+ *  - Enable is one click per site row: the detected stack picks the
+ *    scheduler ({@see SchedulerRecipe}) and
+ *    {@see EnableSchedulerJob} does the SSH work, queued.
  *  - Per-card actions (Pause, Edit cadence, Disable Monitoring, Run-now)
  *    land in milestone 2B.
  */
@@ -58,12 +52,12 @@ class WorkspaceSchedule extends Component
 
     protected string $requiredFeature = 'workspace.schedule';
 
-    use HandlesServerRemovalFlow;
     use BuildsScheduleStats;
+    use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesScheduleCadence;
-    use ManagesScheduleRuns;
     use ManagesSchedulerEnable;
+    use ManagesScheduleRuns;
 
     /** @var list<string> */
     public const SCHEDULE_TABS = ['schedulers', 'overview', 'logs', 'activity'];
@@ -79,15 +73,20 @@ class WorkspaceSchedule extends Component
     #[Url(as: 'tab', except: 'schedulers', history: true)]
     public string $schedule_workspace_tab = 'schedulers';
 
-    /** Form state for "Enable scheduler for site". */
-    public string $enable_site_id = '';
+    /** Site whose one-click enable is queued (row spinner); null when idle. */
+    public ?string $enabling_site_id = null;
 
-    public string $enable_cron_expression = '* * * * *';
+    /** Row whose "Set command…" field is open — a stack with no recipe. */
+    public ?string $custom_command_site_id = null;
 
-    /** @var 'laravel'|'rails'|'' Framework hint when detection picks a preset command. */
-    public string $enable_framework = '';
+    public string $custom_command = '';
 
-    public string $enable_custom_command = '';
+    /**
+     * Why the last enable for a site stopped, rendered under its row.
+     *
+     * @var array<string, list<array{key: string, status: string, message: string}>>
+     */
+    public array $enable_failures = [];
 
     /** When set (?site=… or the nested site route), filters lists to that site. */
     public ?string $context_site_id = null;
@@ -121,9 +120,6 @@ class WorkspaceSchedule extends Component
 
     public ?string $disableMonitoringHeartbeatId = null;
 
-    /** Enable-scheduler modal name (event-driven open/close, like daemons' Add program modal). */
-    public const ENABLE_MODAL = 'schedule-enable';
-
     /** Live streaming for queued SSH ops (run-now, capture toggle) — cache-backed poll. */
     public ?string $scheduler_run_id = null;
 
@@ -138,7 +134,6 @@ class WorkspaceSchedule extends Component
     /** Logs tab — selected scheduler (heartbeat id) whose output history is shown. */
     public ?string $log_scheduler_id = null;
 
-
     public function mount(Server $server, ?Site $site = null): void
     {
         $this->bootWorkspace($server);
@@ -150,7 +145,6 @@ class WorkspaceSchedule extends Component
 
             $this->siteDedicatedContext = true;
             $this->context_site_id = $site->id;
-            $this->enable_site_id = $site->id;
             $this->schedulers_list_scope = 'site';
         } else {
             // Server workspace deep-linked with ?site= to pre-filter without leaving server nav.
@@ -162,7 +156,6 @@ class WorkspaceSchedule extends Component
                     ->exists();
                 if ($exists) {
                     $this->context_site_id = $siteId;
-                    $this->enable_site_id = $siteId;
                     $this->schedulers_list_scope = 'site';
                 }
             }
@@ -173,25 +166,12 @@ class WorkspaceSchedule extends Component
         if (! in_array($this->schedule_workspace_tab, self::SCHEDULE_TABS, true)) {
             $this->schedule_workspace_tab = 'schedulers';
         }
-
-        $this->syncEnableFormToSiteFramework();
     }
-
 
     public function setScheduleWorkspaceTab(string $tab): void
     {
         $this->schedule_workspace_tab = in_array($tab, self::SCHEDULE_TABS, true) ? $tab : 'schedulers';
     }
-
-    /**
-     * Most-recent preflight result rendered after a refused Enable attempt.
-     * Operators see structured per-check pass/warn/fail messages so they know
-     * what to fix. Cleared on next Enable attempt.
-     *
-     * @var list<array{key: string, status: string, message: string}>
-     */
-    public array $preflight_results = [];
-
 
     /**
      * Merged Schedule card skeleton (hide-hero) so lazy load matches the page
@@ -265,8 +245,6 @@ class WorkspaceSchedule extends Component
             ? $sites->firstWhere('id', $this->context_site_id)
             : null;
 
-        $enableTargetSite = $this->resolveEnableTargetSite() ?? $contextSite;
-
         // Activity tab — scheduler audit events for this server. Backed by the
         // generic audit log filtered to server.scheduler.* (UX-identical to the
         // daemons Activity list, no dedicated table).
@@ -314,11 +292,6 @@ class WorkspaceSchedule extends Component
             // True only on the nested site route — hides the "all sites on server"
             // scope toggle (the server route is where the whole-server view lives).
             'scheduleSiteRouteLocked' => $this->siteDedicatedContext,
-            'enableTargetSite' => $enableTargetSite,
-            'showLaravelSchedulerEnable' => $enableTargetSite?->isLaravelFrameworkDetected() ?? false,
-            'showRailsSchedulerEnable' => $enableTargetSite?->isRailsFrameworkDetected() ?? false,
-            'showCustomSchedulerEnable' => $enableTargetSite !== null
-                && ! ($enableTargetSite->isLaravelFrameworkDetected() || $enableTargetSite->isRailsFrameworkDetected()),
             'cards' => $cards,
             'allCards' => $allCards,
             'stats' => $built['stats'],
@@ -329,6 +302,4 @@ class WorkspaceSchedule extends Component
                 : null,
         ]);
     }
-
-
 }

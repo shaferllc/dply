@@ -120,8 +120,6 @@ class Show extends Component
 
     public string $laravel_pulse_notes = '';
 
-    public bool $laravel_scheduler = false;
-
     /** Localhost port for reverse-proxy runtimes (Node, Rails, Puma, containers, etc.). */
     public string $runtime_app_port = '';
 
@@ -197,7 +195,6 @@ class Show extends Component
         $lp = is_array($dm['laravel_pulse'] ?? null) ? $dm['laravel_pulse'] : [];
         $this->laravel_pulse_path = (string) ($lp['path'] ?? '/pulse');
         $this->laravel_pulse_notes = (string) ($lp['notes'] ?? '');
-        $this->laravel_scheduler = (bool) $this->site->laravel_scheduler;
         $this->restart_supervisor_programs_after_deploy = (bool) ($this->site->restart_supervisor_programs_after_deploy ?? false);
         $this->deployment_environment = (string) ($this->site->deployment_environment ?? 'production');
         $this->php_fpm_user = (string) ($this->site->php_fpm_user ?? '');
