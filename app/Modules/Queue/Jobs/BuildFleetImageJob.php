@@ -6,12 +6,14 @@ namespace App\Modules\Queue\Jobs;
 
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Services\FleetImageBuilder;
+use App\Modules\Queue\Services\FleetReconciler;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -45,13 +47,15 @@ class BuildFleetImageJob implements ShouldBeUnique, ShouldQueue
         return $this->fleetId;
     }
 
-    public function handle(FleetImageBuilder $builder): void
+    public function handle(FleetImageBuilder $builder, FleetReconciler $reconciler): void
     {
         $fleet = ManagedQueueFleet::query()->with('namespace.site')->find($this->fleetId);
 
         if (! $fleet instanceof ManagedQueueFleet) {
             return;
         }
+
+        $previous = trim((string) $fleet->image);
 
         $this->writeState($fleet, ['state' => 'building', 'started_at' => now()->toIso8601String()]);
 
@@ -74,6 +78,19 @@ class BuildFleetImageJob implements ShouldBeUnique, ShouldQueue
             'tag' => $tag,
             'error' => null,
         ]);
+
+        // A new tag means new code: workers still on the old one would keep
+        // running the release the deploy just replaced. The tag is the commit,
+        // so rebuilding the same commit rolls nothing.
+        if ($previous !== '' && $previous !== $tag) {
+            try {
+                $reconciler->roll($fleet->fresh() ?? $fleet);
+            } catch (Throwable $e) {
+                // The image is good; the next reconcile still starts new
+                // workers on it. A failed roll is not a failed build.
+                Log::warning('queue.fleet.roll_failed', ['fleet_id' => $fleet->id, 'error' => $e->getMessage()]);
+            }
+        }
     }
 
     /**

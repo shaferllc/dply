@@ -13,6 +13,7 @@ use App\Modules\Queue\Support\ScalingDecision;
 use App\Modules\Queue\Support\WorkerHandle;
 use App\Modules\Queue\Support\WorkerSpec;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -223,9 +224,37 @@ class FleetReconciler
             ->limit($count)
             ->get();
 
+        $this->stopWorkers($fleet, $doomed, 'scale-down');
+    }
+
+    /**
+     * Replace every live worker — after a new image, so none keeps running the
+     * code from before the deploy. Replacements start on the fleet's current
+     * image as the queue asks for them.
+     *
+     * ponytail: stop-then-start, so a busy queue waits up to the grace period
+     * for its replacements; start-before-stop when that gap starts to matter.
+     *
+     * @return int workers replaced
+     */
+    public function roll(ManagedQueueFleet $fleet): int
+    {
+        $old = $this->liveWorkers($fleet)->get();
+
+        $this->stopWorkers($fleet, $old, 'rolled');
+        $this->reconcile($fleet->fresh() ?? $fleet);
+
+        return $old->count();
+    }
+
+    /**
+     * @param  Collection<int, ManagedQueueWorker>  $workers
+     */
+    private function stopWorkers(ManagedQueueFleet $fleet, $workers, string $reason): void
+    {
         $grace = $fleet->graceSeconds();
 
-        foreach ($doomed as $worker) {
+        foreach ($workers as $worker) {
             $worker->forceFill(['state' => ManagedQueueWorker::STATE_DRAINING])->save();
 
             try {
@@ -239,7 +268,7 @@ class FleetReconciler
                 ]);
             }
 
-            $this->settle($worker, ManagedQueueWorker::STATE_STOPPED, 'scale-down');
+            $this->settle($worker, ManagedQueueWorker::STATE_STOPPED, $reason);
         }
     }
 

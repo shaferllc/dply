@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\WorkerPools\WorkerDaemonBackend;
 use App\Support\Sites\SiteDatabaseWorkspace;
 use Laravel\Pennant\Feature;
 
@@ -176,7 +177,11 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
-                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
+                // PHP sites have no Services workspace — except while their
+                // workers still run as systemd units, which only that page lists.
+                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services'
+                    || Site::supportsSystemdServices($site, $server)
+                    || app(WorkerDaemonBackend::class)->hasSystemdWorkerUnits($site))
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'files' || $supportsSsh)
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'database' || SiteDatabaseWorkspace::shouldShowTab($site, $server))
                 // Hide gated items when neither the full feature nor its coming-soon

@@ -26,6 +26,9 @@ use App\Modules\Insights\Jobs\RunSiteInsightsJob;
 use App\Modules\Notifications\Services\DeployDigestBuffer;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\Notifications\Services\ServerDeployPolicyNotificationDispatcher;
+use App\Modules\Queue\Jobs\BuildFleetImageJob;
+use App\Modules\Queue\Models\ManagedQueueFleet;
+use App\Modules\Queue\Services\Runtimes\FleetHostAllocator;
 use App\Modules\Secrets\Services\EphemeralSecretIdentityContext;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Servers\ServerDeployPolicyGuard;
@@ -373,6 +376,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // replicas' credentials always the parent's.
                 $this->syncWorkerReplicaEnv();
                 $this->resumePendingQueueSwitch();
+                $this->rebuildQueueFleets();
                 $caps = $this->site->server?->hostCapabilities();
                 if ($caps?->supportsClusterDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
@@ -572,6 +576,27 @@ class RunSiteDeploymentJob implements ShouldQueue
             $driver,
             $this->auditUserId !== null ? (string) $this->auditUserId : null,
         );
+    }
+
+    /**
+     * dply queue fleets run the site's code from an image, so a deploy that
+     * changed the code has to change the image. The build job rolls the
+     * workers onto the new tag once it is ready.
+     */
+    private function rebuildQueueFleets(): void
+    {
+        // Only real containers have an image to rebuild, and only a fleet host
+        // can build one — without this, every deploy writes a failed build.
+        if (config('queue_service.fleets.runtime') !== 'docker'
+            || app(FleetHostAllocator::class)->hosts()->isEmpty()) {
+            return;
+        }
+
+        ManagedQueueFleet::query()
+            ->where('status', ManagedQueueFleet::STATUS_ACTIVE)
+            ->whereHas('namespace', fn ($q) => $q->where('site_id', $this->site->id))
+            ->pluck('id')
+            ->each(fn ($id) => BuildFleetImageJob::dispatch((string) $id));
     }
 
     /**

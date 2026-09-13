@@ -124,7 +124,12 @@ class SetUpSiteQueueingJob implements ShouldQueue
             }
         }
 
-        $this->markSwitchPending($site, null);
+        // A switch somewhere else supersedes a dply switch still waiting on its
+        // deploy. The same switch stays pending until it succeeds, so a failed
+        // step below is retried by the next deploy rather than forgotten.
+        if (data_get($site->meta, 'queue_switch_pending') !== $this->driver) {
+            $this->markSwitchPending($site, null);
+        }
 
         // 2 — push it to the box ---------------------------------------------
         // Inline, not dispatched: the next steps are only correct once the file
@@ -262,6 +267,7 @@ class SetUpSiteQueueingJob implements ShouldQueue
             $emit->step('setup', __('Deploys will now restart the workers.'));
         }
 
+        $this->markSwitchPending($site, null);
         $this->succeed($emit, __('Queueing is set up. Dispatch a job and it will be picked up.'));
     }
 
@@ -307,6 +313,8 @@ class SetUpSiteQueueingJob implements ShouldQueue
 
     private function markSwitchPending(Site $site, ?string $driver): void
     {
+        // Earlier steps write meta through other paths; never save stale meta back.
+        $site->refresh();
         $meta = is_array($site->meta) ? $site->meta : [];
         if (($meta['queue_switch_pending'] ?? null) === $driver) {
             return;

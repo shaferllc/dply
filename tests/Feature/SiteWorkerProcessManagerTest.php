@@ -213,7 +213,8 @@ test('the switch job starts the new worker before stopping the one that cannot r
     [, , $site] = phpSiteWithOwner();
     $site->forceFill([
         'env_file_content' => "QUEUE_CONNECTION=dply\n",
-        'meta' => ['worker_process_manager' => 'supervisor'],
+        // Pending from an earlier deferral; this run finishes it.
+        'meta' => ['worker_process_manager' => 'supervisor', 'queue_switch_pending' => 'dply'],
     ])->save();
     // Mirrored from a SiteProcess, as ensure() writes it: the row has to stop too.
     $process = SiteProcess::factory()->create(['site_id' => $site->id, 'name' => 'horizon', 'command' => 'php artisan horizon']);
@@ -236,6 +237,7 @@ test('the switch job starts the new worker before stopping the one that cannot r
         ->and($horizon->fresh()->is_active)->toBeFalse()
         ->and($process->fresh()->is_active)->toBeFalse()
         ->and($site->fresh()->meta['queue_stopped_processes'])->toBe(['horizon'])
+        ->and($site->fresh()->meta)->not->toHaveKey('queue_switch_pending')
         ->and(SupervisorProgram::query()->where('site_id', $site->id)->where('is_active', true)->pluck('command')->all())
         ->toHaveCount(1)
         ->each->toContain('queue:work');
@@ -275,6 +277,37 @@ test('a switch moves queue workers still on systemd to supervisor first', functi
         // … and horizon is planned as the program it becomes, which dply cannot use.
         ->and($plan->stop->pluck('slug')->all())->toBe(['dply-worker-'.$site->id.'-horizon'])
         ->and($plan->createDefault)->toBeTrue();
+});
+
+test('a pending dply switch survives a failed step so the next deploy retries it', function () {
+    [, , $site] = phpSiteWithOwner();
+    $site->forceFill(['meta' => ['queue_switch_pending' => 'dply']])->save();
+    $run = queueSwitchRun($site);
+
+    app()->instance(SiteEnvPusher::class, \Mockery::mock(SiteEnvPusher::class)->shouldIgnoreMissing());
+    $exec = \Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $exec->shouldReceive('runInlineBash')->andReturnUsing(
+        fn ($server, string $name) => $name === 'site:queue-setup-config-clear'
+            ? throw new \RuntimeException('ssh dropped')
+            : new ProcessOutput('DPLY_PKG_YES', 0),
+    );
+
+    app()->call([new SetUpSiteQueueingJob((string) $run->id, (string) $site->id, 'dply'), 'handle'], [
+        'exec' => $exec,
+        'provisioner' => \Mockery::mock(SupervisorProvisioner::class),
+    ]);
+
+    expect($run->fresh()->status)->toBe(ConsoleAction::STATUS_FAILED)
+        ->and($site->fresh()->meta['queue_switch_pending'])->toBe('dply');
+
+    // Reverting elsewhere supersedes it: a later deploy must not re-switch to dply.
+    $revert = queueSwitchRun($site);
+    app()->call([new SetUpSiteQueueingJob((string) $revert->id, (string) $site->id, 'redis'), 'handle'], [
+        'exec' => $exec,
+        'provisioner' => \Mockery::mock(SupervisorProvisioner::class),
+    ]);
+
+    expect($site->fresh()->meta)->not->toHaveKey('queue_switch_pending');
 });
 
 test('a package check that cannot run fails the switch instead of reporting it saved', function () {

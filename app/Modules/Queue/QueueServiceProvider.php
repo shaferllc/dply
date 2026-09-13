@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue;
 
+use App\Modules\Queue\Console\FleetHostCommand;
 use App\Modules\Queue\Console\FleetSmokeTestCommand;
 use App\Modules\Queue\Console\FlushQueueUsageCommand;
 use App\Modules\Queue\Console\MeterFleetUsageCommand;
@@ -76,6 +77,8 @@ class QueueServiceProvider extends ServiceProvider
                 QueueDoctorCommand::class,
                 // Sizes managed worker fleets against real queue pressure.
                 QueueFleetTickCommand::class,
+                // Opt a server in as a fleet host; read its smoke/soak proof.
+                FleetHostCommand::class,
                 FleetSmokeTestCommand::class,
                 // Hourly roll-up of worker time into billable MiB-seconds.
                 MeterFleetUsageCommand::class,

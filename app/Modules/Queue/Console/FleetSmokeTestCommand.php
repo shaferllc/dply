@@ -12,6 +12,7 @@ use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\FleetImageBuilder;
+use App\Modules\Queue\Services\FleetReachabilityProbe;
 use App\Modules\Queue\Services\FleetReconciler;
 use App\Modules\Queue\Services\FleetWorkerEnvironment;
 use App\Modules\Queue\Support\QueueEndpoint;
@@ -56,6 +57,7 @@ class FleetSmokeTestCommand extends Command
         FleetWorkerEnvironment $environment,
         ExecuteRemoteTaskOnServer $remote,
         QueueStore $store,
+        FleetReachabilityProbe $probe,
     ): int {
         try {
             $host = $this->resolveHost();
@@ -82,6 +84,9 @@ class FleetSmokeTestCommand extends Command
             $this->step('7. Worker environment');
             $this->assertEnvironment($environment);
 
+            $this->step('7b. The app’s database and Redis answer from the host');
+            $this->assertReachable($probe, $host);
+
             $this->step('8. Push a job');
             $jobId = $store->push($this->namespace, (string) $this->option('queue'), $this->probePayload());
             $this->ok('job '.$jobId);
@@ -97,6 +102,7 @@ class FleetSmokeTestCommand extends Command
 
             $this->newLine();
             $this->info('The chain works: repository → image → container → queue → drained.');
+            $this->recordProof($host);
 
             return self::SUCCESS;
         } catch (Throwable $e) {
@@ -107,6 +113,49 @@ class FleetSmokeTestCommand extends Command
         } finally {
             $this->cleanUp($reconciler);
         }
+    }
+
+    /**
+     * A worker that cannot reach its database claims jobs and fails every one;
+     * this is the step that tells a network apart from broken code.
+     */
+    private function assertReachable(FleetReachabilityProbe $probe, Server $host): void
+    {
+        $results = $probe->check($this->fleet, $host);
+
+        if ($results === []) {
+            $this->ok('no database or Redis host in the site env');
+
+            return;
+        }
+
+        foreach ($results as $r) {
+            $this->line(sprintf('    %s %s %s:%d — %s', $r['ok'] ? '✓' : '✗', $r['name'], $r['host'], $r['port'], $r['detail']));
+        }
+
+        $failed = array_column(array_filter($results, fn (array $r): bool => ! $r['ok']), 'name');
+
+        if ($failed !== []) {
+            throw new RuntimeException('A worker on '.$host->name.' could not reach the app’s '.implode(' and ', $failed).'.');
+        }
+    }
+
+    /**
+     * Passing once starts the soak clock; `dply:queue:fleet-host` reads it back.
+     * A later pass refreshes the smoke stamp but never restarts the soak.
+     */
+    private function recordProof(Server $host): void
+    {
+        $host->refresh();
+        $meta = is_array($host->meta) ? $host->meta : [];
+        $now = now()->toIso8601String();
+
+        data_set($meta, 'queue_fleet_host.proof.smoke_passed_at', $now);
+        if (data_get($meta, 'queue_fleet_host.proof.soak_started_at') === null) {
+            data_set($meta, 'queue_fleet_host.proof.soak_started_at', $now);
+        }
+
+        $host->forceFill(['meta' => $meta])->save();
     }
 
     private function resolveHost(): Server

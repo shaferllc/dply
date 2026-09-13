@@ -83,6 +83,20 @@ test('a backlog starts workers and records them against the fleet', function () 
         ->and($this->fleet->fresh()->desired_workers)->toBe(3);
 });
 
+test('rolling a fleet replaces every worker so none keeps the old image', function () {
+    push(60);
+    reconciler()->reconcile($this->fleet);
+    $old = ManagedQueueWorker::query()->live()->pluck('id')->all();
+
+    $this->fleet->forceFill(['image' => 'registry.dply.test/app:new'])->save();
+    $replaced = reconciler()->roll($this->fleet->fresh());
+
+    expect($replaced)->toBe(3)
+        ->and(ManagedQueueWorker::query()->whereIn('id', $old)->pluck('stop_reason')->unique()->all())->toBe(['rolled'])
+        // The backlog is still there, so replacements start straight away.
+        ->and(ManagedQueueWorker::query()->live()->whereNotIn('id', $old)->count())->toBe(3);
+});
+
 test('workers carry the fleet size they were started at', function () {
     push(20);
     reconciler()->reconcile($this->fleet);
