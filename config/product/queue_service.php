@@ -207,9 +207,10 @@ return [
     | dply-owned workers that drain a namespace's queue. See
     | docs/adr/managed-queue-workers.md.
     |
-    | `runtime` names the substrate. It defaults to `fake` deliberately: a real
-    | runtime starts containers running customer code on dply's machines, and
-    | that has to be a decision someone made, not a default they inherited.
+    | `runtime` names the substrate: `docker` in production, `fake` everywhere
+    | else. Production can default to the real runtime because placement is
+    | already opt-in — FleetHostAllocator only uses servers whose meta sets
+    | `queue_fleet_host.enabled`, so with no opted-in host nothing starts.
     |
     | `target_drain_seconds` is the single scaling dial — how fast a visible
     | backlog should be absorbed. Everything else the autoscaler needs it
@@ -218,7 +219,7 @@ return [
     */
 
     'fleets' => [
-        'runtime' => env('DPLY_QUEUE_FLEET_RUNTIME', 'fake'),
+        'runtime' => env('DPLY_QUEUE_FLEET_RUNTIME', env('APP_ENV') === 'production' ? 'docker' : 'fake'),
         'target_drain_seconds' => (int) env('DPLY_QUEUE_FLEET_TARGET_DRAIN', 20),
 
         /*

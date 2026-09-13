@@ -443,7 +443,7 @@
             </div>
         @endif
 
-        @if ($workers->isEmpty())
+        @if ($workers->isEmpty() && $systemdWorkers->isEmpty())
             <div class="px-4 py-5 text-center sm:px-5">
                 <p class="text-sm font-medium text-brand-ink">{{ __('No queue workers on this site.') }}</p>
                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Nothing is consuming jobs — anything queued will sit until a worker runs.') }}</p>
@@ -481,6 +481,33 @@
                                 </x-danger-button>
                             </div>
                         @endcan
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+        @if ($systemdWorkers->isNotEmpty())
+            {{-- systemd units, not Supervisor: how the VM path runs Horizon.
+                 Read-only here until they are moved onto Supervisor. --}}
+            <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 sm:px-5">
+                <p class="text-xs text-brand-moss">{{ __('Running as systemd units — deploy restarts and the controls above only reach Supervisor programs.') }}</p>
+                @can('update', $site)
+                    <x-secondary-button size="xs" type="button"
+                        wire:click="moveWorkersToSupervisor"
+                        wire:confirm="{{ __('Move this site’s workers to Supervisor? Each unit stops and restarts as a Supervisor program — a few seconds with no worker running.') }}"
+                        wire:loading.attr="disabled" wire:target="moveWorkersToSupervisor">
+                        {{ __('Move to Supervisor') }}
+                    </x-secondary-button>
+                @endcan
+            </div>
+            <ul class="divide-y divide-brand-ink/10">
+                @foreach ($systemdWorkers as $process)
+                    <li class="px-4 py-3.5 sm:px-5" wire:key="systemd-worker-{{ $process->id }}">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <p class="font-mono text-sm font-semibold text-brand-ink">{{ $process->name }}</p>
+                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200/70">{{ __('Active') }}</span>
+                            <span class="text-xs text-brand-mist">{{ __('systemd · scale :n', ['n' => $process->scale]) }}</span>
+                        </div>
+                        <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist">{{ $process->command }}</p>
                     </li>
                 @endforeach
             </ul>
