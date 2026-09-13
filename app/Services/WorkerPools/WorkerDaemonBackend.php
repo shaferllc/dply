@@ -39,12 +39,22 @@ class WorkerDaemonBackend
     ) {}
 
     /**
-     * Process manager for this site's daemons, from its pool (default systemd
-     * for standalone worker hosts with no pool).
+     * Process manager for this site's daemons: its pool's choice, else the
+     * site's own (meta.worker_process_manager), else systemd. The site-level
+     * choice is how a standalone VM site moves its queue workers onto
+     * Supervisor, where the Queue page and deploy restarts manage them.
      */
     public function backendFor(Site $site): string
     {
-        return $this->poolFor($site)?->processManager() ?? WorkerPool::PM_SYSTEMD;
+        $pool = $this->poolFor($site);
+
+        if ($pool !== null) {
+            return $pool->processManager();
+        }
+
+        return data_get($site->meta, 'worker_process_manager') === WorkerPool::PM_SUPERVISOR
+            ? WorkerPool::PM_SUPERVISOR
+            : WorkerPool::PM_SYSTEMD;
     }
 
     /**

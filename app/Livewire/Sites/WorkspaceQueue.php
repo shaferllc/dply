@@ -18,9 +18,11 @@ use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SiteQueueJobRun;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
+use App\Models\WorkerPool;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\QueueNamespace;
@@ -33,6 +35,7 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\ManagedQueueConnector;
 use App\Services\Sites\QueueInsightsInstaller;
+use App\Services\WorkerPools\WorkerDaemonBackend;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
@@ -1675,6 +1678,48 @@ class WorkspaceQueue extends Component
     }
 
     /**
+     * systemd units (SiteProcess) on this site that consume jobs — how the VM
+     * path runs Horizon. They never appear in workers(), so without them a site
+     * running Horizon read here as having no Horizon at all.
+     */
+    public function systemdWorkers(): Collection
+    {
+        // On Supervisor the units are gone and these same processes come back
+        // through workers() as mirrored programs — listing both doubles them.
+        if (app(WorkerDaemonBackend::class)->backendFor($this->site) === WorkerPool::PM_SUPERVISOR) {
+            return collect();
+        }
+
+        return $this->site->processes()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (SiteProcess $process): bool => QueueWorkerClassifier::isQueueWorker($process->command))
+            ->values();
+    }
+
+    /**
+     * Move this site's systemd workers onto Supervisor.
+     *
+     * WorkerDaemonBackend::ensure() tears each unit down and starts the same
+     * command as a Supervisor program — a short gap, never two copies. After
+     * that this page, deploy restarts and the readiness checks all manage one
+     * set of workers.
+     */
+    public function moveWorkersToSupervisor(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['worker_process_manager'] = WorkerPool::PM_SUPERVISOR;
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        ControlWorkerDaemonJob::dispatch((string) $this->site->id, 'ensure', (string) auth()->id() ?: null);
+
+        $this->toastSuccess(__('Moving workers to Supervisor — they appear here as programs once the move finishes.'));
+    }
+
+    /**
      * Overlay live managed depths onto the sampled per-queue rows.
      *
      * Keeps one rendering path: the Queues tab does not need to know which kind
@@ -1738,8 +1783,9 @@ class WorkspaceQueue extends Component
         });
 
         $workers = $this->workers();
+        $systemdWorkers = $this->systemdWorkers();
 
-        foreach ($workers as $worker) {
+        foreach ($workers->concat($systemdWorkers) as $worker) {
             foreach (explode(',', QueueWorkerClassifier::queueNameFrom($worker->command) ?? 'default') as $queue) {
                 $queue = trim($queue);
 
@@ -1769,7 +1815,7 @@ class WorkspaceQueue extends Component
                     ->notDismissed()
                     ->orderByDesc('created_at')
                     ->first(),
-            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers, $pools, $snapshots->first()),
+            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers->concat($systemdWorkers), $pools, $snapshots->first()),
             // Jobs that actually RAN. Only the in-app agent can supply these:
             // a processed job leaves nothing behind in the store.
             'jobRuns' => SiteQueueJobRun::query()
@@ -1787,7 +1833,7 @@ class WorkspaceQueue extends Component
                 'queues' => $byQueue->count(),
                 'pending' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->pending ?? 0)),
                 'failed' => (int) ($snapshots->first()?->failed_total ?? 0),
-                'workers' => $workers->where('is_active', true)->count(),
+                'workers' => $workers->where('is_active', true)->count() + $systemdWorkers->count(),
                 'machines' => (int) $pools->sum('desired_count'),
             ],
             'queueSuggestions' => SiteDaemonAdvisor::onlyForSurface(
@@ -1799,6 +1845,7 @@ class WorkspaceQueue extends Component
             'managedDepths' => $managed = $this->managedQueueDepths(),
             'queues' => $this->mergeManagedDepths($byQueue, $managed)->sortKeys(),
             'workers' => $workers,
+            'systemdWorkers' => $systemdWorkers,
             'failedTotal' => $snapshots->first()?->failed_total,
             'lastCapturedAt' => $snapshots->first()?->captured_at,
         ]);

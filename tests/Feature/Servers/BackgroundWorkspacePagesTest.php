@@ -21,6 +21,7 @@ use App\Models\ServerDatabaseBackup;
 use App\Models\ServerProvisionArtifact;
 use App\Models\ServerProvisionRun;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Models\User;
@@ -256,6 +257,24 @@ test('legacy site queue workers route redirects to the site queue section', func
     $this->actingAs($user)
         ->get(route('sites.queue-workers', ['server' => $server, 'site' => $site]))
         ->assertRedirect(route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'queue']));
+});
+test('queue page shows a horizon worker that runs under systemd', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $server->organization_id,
+    ]);
+    SiteProcess::factory()->create(['site_id' => $site->id, 'name' => 'horizon', 'command' => 'php artisan horizon']);
+    SiteProcess::factory()->create(['site_id' => $site->id, 'name' => 'scheduler', 'type' => SiteProcess::TYPE_SCHEDULER, 'command' => 'php artisan schedule:work']);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->set('queue_workspace_tab', 'workers')
+        ->assertSee('php artisan horizon')
+        ->assertDontSee('php artisan schedule:work')
+        ->assertViewHas('queueStats', fn (array $stats): bool => $stats['workers'] === 1);
 });
 /** Helper: install a stack_summary artifact so ServerInstalledServices stops failing-open. */
 function setExpectedServices(Server $server, array $services): void

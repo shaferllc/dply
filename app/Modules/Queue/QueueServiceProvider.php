@@ -44,10 +44,10 @@ class QueueServiceProvider extends ServiceProvider
         // throughput — a much larger job than a second binding here.
         $this->app->bind(QueueStore::class, PostgresQueueStore::class);
 
-        // The substrate managed workers run on. Fake is the default because
-        // the alternative default is "start containers on whatever machine
-        // booted this container" — a real runtime has to be chosen, never
-        // arrived at. See docs/adr/managed-queue-workers.md, decision 3.
+        // The substrate managed workers run on — docker in production, fake
+        // elsewhere (config/product/queue_service.php). Docker cannot land on
+        // an arbitrary machine: FleetHostAllocator only places on hosts that
+        // opted in. See docs/adr/managed-queue-workers.md, decision 3.
         $this->app->bind(WorkerRuntime::class, function ($app) {
             $runtimes = [
                 'fake' => FakeWorkerRuntime::class,

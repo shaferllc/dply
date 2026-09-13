@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Models\WorkerPool;
@@ -32,7 +33,7 @@ final class SiteQueueReadiness
     public const WARN = 'warn';
 
     /**
-     * @param  Collection<int, SupervisorProgram>  $workers
+     * @param  Collection<int, SupervisorProgram|SiteProcess>  $workers
      * @param  Collection<int, WorkerPool>  $pools
      * @return list<array{key: string, label: string, status: string, detail: string}>
      */
