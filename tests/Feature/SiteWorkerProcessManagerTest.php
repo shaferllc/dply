@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\SiteWorkerProcessManagerTest;
 
+use App\Jobs\CollectSiteHorizonSnapshotJob;
 use App\Jobs\ControlWorkerDaemonJob;
 use App\Livewire\Sites\WorkspaceQueue;
 use App\Livewire\Sites\WorkspaceSystemd;
@@ -12,6 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\WorkerPools\WorkerDaemonBackend;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
@@ -90,4 +92,40 @@ test('moving workers to supervisor records the choice and provisions it', functi
     // The units are torn down by the job; the same workers come back through
     // workers() as Supervisor programs, so they must not be listed twice.
     $component->assertViewHas('systemdWorkers', fn ($workers): bool => $workers->isEmpty());
+});
+
+test('the queue page shows horizon controls only when a worker runs horizon', function () {
+    Bus::fake([ControlWorkerDaemonJob::class, CollectSiteHorizonSnapshotJob::class]);
+    [$user, $server, $site] = phpSiteWithOwner();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->assertDontSee('Reading Horizon from the box');
+
+    SiteProcess::factory()->create(['site_id' => $site->id, 'name' => 'horizon', 'command' => 'php artisan horizon']);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->assertSee('Reading Horizon from the box')
+        ->call('controlHorizon', 'horizon:pause')
+        // Anything off the allowlist never reaches a shell.
+        ->call('controlHorizon', 'horizon:clear');
+
+    Bus::assertDispatchedTimes(ControlWorkerDaemonJob::class, 1);
+    Bus::assertDispatched(ControlWorkerDaemonJob::class, fn (ControlWorkerDaemonJob $job): bool => $job->action === 'horizon:pause');
+    Bus::assertDispatched(CollectSiteHorizonSnapshotJob::class);
+});
+
+test('a failed horizon pull keeps the last snapshot and records why', function () {
+    [, , $site] = phpSiteWithOwner();
+    $site->forceFill(['meta' => ['horizon' => ['status' => 'running', 'collected_at' => now()->subMinute()->toIso8601String()]]])->save();
+
+    $exec = \Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $exec->shouldReceive('runInlineBash')->andThrow(new \RuntimeException('ssh down'));
+
+    (new CollectSiteHorizonSnapshotJob((string) $site->id))->handle($exec);
+
+    $horizon = $site->fresh()->meta['horizon'];
+    expect($horizon['status'])->toBe('running')
+        ->and($horizon['error'])->toContain('ssh down');
 });

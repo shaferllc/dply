@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
 use App\Jobs\CollectSiteFailedJobsJob;
+use App\Jobs\CollectSiteHorizonSnapshotJob;
 use App\Jobs\CollectSiteJobClassesJob;
 use App\Jobs\CollectSiteQueueJobsJob;
 use App\Jobs\ControlWorkerDaemonJob;
@@ -1717,6 +1718,53 @@ class WorkspaceQueue extends Component
         ControlWorkerDaemonJob::dispatch((string) $this->site->id, 'ensure', (string) auth()->id() ?: null);
 
         $this->toastSuccess(__('Moving workers to Supervisor — they appear here as programs once the move finishes.'));
+    }
+
+    /**
+     * Pause, continue or restart Horizon on the box.
+     *
+     * `php artisan horizon:*` in the app directory, through the same job the
+     * worker pool uses, so the output lands in this page's console banner. A
+     * snapshot follows a few seconds later so the panel shows what it left.
+     */
+    public function controlHorizon(string $action): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! in_array($action, ['horizon:pause', 'horizon:continue', 'horizon:terminate'], true)) {
+            return;
+        }
+
+        ControlWorkerDaemonJob::dispatch((string) $this->site->id, $action, (string) auth()->id() ?: null);
+        CollectSiteHorizonSnapshotJob::dispatch((string) $this->site->id)->delay(now()->addSeconds(8));
+
+        $this->toastSuccess(match ($action) {
+            'horizon:pause' => __('Pausing Horizon — jobs wait until you continue it.'),
+            'horizon:continue' => __('Resuming Horizon.'),
+            default => __('Restarting Horizon — it finishes the jobs in hand, then its process manager starts it again.'),
+        });
+    }
+
+    /** Pull a fresh Horizon snapshot from the box — a queued SSH read the panel polls. */
+    public function refreshHorizon(): void
+    {
+        $this->authorize('view', $this->site);
+
+        CollectSiteHorizonSnapshotJob::dispatch((string) $this->site->id);
+    }
+
+    /**
+     * Keep the Horizon panel fresh while it is on screen. The lock, not the
+     * snapshot's own timestamp, is the throttle: that stamp only moves when the
+     * job runs, so polls in between would stack SSH pulls.
+     */
+    public function pollHorizon(): void
+    {
+        if (! Cache::add('site-horizon-poll:'.$this->site->id, true, 30)) {
+            return;
+        }
+
+        CollectSiteHorizonSnapshotJob::dispatch((string) $this->site->id);
     }
 
     /**

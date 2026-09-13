@@ -60,9 +60,9 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
         $dir = rtrim($site->effectiveEnvDirectory(), '/');
 
         try {
-            $out = $exec->runInlineBash($primary, 'worker-pool:horizon-snapshot', $this->script($dir), timeoutSeconds: 60, asRoot: false);
+            $out = $exec->runInlineBash($primary, 'worker-pool:horizon-snapshot', self::script($dir), timeoutSeconds: 60, asRoot: false);
             $buffer = (string) $out->buffer;
-            $snapshot = $this->extract($buffer);
+            $snapshot = self::extract($buffer);
         } catch (\Throwable $e) {
             Log::info('worker-pool: horizon snapshot failed', ['pool_id' => $pool->id, 'error' => $e->getMessage()]);
             $this->recordError($pool, 'SSH/exec failed: '.$e->getMessage());
@@ -113,7 +113,7 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
     /**
      * @return array<string, mixed>|null
      */
-    private function extract(string $buffer): ?array
+    public static function extract(string $buffer): ?array
     {
         if (! preg_match('/DPLY_HZ_START(.*)DPLY_HZ_END/s', $buffer, $m)) {
             return null;
@@ -123,7 +123,11 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
         return is_array($data) ? $data : null;
     }
 
-    private function script(string $dir): string
+    /**
+     * Public so {@see CollectSiteHorizonSnapshotJob} runs the identical script
+     * against a single site — one definition of what a Horizon snapshot is.
+     */
+    public static function script(string $dir): string
     {
         // The PHP snippet runs inside `php artisan tinker` (app booted), reads
         // from Horizon's repositories + the failed_jobs table, and prints fenced

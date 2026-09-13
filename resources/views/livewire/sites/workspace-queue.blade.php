@@ -156,6 +156,67 @@
             </div>
         @endif
 
+        {{-- Horizon, when a worker runs it. Its own panel because it has its own
+             state (running/paused) and controls that queue:work does not. --}}
+        @php($runsHorizon = $workers->concat($systemdWorkers)->contains(fn ($worker): bool => str_contains(strtolower((string) $worker->command), 'horizon')))
+        @if ($runsHorizon)
+            @php($hz = is_array($site->meta['horizon'] ?? null) ? $site->meta['horizon'] : [])
+            @php($hzAt = ! empty($hz['collected_at']) ? \Illuminate\Support\Carbon::parse($hz['collected_at']) : null)
+            @php($hzStatus = $hz['status'] ?? null)
+            @php($hzConnection = \App\Support\Sites\SiteQueueConfiguration::for($site)->connection)
+            <div class="border-b border-brand-ink/10 px-4 py-3 sm:px-5" wire:init="pollHorizon" wire:poll.30s="pollHorizon">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold text-brand-ink">
+                            {{ __('Horizon') }}
+                            @if ($hzStatus !== null)
+                                <span @class([
+                                    'ml-1 rounded-full px-1.5 py-0.5 text-2xs font-semibold ring-1',
+                                    'bg-emerald-50 text-emerald-800 ring-emerald-200/70' => $hzStatus === 'running',
+                                    'bg-amber-50 text-amber-800 ring-amber-200/70' => $hzStatus === 'paused',
+                                    'bg-brand-sand/60 text-brand-moss ring-brand-ink/10' => ! in_array($hzStatus, ['running', 'paused'], true),
+                                ])>{{ $hzStatus }}</span>
+                            @endif
+                        </p>
+                        <p class="mt-0.5 text-xs text-brand-moss">
+                            @if ($hzAt)
+                                {{ __(':p processes · :j jobs/min · :f failed recently', [
+                                    'p' => $hz['processes'] ?? '—',
+                                    'j' => $hz['jobs_per_minute'] ?? '—',
+                                    'f' => $hz['failed_recent'] ?? '—',
+                                ]) }}
+                                <span class="text-brand-mist">· {{ __('read :when', ['when' => $hzAt->diffForHumans()]) }}</span>
+                            @else
+                                {{ __('Reading Horizon from the box…') }}
+                            @endif
+                        </p>
+                        @if (! empty($hz['error']))
+                            <p class="mt-0.5 text-2xs text-amber-800">{{ __('Last refresh failed: :e', ['e' => \Illuminate\Support\Str::limit((string) $hz['error'], 160)]) }}</p>
+                        @endif
+                        {{-- Horizon only reads Redis. On any other connection it runs,
+                             reports healthy, and drains nothing — say so. --}}
+                        @if ($hzConnection !== 'redis')
+                            <p class="mt-0.5 text-2xs font-semibold text-amber-800">{{ __('This site’s jobs go to :c — Horizon only drains Redis, so it is not running them.', ['c' => $hzConnection ?? 'sync']) }}</p>
+                        @endif
+                    </div>
+                    <div class="flex shrink-0 flex-wrap items-center gap-1.5">
+                        @can('update', $site)
+                            @if ($hzStatus === 'paused')
+                                <x-secondary-button size="xs" type="button" wire:click="controlHorizon('horizon:continue')">{{ __('Continue') }}</x-secondary-button>
+                            @else
+                                <x-secondary-button size="xs" type="button" wire:click="controlHorizon('horizon:pause')">{{ __('Pause') }}</x-secondary-button>
+                            @endif
+                            <x-secondary-button size="xs" type="button" wire:click="controlHorizon('horizon:terminate')">{{ __('Restart') }}</x-secondary-button>
+                        @endcan
+                        <x-secondary-button size="xs" type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon">{{ __('Refresh') }}</x-secondary-button>
+                        @if ($site->visitUrl())
+                            <a href="{{ rtrim((string) $site->visitUrl(), '/').$site->horizonDashboardPath() }}" target="_blank" rel="noopener" class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open dashboard') }} ↗</a>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
+
         @php($managedNamespace = $this->managedQueueNamespace())
         @if ($this->managedQueueAvailable())
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 {{ $managedNamespace ? 'bg-brand-sand/20' : 'bg-brand-forest/[0.04]' }} px-4 py-3 sm:px-5">
@@ -491,10 +552,7 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-2.5 sm:px-5">
                 <p class="text-xs text-brand-moss">{{ __('Running as systemd units — deploy restarts and the controls above only reach Supervisor programs.') }}</p>
                 @can('update', $site)
-                    <x-secondary-button size="xs" type="button"
-                        wire:click="moveWorkersToSupervisor"
-                        wire:confirm="{{ __('Move this site’s workers to Supervisor? Each unit stops and restarts as a Supervisor program — a few seconds with no worker running.') }}"
-                        wire:loading.attr="disabled" wire:target="moveWorkersToSupervisor">
+                    <x-secondary-button size="xs" type="button" x-on:click="$dispatch('open-modal', 'queue-move-supervisor')">
                         {{ __('Move to Supervisor') }}
                     </x-secondary-button>
                 @endcan
@@ -1105,6 +1163,39 @@ DPLY_QUEUE_TOKEN=•••</pre>
             <div class="mt-5 flex justify-end gap-2">
                 <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-purge-confirm')">{{ __('Cancel') }}</x-secondary-button>
                 <x-danger-button size="sm" type="button" wire:click="purgeQueue" wire:loading.attr="disabled">{{ __('Purge it') }}</x-danger-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- Moving workers off systemd. ensure() moves every non-web unit, not only
+         the queue consumers listed on the Workers tab, so the modal names them
+         all — a scheduler moving silently would be a surprise. --}}
+    @php($unitsToMove = $site->processes->where('is_active', true)->where('type', '!=', \App\Models\SiteProcess::TYPE_WEB)->values())
+    <x-modal name="queue-move-supervisor" max-width="lg" focusable :label="__('Move workers to Supervisor')">
+        <div class="p-6">
+            <h3 class="text-base font-semibold text-brand-ink">{{ __('Move workers to Supervisor?') }}</h3>
+            <p class="mt-2 text-sm text-brand-moss">
+                {{ __('Each systemd unit stops, then starts again as a Supervisor program running the same command. Expect a few seconds with nothing running — queued jobs wait and are picked up after.') }}
+            </p>
+            @if ($unitsToMove->isNotEmpty())
+                <ul class="mt-3 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10">
+                    @foreach ($unitsToMove as $unit)
+                        <li class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+                            <span class="font-semibold text-brand-ink">{{ $unit->name }}</span>
+                            <code class="ml-auto truncate font-mono text-xs text-brand-moss" title="{{ $unit->command }}">{{ $unit->command }}</code>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+            <p class="mt-3 text-xs text-brand-mist">{{ __('Afterwards they are Supervisor programs: the Workers tab and deploy restarts manage them.') }}</p>
+            <div class="mt-5 flex justify-end gap-2">
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'queue-move-supervisor')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button size="sm" type="button"
+                    wire:click="moveWorkersToSupervisor"
+                    x-on:click="$dispatch('close-modal', 'queue-move-supervisor')"
+                    wire:loading.attr="disabled" wire:target="moveWorkersToSupervisor">
+                    {{ __('Move to Supervisor') }}
+                </x-primary-button>
             </div>
         </div>
     </x-modal>

@@ -273,7 +273,9 @@ test('queue page shows a horizon worker that runs under systemd', function () {
         ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
         ->set('queue_workspace_tab', 'workers')
         ->assertSee('php artisan horizon')
-        ->assertDontSee('php artisan schedule:work')
+        // The scheduler is not a queue worker. Checked on the list, not the
+        // HTML: the move-to-Supervisor modal names it because it moves too.
+        ->assertViewHas('systemdWorkers', fn ($workers): bool => $workers->pluck('name')->all() === ['horizon'])
         ->assertViewHas('queueStats', fn (array $stats): bool => $stats['workers'] === 1);
 });
 /** Helper: install a stack_summary artifact so ServerInstalledServices stops failing-open. */
