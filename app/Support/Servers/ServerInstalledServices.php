@@ -90,6 +90,13 @@ class ServerInstalledServices
             $tags[$tag] = true;
         }
 
+        // Docker is often installed after provisioning (the Tools page's
+        // "Install Docker service", or by hand), which the provision-time stack
+        // summary never sees — so the live tools probe counts too.
+        if ($server->isDockerHost() || (bool) data_get($server->meta, 'manage_tools.docker.present', false)) {
+            $tags['docker'] = true;
+        }
+
         if ($stack === null) {
             // No provision artifact yet (server still building, or pre-existing). Fail open
             // so we don't blank out the UI — the caller can still surface everything.
@@ -163,7 +170,7 @@ class ServerInstalledServices
     }
 
     /**
-     * @param  array<string, mixed> $tags
+     * @param  array<string, mixed>  $tags
      */
     public static function hasAny(Server $server, array $tags): bool
     {

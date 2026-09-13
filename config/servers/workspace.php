@@ -73,7 +73,9 @@ return [
         // No hardcoded soon_badge: orgs on `workspace.docker_preview` still get the
         // badge via the dynamic preview_only flag, while orgs with the full
         // `workspace.docker` feature see the workspace without a "Soon" label.
-        ['key' => 'docker', 'route' => 'servers.docker', 'preview_route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.docker', 'preview_feature' => 'workspace.docker_preview'],
+        // Shown wherever Docker is installed (the `docker` installed-service tag),
+        // like Runtime for PHP — not behind the workspace.docker flag.
+        ['key' => 'docker', 'route' => 'servers.docker', 'icon' => 'square-3-stack-3d', 'label' => 'Docker', 'group' => 'stacks', 'requires_any_tags' => ['docker'], 'except_host_kinds' => ['kubernetes']],
         // background (alphabetical by label)
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],

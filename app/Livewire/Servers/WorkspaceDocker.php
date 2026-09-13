@@ -6,7 +6,6 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
-use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -21,6 +20,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\DockerContainerShellSupport;
 use App\Support\Servers\DockerWorkspaceViewData;
+use App\Support\Servers\ServerInstalledServices;
 use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
@@ -43,9 +43,6 @@ use Livewire\Component;
 class WorkspaceDocker extends Component
 {
     use RendersWorkspacePlaceholder;
-    use RequiresFeature;
-
-    protected string $requiredFeature = 'workspace.docker';
 
     /** When true, render the coming-soon teaser instead of the full workspace. */
     public bool $comingSoonPreview = false;
@@ -163,7 +160,10 @@ class WorkspaceDocker extends Component
 
     public function mount(Server $server): void
     {
-        if (! Feature::active('workspace.docker')) {
+        // A server with Docker installed gets the workspace whatever the flag
+        // says — that is what puts Docker in its sidebar. The flag still opens
+        // it everywhere; the teaser is only for neither.
+        if (! Feature::active('workspace.docker') && ! ServerInstalledServices::has($server, 'docker')) {
             if (workspace_docker_preview_active()) {
                 $this->comingSoonPreview = true;
                 $this->bootWorkspace($server);
@@ -178,18 +178,6 @@ class WorkspaceDocker extends Component
 
         if (! $this->comingSoonPreview && $this->workspace_tab !== 'overview') {
             $this->loadTabIfNeeded($this->workspace_tab);
-        }
-    }
-
-    public function bootedRequiresFeature(): void
-    {
-        if ($this->comingSoonPreview) {
-            return;
-        }
-
-        $flag = $this->requiredFeature;
-        if ($flag !== '' && ! Feature::active($flag)) {
-            abort(404);
         }
     }
 

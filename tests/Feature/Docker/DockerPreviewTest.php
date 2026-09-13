@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Docker;
 
+use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceDockerPreview;
 use App\Models\Organization;
 use App\Models\Server;
+use App\Models\ServerProvisionArtifact;
+use App\Models\ServerProvisionRun;
 use App\Models\User;
+use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -20,14 +24,44 @@ beforeEach(function (): void {
     Feature::flushCache();
 });
 
-test('docker preview sidebar shows soon badge when full feature is off', function (): void {
+test('docker is in the sidebar and opens wherever it is installed, whatever the flag', function (): void {
     [$user, $server] = dockerPreviewUserWithServer();
+    seedDockerPreviewStack($server, ['nginx', 'php-fpm', 'docker-daemon']);
 
     $this->actingAs($user)
         ->get(route('servers.overview', $server))
         ->assertOk()
-        ->assertSee(__('Soon'))
-        ->assertSee('/docker', false);
+        ->assertSee(route('servers.docker', $server), false);
+
+    // The route guard lets it through, and the component is the full
+    // workspace rather than the teaser: Docker is on this box.
+    $this->actingAs($user)->get(route('servers.docker', $server))->assertOk();
+    Livewire::actingAs($user)
+        ->test(WorkspaceDocker::class, ['server' => $server])
+        ->assertSet('comingSoonPreview', false);
+});
+
+test('docker installed after provisioning still gets the sidebar item', function (): void {
+    [$user, $server] = dockerPreviewUserWithServer();
+    seedDockerPreviewStack($server, ['nginx', 'php-fpm']);
+    // What the Tools page probe records after "Install Docker service".
+    $server->forceFill(['meta' => ['host_kind' => 'vm', 'manage_tools' => ['docker' => ['present' => true, 'version' => '27.0.0']]]])->save();
+    ServerInstalledServices::flushCaches();
+
+    $this->actingAs($user)
+        ->get(route('servers.overview', $server))
+        ->assertOk()
+        ->assertSee(route('servers.docker', $server), false);
+});
+
+test('a server without docker has no docker sidebar item', function (): void {
+    [$user, $server] = dockerPreviewUserWithServer();
+    seedDockerPreviewStack($server, ['nginx', 'php-fpm']);
+
+    $this->actingAs($user)
+        ->get(route('servers.overview', $server))
+        ->assertOk()
+        ->assertDontSee(route('servers.docker', $server), false);
 });
 
 test('docker route renders coming soon panel when preview active', function (): void {
@@ -89,6 +123,20 @@ test('docker preview respects per-org override', function (): void {
         ->get(route('servers.docker', $server))
         ->assertNotFound();
 });
+
+/** @param  list<string>  $services  the provision stack's expected services */
+function seedDockerPreviewStack(Server $server, array $services): void
+{
+    $run = ServerProvisionRun::create(['server_id' => $server->id, 'attempt' => 1, 'status' => 'completed']);
+    ServerProvisionArtifact::create([
+        'server_provision_run_id' => $run->id,
+        'type' => 'stack_summary',
+        'key' => 'stack_summary',
+        'label' => 'stack summary',
+        'metadata' => ['expected_services' => $services],
+    ]);
+    ServerInstalledServices::flushCaches();
+}
 
 function dockerPreviewUserWithServer(): array
 {
