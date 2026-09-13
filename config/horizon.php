@@ -43,6 +43,8 @@ $fastQueues = [
     'dply-control',    // worker-pool orchestration
     'dply-manage',     // server manage / remote tasks
     'probes:worker-1', // uptime probes (mirror site_uptime.probe_workers)
+    // ponytail: shares the fast pool; give it its own supervisor if health sweeps starve dply-manage.
+    'dply-background', // health checks, systemd inventory, URL health, error sweeps (dply.queues.background)
 ];
 
 return [
@@ -68,6 +70,7 @@ return [
         'redis:default' => 60,
         'redis:dply' => 60,
         'redis:dply-provision' => 120,
+        'redis:dply-background' => 300,
     ],
 
     'trim' => [
