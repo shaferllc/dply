@@ -6,6 +6,7 @@ namespace App\Modules\Queue\Services;
 
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Contracts\WorkerRuntime;
+use App\Modules\Queue\Jobs\ExposeFleetBackendsJob;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Support\FleetSignal;
@@ -203,6 +204,13 @@ class FleetReconciler
                 'ready_at' => now(),
                 'last_seen_at' => now(),
             ])->save();
+
+            // First worker of this fleet on this host: let the host through to
+            // the app's backends. Queued — this is also the push path.
+            if ($handle->hostServerId !== null
+                && ! in_array((string) $handle->hostServerId, (array) ($fleet->meta['exposed_hosts'] ?? []), true)) {
+                ExposeFleetBackendsJob::dispatch((string) $fleet->id, (string) $handle->hostServerId);
+            }
 
             $started++;
         }

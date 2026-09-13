@@ -27,7 +27,9 @@ class FleetHostCreateCommand extends Command
         {--credential= : DigitalOcean provider credential id}
         {--near= : Server id or name to share a region and VPC with}
         {--region= : DigitalOcean region, when --near is not given}
-        {--size=s-2vcpu-4gb : Droplet size slug}';
+        {--size=s-2vcpu-4gb : Droplet size slug}
+        {--capacity=3072 : Worker memory in MiB it opts in with once ready}
+        {--site= : Site to prove it with — the smoke test builds this site’s image}';
 
     protected $description = 'Create a DigitalOcean droplet to become a queue fleet host.';
 
@@ -77,18 +79,27 @@ class FleetHostCreateCommand extends Command
             'region' => $region,
             'size' => (string) $this->option('size'),
             'status' => Server::STATUS_PENDING,
-            'meta' => ['digitalocean' => [
-                'monitoring' => true,
-                'vpc_uuid' => data_get($near?->meta, 'digitalocean.vpc_uuid'),
-                'tags' => ['dply-queue-fleet-host'],
-            ]],
+            'meta' => [
+                'digitalocean' => [
+                    'monitoring' => true,
+                    'vpc_uuid' => data_get($near?->meta, 'digitalocean.vpc_uuid'),
+                    'tags' => ['dply-queue-fleet-host'],
+                ],
+                // Read when provisioning finishes: PrepareFleetHostJob installs
+                // Docker, opts in and runs the smoke test from here.
+                'queue_fleet_host' => ['pending' => array_filter([
+                    'capacity_mib' => (int) $this->option('capacity'),
+                    'smoke_site_id' => $this->option('site') ?: null,
+                ])],
+            ],
         ]);
 
         ProvisionDigitalOceanDropletJob::dispatch($server);
         audit_log($credential->organization, $owner, 'server.created', $server);
 
-        $this->components->info($server->name.' is provisioning in '.$region.'.');
-        $this->line('  When it is ready: php artisan dply:queue:fleet-host '.$server->name.' --capacity=3072');
+        $this->components->info($server->name.' is provisioning in '.$region.'. When it is ready, dply installs Docker, opts it in'
+            .($this->option('site') ? ' and runs the smoke test.' : '. Pass --site to have it run the smoke test too.'));
+        $this->line('  Follow it: php artisan dply:queue:fleet-host '.$server->name);
 
         return self::SUCCESS;
     }

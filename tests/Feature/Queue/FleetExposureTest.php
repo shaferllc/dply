@@ -5,18 +5,27 @@ declare(strict_types=1);
 namespace Tests\Feature\Queue\FleetExposureTest;
 
 use App\Jobs\ProvisionDigitalOceanDropletJob;
+use App\Jobs\RunSetupScriptJob;
 use App\Models\Organization;
 use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Modules\Queue\Contracts\WorkerRuntime;
+use App\Modules\Queue\Jobs\ExposeFleetBackendsJob;
+use App\Modules\Queue\Jobs\PrepareFleetHostJob;
 use App\Modules\Queue\Models\ManagedQueueFleet;
+use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\FleetBackendExposure;
+use App\Modules\Queue\Services\FleetReconciler;
 use App\Modules\Queue\Services\FleetWorkerEnvironment;
+use App\Modules\Queue\Support\WorkerHandle;
 use App\Services\Servers\ManagedFirewallPort;
 use App\Services\WorkerPools\SiteWorkerFleetTrustedSources;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -68,6 +77,74 @@ test('a backend outside any dply private network is left alone', function () {
         ->open(new ManagedQueueFleet, $host);
 
     expect($result[0]['action'])->toBe('unmanaged');
+});
+
+test('a provisioned fleet host prepares itself: docker, opt-in, then the smoke test', function () {
+    $server = Server::factory()->create(['meta' => ['queue_fleet_host' => ['pending' => ['capacity_mib' => 3072, 'smoke_site_id' => 'site-1']]]]);
+
+    Artisan::shouldReceive('call')->once()->with('dply:queue:fleet-host', ['server' => (string) $server->id, '--capacity' => 3072])->andReturn(0);
+    Artisan::shouldReceive('call')->once()->with('dply:queue:fleet-smoke', ['server' => (string) $server->id, '--site' => 'site-1'])->andReturn(0);
+    Artisan::shouldReceive('output')->andReturn('ok');
+
+    (new PrepareFleetHostJob((string) $server->id))->handle();
+
+    $host = $server->fresh()->meta['queue_fleet_host'];
+    expect($host)->not->toHaveKey('pending')
+        ->and($host['preparation']['opt_in']['ok'])->toBeTrue()
+        ->and($host['preparation']['smoke']['ok'])->toBeTrue();
+});
+
+test('a host whose opt-in fails is not smoke-tested and stays pending', function () {
+    $server = Server::factory()->create(['meta' => ['queue_fleet_host' => ['pending' => ['capacity_mib' => 3072, 'smoke_site_id' => 'site-1']]]]);
+
+    Artisan::shouldReceive('call')->once()->with('dply:queue:fleet-host', \Mockery::any())->andReturn(1);
+    Artisan::shouldReceive('output')->andReturn('Docker did not install');
+
+    (new PrepareFleetHostJob((string) $server->id))->handle();
+
+    $host = $server->fresh()->meta['queue_fleet_host'];
+    expect($host)->toHaveKey('pending')
+        ->and($host['preparation']['opt_in']['ok'])->toBeFalse();
+});
+
+test('provisioning finishing on a pending fleet host starts its preparation', function () {
+    Bus::fake([PrepareFleetHostJob::class]);
+    $server = Server::factory()->create(['meta' => ['queue_fleet_host' => ['pending' => ['capacity_mib' => 3072]]]]);
+    $plain = Server::factory()->create();
+
+    RunSetupScriptJob::applyProvisionOutcomeToServer($server, true);
+    RunSetupScriptJob::applyProvisionOutcomeToServer($plain, true);
+
+    Bus::assertDispatchedTimes(PrepareFleetHostJob::class, 1);
+    Bus::assertDispatched(PrepareFleetHostJob::class, fn ($job): bool => $job->serverId === (string) $server->id);
+});
+
+test('the first worker a fleet places on a host opens that host to the backends, once', function () {
+    Bus::fake([ExposeFleetBackendsJob::class]);
+    config(['queue_service.public_url' => 'https://queue.dply.test/api/queue/v1']);
+    $host = Server::factory()->create();
+    $runtime = \Mockery::mock(WorkerRuntime::class);
+    $runtime->shouldReceive('name')->andReturn('docker');
+    $runtime->shouldReceive('isAlive')->andReturn(true);
+    $runtime->shouldReceive('start')->andReturnUsing(fn () => new WorkerHandle((string) Str::ulid(), 'docker', (string) $host->id));
+    app()->instance(WorkerRuntime::class, $runtime);
+
+    $org = Organization::factory()->create();
+    $namespace = QueueNamespace::query()->create(['organization_id' => $org->id, 'name' => 'orders', 'status' => QueueNamespace::STATUS_ACTIVE]);
+    $fleet = ManagedQueueFleet::query()->create([
+        'namespace_id' => $namespace->id, 'organization_id' => $org->id, 'queue' => 'default',
+        'class' => ManagedQueueFleet::CLASS_FLEX, 'status' => ManagedQueueFleet::STATUS_ACTIVE,
+        'memory_mib' => 256, 'min_workers' => 1, 'max_workers' => 2, 'image' => 'app:1',
+    ]);
+
+    app(FleetReconciler::class)->reconcile($fleet);
+    Bus::assertDispatched(ExposeFleetBackendsJob::class, fn ($job): bool => $job->hostId === (string) $host->id);
+
+    // Once the exposure is recorded, later placements on that host skip it.
+    $fleet->refresh()->forceFill(['meta' => ['exposed_hosts' => [(string) $host->id]]])->save();
+    Bus::fake([ExposeFleetBackendsJob::class]);
+    app(FleetReconciler::class)->wake($fleet->fresh());
+    Bus::assertNotDispatched(ExposeFleetBackendsJob::class);
 });
 
 test('fleet-host-create provisions a droplet beside the app database', function () {

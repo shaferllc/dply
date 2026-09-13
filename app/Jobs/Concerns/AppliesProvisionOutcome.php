@@ -17,6 +17,7 @@ use App\Models\ServerCredentialShare;
 use App\Models\UserSshKey;
 use App\Modules\Insights\Jobs\RunServerInsightsJob;
 use App\Modules\Notifications\Services\NotificationPublisher;
+use App\Modules\Queue\Jobs\PrepareFleetHostJob;
 use App\Notifications\RedisServerProvisionedNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
 use App\Notifications\ServerProvisionFailedNotification;
@@ -60,6 +61,12 @@ trait AppliesProvisionOutcome
             unset($meta['auto_retry_at'], $meta['auto_retry_attempt'], $meta['auto_retry_max']);
             $updates['meta'] = $meta;
             $server->update($updates);
+
+            // Created to be a queue fleet host: install Docker, opt in and prove
+            // it now, rather than waiting for an operator to run the commands.
+            if (is_array(data_get($meta, 'queue_fleet_host.pending'))) {
+                PrepareFleetHostJob::dispatch((string) $server->id);
+            }
 
             // Email server credentials to the creator IF the org has the
             // toggle on. Opt-in only: most operators don't want
