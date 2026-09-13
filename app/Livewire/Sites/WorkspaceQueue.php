@@ -24,10 +24,13 @@ use App\Models\SiteQueueJobRun;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Models\WorkerPool;
+use App\Modules\Queue\Actions\CreateManagedQueueFleet;
 use App\Modules\Queue\Contracts\QueueStore;
+use App\Modules\Queue\Jobs\BuildFleetImageJob;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Services\QueueFailedJobReader;
+use App\Modules\Queue\Services\Runtimes\FleetHostAllocator;
 use App\Modules\Queue\Support\QueueEntitlements;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorDeployRestarter;
@@ -1337,9 +1340,159 @@ class WorkspaceQueue extends Component
     }
 
     /** What a switch to $connection would stop and start — the confirm modals show it. */
-    public function queueWorkerPlan(string $connection): QueueWorkerPlan
+    public function queueWorkerPlan(string $connection, ?bool $fleetDrains = null): QueueWorkerPlan
     {
-        return QueueWorkerPlan::for($this->site, $connection);
+        return QueueWorkerPlan::for($this->site, $connection, $fleetDrains);
+    }
+
+    /**
+     * Where this site's jobs run — the "Run jobs on" picker's current card:
+     * own (its Redis/database, its workers), dply (dply queue, its workers),
+     * dply_servers (dply queue, dply's container hosts). Functions is Phase 3.
+     */
+    public function queueRunMode(): string
+    {
+        $namespace = $this->managedQueueNamespace();
+
+        if ($namespace === null) {
+            return 'own';
+        }
+
+        return ManagedQueueFleet::query()
+            ->where('namespace_id', $namespace->id)
+            ->where('status', ManagedQueueFleet::STATUS_ACTIVE)
+            ->exists() ? 'dply_servers' : 'dply';
+    }
+
+    /**
+     * The picker's cards, with whether each can be chosen right now.
+     *
+     * @return list<array{key: string, title: string, body: string, available: bool, why: ?string}>
+     */
+    public function queueRunOptions(): array
+    {
+        $dplyAllowed = $this->managedQueueNamespace() !== null || $this->managedQueueEntitled();
+        $serversReady = $this->dplyServersAvailable();
+
+        return [
+            ['key' => 'own', 'title' => __('This server'), 'body' => __('Jobs wait in this site’s Redis or database; this server’s workers run them.'), 'available' => true, 'why' => null],
+            ['key' => 'dply', 'title' => __('dply queue'), 'body' => __('Jobs wait on dply; this server’s workers run them.'), 'available' => $dplyAllowed, 'why' => __('Not on this plan')],
+            ['key' => 'dply_servers', 'title' => __('dply queue + dply servers'), 'body' => __('Jobs wait on dply; dply’s servers run them in containers built from this site.'), 'available' => $dplyAllowed && $serversReady, 'why' => $dplyAllowed ? __('No dply servers yet') : __('Not on this plan')],
+            ['key' => 'functions', 'title' => __('dply queue + Functions'), 'body' => __('Jobs wait on dply; serverless functions run them, billed per second.'), 'available' => false, 'why' => __('Coming soon')],
+        ];
+    }
+
+    /** dply's servers exist to run workers on — the "dply servers" card needs one. */
+    public function dplyServersAvailable(): bool
+    {
+        return app(FleetHostAllocator::class)->hosts()->isNotEmpty();
+    }
+
+    /**
+     * Move this site's jobs to another card of the picker.
+     *
+     * Every path ends in the same switch job, so the env, the config cache and
+     * the workers on this server always follow the choice.
+     */
+    public function chooseRunMode(string $mode): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($mode === $this->queueRunMode()) {
+            return;
+        }
+
+        $connector = app(ManagedQueueConnector::class);
+
+        match ($mode) {
+            'own' => $this->runOnOwnQueue($connector),
+            'dply' => $this->runOnDplyQueue($connector),
+            'dply_servers' => $this->runOnDplyServers($connector),
+            default => $this->toastError(__('That option is not available yet.')),
+        };
+    }
+
+    private function runOnOwnQueue(ManagedQueueConnector $connector): void
+    {
+        $this->pauseFleets();
+        $this->disconnectManagedQueue($connector);
+    }
+
+    private function runOnDplyQueue(ManagedQueueConnector $connector): void
+    {
+        if ($connector->namespaceFor($this->site) === null) {
+            $this->upgradeToManagedQueue($connector);
+
+            return;
+        }
+
+        // Off dply's servers: they are paused, not deleted, and this server's
+        // workers come back to drain the dply queue.
+        $this->pauseFleets();
+        $this->dispatchQueueSwitch('dply', __('Moving jobs back to this server’s workers'));
+        $this->toastSuccess(__('dply’s servers are paused; this server’s workers take the jobs again — progress shows in the console above.'));
+    }
+
+    private function runOnDplyServers(ManagedQueueConnector $connector): void
+    {
+        if (! $this->dplyServersAvailable()) {
+            $this->toastError(__('dply has no servers ready to run workers yet.'));
+
+            return;
+        }
+
+        if ($connector->namespaceFor($this->site) === null) {
+            $this->upgradeToManagedQueue($connector);
+        }
+
+        $namespace = $connector->namespaceFor($this->site->fresh() ?? $this->site);
+        if ($namespace === null) {
+            // The connect above already said why.
+            return;
+        }
+
+        $fleet = ManagedQueueFleet::query()
+            ->where('namespace_id', $namespace->id)
+            ->where('queue', 'default')
+            ->first()
+            ?? app(CreateManagedQueueFleet::class)->handle($namespace, [
+                'queue' => 'default',
+                'class' => ManagedQueueFleet::CLASS_FLEX,
+                'memory_mib' => 256,
+                'min_workers' => 0,
+                'max_workers' => 3,
+            ]);
+        $fleet->forceFill(['status' => ManagedQueueFleet::STATUS_ACTIVE])->save();
+
+        // A fleet with no image drains nothing, so this server keeps its
+        // workers until the build finishes — the build hands the queue over.
+        if (trim((string) $fleet->image) === '') {
+            BuildFleetImageJob::dispatch((string) $fleet->id);
+            $this->toastSuccess(__('Building a worker image from this site on dply’s servers. This server keeps running jobs until it is ready, then hands them over.'));
+
+            return;
+        }
+
+        $this->dispatchQueueSwitch('dply', __('Handing jobs to dply’s servers'));
+        $this->toastSuccess(__('Handing jobs to dply’s servers — this server’s queue workers stop once they take over.'));
+    }
+
+    private function pauseFleets(): void
+    {
+        $namespace = $this->managedQueueNamespace();
+
+        if ($namespace !== null) {
+            ManagedQueueFleet::query()
+                ->where('namespace_id', $namespace->id)
+                ->where('status', ManagedQueueFleet::STATUS_ACTIVE)
+                ->update(['status' => ManagedQueueFleet::STATUS_PAUSED]);
+        }
+    }
+
+    private function dispatchQueueSwitch(string $driver, string $label): void
+    {
+        $run = $this->seedQueuedConsoleAction('queue_setup', $label);
+        SetUpSiteQueueingJob::dispatch((string) $run->id, (string) $this->site->id, $driver, (string) auth()->id() ?: null);
     }
 
     public function managedQueueRevertTarget(): string

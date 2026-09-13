@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
 use App\Models\WorkerPool;
+use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Services\WorkerPools\WorkerDaemonBackend;
 use Illuminate\Support\Collection;
 
@@ -39,7 +40,11 @@ final class QueueWorkerPlan
         public readonly Collection $move = new Collection,
     ) {}
 
-    public static function for(Site $site, string $connection): self
+    /**
+     * @param  bool|null  $fleetDrains  whether dply's servers take the jobs;
+     *                                  null reads it from the site's fleets, a bool previews a choice
+     */
+    public static function for(Site $site, string $connection, ?bool $fleetDrains = null): self
     {
         // Jobs run inline on sync; workers neither help nor hurt.
         if ($connection === 'sync') {
@@ -63,6 +68,18 @@ final class QueueWorkerPlan
             ->values();
 
         $active = $programs->where('is_active', true);
+
+        // dply's servers take the jobs: every worker on this server that would
+        // also read the dply queue stops, or the two would split the queue.
+        if ($connection === 'dply' && ($fleetDrains ?? self::fleetDrains($site))) {
+            return new self(
+                $connection,
+                $active->filter(fn (SupervisorProgram $p): bool => self::drains((string) $p->command, $connection))->values(),
+                collect(),
+                false,
+                $move,
+            );
+        }
 
         // On redis, Horizon is the one drainer when the site has it: it balances
         // the redis queues itself, so a queue:work beside it only doubles up.
@@ -110,6 +127,23 @@ final class QueueWorkerPlan
         }
 
         return true;
+    }
+
+    /**
+     * A fleet only counts once it can start workers — one still waiting on its
+     * first image drains nothing, so this server keeps its workers until then.
+     *
+     * ponytail: any active fleet stops every box worker; match per queue when a
+     * site runs a fleet for some queues and box workers for others.
+     */
+    private static function fleetDrains(Site $site): bool
+    {
+        return ManagedQueueFleet::query()
+            ->where('status', ManagedQueueFleet::STATUS_ACTIVE)
+            ->whereNotNull('image')
+            ->where('image', '!=', '')
+            ->whereHas('namespace', fn ($q) => $q->where('site_id', $site->id))
+            ->exists();
     }
 
     public function changesAnything(): bool

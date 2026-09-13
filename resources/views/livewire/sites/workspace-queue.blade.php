@@ -111,6 +111,43 @@
             ],
         ]" />
 
+        {{-- Run jobs on: one choice for where jobs wait and what runs them.
+             Each card opens a confirm listing the worker changes (chooseRunMode). --}}
+        {{-- Inline php directives only in this file: a php block placed after an
+             inline one is swallowed by Blade's block compiler (and so is any
+             comment that spells the block directives out). --}}
+        @php($runMode = $this->queueRunMode())
+        @php($canChoose = auth()->user()?->can('update', $site) ?? false)
+        <div class="border-b border-brand-ink/10 px-4 py-3 sm:px-5">
+            <p class="text-2xs font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Run jobs on') }}</p>
+            <div class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                @foreach ($this->queueRunOptions() as $option)
+                    @php($isCurrent = $runMode === $option['key'])
+                    @php($clickable = ! $isCurrent && $option['available'] && $canChoose)
+                    <button type="button"
+                        @if ($clickable) x-on:click="$dispatch('open-modal', 'queue-run-{{ $option['key'] }}')" @endif
+                        @disabled(! $clickable)
+                        aria-pressed="{{ $isCurrent ? 'true' : 'false' }}"
+                        @class([
+                            'rounded-lg border px-3 py-2.5 text-left transition',
+                            'border-brand-forest bg-brand-forest/[0.06] ring-1 ring-brand-forest/30' => $isCurrent,
+                            'border-brand-ink/10 bg-white hover:border-brand-forest/40' => $clickable,
+                            'cursor-not-allowed border-brand-ink/10 bg-brand-sand/20 opacity-70' => ! $isCurrent && ! $clickable,
+                        ])>
+                        <span class="flex items-center justify-between gap-2">
+                            <span class="text-sm font-semibold text-brand-ink">{{ $option['title'] }}</span>
+                            @if ($isCurrent)
+                                <span class="shrink-0 rounded-full bg-emerald-50 px-1.5 py-0.5 text-2xs font-semibold text-emerald-800">{{ __('In use') }}</span>
+                            @elseif (! $option['available'])
+                                <span class="shrink-0 text-2xs font-semibold text-brand-mist">{{ $option['why'] }}</span>
+                            @endif
+                        </span>
+                        <span class="mt-1 block text-xs leading-relaxed text-brand-moss">{{ $option['body'] }}</span>
+                    </button>
+                @endforeach
+            </div>
+        </div>
+
         <div class="border-b border-brand-ink/10 px-3 py-2 sm:px-4">
             <x-server-workspace-tablist :aria-label="__('Queue workspace sections')" scroll bare class="!mb-0 w-full">
                 <x-server-workspace-tab id="queue-tab-queues" icon="heroicon-o-queue-list" :active="$queue_workspace_tab === 'queues'" wire:click="$set('queue_workspace_tab', 'queues')">
@@ -249,24 +286,11 @@
                     @endif
                 </div>
                 @can('update', $site)
+                    {{-- Switching on and off lives in "Run jobs on" above. --}}
                     @if ($managedNamespace)
-                        <div class="flex shrink-0 items-center gap-3">
-                            <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
-                               class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
-                            <button type="button"
-                                    x-on:click="$dispatch('open-modal', 'queue-switch-revert')"
-                                    wire:loading.attr="disabled" wire:target="disconnectManagedQueue"
-                                    class="text-xs font-semibold text-brand-moss hover:text-rose-700 hover:underline">
-                                <span wire:loading.remove wire:target="disconnectManagedQueue">{{ __('Revert') }}</span>
-                                <span wire:loading wire:target="disconnectManagedQueue">{{ __('Reverting…') }}</span>
-                            </button>
-                        </div>
-                    @elseif ($this->managedQueueEntitled())
-                        <x-primary-button size="xs" type="button" class="shrink-0" x-on:click="$dispatch('open-modal', 'queue-switch-managed')" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
-                            <span wire:loading.remove wire:target="upgradeToManagedQueue">{{ __('Use managed queue') }}</span>
-                            <span wire:loading wire:target="upgradeToManagedQueue">{{ __('Connecting…') }}</span>
-                        </x-primary-button>
-                    @else
+                        <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
+                           class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
+                    @elseif (! $this->managedQueueEntitled())
                         {{-- Say it here rather than behind a click that fails. --}}
                         <a href="{{ route('billing.show', ['organization' => $site->organization_id]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Not on this plan — upgrade') }}</a>
                     @endif
@@ -1216,30 +1240,45 @@ DPLY_QUEUE_TOKEN=•••</pre>
                 'confirmLabel' => __('Switch to :d', ['d' => $switchTarget]),
             ])
         @endif
-        @php($switchNamespace = $this->managedQueueNamespace())
-        @if ($switchNamespace)
-            {{-- Reverting keeps the namespace but strands anything still queued
-                 there: the workers stop looking at dply. --}}
+        {{-- One confirm per "Run jobs on" card that is not the current one. --}}
+        @php($runMode = $this->queueRunMode())
+        @php($dplyAllowed = $this->managedQueueNamespace() !== null || $this->managedQueueEntitled())
+        @if ($runMode !== 'own' && $this->managedQueueNamespace() !== null)
+            {{-- Leaving dply keeps the namespace but strands anything still
+                 queued there: nothing looks at dply any more. --}}
             @php($revertTarget = $this->managedQueueRevertTarget())
             @php($strandedJobs = $this->managedQueuePendingTotal())
             @include('livewire.sites.partials._queue-switch-plan-modal', [
-                'modalName' => 'queue-switch-revert',
-                'title' => __('Point this site back at :d?', ['d' => $revertTarget]),
+                'modalName' => 'queue-run-own',
+                'title' => __('Run jobs on this server again?'),
                 'plan' => $this->queueWorkerPlan($revertTarget),
-                'action' => 'disconnectManagedQueue',
-                'confirmLabel' => __('Revert to :d', ['d' => $revertTarget]),
+                'action' => "chooseRunMode('own')",
+                'confirmLabel' => __('Use this server (:d)', ['d' => $revertTarget]),
                 'note' => $strandedJobs > 0
-                    ? __('There are :count job(s) still in dply. Reverting leaves them there with nothing draining them — drain or purge first if you need them.', ['count' => $strandedJobs])
-                    : __('The dply namespace and its history are kept; reconnecting later mints a new credential.'),
+                    ? __('There are :count job(s) still in dply. Leaving leaves them there with nothing draining them — drain or purge first if you need them.', ['count' => $strandedJobs])
+                    : __('The dply namespace and its history are kept, and dply’s servers are paused, not deleted.'),
             ])
-        @elseif ($this->managedQueueEntitled())
+        @endif
+        @if ($runMode !== 'dply' && $dplyAllowed)
             @include('livewire.sites.partials._queue-switch-plan-modal', [
-                'modalName' => 'queue-switch-managed',
-                'title' => __('Move this site onto the dply queue?'),
-                'plan' => $this->queueWorkerPlan('dply'),
-                'action' => 'upgradeToManagedQueue',
-                'confirmLabel' => __('Use managed queue'),
-                'note' => __('If the app does not have the dply queue package yet, nothing changes on the server until your next deploy installs it.'),
+                'modalName' => 'queue-run-dply',
+                'title' => __('Queue on dply, run on this server?'),
+                'plan' => $this->queueWorkerPlan('dply', false),
+                'action' => "chooseRunMode('dply')",
+                'confirmLabel' => __('Use the dply queue'),
+                'note' => $runMode === 'dply_servers'
+                    ? __('dply’s servers are paused, not deleted.')
+                    : __('If the app does not have the dply queue package yet, nothing changes on the server until your next deploy installs it.'),
+            ])
+        @endif
+        @if ($runMode !== 'dply_servers' && $dplyAllowed && $this->dplyServersAvailable())
+            @include('livewire.sites.partials._queue-switch-plan-modal', [
+                'modalName' => 'queue-run-dply_servers',
+                'title' => __('Run jobs on dply’s servers?'),
+                'plan' => $this->queueWorkerPlan('dply', true),
+                'action' => "chooseRunMode('dply_servers')",
+                'confirmLabel' => __('Use dply’s servers'),
+                'note' => __('dply builds a worker image from this site first. This server keeps running jobs until it is ready; then the workers listed here stop.'),
             ])
         @endif
     @endcan

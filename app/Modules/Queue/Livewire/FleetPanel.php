@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Queue\Livewire;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Modules\Queue\Actions\CreateManagedQueueFleet;
 use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Jobs\BuildFleetImageJob;
 use App\Modules\Queue\Models\ManagedQueueFleet;
@@ -152,37 +153,23 @@ class FleetPanel extends Component
 
         $this->validate($this->rules());
 
-        // One fleet per queue name: two autoscalers on one signal would fight,
-        // and the unique index would reject the second anyway — better to say
-        // so than to surface a constraint violation.
-        $exists = ManagedQueueFleet::query()
-            ->where('namespace_id', $namespace->id)
-            ->where('queue', $this->queue)
-            ->exists();
-
-        if ($exists) {
-            $this->addError('queue', __('This namespace already has a fleet draining :queue.', ['queue' => $this->queue]));
-
-            return;
-        }
-
-        ManagedQueueFleet::query()->create([
-            'namespace_id' => $namespace->id,
-            'organization_id' => $namespace->organization_id,
+        $created = app(CreateManagedQueueFleet::class)->handle($namespace, [
             'queue' => $this->queue,
             'class' => $this->class,
-            'status' => ManagedQueueFleet::STATUS_ACTIVE,
             'image' => trim($this->image),
             'registry_username' => trim($this->registry_username) ?: null,
             'registry_password' => $this->registry_password !== '' ? $this->registry_password : null,
             'memory_mib' => $this->memory_mib,
-            // A pro fleet is defined by never sleeping, so its floor is at
-            // least one whatever was typed.
-            'min_workers' => $this->class === ManagedQueueFleet::CLASS_PRO
-                ? max(1, $this->min_workers)
-                : $this->min_workers,
+            'min_workers' => $this->min_workers,
             'max_workers' => $this->max_workers,
         ]);
+
+        if ($created === null) {
+            // Better to say so than to surface a constraint violation.
+            $this->addError('queue', __('This namespace already has a fleet draining :queue.', ['queue' => $this->queue]));
+
+            return;
+        }
 
         $this->creating = false;
         $this->registry_password = '';

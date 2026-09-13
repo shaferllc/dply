@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Queue\Jobs;
 
+use App\Jobs\SetUpSiteQueueingJob;
+use App\Models\ConsoleAction;
+use App\Models\Site;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Services\FleetImageBuilder;
 use App\Modules\Queue\Services\FleetReconciler;
@@ -79,6 +82,12 @@ class BuildFleetImageJob implements ShouldBeUnique, ShouldQueue
             'error' => null,
         ]);
 
+        // The fleet's first image: the site's own workers kept running while it
+        // built, so now run the switch that hands the queue to this fleet.
+        if ($previous === '') {
+            $this->handOver($fleet);
+        }
+
         // A new tag means new code: workers still on the old one would keep
         // running the release the deploy just replaced. The tag is the commit,
         // so rebuilding the same commit rolls nothing.
@@ -91,6 +100,26 @@ class BuildFleetImageJob implements ShouldBeUnique, ShouldQueue
                 Log::warning('queue.fleet.roll_failed', ['fleet_id' => $fleet->id, 'error' => $e->getMessage()]);
             }
         }
+    }
+
+    private function handOver(ManagedQueueFleet $fleet): void
+    {
+        $site = $fleet->namespace?->site;
+
+        if (! $site instanceof Site || $fleet->status !== ManagedQueueFleet::STATUS_ACTIVE) {
+            return;
+        }
+
+        $run = ConsoleAction::query()->create([
+            'subject_type' => $site->getMorphClass(),
+            'subject_id' => $site->id,
+            'kind' => 'queue_setup',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => __('Handing jobs to dply’s servers'),
+            'output' => ['v' => 1, 'lines' => []],
+        ]);
+
+        SetUpSiteQueueingJob::dispatch((string) $run->id, (string) $site->id, 'dply');
     }
 
     /**
