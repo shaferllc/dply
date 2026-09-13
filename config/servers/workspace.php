@@ -239,7 +239,9 @@ return [
         'web' => [
             'label' => 'Web',
             'icon' => 'globe-alt',
-            'members' => ['webserver', 'edge-proxy', 'docker'],
+            // Docker is its own sidebar item wherever it is installed, not a
+            // sub-tab of Web.
+            'members' => ['webserver', 'edge-proxy'],
         ],
         'runtime' => [
             'label' => 'Runtime',

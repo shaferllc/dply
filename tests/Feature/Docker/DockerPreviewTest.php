@@ -41,6 +41,15 @@ test('docker is in the sidebar and opens wherever it is installed, whatever the 
         ->assertSet('comingSoonPreview', false);
 });
 
+test('docker is its own sidebar item, not a tab folded into Web', function (): void {
+    [, $server] = dockerPreviewUserWithServer();
+    seedDockerPreviewStack($server, ['nginx', 'php-fpm', 'docker-daemon']);
+
+    $keys = collect(server_workspace_collapse_clusters($server, server_workspace_nav_for_server($server)))->pluck('key')->all();
+
+    expect($keys)->toContain('docker');
+});
+
 test('docker installed after provisioning still gets the sidebar item', function (): void {
     [$user, $server] = dockerPreviewUserWithServer();
     seedDockerPreviewStack($server, ['nginx', 'php-fpm']);
