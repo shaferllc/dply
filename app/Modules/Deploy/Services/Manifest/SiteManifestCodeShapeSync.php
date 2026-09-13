@@ -211,8 +211,11 @@ final class SiteManifestCodeShapeSync
                 'command' => $process->command,
                 'scale' => $process->scale,
                 'env_vars' => $process->env !== [] ? $process->env : null,
-                // Keep inactive when daemons are owned elsewhere (supervisor templates).
-                'is_active' => $this->shouldEnsureProcessDaemons($site),
+                // Keep inactive when daemons are owned elsewhere (supervisor
+                // templates), or when a queue switch stopped it — a deploy must
+                // not restart a worker that cannot read the site's connection.
+                'is_active' => $this->shouldEnsureProcessDaemons($site)
+                    && ! in_array($name, (array) data_get($site->meta, 'queue_stopped_processes', []), true),
                 'managed_by_manifest' => true,
                 'meta' => $process->meta() !== [] ? $process->meta() : null,
             ]);

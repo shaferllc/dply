@@ -150,15 +150,7 @@ final class ManagedQueueConnector
 
         unset($variables['DPLY_QUEUE_URL'], $variables['DPLY_QUEUE_TOKEN']);
 
-        // Nothing recorded means this site was connected before the revert path
-        // existed. Fall back to what it has attached, and to `sync` only as the
-        // last resort — a site with no queue resource genuinely has nowhere
-        // else to run jobs.
-        $connection = $previous['QUEUE_CONNECTION']
-            ?? SiteQueueConfiguration::suggestedDriverFor($site)
-            ?? 'sync';
-
-        $variables['QUEUE_CONNECTION'] = $connection;
+        $variables['QUEUE_CONNECTION'] = $this->revertConnectionFor($site);
 
         if (isset($previous['QUEUE_FAILED_DRIVER'])) {
             $variables['QUEUE_FAILED_DRIVER'] = $previous['QUEUE_FAILED_DRIVER'];
@@ -171,6 +163,24 @@ final class ManagedQueueConnector
             'env_file_content' => $this->writer->render($variables, $existing['comments']),
             'env_cache_origin' => 'local-edit',
         ])->save();
+    }
+
+    /**
+     * The connection a revert lands on — read before disconnecting, since
+     * disconnect() drops what was recorded.
+     *
+     * Nothing recorded means this site was connected before the revert path
+     * existed. Fall back to what it has attached, and to `sync` only as the
+     * last resort — a site with no queue resource genuinely has nowhere else
+     * to run jobs.
+     */
+    public function revertConnectionFor(Site $site): string
+    {
+        $previous = data_get($site->meta, 'managed_queue.previous.QUEUE_CONNECTION');
+
+        return is_string($previous) && $previous !== ''
+            ? $previous
+            : (SiteQueueConfiguration::suggestedDriverFor($site) ?? 'sync');
     }
 
     /** The namespace serving this site, if it has one. */

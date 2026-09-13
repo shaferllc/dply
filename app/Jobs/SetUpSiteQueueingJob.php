@@ -6,13 +6,16 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
+use App\Models\WorkerPool;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\SupervisorProvisioner;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
-use App\Support\Sites\QueueWorkerClassifier;
+use App\Services\WorkerPools\WorkerDaemonBackend;
+use App\Support\Sites\QueueWorkerPlan;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -96,6 +99,33 @@ class SetUpSiteQueueingJob implements ShouldQueue
             ])->save();
         }
 
+        $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
+
+        // `dply` only resolves once the queue package is in the release. Pushing
+        // it before then points every dispatch at a connection the app cannot
+        // load; the next deploy installs the package and ships this same env.
+        if ($this->driver === 'dply') {
+            try {
+                $packageInstalled = $this->queuePackageInstalled($exec, $site, $dir);
+            } catch (\Throwable $e) {
+                // Not "saved": a check that never ran must not read as a switch
+                // that was deliberately deferred.
+                $this->fail($emit, __('Could not check for the dply queue package: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+
+                return;
+            }
+
+            if (! $packageInstalled) {
+                // The deploy that installs the package runs this job again.
+                $this->markSwitchPending($site, $this->driver);
+                $this->succeed($emit, __('Saved. It takes effect on your next deploy, which installs the dply queue package — the workers switch then.'));
+
+                return;
+            }
+        }
+
+        $this->markSwitchPending($site, null);
+
         // 2 — push it to the box ---------------------------------------------
         // Inline, not dispatched: the next steps are only correct once the file
         // is actually on disk, and a queued push would race them.
@@ -117,7 +147,6 @@ class SetUpSiteQueueingJob implements ShouldQueue
         // Mandatory, not tidy-up. With a cached config the app keeps the OLD
         // QUEUE_CONNECTION and every later step passes while jobs still run
         // inline — a success that is indistinguishable from the bug.
-        $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
         $emit->step('setup', __('Clearing the config cache so the app sees it …'));
 
         try {
@@ -134,17 +163,57 @@ class SetUpSiteQueueingJob implements ShouldQueue
             return;
         }
 
-        // 4 — a worker to drain it -------------------------------------------
-        $existingWorker = SupervisorProgram::query()
-            ->where('site_id', $site->id)
-            ->get()
-            ->first(fn (SupervisorProgram $p): bool => QueueWorkerClassifier::isQueueWorker($p->command));
+        // 4 — workers that read the new connection ----------------------------
+        // Starts before stops, so there is no moment with nothing draining.
+        // Stopped programs are deactivated, not deleted: switching back brings
+        // them back. Idempotent — a worker that already drains this connection
+        // is left alone rather than stacked, which would double concurrency.
+        $backend = app(WorkerDaemonBackend::class);
 
-        if ($existingWorker !== null) {
-            // Idempotent: re-running must not stack a second worker on the same
-            // queue, which would double concurrency silently.
-            $emit->step('setup', __('A queue worker already exists — leaving it alone.'));
-        } else {
+        // Units first: a queue worker under systemd is invisible to this page
+        // and to deploy restarts. ensure() starts each program before its unit
+        // comes down, and leaves the units alone if Supervisor fails.
+        $moving = QueueWorkerPlan::for($site, $this->driver)->move;
+        if ($moving->isNotEmpty()) {
+            $emit->step('setup', trans_choice('Moving :count systemd unit to Supervisor first …|Moving :count systemd units to Supervisor first …', $moving->count(), ['count' => $moving->count()]));
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta['worker_process_manager'] = WorkerPool::PM_SUPERVISOR;
+            $site->forceFill(['meta' => $meta])->save();
+
+            try {
+                $backend->ensure($site->fresh());
+            } catch (\Throwable $e) {
+                $this->fail($emit, __('Could not move the workers to Supervisor: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+
+                return;
+            }
+
+            $site->refresh();
+        }
+
+        $plan = QueueWorkerPlan::for($site, $this->driver);
+
+        if (! $plan->changesAnything()) {
+            $emit->step('setup', __('The workers already read :d — leaving them alone.', ['d' => $this->driver]));
+        }
+
+        foreach ($plan->start as $program) {
+            $emit->step('setup', __('Starting :p again …', ['p' => $program->slug]));
+            $program->forceFill(['is_active' => true])->save();
+            $source = $backend->sourceProcessFor($site, $program);
+            $source?->forceFill(['is_active' => true])->save();
+            $this->rememberQueueStop($site, $source, stopped: false);
+
+            try {
+                $provisioner->syncProgram($site->server->fresh(), (string) $program->id);
+            } catch (\Throwable $e) {
+                $this->fail($emit, __(':p did not start: :msg', ['p' => $program->slug, 'msg' => Str::limit($e->getMessage(), 300)]));
+
+                return;
+            }
+        }
+
+        if ($plan->createDefault) {
             $emit->step('setup', __('Creating a queue worker …'));
 
             $program = SupervisorProgram::query()->create([
@@ -163,6 +232,25 @@ class SetUpSiteQueueingJob implements ShouldQueue
                 $provisioner->syncProgram($site->server->fresh(), (string) $program->id);
             } catch (\Throwable $e) {
                 $this->fail($emit, __('Worker saved, but Supervisor did not pick it up: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
+
+                return;
+            }
+        }
+
+        if ($plan->stop->isNotEmpty()) {
+            foreach ($plan->stop as $program) {
+                $emit->step('setup', __('Stopping :p — it cannot read :d. Kept, so switching back restarts it.', ['p' => $program->slug, 'd' => $this->driver]));
+                $program->forceFill(['is_active' => false])->save();
+                $source = $backend->sourceProcessFor($site, $program);
+                $source?->forceFill(['is_active' => false])->save();
+                $this->rememberQueueStop($site, $source, stopped: true);
+            }
+
+            try {
+                // sync() only writes active programs, so the stopped confs go.
+                $provisioner->sync($site->server->fresh());
+            } catch (\Throwable $e) {
+                $this->fail($emit, __('Could not stop the old workers: :msg', ['msg' => Str::limit($e->getMessage(), 300)]));
 
                 return;
             }
@@ -194,6 +282,59 @@ class SetUpSiteQueueingJob implements ShouldQueue
      * left `queued` reports "no queue worker picked this up" no matter what the
      * console output says.
      */
+    /**
+     * A deploy re-syncs manifest processes as active. This list is what keeps
+     * a worker the switch stopped from coming back on the next one — the
+     * process row's own meta is rewritten from the manifest, so it cannot hold it.
+     */
+    private function rememberQueueStop(Site $site, ?SiteProcess $process, bool $stopped): void
+    {
+        if ($process === null) {
+            return;
+        }
+
+        $site->refresh();
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $names = array_values(array_diff((array) ($meta['queue_stopped_processes'] ?? []), [$process->name]));
+
+        if ($stopped) {
+            $names[] = $process->name;
+        }
+
+        $meta['queue_stopped_processes'] = $names;
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    private function markSwitchPending(Site $site, ?string $driver): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        if (($meta['queue_switch_pending'] ?? null) === $driver) {
+            return;
+        }
+
+        if ($driver === null) {
+            unset($meta['queue_switch_pending']);
+        } else {
+            $meta['queue_switch_pending'] = $driver;
+        }
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    private function queuePackageInstalled(ExecuteRemoteTaskOnServer $exec, Site $site, string $dir): bool
+    {
+        $package = (string) config('dply.queue_insights.package', 'dply/queue-insights');
+
+        $out = $exec->runInlineBash(
+            $site->server,
+            'site:queue-setup-package-check',
+            sprintf('test -d %s && echo DPLY_PKG_YES || echo DPLY_PKG_NO', escapeshellarg($dir.'/vendor/'.$package)),
+            timeoutSeconds: 30,
+            asRoot: false,
+        );
+
+        return str_contains((string) $out->buffer, 'DPLY_PKG_YES');
+    }
+
     private function fail(ConsoleEmitter $emit, string $message): void
     {
         $emit->error($message, 'setup');

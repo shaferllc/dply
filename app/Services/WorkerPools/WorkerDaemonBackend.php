@@ -65,9 +65,14 @@ class WorkerDaemonBackend
     public function ensure(Site $site): array
     {
         if ($this->backendFor($site) === WorkerPool::PM_SUPERVISOR) {
-            $this->teardownSystemdWorkers($site);
+            // Supervisor first: a failed install or sync must leave the units
+            // running, not the site with no workers. And only units that were
+            // actually mirrored come down — a role-filtered or command-less one
+            // has no program to take its place.
+            [$detail, $mirroredProcessIds] = $this->provisionSupervisor($site);
+            $this->teardownSystemdWorkers($site, $mirroredProcessIds);
 
-            return ['backend' => WorkerPool::PM_SUPERVISOR, 'detail' => $this->provisionSupervisor($site)];
+            return ['backend' => WorkerPool::PM_SUPERVISOR, 'detail' => $detail];
         }
 
         // systemd (default): write + start units, then retire any managed
@@ -76,6 +81,17 @@ class WorkerDaemonBackend
         $this->teardownSupervisorWorkers($site);
 
         return ['backend' => WorkerPool::PM_SYSTEMD, 'detail' => implode(', ', $written) ?: 'none'];
+    }
+
+    /**
+     * Whether this site still runs workers as systemd units — the case where a
+     * PHP site needs the Services page, since nothing else lists them.
+     */
+    public function hasSystemdWorkerUnits(Site $site): bool
+    {
+        return $site->exists
+            && $this->backendFor($site) === WorkerPool::PM_SYSTEMD
+            && $site->processes()->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB)->exists();
     }
 
     /**
@@ -116,7 +132,10 @@ class WorkerDaemonBackend
         return $poolId ? WorkerPool::query()->find($poolId) : null;
     }
 
-    private function provisionSupervisor(Site $site): string
+    /**
+     * @return array{0: string, 1: list<string>} sync output, and the ids of the processes now running as programs
+     */
+    private function provisionSupervisor(Site $site): array
     {
         $server = $site->server;
         if ($server === null) {
@@ -127,21 +146,35 @@ class WorkerDaemonBackend
             $this->supervisor->installSupervisorPackage($server);
         }
 
-        $this->syncManagedProgramsFromSite($site);
+        $mirrored = $this->syncManagedProgramsFromSite($site);
 
-        return $this->supervisor->sync($server);
+        return [$this->supervisor->sync($server), $mirrored];
+    }
+
+    /**
+     * The SiteProcess a managed program mirrors, if it is one. A switch that
+     * stops such a program has to deactivate this row too — ensure() re-mirrors
+     * every active process, so the program alone would come straight back.
+     */
+    public function sourceProcessFor(Site $site, SupervisorProgram $program): ?SiteProcess
+    {
+        $site->loadMissing('processes');
+
+        return $site->processes->first(fn (SiteProcess $process): bool => $this->programSlug($site, $process) === $program->slug);
     }
 
     /**
      * Mirror the site's active non-web SiteProcesses into managed
      * SupervisorProgram rows (idempotent upsert by slug); deactivate managed
      * rows whose SiteProcess has since gone away.
+     *
+     * @return list<string> ids of the processes that now have a program
      */
-    private function syncManagedProgramsFromSite(Site $site): void
+    private function syncManagedProgramsFromSite(Site $site): array
     {
         $server = $site->server;
         if ($server === null) {
-            return;
+            return [];
         }
 
         $site->loadMissing('processes');
@@ -151,6 +184,7 @@ class WorkerDaemonBackend
         [$runtimeMode, $workerRole] = $this->hostRuntimeFor($site);
 
         $keptSlugs = [];
+        $mirrored = [];
         foreach ($site->processes as $process) {
             if ($process->type === SiteProcess::TYPE_WEB || ! $process->is_active) {
                 continue;
@@ -179,6 +213,7 @@ class WorkerDaemonBackend
 
             $slug = $this->programSlug($site, $process);
             $keptSlugs[] = $slug;
+            $mirrored[] = (string) $process->id;
 
             $oneshot = $process->isOneshot();
             $stopwait = $process->stopwaitsecs();
@@ -207,6 +242,8 @@ class WorkerDaemonBackend
         $this->managedPrograms($site)
             ->when($keptSlugs !== [], fn (Builder $q) => $q->whereNotIn('slug', $keptSlugs))
             ->update(['is_active' => false]);
+
+        return $mirrored;
     }
 
     /**
@@ -236,12 +273,14 @@ class WorkerDaemonBackend
     /**
      * Stop + remove this site's worker systemd units — the teardown half of a
      * switch TO supervisor. Best-effort per unit.
+     *
+     * @param  list<string>  $processIds  only these — the ones Supervisor now runs
      */
-    private function teardownSystemdWorkers(Site $site): void
+    private function teardownSystemdWorkers(Site $site, array $processIds): void
     {
         $site->loadMissing('processes');
         foreach ($site->processes as $process) {
-            if ($process->type === SiteProcess::TYPE_WEB || ! $process->is_active) {
+            if (! in_array((string) $process->id, $processIds, true)) {
                 continue;
             }
             try {
@@ -267,7 +306,7 @@ class WorkerDaemonBackend
         return 'dply-worker-'.$site->id.'-';
     }
 
-    private function programSlug(Site $site, SiteProcess $process): string
+    public function programSlug(Site $site, SiteProcess $process): string
     {
         $name = preg_replace('/[^a-zA-Z0-9_-]+/', '-', (string) $process->name) ?: 'worker';
 

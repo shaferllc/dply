@@ -41,6 +41,7 @@ use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\Sites\QueueJobPayload;
 use App\Support\Sites\QueueWorkerClassifier;
 use App\Support\Sites\QueueWorkerCommand;
+use App\Support\Sites\QueueWorkerPlan;
 use App\Support\Sites\SiteDaemonAdvisor;
 use App\Support\Sites\SiteQueueAlertRules;
 use App\Support\Sites\SiteQueueConfiguration;
@@ -1295,6 +1296,11 @@ class WorkspaceQueue extends Component
 
         $this->site->refresh();
 
+        // Push, clear the config cache and reconcile workers now — or, until a
+        // deploy has installed the queue package, report that the deploy will.
+        $run = $this->seedQueuedConsoleAction('queue_setup', __('Switching to the dply queue'));
+        SetUpSiteQueueingJob::dispatch((string) $run->id, (string) $this->site->id, 'dply', (string) auth()->id() ?: null);
+
         // Held for this render only. dply stores a hash; if the operator loses
         // this, the answer is a new credential, not a lookup.
         $this->managed_token = $result['token'];
@@ -1320,10 +1326,25 @@ class WorkspaceQueue extends Component
             return;
         }
 
+        $target = $connector->revertConnectionFor($this->site);
         $connector->disconnect($this->site);
         $this->site->refresh();
 
-        $this->toastSuccess(__('Back on this site’s own queue. Deploy or push the .env to apply it on the server.'));
+        $run = $this->seedQueuedConsoleAction('queue_setup', __('Switching back to :d', ['d' => $target]));
+        SetUpSiteQueueingJob::dispatch((string) $run->id, (string) $this->site->id, $target, (string) auth()->id() ?: null);
+
+        $this->toastSuccess(__('Switching back to :d — progress shows in the console above.', ['d' => $target]));
+    }
+
+    /** What a switch to $connection would stop and start — the confirm modals show it. */
+    public function queueWorkerPlan(string $connection): QueueWorkerPlan
+    {
+        return QueueWorkerPlan::for($this->site, $connection);
+    }
+
+    public function managedQueueRevertTarget(): string
+    {
+        return app(ManagedQueueConnector::class)->revertConnectionFor($this->site);
     }
 
     /**
@@ -1702,8 +1723,8 @@ class WorkspaceQueue extends Component
     /**
      * Move this site's systemd workers onto Supervisor.
      *
-     * WorkerDaemonBackend::ensure() tears each unit down and starts the same
-     * command as a Supervisor program — a short gap, never two copies. After
+     * WorkerDaemonBackend::ensure() starts each command as a Supervisor program,
+     * then tears its unit down — a few seconds of overlap, never a gap. After
      * that this page, deploy restarts and the readiness checks all manage one
      * set of workers.
      */
@@ -1760,6 +1781,14 @@ class WorkspaceQueue extends Component
      */
     public function pollHorizon(): void
     {
+        $this->authorize('view', $this->site);
+
+        // One pull is enough to learn the app does not ship Horizon; Refresh
+        // still asks again after a deploy that adds it.
+        if (data_get($this->site->meta, 'horizon.horizon_installed') === false) {
+            return;
+        }
+
         if (! Cache::add('site-horizon-poll:'.$this->site->id, true, 30)) {
             return;
         }

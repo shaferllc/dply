@@ -40,7 +40,7 @@
                 </div>
                 @can('update', $site)
                     @if ($suggested !== null)
-                        <x-primary-button size="xs" type="button" class="shrink-0" wire:click="switchQueueDriver" wire:loading.attr="disabled" wire:target="switchQueueDriver">
+                        <x-primary-button size="xs" type="button" class="shrink-0" x-on:click="$dispatch('open-modal', 'queue-switch-driver')" wire:loading.attr="disabled" wire:target="switchQueueDriver">
                             <span wire:loading.remove wire:target="switchQueueDriver">{{ __('Switch to :d', ['d' => $suggested]) }}</span>
                             <span wire:loading wire:target="switchQueueDriver">{{ __('Switching…') }}</span>
                         </x-primary-button>
@@ -253,15 +253,8 @@
                         <div class="flex shrink-0 items-center gap-3">
                             <a href="{{ route('queues.show', ['queueNamespace' => $managedNamespace]) }}" wire:navigate
                                class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Manage queue') }}</a>
-                            {{-- Reverting is not destructive to the namespace, but it does
-                                 strand anything still queued there: the workers stop looking
-                                 at dply. The count goes in the confirm, not behind it. --}}
-                            @php($strandedJobs = $this->managedQueuePendingTotal())
                             <button type="button"
-                                    wire:click="disconnectManagedQueue"
-                                    wire:confirm="{{ $strandedJobs > 0
-                                        ? __('There are :count job(s) still in dply. Reverting leaves them there with nothing draining them — drain or purge first if you need them. Revert anyway?', ['count' => $strandedJobs])
-                                        : __('Point this site back at its own queue? The dply namespace and its history are kept; reconnecting later mints a new credential.') }}"
+                                    x-on:click="$dispatch('open-modal', 'queue-switch-revert')"
                                     wire:loading.attr="disabled" wire:target="disconnectManagedQueue"
                                     class="text-xs font-semibold text-brand-moss hover:text-rose-700 hover:underline">
                                 <span wire:loading.remove wire:target="disconnectManagedQueue">{{ __('Revert') }}</span>
@@ -269,7 +262,7 @@
                             </button>
                         </div>
                     @elseif ($this->managedQueueEntitled())
-                        <x-primary-button size="xs" type="button" class="shrink-0" wire:click="upgradeToManagedQueue" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
+                        <x-primary-button size="xs" type="button" class="shrink-0" x-on:click="$dispatch('open-modal', 'queue-switch-managed')" wire:loading.attr="disabled" wire:target="upgradeToManagedQueue">
                             <span wire:loading.remove wire:target="upgradeToManagedQueue">{{ __('Use managed queue') }}</span>
                             <span wire:loading wire:target="upgradeToManagedQueue">{{ __('Connecting…') }}</span>
                         </x-primary-button>
@@ -978,6 +971,17 @@
             </x-server-workspace-tab-panel>
         @else
             <x-server-workspace-tab-panel id="queue-panel-fleet" labelled-by="queue-tab-fleet" panel-class="min-w-0">
+                {{-- dply-run workers for the managed queue. The same component the
+                     namespace page embeds, so fleets are built in one place and
+                     this page never drifts from it. --}}
+                @php($fleetNamespace = $this->managedQueueNamespace())
+                @if ($fleetNamespace)
+                    @can('view', $fleetNamespace)
+                        <div class="border-b border-brand-ink/10">
+                            @livewire('queue-fleet-panel', ['queueNamespace' => $fleetNamespace], key('site-fleet-panel-'.$fleetNamespace->id))
+                        </div>
+                    @endcan
+                @endif
                 @if ($pools->isEmpty())
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('No managed worker servers attached.') }}</p>
@@ -1175,7 +1179,7 @@ DPLY_QUEUE_TOKEN=•••</pre>
         <div class="p-6">
             <h3 class="text-base font-semibold text-brand-ink">{{ __('Move workers to Supervisor?') }}</h3>
             <p class="mt-2 text-sm text-brand-moss">
-                {{ __('Each systemd unit stops, then starts again as a Supervisor program running the same command. Expect a few seconds with nothing running — queued jobs wait and are picked up after.') }}
+                {{ __('Each command starts as a Supervisor program first, then its systemd unit stops — a few seconds where both run, never a gap. If that overlap crosses a minute, the scheduler can run that minute twice. If Supervisor fails to start, the units are left running.') }}
             </p>
             @if ($unitsToMove->isNotEmpty())
                 <ul class="mt-3 divide-y divide-brand-ink/10 rounded-lg border border-brand-ink/10">
@@ -1199,6 +1203,46 @@ DPLY_QUEUE_TOKEN=•••</pre>
             </div>
         </div>
     </x-modal>
+
+    {{-- Every connection switch confirms with the worker stop/start list first. --}}
+    @can('update', $site)
+        @php($switchTarget = $queueConfigWarning ? $this->suggestedQueueDriver() : null)
+        @if ($switchTarget !== null)
+            @include('livewire.sites.partials._queue-switch-plan-modal', [
+                'modalName' => 'queue-switch-driver',
+                'title' => __('Switch this site to :d?', ['d' => $switchTarget]),
+                'plan' => $this->queueWorkerPlan($switchTarget),
+                'action' => 'switchQueueDriver',
+                'confirmLabel' => __('Switch to :d', ['d' => $switchTarget]),
+            ])
+        @endif
+        @php($switchNamespace = $this->managedQueueNamespace())
+        @if ($switchNamespace)
+            {{-- Reverting keeps the namespace but strands anything still queued
+                 there: the workers stop looking at dply. --}}
+            @php($revertTarget = $this->managedQueueRevertTarget())
+            @php($strandedJobs = $this->managedQueuePendingTotal())
+            @include('livewire.sites.partials._queue-switch-plan-modal', [
+                'modalName' => 'queue-switch-revert',
+                'title' => __('Point this site back at :d?', ['d' => $revertTarget]),
+                'plan' => $this->queueWorkerPlan($revertTarget),
+                'action' => 'disconnectManagedQueue',
+                'confirmLabel' => __('Revert to :d', ['d' => $revertTarget]),
+                'note' => $strandedJobs > 0
+                    ? __('There are :count job(s) still in dply. Reverting leaves them there with nothing draining them — drain or purge first if you need them.', ['count' => $strandedJobs])
+                    : __('The dply namespace and its history are kept; reconnecting later mints a new credential.'),
+            ])
+        @elseif ($this->managedQueueEntitled())
+            @include('livewire.sites.partials._queue-switch-plan-modal', [
+                'modalName' => 'queue-switch-managed',
+                'title' => __('Move this site onto the dply queue?'),
+                'plan' => $this->queueWorkerPlan('dply'),
+                'action' => 'upgradeToManagedQueue',
+                'confirmLabel' => __('Use managed queue'),
+                'note' => __('If the app does not have the dply queue package yet, nothing changes on the server until your next deploy installs it.'),
+            ])
+        @endif
+    @endcan
 
     {{-- Bulk failed-job actions. Retry-all can put thousands of jobs back on a
          queue in one go, and delete-all destroys the only record of what broke;

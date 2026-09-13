@@ -50,6 +50,20 @@ function manifest(string $yaml): DplyManifest
     return (new DplyManifestParser)->parseYaml($yaml);
 }
 
+test('a deploy does not restart a worker a queue switch stopped', function () {
+    $site = manifestSite();
+    $site->forceFill(['meta' => ['queue_stopped_processes' => ['horizon']]])->save();
+
+    sync()->reconcile($site->fresh(), manifest(<<<'YAML'
+    processes:
+      horizon: php artisan horizon
+      worker: php artisan queue:work
+    YAML));
+
+    expect(SiteProcess::where('site_id', $site->id)->where('managed_by_manifest', true)->orderBy('name')->pluck('is_active', 'name')->all())
+        ->toBe(['horizon' => false, 'worker' => true]);
+});
+
 test('reconcile creates managed build/release steps and processes', function () {
     $site = manifestSite();
 

@@ -243,7 +243,7 @@
                                         <td class="px-3 py-2 text-right sm:px-4">
                                             @if ($canMutate)
                                                 <div class="inline-flex gap-1.5">
-                                                    <x-spinner-button size="xs" variant="secondary" type="button" target="runCronEvent" wire:click="runCronEvent(@js($event['hook']))">{{ __('Run now') }}</x-spinner-button>
+                                                    <x-spinner-button size="xs" variant="secondary" type="button" target="runCronEvent" wire:click="runCronEvent({!! \Illuminate\Support\Js::from($event['hook']) !!})">{{ __('Run now') }}</x-spinner-button>
                                                     <button type="button" wire:click="confirmDeleteCronEvent(@js($event['hook']))" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100">{{ __('Unschedule') }}</button>
                                                 </div>
                                             @endif

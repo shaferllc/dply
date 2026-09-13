@@ -5,6 +5,7 @@ namespace App\Modules\Deploy\Jobs;
 use App\Enums\DeploymentMethod;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
+use App\Jobs\SetUpSiteQueueingJob;
 use App\Jobs\SyncWorkerPoolEnvJob;
 use App\Jobs\TestSiteHealthJob;
 use App\Models\ConsoleAction;
@@ -371,6 +372,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // primary is fine. Syncing on every successful deploy makes the
                 // replicas' credentials always the parent's.
                 $this->syncWorkerReplicaEnv();
+                $this->resumePendingQueueSwitch();
                 $caps = $this->site->server?->hostCapabilities();
                 if ($caps?->supportsClusterDeploy()) {
                     $siteUpdates['status'] = Site::activeStatusForWebserver($this->site->webserver());
@@ -540,6 +542,35 @@ class RunSiteDeploymentJob implements ShouldQueue
         throw new \RuntimeException(
             'Deployment blocked: the app requires environment variables that are not set: '
             .$shown.$more.'. Add them on the Deploy panel (or Settings → Environment) and redeploy.'
+        );
+    }
+
+    /**
+     * A switch to the dply queue waits for the deploy that installs its
+     * package. This is that deploy, so finish the switch: push, clear the
+     * config cache, move the workers. The job re-checks the package itself.
+     */
+    private function resumePendingQueueSwitch(): void
+    {
+        $driver = data_get($this->site->meta, 'queue_switch_pending');
+        if (! is_string($driver) || $driver === '') {
+            return;
+        }
+
+        $run = ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => 'queue_setup',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => __('Finishing the switch to :d', ['d' => $driver]),
+            'output' => ['v' => 1, 'lines' => []],
+        ]);
+
+        SetUpSiteQueueingJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            $driver,
+            $this->auditUserId !== null ? (string) $this->auditUserId : null,
         );
     }
 

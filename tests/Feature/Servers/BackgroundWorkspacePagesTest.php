@@ -234,7 +234,7 @@ test('schedule route renders via http', function () {
         ->get(route('servers.schedule', $server))
         ->assertOk()
         ->assertSee('Schedule', false)
-        ->assertSee('Framework schedulers running on this server', false);
+        ->assertSee('Framework schedulers on this server', false);
 });
 test('backups route renders via http', function () {
     $user = actingOrgUser();
