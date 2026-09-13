@@ -22,6 +22,11 @@ uses(RefreshDatabase::class);
 
 test('fleet-host opts a server in, reads its soak, and opts it out', function () {
     $server = Server::factory()->create(['name' => 'fleet-1']);
+    $remote = \Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $remote->shouldReceive('runInlineBash')->once()
+        ->withArgs(fn ($s, string $name, string $script, ...$rest): bool => $name === 'fleet-host-install-docker' && str_contains($script, 'docker'))
+        ->andReturn(new ProcessOutput('Docker already installed', 0));
+    app()->instance(ExecuteRemoteTaskOnServer::class, $remote);
 
     $this->artisan('dply:queue:fleet-host', ['server' => 'fleet-1', '--capacity' => 3072])->assertSuccessful();
     expect($server->fresh()->meta['queue_fleet_host'])->toMatchArray(['enabled' => true, 'capacity_mib' => 3072]);

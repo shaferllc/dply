@@ -11,6 +11,7 @@ use App\Modules\Queue\Contracts\QueueStore;
 use App\Modules\Queue\Models\ManagedQueueFleet;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Models\QueueNamespace;
+use App\Modules\Queue\Services\FleetBackendExposure;
 use App\Modules\Queue\Services\FleetImageBuilder;
 use App\Modules\Queue\Services\FleetReachabilityProbe;
 use App\Modules\Queue\Services\FleetReconciler;
@@ -121,6 +122,14 @@ class FleetSmokeTestCommand extends Command
      */
     private function assertReachable(FleetReachabilityProbe $probe, Server $host): void
     {
+        // Open what is safe to open first, so the probe measures the network
+        // the workers will actually have.
+        foreach (app(FleetBackendExposure::class)->open($this->fleet, $host) as $exposed) {
+            if ($exposed['action'] === 'loopback') {
+                $this->line(sprintf('    ! %s is on the app server’s loopback — rebind it onto the private network to let fleets reach it.', $exposed['name']));
+            }
+        }
+
         $results = $probe->check($this->fleet, $host);
 
         if ($results === []) {

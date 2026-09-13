@@ -7,6 +7,7 @@ namespace App\Modules\Queue\Console;
 use App\Models\Server;
 use App\Modules\Queue\Models\ManagedQueueWorker;
 use App\Modules\Queue\Services\Runtimes\FleetHostAllocator;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -33,7 +34,7 @@ class FleetHostCommand extends Command
 
     protected $description = 'Opt a server in as a queue fleet host, or show its proof status.';
 
-    public function handle(): int
+    public function handle(ExecuteRemoteTaskOnServer $remote): int
     {
         $needle = (string) $this->argument('server');
         $server = Server::query()->whereKey($needle)->first() ?? Server::query()->where('name', $needle)->first();
@@ -70,6 +71,30 @@ class FleetHostCommand extends Command
             } else {
                 $this->components->warn(sprintf('Builds reserve %d MiB of this. Once workers hold more than %d MiB, a deploy’s image build has to wait for them to scale down.', self::BUILD_MIB, $capacity - self::BUILD_MIB));
             }
+
+            // Docker before the opt-in: the allocator places workers on any
+            // enabled host, and one without a daemon fails every start.
+            // Same script as the server page's "Install Docker service".
+            try {
+                $result = $remote->runInlineBash(
+                    $server,
+                    'fleet-host-install-docker',
+                    (string) config('servers.manage.service_actions.install_docker.script'),
+                    timeoutSeconds: 600,
+                    asRoot: true,
+                );
+                $dockerError = $result->exitCode === 0 ? null : trim(mb_substr((string) $result->buffer, -400));
+            } catch (\Throwable $e) {
+                $dockerError = $e->getMessage();
+            }
+
+            if ($dockerError !== null) {
+                $this->components->error('Docker did not install on '.$server->name.', so it was not opted in: '.$dockerError);
+
+                return self::FAILURE;
+            }
+
+            $this->components->twoColumnDetail('Docker', 'ready');
 
             data_set($meta, 'queue_fleet_host.enabled', true);
             data_set($meta, 'queue_fleet_host.capacity_mib', $capacity);
