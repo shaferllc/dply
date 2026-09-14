@@ -57,15 +57,34 @@
     x-data="{
         copiedIp: false,
         copiedSsh: false,
+        // The key to offer, remembered per browser: a path on this person's
+        // machine that dply never sees. Empty means 'let ssh choose', as before.
+        sshKeyPath: (() => { try { return localStorage.getItem('dply.sshKeyPath') || ''; } catch (e) { return ''; } })(),
+        saveSshKeyPath(value) {
+            this.sshKeyPath = (value || '').trim();
+            try { localStorage.setItem('dply.sshKeyPath', this.sshKeyPath); } catch (e) { /* private window */ }
+        },
+        // ssh offers every key the agent holds, one per attempt; past the
+        // server's MaxAuthTries (6) it disconnects with 'Too many authentication
+        // failures' before reaching the right one. IdentitiesOnly offers one.
+        withSshKey(command) {
+            if (! this.sshKeyPath) { return command; }
+            const key = /^[~\/][A-Za-z0-9._\/-]*$/.test(this.sshKeyPath)
+                ? this.sshKeyPath
+                : `'${this.sshKeyPath.replace(/'/g, `'\\''`)}'`;
+            return command.replace(/^ssh /, `ssh -o IdentitiesOnly=yes -i ${key} `);
+        },
         async openTerminal(uri, command) {
+            const full = this.withSshKey(command);
             // Always copy the command to the clipboard so the user can paste in their own
             // terminal (paste-fallback for OSes without an ssh:// handler, and the only path
             // for docker-exec which has no URL scheme).
-            try { await navigator.clipboard?.writeText(command); } catch (e) { /* ignore */ }
+            try { await navigator.clipboard?.writeText(full); } catch (e) { /* ignore */ }
             this.copiedSsh = true;
             setTimeout(() => this.copiedSsh = false, 2400);
-            // If we have a URL scheme (ssh://…), let the OS launch its handler.
-            if (uri) {
+            // An ssh:// link cannot carry -i or IdentitiesOnly: with a key set it
+            // would fail exactly the way the copied command avoids, so paste that.
+            if (uri && ! this.sshKeyPath) {
                 window.location.href = uri;
             }
         },
@@ -142,6 +161,24 @@
                             <span class="text-xs text-brand-mist">—</span>
                         @endif
                     </div>
+                    @if ($server->ip_address)
+                        {{-- Which key the SSH button offers. Without one, ssh walks the
+                             whole agent and a few keys in trips the server's limit. --}}
+                        <div class="mt-1.5" x-data="{ editingKey: false }">
+                            <button type="button" x-on:click="editingKey = ! editingKey" class="text-2xs text-brand-mist hover:text-brand-ink hover:underline"
+                                x-text="sshKeyPath ? @js(__('SSH key: ')) + sshKeyPath : @js(__('Set your SSH key'))">{{ __('Set your SSH key') }}</button>
+                            <div x-show="editingKey" x-cloak class="mt-1.5">
+                                <input type="text"
+                                    x-bind:value="sshKeyPath"
+                                    x-on:change="saveSshKeyPath($event.target.value)"
+                                    x-on:keydown.enter.prevent="saveSshKeyPath($event.target.value); editingKey = false"
+                                    placeholder="~/.ssh/id_ed25519"
+                                    aria-label="{{ __('Path to your SSH private key') }}"
+                                    class="block w-full rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-mono text-2xs text-brand-ink" />
+                                <p class="mt-1 text-2xs leading-4 text-brand-mist">{{ __('The SSH button then copies a command that offers only this key (IdentitiesOnly), so an agent holding several keys can’t hit “Too many authentication failures”. Remembered in this browser.') }}</p>
+                            </div>
+                        </div>
+                    @endif
                 </div>
                 <nav
                     class="flex flex-col gap-0.5 p-2"
