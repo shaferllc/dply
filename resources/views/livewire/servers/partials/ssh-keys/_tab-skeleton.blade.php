@@ -15,7 +15,8 @@
 
     // Actions carried on the right of each tab's first head.
     $headActions = match ($tab) {
-        'keys' => [20, 18, 20],
+        // Get SSH access, Add a key, Sync now, Review drift.
+        'keys' => [28, 20, 18, 20],
         'preview' => [18, 20],
         'notifications' => [24],
         default => [],
