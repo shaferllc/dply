@@ -195,7 +195,6 @@
 
         {{-- Horizon, when a worker runs it. Its own panel because it has its own
              state (running/paused) and controls that queue:work does not. --}}
-        @php($runsHorizon = $workers->concat($systemdWorkers)->contains(fn ($worker): bool => str_contains(strtolower((string) $worker->command), 'horizon')))
         @if ($runsHorizon)
             @php($hz = is_array($site->meta['horizon'] ?? null) ? $site->meta['horizon'] : [])
             @php($hzAt = ! empty($hz['collected_at']) ? \Illuminate\Support\Carbon::parse($hz['collected_at']) : null)
@@ -217,10 +216,12 @@
                         </p>
                         <p class="mt-0.5 text-xs text-brand-moss">
                             @if ($hzAt)
-                                {{ __(':p processes · :j jobs/min · :f failed recently', [
+                                {{-- No failed count here: Horizon's "recently failed"
+                                     window disagreed with the Activity badge, and two
+                                     failed numbers on one page is one too many. --}}
+                                {{ __(':p processes · :j jobs/min', [
                                     'p' => $hz['processes'] ?? '—',
                                     'j' => $hz['jobs_per_minute'] ?? '—',
-                                    'f' => $hz['failed_recent'] ?? '—',
                                 ]) }}
                                 <span class="text-brand-mist">· {{ __('read :when', ['when' => $hzAt->diffForHumans()]) }}</span>
                             @else
@@ -352,6 +353,16 @@
                                 </p>
                             @elseif ($latest)
                                 <p class="text-xs text-brand-mist">
+                                    {{-- Jobs per minute over Horizon's recent snapshots. Index
+                                         access, not data_get: queue names may contain dots. --}}
+                                    @php($throughput = array_values(array_map('floatval', (array) ($site->meta['horizon']['queue_throughput'][$queueName] ?? []))))
+                                    @if (count($throughput) > 1)
+                                        @php($peak = max(1.0, max($throughput)))
+                                        <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="inline-block h-4 w-16 align-middle text-brand-forest" role="img" aria-label="{{ __('Throughput from Horizon, peak :p jobs/min', ['p' => round(max($throughput), 1)]) }}">
+                                            <polyline fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"
+                                                points="{{ collect($throughput)->map(fn (float $v, int $i): string => round($i / (count($throughput) - 1) * 100, 2).','.round(19 - $v / $peak * 18, 2))->implode(' ') }}" />
+                                        </svg> ·
+                                    @endif
                                     @if ($latest->reserved !== null)
                                         {{ __(':r running', ['r' => $latest->reserved]) }} ·
                                     @endif
@@ -627,6 +638,7 @@
                      by memory. --}}
                 <nav class="flex gap-0.5 overflow-x-auto border-b border-brand-ink/10 px-3 py-2 sm:gap-1 sm:px-4" style="-webkit-overflow-scrolling: touch;" aria-label="{{ __('Activity views') }}">
                     @foreach ([
+                        ['key' => 'running', 'label' => __('Running'), 'icon' => 'play', 'count' => $queueStats['running'] ?: null],
                         ['key' => 'waiting', 'label' => __('Waiting'), 'icon' => 'list-bullet', 'count' => null],
                         ['key' => 'delayed', 'label' => __('Delayed'), 'icon' => 'clock', 'count' => null],
                         ['key' => 'failed', 'label' => __('Failed'), 'icon' => 'exclamation-triangle', 'count' => $queueStats['failed'] ?: null],
@@ -724,8 +736,75 @@
                         </div>
                     @endif
                 @endif
+                @elseif ($activity_view === 'running')
+                @php($hzJobs = collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : []))
+                @php($runningJobs = $hzJobs->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['reserved', 'running'], true))->values())
+                @if ($runsHorizon)
+                    {{-- Horizon only refreshes from the Queues tab's poll; without this
+                         a list of what is running right now would freeze on open. --}}
+                    <div wire:init="pollHorizon" wire:poll.30s="pollHorizon" class="border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
+                        {{ __('Jobs a worker is holding right now, from Horizon.') }}
+                        @if (! empty($site->meta['horizon']['collected_at']))
+                            <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($site->meta['horizon']['collected_at'])->diffForHumans()]) }}</span>
+                        @endif
+                    </div>
+                    @if ($runningJobs->isEmpty())
+                        <p class="px-4 py-5 text-center text-sm font-medium text-brand-ink sm:px-5">{{ __('Nothing running right now.') }}</p>
+                    @else
+                        <ul class="divide-y divide-brand-ink/10">
+                            @foreach ($runningJobs as $job)
+                                <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="running-{{ $loop->index }}">
+                                    <p class="min-w-0 truncate font-mono text-xs font-semibold text-brand-ink">{{ $job['name'] ?? 'job' }}</p>
+                                    <p class="shrink-0 text-2xs text-brand-mist">
+                                        {{ $job['queue'] ?? '?' }}
+                                        @if (($job['age'] ?? null) !== null)
+                                            · {{ __('running for :s s', ['s' => (int) round((float) $job['age'])]) }}
+                                        @endif
+                                    </p>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                @else
+                    {{-- queue:work leaves no record of which job it holds; the store
+                         only knows how many are reserved. Say that plainly. --}}
+                    <div class="px-4 py-3 text-xs text-brand-moss sm:px-5">
+                        {{ __('Counts from the last sweep. Naming the job a worker is holding needs Horizon or the queue agent.') }}
+                    </div>
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($queues as $queueName => $data)
+                            <li class="flex items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="running-count-{{ $queueName }}">
+                                <span class="font-mono text-xs font-semibold text-brand-ink">{{ $queueName }}</span>
+                                <span class="text-xs text-brand-moss">{{ ($data['latest']->reserved ?? null) === null ? '—' : __(':n running', ['n' => $data['latest']->reserved]) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
                 @elseif ($activity_view === 'history')
-                @if ($jobRuns->isEmpty())
+                {{-- Without the queue agent the app's own traffic leaves nothing in
+                     dply — but Horizon keeps its recent finished jobs, so show those
+                     rather than an empty panel. --}}
+                @php($hzFinished = $runsHorizon ? collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : [])->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['completed', 'failed'], true))->values() : collect())
+                @if ($jobRuns->isEmpty() && $hzFinished->isNotEmpty())
+                    <div wire:init="pollHorizon" wire:poll.30s="pollHorizon" class="border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
+                        {{ __('From Horizon’s recent jobs. The queue agent records every run with timings and errors.') }}
+                    </div>
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($hzFinished as $job)
+                            @php($jobFailed = strtolower((string) ($job['status'] ?? '')) === 'failed')
+                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="hz-history-{{ $loop->index }}">
+                                <p class="min-w-0 truncate font-mono text-xs font-semibold {{ $jobFailed ? 'text-rose-700' : 'text-brand-ink' }}">{{ $job['name'] ?? 'job' }}</p>
+                                <p class="shrink-0 text-2xs text-brand-mist">
+                                    <span @class(['rounded-full px-1.5 py-0.5 font-semibold', 'bg-rose-100 text-rose-900' => $jobFailed, 'bg-emerald-50 text-emerald-800' => ! $jobFailed])>{{ $jobFailed ? __('failed') : __('completed') }}</span>
+                                    · {{ $job['queue'] ?? '?' }}
+                                    @if (($job['age'] ?? null) !== null)
+                                        · {{ __(':s s ago', ['s' => (int) round((float) $job['age'])]) }}
+                                    @endif
+                                </p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @elseif ($jobRuns->isEmpty())
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">

@@ -751,7 +751,7 @@ class WorkspaceQueue extends Component
     public function showActivity(string $view): void
     {
         $this->queue_workspace_tab = 'activity';
-        $this->activity_view = in_array($view, ['waiting', 'delayed', 'failed', 'history'], true) ? $view : 'waiting';
+        $this->activity_view = in_array($view, ['running', 'waiting', 'delayed', 'failed', 'history'], true) ? $view : 'waiting';
 
         // Each view pays its own way: the reads happen when their view is
         // opened, so landing on Activity does not fire SSH reads for panels
@@ -2075,6 +2075,7 @@ class WorkspaceQueue extends Component
                 'pending' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->pending ?? 0)),
                 // Failed counts are per queue now; the badge is their sum.
                 'failed' => $failedTotal = (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->failed_total ?? 0)),
+                'running' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->reserved ?? 0)),
                 'workers' => $workers->where('is_active', true)->count() + $systemdWorkers->count(),
                 'machines' => (int) $pools->sum('desired_count'),
             ],
@@ -2088,6 +2089,9 @@ class WorkspaceQueue extends Component
             'queues' => $this->mergeManagedDepths($byQueue, $managed)->sortKeys(),
             'workers' => $workers,
             'systemdWorkers' => $systemdWorkers,
+            // Horizon's own panel, and the Activity views that read what it
+            // reports, only make sense when a worker actually runs it.
+            'runsHorizon' => $workers->concat($systemdWorkers)->contains(fn ($worker): bool => str_contains(strtolower((string) $worker->command), 'horizon')),
             'failedTotal' => $newest !== null ? $failedTotal : null,
             'lastCapturedAt' => $newest?->captured_at,
         ]);
