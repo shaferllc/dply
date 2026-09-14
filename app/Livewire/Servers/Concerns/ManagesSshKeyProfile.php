@@ -158,9 +158,15 @@ trait ManagesSshKeyProfile
             return;
         }
 
-        // The same guarded path as the Sync button: it will not silently write
-        // a set that locks dply out of its own connection user.
-        $this->requestSyncAuthorizedKeys();
+        // Straight to the sync, not the Sync button's confirm step: that asks
+        // before syncing a set with no key for dply's connection user, which is
+        // this exact case (the new key is for the deploy user), and its dialog
+        // opened behind the private-key reveal — so nothing synced. It cannot
+        // lock dply out: the sync always re-writes dply's own operational key
+        // for its connection user (and the recovery key for root), and keeps
+        // every key it did not place. syncAuthorizedKeys() still refuses to
+        // start while another sync is running.
+        $this->syncAuthorizedKeys();
 
         $slug = Str::slug((string) ($this->server->name ?: $this->server->id)) ?: 'server';
 
