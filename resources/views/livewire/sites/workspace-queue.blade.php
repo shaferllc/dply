@@ -506,6 +506,14 @@
                             </div>
                         </div>
 
+                        @php($newConnection = strtolower(trim((string) $new_connection)) ?: $defaultQueueConnection)
+                        @if ($horizonRunning && ! $editing && $newConnection === 'redis')
+                            <p class="flex items-start gap-1.5 rounded-lg border border-amber-200/70 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span>{{ __('Horizon is already running workers for this app’s Redis queues — a queue:work on Redis would compete with it. Add the queue to config/horizon.php instead, or set a Connection above if this drains one Horizon can’t.') }}</span>
+                            </p>
+                        @endif
+
                         <details class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
                             <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Worker options') }}</summary>
                             <div class="mt-3 grid gap-3 sm:grid-cols-4">
@@ -589,6 +597,15 @@
                             <span class="text-xs text-brand-mist">{{ __('numprocs') }} {{ $worker->numprocs }}</span>
                         </div>
                         <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-mist">{{ $worker->command }}</p>
+                        @if (in_array((string) $worker->id, $redundantWorkerIds, true))
+                            {{-- Flagged, not blocked: a queue:work on a connection Horizon
+                                 cannot drain is legitimate, and that case is filtered out
+                                 upstream — what reaches here competes with Horizon. --}}
+                            <p class="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-amber-800">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span>{{ __('Horizon already runs workers for this app’s Redis queues, so this one is redundant — it competes with Horizon for the same jobs, outside its balancing and dashboard. Remove it unless it drains a connection Horizon can’t.') }}</span>
+                            </p>
+                        @endif
 
                         @can('update', $site)
                             <div class="mt-2 flex flex-wrap items-center gap-1.5" wire:loading.class="opacity-60" wire:target="startWorker,stopWorker,restartWorker,deleteWorker">

@@ -1877,6 +1877,25 @@ class WorkspaceQueue extends Component
     }
 
     /**
+     * A queue:work beside a running Horizon, on a Redis connection. Horizon
+     * already runs workers for this app's Redis queues, so this one competes
+     * with them for the same jobs, outside Horizon's balancing and dashboard.
+     * One on another connection — database, SQS — drains what Horizon cannot
+     * and is not flagged. Flagged only: never blocked, never removed.
+     */
+    public static function drainsRedisBesideHorizon(string $command, ?string $defaultConnection): bool
+    {
+        if (! QueueWorkerClassifier::isQueueWorker($command) || str_contains(strtolower($command), 'horizon')) {
+            return false;
+        }
+
+        // No connection argument means the app's default connection.
+        $connection = QueueWorkerCommand::parse($command)->connection ?? $defaultConnection;
+
+        return strtolower(trim((string) $connection)) === 'redis';
+    }
+
+    /**
      * Move this site's systemd workers onto Supervisor.
      *
      * WorkerDaemonBackend::ensure() starts each command as a Supervisor program,
@@ -2048,6 +2067,19 @@ class WorkspaceQueue extends Component
 
         $pools = $this->site->attachedWorkerPools();
 
+        // Horizon or queue:work on Redis — one or the other. Computed once here
+        // rather than per row: workers() is a query.
+        $horizonRunning = $workers->concat($systemdWorkers)
+            ->contains(fn ($worker): bool => (bool) $worker->is_active && str_contains(strtolower((string) $worker->command), 'horizon'));
+        $defaultQueueConnection = SiteQueueConfiguration::for($this->site)->connection;
+        $redundantWorkerIds = $horizonRunning
+            ? $workers
+                ->filter(fn (SupervisorProgram $worker): bool => self::drainsRedisBesideHorizon((string) $worker->command, $defaultQueueConnection))
+                ->map(fn (SupervisorProgram $worker): string => (string) $worker->id)
+                ->values()
+                ->all()
+            : [];
+
         return view('livewire.sites.workspace-queue', [
             // The check nothing on the box can make: a worker against `sync`
             // consumes nothing while every other reading looks healthy.
@@ -2100,6 +2132,9 @@ class WorkspaceQueue extends Component
             // Horizon's own panel, and the Activity views that read what it
             // reports, only make sense when a worker actually runs it.
             'runsHorizon' => $workers->concat($systemdWorkers)->contains(fn ($worker): bool => str_contains(strtolower((string) $worker->command), 'horizon')),
+            'horizonRunning' => $horizonRunning,
+            'defaultQueueConnection' => $defaultQueueConnection,
+            'redundantWorkerIds' => $redundantWorkerIds,
             'failedTotal' => $newest !== null ? $failedTotal : null,
             'lastCapturedAt' => $newest?->captured_at,
         ]);
