@@ -1955,7 +1955,7 @@ class WorkspaceQueue extends Component
     private function mergeManagedDepths(Collection $byQueue, array $managed): Collection
     {
         foreach ($managed as $queue => $depth) {
-            $existing = (array) $byQueue->get($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+            $existing = (array) $byQueue->get($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0]);
 
             $existing['latest'] = new SiteQueueSnapshot([
                 'site_id' => $this->site->id,
@@ -1980,27 +1980,37 @@ class WorkspaceQueue extends Component
     {
         $since = now()->subHours(max(1, $this->window_hours));
 
-        $snapshots = SiteQueueSnapshot::query()
+        $window = SiteQueueSnapshot::query()
             ->where('site_id', $this->site->id)
-            ->where('captured_at', '>=', $since)
-            ->orderByDesc('captured_at')
-            ->limit(2000)
-            ->get();
+            ->where('captured_at', '>=', $since);
 
         // One card per queue: newest reading, plus the window's peak so a
-        // backlog that has already drained is still visible. A queue seen in
-        // history but with no worker now is the interesting case, so the list
-        // is built from BOTH sources rather than from the workers alone.
-        $byQueue = $snapshots->groupBy('queue')->map(function (Collection $rows): array {
-            $latest = $rows->first();
+        // backlog that has already drained is still visible. Both come from
+        // SQL: loading every sample was capped at 2000 rows, which cut the
+        // window short — and PEAK with it — on any site with ~7+ queues.
+        $latestRows = (clone $window)
+            ->selectRaw('distinct on (queue) *')
+            ->orderBy('queue')
+            ->orderByDesc('captured_at')
+            ->get();
 
-            return [
-                'latest' => $latest,
-                'peak_pending' => (int) $rows->max('pending'),
-                'samples' => $rows->count(),
-                'trend' => $rows->sortBy('captured_at')->pluck('pending')->all(),
-            ];
-        });
+        $stats = (clone $window)
+            ->selectRaw('queue, max(pending) as peak_pending, count(*) as samples')
+            ->groupBy('queue')
+            ->toBase()
+            ->get()
+            ->keyBy('queue');
+
+        // A queue seen in history but with no worker now is the interesting
+        // case, so the list is built from BOTH sources rather than from the
+        // workers alone — which is why `latest` may be null further down.
+        $byQueue = $latestRows->keyBy('queue')->toBase()->map(fn (?SiteQueueSnapshot $latest, string $queue): array => [
+            'latest' => $latest,
+            'peak_pending' => (int) ($stats->get($queue)->peak_pending ?? 0),
+            'samples' => (int) ($stats->get($queue)->samples ?? 0),
+        ]);
+
+        $newest = $latestRows->sortByDesc('captured_at')->first();
 
         $workers = $this->workers();
         $systemdWorkers = $this->systemdWorkers();
@@ -2012,7 +2022,7 @@ class WorkspaceQueue extends Component
                 if ($queue !== '' && ! $byQueue->has($queue)) {
                     // Declared by a worker but never sampled — the sweep has not
                     // run yet, or it could not read this site.
-                    $byQueue->put($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+                    $byQueue->put($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0]);
                 }
             }
         }
@@ -2035,7 +2045,7 @@ class WorkspaceQueue extends Component
                     ->notDismissed()
                     ->orderByDesc('created_at')
                     ->first(),
-            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers->concat($systemdWorkers), $pools, $snapshots->first()),
+            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers->concat($systemdWorkers), $pools, $newest),
             // Jobs that actually RAN. Only the in-app agent can supply these:
             // a processed job leaves nothing behind in the store.
             'jobRuns' => SiteQueueJobRun::query()
@@ -2052,7 +2062,8 @@ class WorkspaceQueue extends Component
             'queueStats' => [
                 'queues' => $byQueue->count(),
                 'pending' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->pending ?? 0)),
-                'failed' => (int) ($snapshots->first()?->failed_total ?? 0),
+                // Failed counts are per queue now; the badge is their sum.
+                'failed' => $failedTotal = (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->failed_total ?? 0)),
                 'workers' => $workers->where('is_active', true)->count() + $systemdWorkers->count(),
                 'machines' => (int) $pools->sum('desired_count'),
             ],
@@ -2066,8 +2077,8 @@ class WorkspaceQueue extends Component
             'queues' => $this->mergeManagedDepths($byQueue, $managed)->sortKeys(),
             'workers' => $workers,
             'systemdWorkers' => $systemdWorkers,
-            'failedTotal' => $snapshots->first()?->failed_total,
-            'lastCapturedAt' => $snapshots->first()?->captured_at,
+            'failedTotal' => $newest !== null ? $failedTotal : null,
+            'lastCapturedAt' => $newest?->captured_at,
         ]);
     }
 }

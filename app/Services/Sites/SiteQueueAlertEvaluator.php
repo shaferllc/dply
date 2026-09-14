@@ -48,7 +48,6 @@ final class SiteQueueAlertEvaluator
             ->where('site_id', $site->id)
             ->where('captured_at', '>=', now()->subMinutes($window + 5))
             ->orderByDesc('captured_at')
-            ->limit(2000)
             ->get()
             ->groupBy('queue');
 

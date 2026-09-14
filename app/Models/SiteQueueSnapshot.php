@@ -18,9 +18,11 @@ use Illuminate\Support\Carbon;
  * @property string $queue
  * @property string $source
  * @property ?int $pending
+ * @property ?int $delayed
  * @property ?int $reserved
  * @property ?int $failed_total
  * @property ?int $oldest_pending_age_s
+ * @property ?int $time_to_clear_s
  * @property ?int $worker_processes
  * @property Carbon $captured_at
  */
@@ -40,9 +42,11 @@ class SiteQueueSnapshot extends Model
         'queue',
         'source',
         'pending',
+        'delayed',
         'reserved',
         'failed_total',
         'oldest_pending_age_s',
+        'time_to_clear_s',
         'worker_processes',
         'captured_at',
     ];
@@ -51,9 +55,11 @@ class SiteQueueSnapshot extends Model
     {
         return [
             'pending' => 'integer',
+            'delayed' => 'integer',
             'reserved' => 'integer',
             'failed_total' => 'integer',
             'oldest_pending_age_s' => 'integer',
+            'time_to_clear_s' => 'integer',
             'worker_processes' => 'integer',
             'captured_at' => 'datetime',
         ];

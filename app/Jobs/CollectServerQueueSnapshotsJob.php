@@ -271,30 +271,56 @@ PHP;
     /**
      * Separate from the boot so a test can run it against a booted app.
      *
-     * Horizon's workload rows are ARRAYS; `$w->length` on one reads null, which
-     * `?? 0` then stored as a confident zero — every Horizon queue read empty
-     * and workerless. `$g` reads either shape, and a field Horizon did not
-     * answer stays null rather than becoming a zero.
+     * Depth comes from the framework for every site — `pendingSize`,
+     * `delayedSize`, `reservedSize` and the oldest job's creation time exist on
+     * every driver in current Laravel, so Horizon and plain queue:work sites
+     * share one definition of "pending" and "oldest". An older app lacks them
+     * and those fields stay null. Horizon adds only what it alone knows: its
+     * process count and its time-to-clear estimate.
+     *
+     * Horizon's workload rows are ARRAYS; reading them as objects once stored a
+     * confident zero for every Horizon queue. A field nobody answered stays
+     * null, never zero.
      */
     private function readPhp(): string
     {
-        return <<<'PHP'
-$g = fn ($o, $k) => is_array($o) ? ($o[$k] ?? null) : ($o->$k ?? null);
+        return CollectWorkerPoolHorizonSnapshotJob::READ_EITHER_SHAPE_PHP."\n".<<<'PHP'
 $horizon = $T(fn () => class_exists(\Laravel\Horizon\Horizon::class), false);
-$workload = $horizon ? $T(fn () => collect(app(\Laravel\Horizon\Contracts\WorkloadRepository::class)->get())->keyBy(fn ($w) => (string) $g($w, 'name')), null) : null;
-$failed = $T(fn () => (int) app('queue.failer')->count(), null);
+// Horizon's own queue list, so a bare `php artisan horizon` samples every queue
+// in config/horizon.php rather than only `default`. A grouped workload
+// (`high,default`) names its members in split_queues; each is drained by the
+// group's processes, which is what the no-worker rule needs to know.
+$workload = [];
+foreach (($horizon ? $T(fn () => app(\Laravel\Horizon\Contracts\WorkloadRepository::class)->get(), []) : []) as $w) {
+    $split = $g($w, 'split_queues');
+    foreach (($split ? collect($split)->all() : [$w]) as $part) {
+        $workload[(string) $g($part, 'name')] = ['processes' => $g($w, 'processes'), 'wait' => $g($part, 'wait')];
+    }
+}
+$conn = $T(fn () => app('queue')->connection());
+$ask = fn (string $method, string $queue) => $conn !== null && method_exists($conn, $method) ? $T(fn () => $conn->$method($queue)) : null;
+$failer = $T(fn () => app('queue.failer'));
+// An older failer's count() takes no queue; passed one anyway it would report
+// the site's total as every queue's.
+$perQueueFailed = $T(fn () => (new \ReflectionMethod($failer, 'count'))->getNumberOfParameters() >= 2, false);
 $rows = [];
-foreach ((array) $in['queues'] as $queue) {
-    $w = $workload?->get($queue);
+foreach (array_values(array_unique([...(array) $in['queues'], ...array_keys($workload)])) as $queue) {
+    $w = $workload[$queue] ?? null;
+    $oldest = $ask('creationTimeOfOldestPendingJob', $queue);
     $rows[] = [
         'queue' => $queue,
         'source' => $w !== null ? 'horizon' : 'artisan',
-        'pending' => $w !== null ? $g($w, 'length') : $T(fn () => (int) \Illuminate\Support\Facades\Queue::size($queue), null),
-        'oldest_pending_age_s' => $w !== null ? $g($w, 'wait') : null,
-        'worker_processes' => $w !== null ? $g($w, 'processes') : null,
+        'pending' => $ask('pendingSize', $queue) ?? $T(fn () => \Illuminate\Support\Facades\Queue::size($queue)),
+        'delayed' => $ask('delayedSize', $queue),
+        'reserved' => $ask('reservedSize', $queue),
+        // Both clocks are this box's: the job was stamped by this app.
+        'oldest_pending_age_s' => is_numeric($oldest) ? max(0, time() - (int) $oldest) : null,
+        'time_to_clear_s' => $w['wait'] ?? null,
+        'worker_processes' => $w['processes'] ?? null,
+        'failed' => $perQueueFailed ? $T(fn () => $failer->count(null, $queue)) : null,
     ];
 }
-echo 'DPLY_Q_START'.json_encode(['site_id' => $in['site_id'], 'failed_total' => $failed, 'queues' => $rows])."DPLY_Q_END\n";
+echo 'DPLY_Q_START'.json_encode(['site_id' => $in['site_id'], 'queues' => $rows])."DPLY_Q_END\n";
 PHP;
     }
 
@@ -423,9 +449,12 @@ PHP;
                     'queue' => $row['queue'],
                     'source' => $source,
                     'pending' => $this->int($row['pending'] ?? null),
+                    'delayed' => $this->int($row['delayed'] ?? null),
+                    'reserved' => $this->int($row['reserved'] ?? null),
                     'oldest_pending_age_s' => $this->int($row['oldest_pending_age_s'] ?? null),
+                    'time_to_clear_s' => $this->int($row['time_to_clear_s'] ?? null),
                     'worker_processes' => $processes,
-                    'failed_total' => $this->int($payload['failed_total'] ?? null),
+                    'failed_total' => $this->int($row['failed'] ?? null),
                     'captured_at' => $capturedAt,
                 ]);
             }

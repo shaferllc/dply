@@ -63,11 +63,19 @@ function processesFor(Site $site, string $queue): ?int
 test('the on-box read reports Horizon array workloads as real numbers, not zeros', function () {
     // Horizon hands back workload rows as arrays. Reading them as objects stored
     // pending 0 / processes 0 for every Horizon queue while Horizon itself said 15.
+    // `high,low` is a grouped workload: only Horizon knows about it (no worker
+    // declares it), and each member queue is drained by the group's processes.
     app()->instance(WorkloadRepository::class, new class implements WorkloadRepository
     {
         public function get()
         {
-            return [['name' => 'default', 'length' => 5, 'wait' => 12.4, 'processes' => 15, 'split_queues' => null]];
+            return [
+                ['name' => 'default', 'length' => 5, 'wait' => 12.4, 'processes' => 15, 'split_queues' => null],
+                ['name' => 'high,low', 'length' => 7, 'wait' => 9.0, 'processes' => 4, 'split_queues' => [
+                    ['name' => 'high', 'length' => 3, 'wait' => 2.0],
+                    ['name' => 'low', 'length' => 4, 'wait' => 9.0],
+                ]],
+            ];
         }
     });
 
@@ -82,10 +90,16 @@ test('the on-box read reports Horizon array workloads as real numbers, not zeros
 
     $rows = collect((new ReflectionMethod($job, 'extract'))->invoke($job, $out)[0]['queues'])->keyBy('queue');
 
-    expect($rows['default'])->toMatchArray(['source' => 'horizon', 'pending' => 5, 'oldest_pending_age_s' => 12.4, 'worker_processes' => 15])
-        // Not in Horizon's workload: falls back to the framework, and the
-        // process count is left for the process manager to answer.
-        ->and($rows['emails'])->toMatchArray(['source' => 'artisan', 'worker_processes' => null]);
+    // Depth is the framework's on every site; Horizon adds processes and its
+    // time-to-clear estimate, which is no longer passed off as the oldest age.
+    expect($rows['default'])->toMatchArray(['source' => 'horizon', 'time_to_clear_s' => 12.4, 'worker_processes' => 15])
+        ->and($rows['default']['pending'])->toBeInt()
+        ->and($rows['high'])->toMatchArray(['source' => 'horizon', 'time_to_clear_s' => 2.0, 'worker_processes' => 4])
+        ->and($rows['low'])->toMatchArray(['source' => 'horizon', 'time_to_clear_s' => 9.0, 'worker_processes' => 4])
+        ->and($rows)->not->toHaveKey('high,low')
+        // Not in Horizon's workload: the process count is left for the
+        // process manager to answer, and there is no Horizon estimate.
+        ->and($rows['emails'])->toMatchArray(['source' => 'artisan', 'worker_processes' => null, 'time_to_clear_s' => null]);
 });
 
 test('running supervisor processes are credited to every queue the program drains', function () {
@@ -106,6 +120,24 @@ test('running supervisor processes are credited to every queue the program drain
 
     expect(processesFor($site, 'high'))->toBe(2)
         ->and(processesFor($site, 'default'))->toBe(2);
+});
+
+test('each queue row keeps its own running, delayed and failed counts', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work --queue=emails,default');
+
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [
+        ['queue' => 'emails', 'source' => 'horizon', 'pending' => 2, 'delayed' => 5, 'reserved' => 1, 'oldest_pending_age_s' => 40, 'time_to_clear_s' => 7.6, 'worker_processes' => 3, 'failed' => 9],
+        ['queue' => 'default', 'source' => 'horizon', 'pending' => 0, 'delayed' => null, 'reserved' => 0, 'oldest_pending_age_s' => null, 'time_to_clear_s' => 0, 'worker_processes' => 3, 'failed' => 1],
+    ]);
+
+    $rows = SiteQueueSnapshot::query()->where('site_id', $site->id)->get()->keyBy('queue');
+
+    expect($rows['emails']->only(['delayed', 'reserved', 'oldest_pending_age_s', 'time_to_clear_s', 'failed_total']))
+        ->toBe(['delayed' => 5, 'reserved' => 1, 'oldest_pending_age_s' => 40, 'time_to_clear_s' => 8, 'failed_total' => 9])
+        // The failer's count is per queue now, not the site's total on every row.
+        ->and($rows['default']->failed_total)->toBe(1)
+        ->and($rows['default']->delayed)->toBeNull();
 });
 
 test('jobs waiting behind a stopped worker page no_worker', function () {

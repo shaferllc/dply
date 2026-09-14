@@ -336,6 +336,17 @@
                                 </p>
                             @elseif ($latest)
                                 <p class="text-xs text-brand-mist">
+                                    @if ($latest->reserved !== null)
+                                        {{ __(':r running', ['r' => $latest->reserved]) }} ·
+                                    @endif
+                                    @if ($latest->delayed)
+                                        {{ __(':d delayed', ['d' => $latest->delayed]) }} ·
+                                    @endif
+                                    {{-- Horizon's estimate of how long the backlog takes to
+                                         drain — not the oldest job's age, which is OLDEST WAIT. --}}
+                                    @if ($latest->time_to_clear_s !== null)
+                                        {{ __('clears in ~:ss', ['s' => $latest->time_to_clear_s]) }} ·
+                                    @endif
                                     {{ __('source') }} {{ $latest->source }} ·
                                     {{ trans_choice(':count sample|:count samples', $data['samples'], ['count' => $data['samples']]) }}
                                 </p>
