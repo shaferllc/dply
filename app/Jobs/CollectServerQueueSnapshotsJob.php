@@ -373,18 +373,49 @@ $horizon = $T(fn () => class_exists(\Laravel\Horizon\Horizon::class), false);
 // processes, and this page is about one server. A master is named
 // `<basename>-<4-char token>`; each of its supervisors records
 // `connection:queue => processes`, where a pool's queue may be `high,default`.
+//
+// Hostname alone cannot separate two apps on ONE box that share Redis and a
+// Horizon prefix (it defaults to slug(APP_NAME)): each sees the other's
+// supervisors. So a supervisor counts only if THIS app's own Horizon config
+// runs it — Horizon's ProvisioningPlan, resolved the way Horizon deploys it:
+// the first environment pattern matching app()->environment(). Anything else
+// on this box is another app's, reported so the page can say so.
+$configured = [];
+if ($horizon) {
+    $env = (string) $T(fn () => app()->environment(), '');
+    foreach ((array) $T(fn () => \Laravel\Horizon\ProvisioningPlan::get('dply')->toSupervisorOptions(), []) as $pattern => $supervisors) {
+        if (! \Illuminate\Support\Str::is((string) $pattern, $env)) {
+            continue;
+        }
+        // Each environment's supervisors come back as a Collection; (array) on
+        // one yields its internal properties, not its items.
+        foreach (collect($supervisors)->all() as $name => $options) {
+            $configured[(string) $name] = array_values(array_filter(array_map('trim', explode(',', (string) $g($options, 'queue')))));
+        }
+        break;
+    }
+}
 $local = [];
+$foreign = [];
 if ($horizon) {
     $base = (string) $T(fn () => \Laravel\Horizon\MasterSupervisor::basename(), '');
     foreach ($T(fn () => app(\Laravel\Horizon\Contracts\SupervisorRepository::class)->all(), []) as $s) {
-        if ($base === '' || ! preg_match('/^'.preg_quote($base, '/').'-[A-Za-z0-9]{4}$/', (string) $g($s, 'master'))) {
+        $master = (string) $g($s, 'master');
+        if ($base === '' || ! preg_match('/^'.preg_quote($base, '/').'-[A-Za-z0-9]{4}$/', $master)) {
             continue;
         }
+        $short = substr((string) $g($s, 'name'), strlen($master) + 1);
         foreach ((array) $g($s, 'processes') as $pool => $count) {
             foreach (explode(',', (string) (explode(':', (string) $pool, 2)[1] ?? '')) as $q) {
-                if (($q = trim($q)) !== '') {
-                    $local[$q] = ($local[$q] ?? 0) + (int) $count;
+                if (($q = trim($q)) === '') {
+                    continue;
                 }
+                // Unreadable config: fall back to the hostname match alone.
+                if ($configured !== [] && ! in_array($q, $configured[$short] ?? [], true)) {
+                    $foreign[$q] = true;
+                    continue;
+                }
+                $local[$q] = ($local[$q] ?? 0) + (int) $count;
             }
         }
     }
@@ -430,7 +461,7 @@ foreach (array_values(array_unique([...(array) $in['queues'], ...array_keys($wor
         'last_failure' => is_string($lastFailure) ? mb_substr($lastFailure, 0, 250) : null,
     ];
 }
-echo 'DPLY_Q_START'.json_encode(['site_id' => $in['site_id'], 'queues' => $rows])."DPLY_Q_END\n";
+echo 'DPLY_Q_START'.json_encode(['site_id' => $in['site_id'], 'queues' => $rows, 'horizon_foreign' => array_keys($foreign)])."DPLY_Q_END\n";
 PHP;
     }
 
@@ -529,6 +560,7 @@ PHP;
     {
         $capturedAt = now();
         $touchedSiteIds = [];
+        $sharing = [];
 
         foreach ($payloads as $payload) {
             $siteId = (string) ($payload['site_id'] ?? '');
@@ -538,6 +570,7 @@ PHP;
             }
 
             $touchedSiteIds[] = $siteId;
+            $sharing[$siteId] = $payload['horizon_foreign'] ?? null;
 
             foreach ((array) ($payload['queues'] ?? []) as $row) {
                 if (! is_array($row) || ! is_string($row['queue'] ?? null)) {
@@ -573,7 +606,31 @@ PHP;
             }
         }
 
+        $this->storeHorizonSharing($sharing);
         $this->evaluateAlerts($touchedSiteIds);
+    }
+
+    /**
+     * Remember when another app's Horizon supervisors appear under this app's
+     * Horizon keys, so the page can say why Horizon's own numbers look wrong.
+     * Written only on change: this runs every five minutes for every site.
+     *
+     * @param  array<string, mixed>  $sharing  site id => the other app's queues
+     */
+    private function storeHorizonSharing(array $sharing): void
+    {
+        if ($sharing === []) {
+            return;
+        }
+
+        foreach (Site::query()->whereIn('id', array_keys($sharing))->get() as $site) {
+            $queues = $sharing[$site->id] ?? null;
+            $queues = is_array($queues) && $queues !== [] ? array_values(array_map('strval', $queues)) : null;
+
+            if (data_get($site->meta, 'queue_horizon_shared') !== $queues) {
+                $site->putMeta('queue_horizon_shared', $queues);
+            }
+        }
     }
 
     /**

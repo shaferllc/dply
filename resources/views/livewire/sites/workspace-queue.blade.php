@@ -228,6 +228,15 @@
                                 {{ __('Reading Horizon from the box…') }}
                             @endif
                         </p>
+                        {{-- Two apps on one box sharing Redis and a Horizon prefix
+                             see each other's supervisors, jobs and metrics. dply's
+                             cards filter the other app out; Horizon cannot. --}}
+                        @php($sharedWith = array_values((array) ($site->meta['queue_horizon_shared'] ?? [])))
+                        @if ($sharedWith !== [])
+                            <p class="mt-0.5 text-2xs font-semibold text-amber-800">
+                                {{ __('Another app on this server shares this app’s Horizon keys in Redis (it runs :q), so Horizon’s own counts and dashboard mix the two. Set a unique HORIZON_PREFIX in this app’s .env.', ['q' => implode(', ', array_slice($sharedWith, 0, 6))]) }}
+                            </p>
+                        @endif
                         @if (! empty($hz['error']))
                             <p class="mt-0.5 text-2xs text-amber-800">{{ __('Last refresh failed: :e', ['e' => \Illuminate\Support\Str::limit((string) $hz['error'], 160)]) }}</p>
                         @endif
