@@ -4,7 +4,7 @@ namespace App\Models;
 
 use App\Enums\ServerProvider;
 use App\Enums\SiteType;
-use App\Livewire\Servers\WorkspaceOverview;
+use App\Jobs\ResizeServerJob;
 use App\Modules\Certificates\Services\WildcardCertificateIssuer;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Support\Hosts\HostCapabilities;
@@ -108,7 +108,7 @@ class Server extends Model
     public const STATUS_DISCONNECTED = 'disconnected';
 
     /**
-     * Mid-resize at the provider. Transient and self-clearing: {@see \App\Jobs\ResizeServerJob}
+     * Mid-resize at the provider. Transient and self-clearing: {@see ResizeServerJob}
      * stashes the prior status in meta['resize']['previous_status'] and restores
      * it when the sequence ends, however it ends.
      *
@@ -1293,6 +1293,29 @@ class Server extends Model
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * The account a PERSON should SSH in as — for every "copy this command" in
+     * the UI. dply-provisioned boxes get a deploy user
+     * (server_provision.deploy_ssh_user, `dply`), but a server whose record
+     * still says root — it had no dedicated operational key when provisioning
+     * finished — kept root, so human-facing commands knocked on root.
+     * `dply:server:ssh` already defaults to the deploy user; this is that rule
+     * for the web UI. A real non-root ssh_user (ubuntu on AWS, an Azure admin)
+     * is the login as-is. Not dply's own connection user: that stays ssh_user.
+     */
+    public function loginUser(): string
+    {
+        $user = trim((string) $this->ssh_user);
+
+        if ($user !== '' && $user !== 'root') {
+            return $user;
+        }
+
+        $deploy = trim((string) config('server_provision.deploy_ssh_user', 'dply'));
+
+        return $deploy !== '' ? $deploy : 'root';
     }
 
     public function getSshConnectionString(): string

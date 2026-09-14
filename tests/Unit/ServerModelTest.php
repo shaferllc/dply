@@ -38,6 +38,15 @@ test('get ssh connection string uses placeholder when no ip', function () {
     expect($server->getSshConnectionString())->toBe('root@0.0.0.0');
 });
 
+test('a person logs in as the deploy user, not root', function () {
+    // A record left on root (no dedicated operational key at provision time)
+    // still gets the deploy user for human-facing commands.
+    expect(Server::factory()->make(['ssh_user' => 'root'])->loginUser())->toBe(config('server_provision.deploy_ssh_user', 'dply'))
+        ->and(Server::factory()->make(['ssh_user' => ''])->loginUser())->toBe(config('server_provision.deploy_ssh_user', 'dply'))
+        // A real non-root login (ubuntu on AWS, an Azure admin) is kept as-is.
+        ->and(Server::factory()->make(['ssh_user' => 'ubuntu'])->loginUser())->toBe('ubuntu');
+});
+
 test('servers table has dual key columns', function () {
     expect(Schema::hasColumn('servers', 'ssh_operational_private_key'))->toBeTrue();
     expect(Schema::hasColumn('servers', 'ssh_recovery_private_key'))->toBeTrue();

@@ -114,7 +114,9 @@
                         $tunnelCmds = [];
                         if ($s->private_ip_address) {
                             $localPort = 15400;
-                            $sshUser = trim((string) $s->ssh_user) !== '' ? trim((string) $s->ssh_user) : 'deploy';
+                            // The deploy user, not root — and never 'deploy', which dply
+                            // does not create. See Server::loginUser().
+                            $sshUser = $s->loginUser();
                             foreach ($sEngines as $eng) {
                                 $tunnelCmds[] = [
                                     'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' '.$eng->port.' → localhost:'.$localPort,

@@ -31,6 +31,9 @@ test('the server SSH button can offer one chosen key instead of the whole agent'
 
     $this->actingAs($user)
         ->blade('<x-server-workspace-shell :server="$server">Body</x-server-workspace-shell>', ['server' => $server])
+        // The deploy user, not the root the record was created with.
+        ->assertSee('dply@203.0.113.7')
+        ->assertDontSee('root@203.0.113.7')
         ->assertSee('Set your SSH key')
         ->assertSee('ssh -o IdentitiesOnly=yes -i', false)
         ->assertSee('dply.sshKeyPath', false)
