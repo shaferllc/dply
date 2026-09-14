@@ -10,6 +10,7 @@ use App\Models\SiteQueueSnapshot;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\Sites\SiteQueueAlertRules;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Turn the five-minute depth sweep into "somebody should look at this".
@@ -26,6 +27,14 @@ use Illuminate\Support\Collection;
  */
 final class SiteQueueAlertEvaluator
 {
+    /**
+     * Consecutive failed reads before anyone is paged. One dropped SSH
+     * connection is noise; two sweeps in a row is ten minutes of blindness.
+     */
+    public const UNREADABLE_AFTER_FAILURES = 2;
+
+    private const UNREADABLE_KEY = '*|unreadable';
+
     public function __construct(private readonly NotificationPublisher $publisher) {}
 
     public function evaluate(Site $site): void
@@ -48,12 +57,16 @@ final class SiteQueueAlertEvaluator
             ->where('site_id', $site->id)
             ->where('captured_at', '>=', now()->subMinutes($window + 5))
             ->orderByDesc('captured_at')
-            ->limit(2000)
             ->get()
             ->groupBy('queue');
 
+        $paused = array_keys((array) data_get($site->meta, 'queue_paused', []));
         $state = (array) ($stored['state'] ?? []);
         $changed = false;
+
+        // Being here means the sweep just read this site: that is the
+        // recovery for an unreadable alert.
+        $this->step($state, self::UNREADABLE_KEY, false, $changed);
 
         foreach ($rows as $queue => $samples) {
             $rules = SiteQueueAlertRules::for($site, (string) $queue);
@@ -62,45 +75,85 @@ final class SiteQueueAlertEvaluator
                 continue;
             }
 
-            foreach ($this->rulesFor($rules, $samples, $window) as $rule => $fired) {
-                $key = $queue.'|'.$rule;
-                $active = isset($state[$key]);
+            $isPaused = in_array((string) $queue, $paused, true);
 
-                if (! $fired) {
-                    if ($active) {
-                        // Recovered. Clearing the marker is what makes the NEXT
-                        // occurrence a fresh alert rather than a silent repeat.
-                        unset($state[$key]);
-                        $changed = true;
-                    }
-
-                    continue;
+            foreach ($this->rulesFor($rules, $samples, $window, $isPaused) as $rule => $fired) {
+                if ($this->step($state, $queue.'|'.$rule, $fired, $changed)) {
+                    $this->publish($site, (string) $queue, $rule, $samples, $window, $rules);
                 }
-
-                if ($active && ! $this->cooledDown((string) $state[$key])) {
-                    continue;
-                }
-
-                $state[$key] = now()->toIso8601String();
-                $changed = true;
-
-                $this->publish($site, (string) $queue, $rule, $samples->first(), $rules);
             }
         }
 
         if ($changed) {
-            $meta = is_array($site->meta) ? $site->meta : [];
             $stored['state'] = $state;
-            $meta['queue_alerts'] = $stored;
-            $site->forceFill(['meta' => $meta])->save();
+            $site->putMeta('queue_alerts', $stored);
         }
+    }
+
+    /**
+     * The sweep could not read this site — SSH failed, or the app did not
+     * answer. Silence used to read as health; after enough misses in a row it
+     * pages instead.
+     */
+    public function evaluateUnreadable(Site $site): void
+    {
+        $stored = (array) data_get($site->meta, 'queue_alerts', []);
+
+        if (($stored['enabled'] ?? true) === false) {
+            return;
+        }
+
+        $error = (array) data_get($site->meta, 'queue_read_error', []);
+        $state = (array) ($stored['state'] ?? []);
+        $changed = false;
+
+        $fired = (int) ($error['failures'] ?? 0) >= self::UNREADABLE_AFTER_FAILURES;
+
+        if ($this->step($state, self::UNREADABLE_KEY, $fired, $changed)) {
+            $this->publishUnreadable($site, (string) ($error['error'] ?? ''));
+        }
+
+        if ($changed) {
+            $stored['state'] = $state;
+            $site->putMeta('queue_alerts', $stored);
+        }
+    }
+
+    /**
+     * Advance one rule's state; true when it should notify now.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function step(array &$state, string $key, bool $fired, bool &$changed): bool
+    {
+        $active = isset($state[$key]);
+
+        if (! $fired) {
+            if ($active) {
+                // Recovered. Clearing the marker is what makes the NEXT
+                // occurrence a fresh alert rather than a silent repeat.
+                unset($state[$key]);
+                $changed = true;
+            }
+
+            return false;
+        }
+
+        if ($active && ! $this->cooledDown((string) $state[$key])) {
+            return false;
+        }
+
+        $state[$key] = now()->toIso8601String();
+        $changed = true;
+
+        return true;
     }
 
     /**
      * @param  Collection<int, SiteQueueSnapshot>  $samples
      * @return array<string, bool>
      */
-    private function rulesFor(SiteQueueAlertRules $rules, Collection $samples, int $window): array
+    private function rulesFor(SiteQueueAlertRules $rules, Collection $samples, int $window, bool $isPaused): array
     {
         $latest = $samples->first();
 
@@ -108,20 +161,30 @@ final class SiteQueueAlertEvaluator
             return [];
         }
 
-        $sustained = $samples
-            ->filter(fn (SiteQueueSnapshot $s): bool => $s->captured_at >= now()->subMinutes($window))
-            ->values();
+        $sustained = $this->within($samples, $window);
 
         return [
+            // A burst of failures — the shape of a deploy that broke every
+            // job. Counted from the failer's own total, so retrying or
+            // clearing failed jobs reads as zero new failures, never as news.
+            'failures' => $rules->failuresAtLeast !== null
+                && $this->newFailures($sustained) >= $rules->failuresAtLeast,
+
             // Jobs waiting and nothing draining them: the one failure that is
-            // wrong at any depth, any hour, on any site.
+            // wrong at any depth, any hour, on any site. Null processes means
+            // the count could not be read — unknown is not zero, and paging on
+            // it told every healthy queue:work site it had no worker. A paused
+            // queue has no worker because someone stopped it on purpose.
             'no_worker' => $rules->noWorker
+                && ! $isPaused
                 && (int) ($latest->pending ?? 0) > 0
-                && (int) ($latest->worker_processes ?? 0) === 0,
+                && $latest->worker_processes !== null
+                && (int) $latest->worker_processes === 0,
 
             // Deep AND staying deep. Requiring every sample in the window to be
             // over the line means a burst that drains does not page anyone;
             // two samples minimum, so a single reading cannot look sustained.
+            // Still applies while paused: a pause that keeps filling is news.
             'backlog' => $rules->pendingOver !== null
                 && $sustained->count() >= 2
                 && $sustained->every(fn (SiteQueueSnapshot $s): bool => (int) ($s->pending ?? 0) > $rules->pendingOver),
@@ -133,6 +196,35 @@ final class SiteQueueAlertEvaluator
         ];
     }
 
+    /**
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     * @return Collection<int, SiteQueueSnapshot>
+     */
+    private function within(Collection $samples, int $window): Collection
+    {
+        return $samples
+            ->filter(fn (SiteQueueSnapshot $s): bool => $s->captured_at >= now()->subMinutes($window))
+            ->values();
+    }
+
+    /**
+     * Failures added between the oldest and newest sample in the window. A
+     * total that went down was retried or cleared, which is zero new ones.
+     *
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     */
+    private function newFailures(Collection $samples): int
+    {
+        $newest = $samples->first()?->failed_total;
+        $oldest = $samples->last()?->failed_total;
+
+        if ($samples->count() < 2 || $newest === null || $oldest === null) {
+            return 0;
+        }
+
+        return max(0, $newest - $oldest);
+    }
+
     private function cooledDown(string $firedAt): bool
     {
         $minutes = max(5, (int) config('dply.queue_alerts.cooldown_minutes', 60));
@@ -140,15 +232,26 @@ final class SiteQueueAlertEvaluator
         return strtotime($firedAt) < now()->subMinutes($minutes)->getTimestamp();
     }
 
-    private function publish(Site $site, string $queue, string $rule, ?SiteQueueSnapshot $latest, SiteQueueAlertRules $rules): void
+    /**
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     */
+    private function publish(Site $site, string $queue, string $rule, Collection $samples, int $window, SiteQueueAlertRules $rules): void
     {
         if ($site->organization === null) {
             return;
         }
 
+        $latest = $samples->first();
         $pending = (int) ($latest->pending ?? 0);
 
         [$title, $body] = match ($rule) {
+            'failures' => [
+                __('Jobs are failing on :q on :site', ['q' => $queue, 'site' => $site->name]),
+                trim(__(':n job(s) failed in the last :m minutes.', [
+                    'n' => $this->newFailures($this->within($samples, $window)),
+                    'm' => $window,
+                ]).' '.($latest?->last_failure !== null ? __('Latest: :e', ['e' => $latest->last_failure]) : '')),
+            ],
             'no_worker' => [
                 __('Queue :q on :site has no worker', ['q' => $queue, 'site' => $site->name]),
                 __(':n job(s) are waiting and nothing is draining them. A worker is stopped, crashed, or was never created.', ['n' => $pending]),
@@ -168,11 +271,17 @@ final class SiteQueueAlertEvaluator
         };
 
         $this->publisher->publish(
-            eventKey: $rule === 'no_worker' ? 'site.queue.no_worker' : 'site.queue.backlog',
+            eventKey: match ($rule) {
+                'no_worker' => 'site.queue.no_worker',
+                'failures' => 'site.queue.failures',
+                default => 'site.queue.backlog',
+            },
             subject: $site,
             title: '['.config('app.name').'] '.$title,
             body: $body,
-            url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'queue'], absolute: true),
+            // Straight to the failed list: the exception is the first thing
+            // anyone opens the page to read.
+            url: $this->queueUrl($site).($rule === 'failures' ? '?activity=failed' : ''),
             metadata: [
                 'site_id' => $site->id,
                 'site_name' => $site->name,
@@ -183,5 +292,34 @@ final class SiteQueueAlertEvaluator
                 'worker_processes' => $latest->worker_processes ?? null,
             ],
         );
+    }
+
+    private function publishUnreadable(Site $site, string $error): void
+    {
+        if ($site->organization === null) {
+            return;
+        }
+
+        $this->publisher->publish(
+            eventKey: 'site.queue.unreadable',
+            subject: $site,
+            title: '['.config('app.name').'] '.__('Can’t read the queues on :site', ['site' => $site->name]),
+            body: __('The last :n queue checks failed, so nothing on this site is being watched. :e', [
+                'n' => self::UNREADABLE_AFTER_FAILURES,
+                'e' => Str::limit($error, 300),
+            ]),
+            url: $this->queueUrl($site),
+            metadata: [
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'rule' => 'unreadable',
+                'error' => Str::limit($error, 300),
+            ],
+        );
+    }
+
+    private function queueUrl(Site $site): string
+    {
+        return route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'queue'], absolute: true);
     }
 }

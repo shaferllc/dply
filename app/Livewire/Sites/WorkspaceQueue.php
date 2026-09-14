@@ -135,6 +135,9 @@ class WorkspaceQueue extends Component
 
     public bool $alert_no_worker = true;
 
+    /** New failures within the window that page. Blank disables the rule. */
+    public string $alert_failures_at_least = '10';
+
     /** Queue the purge modal is asking about. */
     public string $purge_queue = '';
 
@@ -193,6 +196,11 @@ class WorkspaceQueue extends Component
 
         $this->server = $server;
         $this->site = $site;
+
+        // A "jobs are failing" alert links here; land on the list it is about.
+        if (request()->query('activity') === 'failed') {
+            $this->showActivity('failed');
+        }
     }
 
     /**
@@ -569,9 +577,7 @@ class WorkspaceQueue extends Component
         // any worker still running with the old one, and those keep reporting
         // until the next deploy restarts them.
         $token = (string) data_get($meta, 'queue_insights.token', '') ?: (string) Str::random(48);
-        $meta['queue_insights'] = ['enabled' => $enabled, 'token' => $token];
-
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_insights', ['enabled' => $enabled, 'token' => $token]);
 
         // Without the endpoint and token in the app's env the package installs
         // and then registers no listeners at all — silently, by design. Writing
@@ -745,7 +751,7 @@ class WorkspaceQueue extends Component
     public function showActivity(string $view): void
     {
         $this->queue_workspace_tab = 'activity';
-        $this->activity_view = in_array($view, ['waiting', 'delayed', 'failed', 'history'], true) ? $view : 'waiting';
+        $this->activity_view = in_array($view, ['running', 'waiting', 'delayed', 'failed', 'history'], true) ? $view : 'waiting';
 
         // Each view pays its own way: the reads happen when their view is
         // opened, so landing on Activity does not fire SSH reads for panels
@@ -1264,15 +1270,7 @@ class WorkspaceQueue extends Component
     /** @param  array<string, mixed>  $value */
     private function writeSiteMeta(string $key, array $value): void
     {
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-
-        if ($value === []) {
-            unset($meta[$key]);
-        } else {
-            $meta[$key] = $value;
-        }
-
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta($key, $value === [] ? null : $value);
     }
 
     /**
@@ -1720,6 +1718,7 @@ class WorkspaceQueue extends Component
         $this->alert_sustained_minutes = $rules->sustainedMinutes;
         $this->alert_oldest_over_s = $rules->oldestOverSeconds === null ? '' : (string) $rules->oldestOverSeconds;
         $this->alert_no_worker = $rules->noWorker;
+        $this->alert_failures_at_least = $rules->failuresAtLeast === null ? '' : (string) $rules->failuresAtLeast;
 
         $this->dispatch('open-modal', 'queue-alerts');
     }
@@ -1731,6 +1730,7 @@ class WorkspaceQueue extends Component
         $this->validate([
             'alert_pending_over' => ['nullable', 'integer', 'min:1', 'max:10000000'],
             'alert_oldest_over_s' => ['nullable', 'integer', 'min:1', 'max:604800'],
+            'alert_failures_at_least' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'alert_sustained_minutes' => ['required', 'integer', 'min:'.SiteQueueAlertRules::MIN_SUSTAINED_MINUTES, 'max:1440'],
         ]);
 
@@ -1740,6 +1740,7 @@ class WorkspaceQueue extends Component
             'sustained_minutes' => $this->alert_sustained_minutes,
             'oldest_over_s' => $this->alert_oldest_over_s === '' ? null : (int) $this->alert_oldest_over_s,
             'no_worker' => $this->alert_no_worker,
+            'failures_at_least' => $this->alert_failures_at_least === '' ? null : (int) $this->alert_failures_at_least,
         ];
 
         if ($this->alert_queue === '') {
@@ -1753,9 +1754,7 @@ class WorkspaceQueue extends Component
         // would keep a queue silent under a rule that no longer describes it.
         unset($stored['state']);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['queue_alerts'] = $stored;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_alerts', $stored);
 
         $this->dispatch('close-modal', 'queue-alerts');
         $this->toastSuccess($this->alert_queue === ''
@@ -1775,9 +1774,7 @@ class WorkspaceQueue extends Component
         $stored = (array) data_get($this->site->meta, 'queue_alerts', []);
         unset($stored['queues'][$this->alert_queue], $stored['state']);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['queue_alerts'] = $stored;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_alerts', $stored);
 
         $this->dispatch('close-modal', 'queue-alerts');
         $this->toastSuccess(__(':q follows the site defaults again.', ['q' => $this->alert_queue]));
@@ -1891,9 +1888,7 @@ class WorkspaceQueue extends Component
     {
         $this->authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['worker_process_manager'] = WorkerPool::PM_SUPERVISOR;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('worker_process_manager', WorkerPool::PM_SUPERVISOR);
 
         ControlWorkerDaemonJob::dispatch((string) $this->site->id, 'ensure', (string) auth()->id() ?: null);
 
@@ -1971,7 +1966,7 @@ class WorkspaceQueue extends Component
     private function mergeManagedDepths(Collection $byQueue, array $managed): Collection
     {
         foreach ($managed as $queue => $depth) {
-            $existing = (array) $byQueue->get($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+            $existing = (array) $byQueue->get($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0]);
 
             $existing['latest'] = new SiteQueueSnapshot([
                 'site_id' => $this->site->id,
@@ -1996,27 +1991,37 @@ class WorkspaceQueue extends Component
     {
         $since = now()->subHours(max(1, $this->window_hours));
 
-        $snapshots = SiteQueueSnapshot::query()
+        $window = SiteQueueSnapshot::query()
             ->where('site_id', $this->site->id)
-            ->where('captured_at', '>=', $since)
-            ->orderByDesc('captured_at')
-            ->limit(2000)
-            ->get();
+            ->where('captured_at', '>=', $since);
 
         // One card per queue: newest reading, plus the window's peak so a
-        // backlog that has already drained is still visible. A queue seen in
-        // history but with no worker now is the interesting case, so the list
-        // is built from BOTH sources rather than from the workers alone.
-        $byQueue = $snapshots->groupBy('queue')->map(function (Collection $rows): array {
-            $latest = $rows->first();
+        // backlog that has already drained is still visible. Both come from
+        // SQL: loading every sample was capped at 2000 rows, which cut the
+        // window short — and PEAK with it — on any site with ~7+ queues.
+        $latestRows = (clone $window)
+            ->selectRaw('distinct on (queue) *')
+            ->orderBy('queue')
+            ->orderByDesc('captured_at')
+            ->get();
 
-            return [
-                'latest' => $latest,
-                'peak_pending' => (int) $rows->max('pending'),
-                'samples' => $rows->count(),
-                'trend' => $rows->sortBy('captured_at')->pluck('pending')->all(),
-            ];
-        });
+        $stats = (clone $window)
+            ->selectRaw('queue, max(pending) as peak_pending, count(*) as samples')
+            ->groupBy('queue')
+            ->toBase()
+            ->get()
+            ->keyBy('queue');
+
+        // A queue seen in history but with no worker now is the interesting
+        // case, so the list is built from BOTH sources rather than from the
+        // workers alone — which is why `latest` may be null further down.
+        $byQueue = $latestRows->keyBy('queue')->toBase()->map(fn (?SiteQueueSnapshot $latest, string $queue): array => [
+            'latest' => $latest,
+            'peak_pending' => (int) ($stats->get($queue)->peak_pending ?? 0),
+            'samples' => (int) ($stats->get($queue)->samples ?? 0),
+        ]);
+
+        $newest = $latestRows->sortByDesc('captured_at')->first();
 
         $workers = $this->workers();
         $systemdWorkers = $this->systemdWorkers();
@@ -2028,7 +2033,7 @@ class WorkspaceQueue extends Component
                 if ($queue !== '' && ! $byQueue->has($queue)) {
                     // Declared by a worker but never sampled — the sweep has not
                     // run yet, or it could not read this site.
-                    $byQueue->put($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0, 'trend' => []]);
+                    $byQueue->put($queue, ['latest' => null, 'peak_pending' => 0, 'samples' => 0]);
                 }
             }
         }
@@ -2051,7 +2056,7 @@ class WorkspaceQueue extends Component
                     ->notDismissed()
                     ->orderByDesc('created_at')
                     ->first(),
-            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers->concat($systemdWorkers), $pools, $snapshots->first()),
+            'readinessChecks' => SiteQueueReadiness::checks($this->site, $workers->concat($systemdWorkers), $pools, $newest),
             // Jobs that actually RAN. Only the in-app agent can supply these:
             // a processed job leaves nothing behind in the store.
             'jobRuns' => SiteQueueJobRun::query()
@@ -2068,7 +2073,9 @@ class WorkspaceQueue extends Component
             'queueStats' => [
                 'queues' => $byQueue->count(),
                 'pending' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->pending ?? 0)),
-                'failed' => (int) ($snapshots->first()?->failed_total ?? 0),
+                // Failed counts are per queue now; the badge is their sum.
+                'failed' => $failedTotal = (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->failed_total ?? 0)),
+                'running' => (int) $byQueue->sum(fn (array $q): int => (int) ($q['latest']->reserved ?? 0)),
                 'workers' => $workers->where('is_active', true)->count() + $systemdWorkers->count(),
                 'machines' => (int) $pools->sum('desired_count'),
             ],
@@ -2082,8 +2089,11 @@ class WorkspaceQueue extends Component
             'queues' => $this->mergeManagedDepths($byQueue, $managed)->sortKeys(),
             'workers' => $workers,
             'systemdWorkers' => $systemdWorkers,
-            'failedTotal' => $snapshots->first()?->failed_total,
-            'lastCapturedAt' => $snapshots->first()?->captured_at,
+            // Horizon's own panel, and the Activity views that read what it
+            // reports, only make sense when a worker actually runs it.
+            'runsHorizon' => $workers->concat($systemdWorkers)->contains(fn ($worker): bool => str_contains(strtolower((string) $worker->command), 'horizon')),
+            'failedTotal' => $newest !== null ? $failedTotal : null,
+            'lastCapturedAt' => $newest?->captured_at,
         ]);
     }
 }

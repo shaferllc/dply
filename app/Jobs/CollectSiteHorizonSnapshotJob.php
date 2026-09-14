@@ -53,22 +53,33 @@ class CollectSiteHorizonSnapshotJob implements ShouldQueue
                 asRoot: false,
             );
             $buffer = (string) $out->buffer;
-            $snapshot = CollectWorkerPoolHorizonSnapshotJob::extract($buffer);
         } catch (\Throwable $e) {
             Log::info('site: horizon snapshot failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
-            $this->write($site, ['error' => 'SSH/exec failed: '.$e->getMessage()], keepLast: true);
+            self::write($site, ['error' => 'SSH/exec failed: '.$e->getMessage()], keepLast: true);
 
             return;
         }
+
+        self::record($site, $buffer);
+    }
+
+    /**
+     * Store what one run of the Horizon script printed. Public so the
+     * five-minute queue sweep, which runs the same script in its own SSH
+     * session, keeps this fresh while nobody has the page open.
+     */
+    public static function record(Site $site, string $buffer): void
+    {
+        $snapshot = CollectWorkerPoolHorizonSnapshotJob::extract($buffer);
 
         if ($snapshot === null) {
             $tail = trim(mb_substr($buffer, -300));
-            $this->write($site, ['error' => 'No snapshot returned from the box. Output tail: '.($tail !== '' ? $tail : '(empty)')], keepLast: true);
+            self::write($site, ['error' => 'No snapshot returned from the box. Output tail: '.($tail !== '' ? $tail : '(empty)')], keepLast: true);
 
             return;
         }
 
-        $this->write($site, $snapshot + ['collected_at' => now()->toIso8601String(), 'error' => null], keepLast: false);
+        self::write($site, $snapshot + ['collected_at' => now()->toIso8601String(), 'error' => null], keepLast: false);
     }
 
     /**
@@ -78,7 +89,7 @@ class CollectSiteHorizonSnapshotJob implements ShouldQueue
      *
      * @param  array<string, mixed>  $values
      */
-    private function write(Site $site, array $values, bool $keepLast): void
+    private static function write(Site $site, array $values, bool $keepLast): void
     {
         $site->refresh();
         $meta = is_array($site->meta) ? $site->meta : [];
@@ -90,7 +101,6 @@ class CollectSiteHorizonSnapshotJob implements ShouldQueue
             $values['error'] = mb_substr($values['error'], 0, 600);
         }
 
-        $meta['horizon'] = array_merge($current, $values);
-        $site->forceFill(['meta' => $meta])->save();
+        $site->putMeta('horizon', array_merge($current, $values));
     }
 }

@@ -124,6 +124,16 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
     }
 
     /**
+     * `$g($row, 'key')` — read a Horizon record whatever its shape.
+     *
+     * Horizon returns workload rows as ARRAYS and job records as OBJECTS, so
+     * object access on an array silently yields null: every queue name '?',
+     * every metric '—', and on the queue sweep every depth a confident zero.
+     * Shared by every on-box Horizon read so the fix cannot drift apart again.
+     */
+    public const READ_EITHER_SHAPE_PHP = '$g = fn ($o, $k, $d = null) => is_array($o) ? ($o[$k] ?? $d) : ($o->$k ?? $d);';
+
+    /**
      * Public so {@see CollectSiteHorizonSnapshotJob} runs the identical script
      * against a single site — one definition of what a Horizon snapshot is.
      */
@@ -132,7 +142,7 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
         // The PHP snippet runs inside `php artisan tinker` (app booted), reads
         // from Horizon's repositories + the failed_jobs table, and prints fenced
         // JSON. base64 avoids every layer of shell/tinker quoting.
-        $php = <<<'PHP'
+        $php = self::READ_EITHER_SHAPE_PHP."\n".<<<'PHP'
 $T = function ($cb, $d = null) { try { return $cb(); } catch (\Throwable $e) { return $d; } };
 $jr = $T(fn () => app(\Laravel\Horizon\Contracts\JobRepository::class));
 $mr = $T(fn () => app(\Laravel\Horizon\Contracts\MetricsRepository::class));
@@ -155,10 +165,6 @@ $out['completed'] = $T(fn () => (int) $jr->countCompleted(), null);
 $out['pending'] = $T(fn () => (int) $jr->countPending(), null);
 $out['failed_recent'] = $T(fn () => (int) $jr->countRecentlyFailed(), null);
 $out['jobs_per_minute'] = $T(fn () => $mr->jobsProcessedPerMinute(), null);
-// Horizon returns workload rows as ARRAYS and job records as OBJECTS, so read
-// both shapes through one accessor — object access on an array silently yields
-// null (every queue name → '?', every metric → '—').
-$g = fn ($o, $k, $d = null) => is_array($o) ? ($o[$k] ?? $d) : ($o->$k ?? $d);
 $out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $g($w, 'name', '?'), 'length' => $g($w, 'length'), 'wait' => $g($w, 'wait'), 'processes' => $g($w, 'processes')])->values()->all(), []);
 // The LIVE applied config — read straight off the running supervisor options
 // (Horizon read the box's HORIZON_* env at boot). This is what the monitor shows
