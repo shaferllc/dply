@@ -108,6 +108,16 @@ test('the page shows one failed number, and a throughput line per Horizon queue'
         ->assertSee('Throughput from Horizon, peak 4 jobs/min');
 });
 
+test('the Horizon row warns when another app shares this app’s Horizon keys', function () {
+    [$user, $server, $site] = horizonSite();
+    $site->putMeta('queue_horizon_shared', ['dply-control', 'dply-provision']);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site->fresh()])
+        ->assertSee('it runs dply-control, dply-provision')
+        ->assertSee('Set a unique HORIZON_PREFIX');
+});
+
 test('a queue the latest sweep no longer reports drops off the page', function () {
     // Sampled an hour ago — before the sweep stopped reading other servers'
     // Horizon queues — and not since. It must not linger for the 24h window.

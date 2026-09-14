@@ -94,6 +94,9 @@ test('the on-box read reports only this server’s Horizon queues, with real num
                 // A hostname that merely starts with ours is another server.
                 (object) ['name' => 'box-10-qq99:supervisor-1', 'master' => 'box-10-qq99', 'processes' => ['redis:mail' => 2]],
                 (object) ['name' => 'box-2-wx34:supervisor-1', 'master' => 'box-2-wx34', 'processes' => ['redis:reports' => 3, 'redis:default' => 5]],
+                // Same box, same Horizon keys, a different app: its supervisor
+                // is not in this app's config, so none of it counts here.
+                (object) ['name' => 'box-1-cd56:supervisor-fast', 'master' => 'box-1-cd56', 'processes' => ['redis:dply-control' => 6, 'redis:default' => 3]],
             ];
         }
 
@@ -113,6 +116,9 @@ test('the on-box read reports only this server’s Horizon queues, with real num
     });
 
     MasterSupervisor::determineNameUsing(fn (): string => 'box-1');
+    config(['horizon.defaults' => [], 'horizon.environments' => [
+        app()->environment() => ['supervisor-1' => ['connection' => 'redis', 'queue' => ['default', 'high,low'], 'maxProcesses' => 4]],
+    ]]);
 
     $job = new CollectServerQueueSnapshotsJob('01hzzzzzzzzzzzzzzzzzzzzzzz');
     $php = fn (string $method): string => (new ReflectionMethod($job, $method))->invoke($job);
@@ -124,7 +130,12 @@ test('the on-box read reports only this server’s Horizon queues, with real num
     putenv('DPLY_Q_IN');
     MasterSupervisor::determineNameUsing(fn (): string => Str::slug((string) gethostname()));
 
-    $rows = collect((new ReflectionMethod($job, 'extract'))->invoke($job, $out)[0]['queues'])->keyBy('queue');
+    $payload = (new ReflectionMethod($job, 'extract'))->invoke($job, $out)[0];
+    $rows = collect($payload['queues'])->keyBy('queue');
+
+    // The other app's queues are named, so the page can explain the overlap.
+    expect($payload['horizon_foreign'])->toEqualCanonicalizing(['dply-control', 'default'])
+        ->and($rows)->not->toHaveKey('dply-control');
 
     // Depth is the framework's on every site; Horizon adds processes and its
     // time-to-clear estimate, which is no longer passed off as the oldest age.
@@ -395,6 +406,24 @@ test('a site without Horizon does not pay for a Horizon read', function () {
     $job = new CollectServerQueueSnapshotsJob((string) $site->server_id);
 
     expect((new ReflectionMethod($job, 'script'))->invoke($job, targetsFor($site)))->not->toContain('DPLY_HZSITE_START');
+});
+
+test('another app sharing Horizon keys is remembered, and forgotten once it is gone', function () {
+    $site = queueSite();
+    worker($site, 'php artisan horizon');
+
+    $sweepWith = function (array $foreign) use ($site): void {
+        $payload = json_encode(['site_id' => $site->id, 'queues' => [['queue' => 'default', 'source' => 'horizon', 'pending' => 0, 'worker_processes' => 2]], 'horizon_foreign' => $foreign]);
+        $exec = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+        $exec->shouldReceive('runInlineBash')->andReturn(new ProcessOutput("DPLY_SV_START\nDPLY_SV_END\nDPLY_Q_START{$payload}DPLY_Q_END\n"));
+        (new CollectServerQueueSnapshotsJob((string) $site->server_id))->handle($exec);
+    };
+
+    $sweepWith(['dply-control', 'dply-manage']);
+    expect(data_get($site->fresh()->meta, 'queue_horizon_shared'))->toBe(['dply-control', 'dply-manage']);
+
+    $sweepWith([]);
+    expect($site->fresh()->meta)->not->toHaveKey('queue_horizon_shared');
 });
 
 test('putMeta writes one key without reverting what a stale copy never saw', function () {
