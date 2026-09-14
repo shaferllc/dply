@@ -2015,13 +2015,21 @@ class WorkspaceQueue extends Component
         // A queue seen in history but with no worker now is the interesting
         // case, so the list is built from BOTH sources rather than from the
         // workers alone — which is why `latest` may be null further down.
+        $newest = $latestRows->sortByDesc('captured_at')->first();
+
+        // A queue the latest sweep no longer reports drops off rather than
+        // lingering for the whole window — another server's Horizon queue
+        // sampled before the sweep learned to tell servers apart, or a queue
+        // nothing declares any more. Ten minutes spans one sweep boundary.
+        $latestRows = $latestRows
+            ->filter(fn (SiteQueueSnapshot $row): bool => $newest !== null && $row->captured_at->gte($newest->captured_at->copy()->subMinutes(10)))
+            ->values();
+
         $byQueue = $latestRows->keyBy('queue')->toBase()->map(fn (?SiteQueueSnapshot $latest, string $queue): array => [
             'latest' => $latest,
             'peak_pending' => (int) ($stats->get($queue)->peak_pending ?? 0),
             'samples' => (int) ($stats->get($queue)->samples ?? 0),
         ]);
-
-        $newest = $latestRows->sortByDesc('captured_at')->first();
 
         $workers = $this->workers();
         $systemdWorkers = $this->systemdWorkers();

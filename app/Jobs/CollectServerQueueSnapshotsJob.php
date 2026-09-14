@@ -367,16 +367,40 @@ PHP;
     {
         return CollectWorkerPoolHorizonSnapshotJob::READ_EITHER_SHAPE_PHP."\n".<<<'PHP'
 $horizon = $T(fn () => class_exists(\Laravel\Horizon\Horizon::class), false);
-// Horizon's own queue list, so a bare `php artisan horizon` samples every queue
-// in config/horizon.php rather than only `default`. A grouped workload
-// (`high,default`) names its members in split_queues; each is drained by the
-// group's processes, which is what the no-worker rule needs to know.
-$workload = [];
-foreach (($horizon ? $T(fn () => app(\Laravel\Horizon\Contracts\WorkloadRepository::class)->get(), []) : []) as $w) {
+// The queues THIS box's Horizon supervises, and its processes on each. The
+// workload repository reads the shared Redis: for an app whose Horizon runs on
+// several servers it lists every server's queues and sums every server's
+// processes, and this page is about one server. A master is named
+// `<basename>-<4-char token>`; each of its supervisors records
+// `connection:queue => processes`, where a pool's queue may be `high,default`.
+$local = [];
+if ($horizon) {
+    $base = (string) $T(fn () => \Laravel\Horizon\MasterSupervisor::basename(), '');
+    foreach ($T(fn () => app(\Laravel\Horizon\Contracts\SupervisorRepository::class)->all(), []) as $s) {
+        if ($base === '' || ! preg_match('/^'.preg_quote($base, '/').'-[A-Za-z0-9]{4}$/', (string) $g($s, 'master'))) {
+            continue;
+        }
+        foreach ((array) $g($s, 'processes') as $pool => $count) {
+            foreach (explode(',', (string) (explode(':', (string) $pool, 2)[1] ?? '')) as $q) {
+                if (($q = trim($q)) !== '') {
+                    $local[$q] = ($local[$q] ?? 0) + (int) $count;
+                }
+            }
+        }
+    }
+}
+// Horizon's time-to-clear estimate per queue; a grouped workload names its
+// members in split_queues.
+$wait = [];
+foreach (($local !== [] ? $T(fn () => app(\Laravel\Horizon\Contracts\WorkloadRepository::class)->get(), []) : []) as $w) {
     $split = $g($w, 'split_queues');
     foreach (($split ? collect($split)->all() : [$w]) as $part) {
-        $workload[(string) $g($part, 'name')] = ['processes' => $g($w, 'processes'), 'wait' => $g($part, 'wait')];
+        $wait[(string) $g($part, 'name')] = $g($part, 'wait');
     }
+}
+$workload = [];
+foreach ($local as $q => $processes) {
+    $workload[$q] = ['processes' => $processes, 'wait' => $wait[$q] ?? null];
 }
 $conn = $T(fn () => app('queue')->connection());
 $ask = fn (string $method, string $queue) => $conn !== null && method_exists($conn, $method) ? $T(fn () => $conn->$method($queue)) : null;

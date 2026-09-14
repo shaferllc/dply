@@ -738,7 +738,9 @@
                 @endif
                 @elseif ($activity_view === 'running')
                 @php($hzJobs = collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : []))
-                @php($runningJobs = $hzJobs->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['reserved', 'running'], true))->values())
+                {{-- Horizon's job list spans every server sharing its Redis; keep
+                     the jobs on queues this page is about. --}}
+                @php($runningJobs = $hzJobs->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['reserved', 'running'], true) && $queues->has((string) ($job['queue'] ?? '')))->values())
                 @if ($runsHorizon)
                     {{-- Horizon only refreshes from the Queues tab's poll; without this
                          a list of what is running right now would freeze on open. --}}
@@ -784,7 +786,7 @@
                 {{-- Without the queue agent the app's own traffic leaves nothing in
                      dply — but Horizon keeps its recent finished jobs, so show those
                      rather than an empty panel. --}}
-                @php($hzFinished = $runsHorizon ? collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : [])->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['completed', 'failed'], true))->values() : collect())
+                @php($hzFinished = $runsHorizon ? collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : [])->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['completed', 'failed'], true) && $queues->has((string) ($job['queue'] ?? '')))->values() : collect())
                 @if ($jobRuns->isEmpty() && $hzFinished->isNotEmpty())
                     <div wire:init="pollHorizon" wire:poll.30s="pollHorizon" class="border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                         {{ __('From Horizon’s recent jobs. The queue agent records every run with timings and errors.') }}

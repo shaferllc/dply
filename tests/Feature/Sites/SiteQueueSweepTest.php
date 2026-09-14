@@ -15,7 +15,11 @@ use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use Laravel\Horizon\Contracts\SupervisorRepository;
 use Laravel\Horizon\Contracts\WorkloadRepository;
+use Laravel\Horizon\MasterSupervisor;
+use Laravel\Horizon\Supervisor;
 use Mockery;
 use ReflectionMethod;
 
@@ -60,17 +64,19 @@ function processesFor(Site $site, string $queue): ?int
     return SiteQueueSnapshot::query()->where('site_id', $site->id)->where('queue', $queue)->latest('captured_at')->value('worker_processes');
 }
 
-test('the on-box read reports Horizon array workloads as real numbers, not zeros', function () {
+test('the on-box read reports only this server’s Horizon queues, with real numbers', function () {
     // Horizon hands back workload rows as arrays. Reading them as objects stored
     // pending 0 / processes 0 for every Horizon queue while Horizon itself said 15.
-    // `high,low` is a grouped workload: only Horizon knows about it (no worker
-    // declares it), and each member queue is drained by the group's processes.
+    // Its workload also spans every server sharing Redis: `reports` and `mail`
+    // are other boxes' queues, and `default` has 5 more processes elsewhere.
+    // `high,low` is one pool draining both; each is credited its processes.
     app()->instance(WorkloadRepository::class, new class implements WorkloadRepository
     {
         public function get()
         {
             return [
-                ['name' => 'default', 'length' => 5, 'wait' => 12.4, 'processes' => 15, 'split_queues' => null],
+                ['name' => 'default', 'length' => 5, 'wait' => 12.4, 'processes' => 20, 'split_queues' => null],
+                ['name' => 'reports', 'length' => 1, 'wait' => 1.0, 'processes' => 3, 'split_queues' => null],
                 ['name' => 'high,low', 'length' => 7, 'wait' => 9.0, 'processes' => 4, 'split_queues' => [
                     ['name' => 'high', 'length' => 3, 'wait' => 2.0],
                     ['name' => 'low', 'length' => 4, 'wait' => 9.0],
@@ -78,6 +84,35 @@ test('the on-box read reports Horizon array workloads as real numbers, not zeros
             ];
         }
     });
+
+    app()->instance(SupervisorRepository::class, new class implements SupervisorRepository
+    {
+        public function all()
+        {
+            return [
+                (object) ['name' => 'box-1-ab12:supervisor-1', 'master' => 'box-1-ab12', 'processes' => ['redis:default' => 15, 'redis:high,low' => 4]],
+                // A hostname that merely starts with ours is another server.
+                (object) ['name' => 'box-10-qq99:supervisor-1', 'master' => 'box-10-qq99', 'processes' => ['redis:mail' => 2]],
+                (object) ['name' => 'box-2-wx34:supervisor-1', 'master' => 'box-2-wx34', 'processes' => ['redis:reports' => 3, 'redis:default' => 5]],
+            ];
+        }
+
+        public function names() {}
+
+        public function find($name) {}
+
+        public function get(array $names) {}
+
+        public function longestActiveTimeout() {}
+
+        public function update(Supervisor $supervisor) {}
+
+        public function forget($names) {}
+
+        public function flushExpired() {}
+    });
+
+    MasterSupervisor::determineNameUsing(fn (): string => 'box-1');
 
     $job = new CollectServerQueueSnapshotsJob('01hzzzzzzzzzzzzzzzzzzzzzzz');
     $php = fn (string $method): string => (new ReflectionMethod($job, $method))->invoke($job);
@@ -87,6 +122,7 @@ test('the on-box read reports Horizon array workloads as real numbers, not zeros
     eval($php('preludePhp').$php('readPhp'));
     $out = (string) ob_get_clean();
     putenv('DPLY_Q_IN');
+    MasterSupervisor::determineNameUsing(fn (): string => Str::slug((string) gethostname()));
 
     $rows = collect((new ReflectionMethod($job, 'extract'))->invoke($job, $out)[0]['queues'])->keyBy('queue');
 
@@ -97,6 +133,8 @@ test('the on-box read reports Horizon array workloads as real numbers, not zeros
         ->and($rows['high'])->toMatchArray(['source' => 'horizon', 'time_to_clear_s' => 2.0, 'worker_processes' => 4])
         ->and($rows['low'])->toMatchArray(['source' => 'horizon', 'time_to_clear_s' => 9.0, 'worker_processes' => 4])
         ->and($rows)->not->toHaveKey('high,low')
+        ->and($rows)->not->toHaveKey('reports')
+        ->and($rows)->not->toHaveKey('mail')
         // Not in Horizon's workload: the process count is left for the
         // process manager to answer, and there is no Horizon estimate.
         ->and($rows['emails'])->toMatchArray(['source' => 'artisan', 'worker_processes' => null, 'time_to_clear_s' => null]);

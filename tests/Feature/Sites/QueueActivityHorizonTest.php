@@ -51,6 +51,9 @@ function horizonSite(string $command = 'php artisan horizon'): array
         'queue_throughput' => ['default' => [1.0, 4.0, 2.5]],
         'recent_jobs' => [
             ['name' => 'App\\Jobs\\ChargeCard', 'queue' => 'default', 'status' => 'reserved', 'age' => 12.0],
+            // Another server's queue: Horizon's list spans every box on its Redis.
+            ['name' => 'App\\Jobs\\RunReport', 'queue' => 'reports', 'status' => 'reserved', 'age' => 3.0],
+            ['name' => 'App\\Jobs\\MailDigest', 'queue' => 'reports', 'status' => 'completed', 'age' => 5.0],
             ['name' => 'App\\Jobs\\SendReceipt', 'queue' => 'default', 'status' => 'completed', 'age' => 40.0],
             ['name' => 'App\\Jobs\\SyncLedger', 'queue' => 'default', 'status' => 'failed', 'age' => 90.0],
         ],
@@ -77,7 +80,8 @@ test('Running lists the jobs Horizon says a worker is holding', function () {
         ->call('showActivity', 'running')
         ->assertSee('App\\Jobs\\ChargeCard')
         ->assertSee('running for 12 s')
-        ->assertDontSee('App\\Jobs\\SendReceipt');
+        ->assertDontSee('App\\Jobs\\SendReceipt')
+        ->assertDontSee('App\\Jobs\\RunReport');
 });
 
 test('History falls back to Horizon’s finished jobs when the agent has recorded nothing', function () {
@@ -89,7 +93,8 @@ test('History falls back to Horizon’s finished jobs when the agent has recorde
         ->assertSee('From Horizon’s recent jobs')
         ->assertSee('App\\Jobs\\SendReceipt')
         ->assertSee('App\\Jobs\\SyncLedger')
-        ->assertDontSee('App\\Jobs\\ChargeCard');
+        ->assertDontSee('App\\Jobs\\ChargeCard')
+        ->assertDontSee('App\\Jobs\\MailDigest');
 });
 
 test('the page shows one failed number, and a throughput line per Horizon queue', function () {
@@ -101,6 +106,24 @@ test('the page shows one failed number, and a throughput line per Horizon queue'
         ->assertDontSee('failed recently')
         ->assertSee('15 processes · 4 jobs/min')
         ->assertSee('Throughput from Horizon, peak 4 jobs/min');
+});
+
+test('a queue the latest sweep no longer reports drops off the page', function () {
+    // Sampled an hour ago — before the sweep stopped reading other servers'
+    // Horizon queues — and not since. It must not linger for the 24h window.
+    [$user, $server, $site] = horizonSite();
+    SiteQueueSnapshot::query()->create([
+        'site_id' => $site->id,
+        'queue' => 'dply-control',
+        'source' => 'horizon',
+        'pending' => 0,
+        'captured_at' => now()->subHour(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->assertDontSee('dply-control')
+        ->assertSee('default');
 });
 
 test('without Horizon, Running says how many are held rather than inventing names', function () {
