@@ -3,6 +3,7 @@
 namespace App\Livewire\Sites;
 
 use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Models\ConfigRevision;
@@ -12,6 +13,7 @@ use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -19,6 +21,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WebserverConfig extends Component
 {
+    use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
     use WatchesConsoleActionOutcomes;
 
@@ -50,7 +53,6 @@ class WebserverConfig extends Component
      * push a config you haven't validated since the last change.
      */
     public bool $config_validated = false;
-
 
     public ?string $remote_live_config = null;
 
@@ -490,6 +492,12 @@ class WebserverConfig extends Component
         }, $name, [
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
+    }
+
+    /** Scopes the console banner's Dismiss/Stop buttons to this site's runs. */
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
     }
 
     public function render(): View
