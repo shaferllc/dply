@@ -27,10 +27,17 @@
             copiedInstall: false,
             installFilename: 'id_ed25519_dply',
             acknowledged: false,
+            // Set by "Get SSH access": where the key is already installed, so the
+            // install command can also write a one-key ~/.ssh/config entry.
+            access: null,
             openFromLivewire(detail) {
                 const d = detail || {};
                 this.privateKey = d.privateKey ?? d.private_key ?? '';
                 this.publicKey = d.publicKey ?? d.public_key ?? '';
+                this.access = d.access && d.access.host ? d.access : null;
+                if (this.access && this.access.file) {
+                    this.installFilename = this.access.file;
+                }
                 this.copiedPrivate = false;
                 this.copiedPublic = false;
                 this.copiedInstall = false;
@@ -61,12 +68,34 @@
             installCommand() {
                 const name = this.safeFilename();
                 const key = String(this.privateKey || '').replace(/\r?\n$/, '');
-                return (
+                const keyFile =
                     'mkdir -p ~/.ssh && chmod 700 ~/.ssh\n' +
                     'umask 077 && cat > ~/.ssh/' + name + " <<'DPLY_KEY_EOF'\n" +
                     key + '\n' +
                     'DPLY_KEY_EOF\n' +
-                    'chmod 600 ~/.ssh/' + name + '\n' +
+                    'chmod 600 ~/.ssh/' + name + '\n';
+                const a = this.access;
+                if (a && a.host) {
+                    // Not added to the agent: a fuller agent is exactly what spends
+                    // the server's MaxAuthTries. The config entry offers this key
+                    // alone for this host — the dply button's ssh:// link included.
+                    return (
+                        keyFile +
+                        'touch ~/.ssh/config && chmod 600 ~/.ssh/config\n' +
+                        'grep -qs "IdentityFile ~/.ssh/' + name + '$" ~/.ssh/config || cat >> ~/.ssh/config <<\'DPLY_CFG_EOF\'\n' +
+                        '\n' +
+                        'Host ' + a.host + ' ' + a.alias + '\n' +
+                        '    HostName ' + a.host + '\n' +
+                        '    User ' + a.user + '\n' +
+                        (a.port && Number(a.port) !== 22 ? '    Port ' + a.port + '\n' : '') +
+                        '    IdentityFile ~/.ssh/' + name + '\n' +
+                        '    IdentitiesOnly yes\n' +
+                        'DPLY_CFG_EOF\n' +
+                        'echo "Ready: ssh ' + a.alias + '   (or: ssh ' + a.host + ')"\n'
+                    );
+                }
+                return (
+                    keyFile +
                     'if command -v ssh-add >/dev/null 2>&1; then\n' +
                     '  if [ "$(uname)" = "Darwin" ]; then ssh-add --apple-use-keychain ~/.ssh/' + name + ' 2>/dev/null || ssh-add ~/.ssh/' + name + ';\n' +
                     '  else ssh-add ~/.ssh/' + name + ';\n' +
@@ -87,11 +116,13 @@
                 this.revealOpen = false;
                 this.privateKey = '';
                 this.publicKey = '';
+                this.access = null;
             },
             cancelReveal() {
                 this.revealOpen = false;
                 this.privateKey = '';
                 this.publicKey = '';
+                this.access = null;
                 this.copiedPrivate = false;
                 this.copiedPublic = false;
                 this.copiedInstall = false;
@@ -168,7 +199,11 @@
                     {{-- Install on local machine — paste-ready bash one-liner. --}}
                     <div class="rounded-xl border border-brand-sage/25 bg-brand-sage/5 px-4 py-3">
                         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Install on your machine') }}</p>
-                        <p class="mt-1 text-xs leading-5 text-brand-moss">{{ __('Copies a one-liner that writes the private key to ~/.ssh/, chmods it 600, and (on macOS) adds it to your login keychain. Paste it in your terminal.') }}</p>
+                        <p x-show="! access" class="mt-1 text-xs leading-5 text-brand-moss">{{ __('Copies a one-liner that writes the private key to ~/.ssh/, chmods it 600, and (on macOS) adds it to your login keychain. Paste it in your terminal.') }}</p>
+                        <p x-show="access" x-cloak class="mt-1 text-xs leading-5 text-brand-moss">
+                            {{ __('dply installed the public key on the server for you (the sync is running). Paste this once: it saves the key to ~/.ssh/ and adds an SSH config entry that offers only this key, so a busy agent can’t hit “Too many authentication failures”. Then just run') }}
+                            <code class="font-mono text-brand-ink" x-text="access ? 'ssh ' + access.alias : ''"></code>.
+                        </p>
                         <div class="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                             <label class="block">
                                 <span class="text-xs font-medium text-brand-moss">{{ __('Filename in ~/.ssh/') }}</span>

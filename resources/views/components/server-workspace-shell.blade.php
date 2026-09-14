@@ -168,6 +168,8 @@
                         <div class="mt-1.5" x-data="{ editingKey: false }">
                             <button type="button" x-on:click="editingKey = ! editingKey" class="text-2xs text-brand-mist hover:text-brand-ink hover:underline"
                                 x-text="sshKeyPath ? @js(__('SSH key: ')) + sshKeyPath : @js(__('Set your SSH key'))">{{ __('Set your SSH key') }}</button>
+                            <span class="text-2xs text-brand-mist">·</span>
+                            <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="text-2xs font-semibold text-brand-forest hover:underline">{{ __('Can’t get in? Get SSH access') }}</a>
                             <div x-show="editingKey" x-cloak class="mt-1.5">
                                 <input type="text"
                                     x-bind:value="sshKeyPath"

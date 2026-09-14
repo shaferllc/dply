@@ -38,6 +38,40 @@ function actingOwnerWithServer(): array
     return [$user, $server];
 }
 
+test('get SSH access generates a key, installs it for the deploy user, and hands back a one-key setup', function () {
+    // The record says root; a person logs in as the deploy user.
+    [$user, $server] = actingOwnerWithServer();
+    Queue::fake();
+
+    // A key already targets root (dply's connection user), so the guarded
+    // sync goes straight to the queue rather than asking to confirm a lockout.
+    ServerAuthorizedKey::query()->create([
+        'server_id' => $server->id,
+        'name' => 'control',
+        'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('c', 43).' control',
+        'target_linux_user' => '',
+    ]);
+
+    $deployUser = config('server_provision.deploy_ssh_user', 'dply');
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSshKeys::class, ['server' => $server])
+        ->call('issueSshAccess')
+        ->assertHasNoErrors()
+        ->assertDispatched('dply-ssh-keypair-generated', function (string $event, array $params) use ($server, $deployUser): bool {
+            return str_contains((string) ($params['privateKey'] ?? ''), 'BEGIN OPENSSH PRIVATE KEY')
+                && ($params['access']['user'] ?? null) === $deployUser
+                && ($params['access']['host'] ?? null) === $server->ip_address
+                && str_starts_with((string) ($params['access']['alias'] ?? ''), 'dply');
+        });
+
+    $issued = ServerAuthorizedKey::query()->where('server_id', $server->id)->where('name', '!=', 'control')->sole();
+    expect($issued->target_linux_user)->toBe($deployUser)
+        ->and($issued->public_key)->toStartWith('ssh-ed25519 ');
+
+    Queue::assertPushed(SyncAuthorizedKeysJob::class);
+});
+
 test('add key writes audit event', function () {
     [$user, $server] = actingOwnerWithServer();
 

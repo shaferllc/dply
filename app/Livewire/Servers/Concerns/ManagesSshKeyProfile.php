@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\UserSshKey;
+use App\Modules\Notifications\Services\ServerSshKeyNotificationDispatcher;
+use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Support\OpenSshEd25519KeyPairGenerator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 
 /**
@@ -110,6 +113,69 @@ trait ManagesSshKeyProfile
         );
 
         $this->toastSuccess(__('A new key pair was generated. Copy your private key from the dialog, then use “Add SSH key” and “Sync authorized_keys”.'));
+    }
+
+    /**
+     * One click to SSH in. Generates a key pair, installs the public key for
+     * the login user through the normal add + sync (so it is known to be on the
+     * box), and hands back the private key with a paste-ready setup: the key
+     * file plus a ~/.ssh/config entry with IdentitiesOnly. A person whose agent
+     * holds several keys otherwise spends the server's MaxAuthTries before the
+     * right one and gets "Too many authentication failures" — every time.
+     */
+    public function issueSshAccess(ServerAuthorizedKeysAuditLogger $audit, ServerSshKeyNotificationDispatcher $notifications): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfSyncBusy()) {
+            return;
+        }
+
+        try {
+            [$private, $public] = OpenSshEd25519KeyPairGenerator::generate();
+        } catch (\RuntimeException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        // The account a person logs in as — the deploy user, not root. The
+        // form only accepts users on this list until the full list is synced.
+        $user = $this->server->loginUser();
+        if (! in_array($user, $this->system_users, true)) {
+            $this->system_users[] = $user;
+        }
+
+        $this->profile_key_id = null;
+        $this->new_auth_name = __('SSH access · :who', ['who' => Auth::user()?->name ?: __('me')]);
+        $this->new_auth_key = $public;
+        $this->new_target_linux_user = $user;
+        $this->new_review_after = null;
+
+        $this->addAuthorizedKey($audit, $notifications);
+
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        // The same guarded path as the Sync button: it will not silently write
+        // a set that locks dply out of its own connection user.
+        $this->requestSyncAuthorizedKeys();
+
+        $slug = Str::slug((string) ($this->server->name ?: $this->server->id)) ?: 'server';
+
+        $this->dispatch(
+            'dply-ssh-keypair-generated',
+            privateKey: $private,
+            publicKey: $public,
+            access: [
+                'host' => (string) $this->server->ip_address,
+                'user' => $user,
+                'port' => (int) ($this->server->ssh_port ?: 22),
+                'alias' => str_starts_with($slug, 'dply') ? $slug : 'dply-'.$slug,
+                'file' => 'dply_'.$slug,
+            ],
+        );
     }
 
     #[On('personal-ssh-key-created')]

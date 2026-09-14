@@ -33,6 +33,23 @@
                              more" link that used to sit inside the prose moves
                              here rather than being dropped. --}}
                         <a href="https://www.ssh.com/academy/ssh/public-key-authentication" target="_blank" rel="noopener" class="whitespace-nowrap text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage">{{ __('Learn more') }}</a>
+                        {{-- The one-click way in: a new key, installed for the login
+                             user by dply, plus a paste-once SSH setup. --}}
+                        <button
+                            type="button"
+                            wire:click="issueSshAccess"
+                            wire:loading.attr="disabled"
+                            wire:target="issueSshAccess"
+                            @disabled($syncBusy)
+                            title="{{ __('Generate a key, install it for :user, and get a paste-once SSH setup', ['user' => $server->loginUser()]) }}"
+                            class="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md border border-brand-sage/40 bg-white px-2 text-xs font-semibold text-brand-forest shadow-sm transition hover:bg-brand-sage/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <x-heroicon-m-key class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="issueSshAccess" aria-hidden="true" />
+                            <span wire:loading wire:target="issueSshAccess" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-spinner variant="forest" size="sm" />
+                            </span>
+                            {{ __('Get SSH access') }}
+                        </button>
                         <button
                             type="button"
                             x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
