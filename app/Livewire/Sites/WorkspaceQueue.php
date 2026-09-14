@@ -747,6 +747,26 @@ class WorkspaceQueue extends Component
     }
 
     /**
+     * One Horizon job's full payload, for a Running or History row. The job is
+     * no longer on the queue, so it is read from Horizon's own record.
+     */
+    public function revealHorizonPayload(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->payload_uuid === $id) {
+            $this->payload_uuid = '';
+
+            return;
+        }
+
+        $this->payload_uuid = $id;
+        $this->startedRead('payload');
+
+        ReadSiteQueueJobPayloadJob::dispatch((string) $this->site->id, '', $id, (string) auth()->id(), 'horizon');
+    }
+
+    /**
      * @return array{payload: ?string, error: ?string}|null
      */
     public function revealedPayload(): ?array
@@ -769,7 +789,9 @@ class WorkspaceQueue extends Component
         // Each view pays its own way: the reads happen when their view is
         // opened, so landing on Activity does not fire SSH reads for panels
         // nobody looked at.
-        if ($this->activity_view === 'failed' && CollectSiteFailedJobsJob::cached((string) $this->site->id) === null) {
+        // Failed always re-reads on open, but renders the last list straight
+        // away (kept a day, labelled with its age) instead of a spinner.
+        if ($this->activity_view === 'failed' && $this->managedFailedJobs() === null) {
             $this->refreshFailedJobs();
         }
 

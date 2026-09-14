@@ -31,7 +31,9 @@ class CollectSiteHorizonSnapshotJob implements ShouldQueue
 
     public function __construct(public string $siteId)
     {
-        $this->onQueue('dply-control');
+        // The open page polls this every 30s: not behind the five-minute sweeps
+        // on dply-control, which refresh the same data for closed pages.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public function handle(ExecuteRemoteTaskOnServer $exec): void

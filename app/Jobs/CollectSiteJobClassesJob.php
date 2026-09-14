@@ -44,7 +44,9 @@ class CollectSiteJobClassesJob implements ShouldQueue
 
     public function __construct(public string $siteId)
     {
-        $this->onQueue('dply-control');
+        // Someone clicked and is watching a spinner: not behind the five-minute
+        // sweeps on dply-control.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public static function cacheKey(string $siteId): string

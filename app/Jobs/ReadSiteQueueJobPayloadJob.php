@@ -51,7 +51,9 @@ class ReadSiteQueueJobPayloadJob implements ShouldQueue
         public string $userId,
         public string $scope = 'waiting',
     ) {
-        $this->onQueue('dply-control');
+        // Someone clicked and is watching a spinner: not behind the five-minute
+        // sweeps on dply-control.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public static function cacheKey(string $siteId, string $userId, string $uuid): string
@@ -85,7 +87,7 @@ class ReadSiteQueueJobPayloadJob implements ShouldQueue
         $payload = base64_encode((string) json_encode([
             'queue' => $this->queueName,
             'uuid' => $this->jobUuid,
-            'scope' => $this->scope === 'delayed' ? 'delayed' : 'waiting',
+            'scope' => in_array($this->scope, ['delayed', 'horizon'], true) ? $this->scope : 'waiting',
             'max' => self::MAX_CHARS,
         ]));
         $php = base64_encode($this->remotePhp());
@@ -149,6 +151,16 @@ if ($app === null) { $done(['error' => 'Could not boot the application.']); retu
 $queue = (string) $in['queue'];
 $uuid = (string) $in['uuid'];
 $delayed = ($in['scope'] ?? 'waiting') === 'delayed';
+// A running or finished job is no longer on the queue. Horizon keeps its record,
+// payload included, for as long as it keeps recent jobs — read it from there.
+if (($in['scope'] ?? '') === 'horizon') {
+    $record = $T(fn () => app(\Laravel\Horizon\Contracts\JobRepository::class)->getJobs([$uuid])->first(), null);
+    $raw = is_object($record) ? ($record->payload ?? null) : (is_array($record) ? ($record['payload'] ?? null) : null);
+    if (! is_string($raw) || $raw === '') { $done(['error' => 'Horizon no longer has this job — it trims its recent jobs after a while.']); return; }
+    $data = json_decode($raw, true);
+    $pretty = is_array($data) ? (string) json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) : $raw;
+    $done(['payload' => mb_substr($pretty, 0, (int) $in['max'])]); return;
+}
 $conn = $T(fn () => config('queue.default'), null);
 $driver = $T(fn () => config('queue.connections.'.$conn.'.driver'), null);
 $rows = [];

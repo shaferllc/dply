@@ -45,7 +45,9 @@ class CollectSiteFailedJobsJob implements ShouldQueue
 
     public function __construct(public string $siteId)
     {
-        $this->onQueue('dply-control');
+        // Someone clicked and is watching a spinner: not behind the five-minute
+        // sweeps on dply-control.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public static function cacheKey(string $siteId): string
@@ -108,13 +110,15 @@ class CollectSiteFailedJobsJob implements ShouldQueue
      */
     private function store(array $result): void
     {
+        // Kept for a day so opening Failed shows the last list at once, labelled
+        // with its age, while a fresh read runs behind it.
         Cache::put(self::cacheKey($this->siteId), [
             'jobs' => array_values((array) ($result['jobs'] ?? [])),
             'total' => (int) ($result['total'] ?? 0),
             'driver' => $result['driver'] ?? null,
             'error' => $result['error'] ?? null,
             'read_at' => now()->toIso8601String(),
-        ], now()->addMinutes(3));
+        ], now()->addDay());
     }
 
     /**
@@ -127,18 +131,38 @@ class CollectSiteFailedJobsJob implements ShouldQueue
      */
     private function remotePhp(): string
     {
+        return $this->preludePhp().$this->bootPhp().$this->readPhp();
+    }
+
+    private function preludePhp(): string
+    {
         return <<<'PHP'
 $in = json_decode(base64_decode((string) getenv('DPLY_FJ_IN')), true);
 if (! is_array($in)) { return; }
 $T = function ($cb, $d = null) { try { return $cb(); } catch (\Throwable $e) { return $d; } };
+$done = function (array $o) { echo 'DPLY_FJ_START'.json_encode($o).'DPLY_FJ_END'; };
+
+PHP;
+    }
+
+    private function bootPhp(): string
+    {
+        return <<<'PHP'
 $app = $T(function () {
     require getcwd().'/vendor/autoload.php';
     $a = require getcwd().'/bootstrap/app.php';
     $a->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     return $a;
 });
-$done = function (array $o) { echo 'DPLY_FJ_START'.json_encode($o).'DPLY_FJ_END'; };
 if ($app === null) { $done(['error' => 'Could not boot the application.']); return; }
+
+PHP;
+    }
+
+    /** Separate from the boot so a test can run it against a booted app. */
+    private function readPhp(): string
+    {
+        return <<<'PHP'
 $driver = $T(fn () => config('queue.failed.driver'), null);
 if ($driver === null || $driver === 'null') {
     $done(['driver' => $driver, 'error' => 'This app does not store failed jobs (QUEUE_FAILED_DRIVER is null), so a job that fails is gone. Point it at the database driver to keep them.']);
@@ -146,9 +170,21 @@ if ($driver === null || $driver === 'null') {
 }
 $failer = $T(fn () => $app->make('queue.failer'), null);
 if ($failer === null) { $done(['driver' => $driver, 'error' => 'The app has no failed-job provider configured.']); return; }
-$all = $T(fn () => $failer->all(), []);
-$rows = [];
 $limit = (int) $in['limit'];
+// A table-backed failer is read newest-first with a LIMIT: all() loads every
+// failed job the app has ever kept into memory, which after a bad month is most
+// of the wait. Same order all() uses (id desc); anything else falls back to it.
+$all = null;
+$total = null;
+if (in_array($driver, ['database', 'database-uuids'], true)) {
+    $table = $T(fn () => \Illuminate\Support\Facades\DB::connection(config('queue.failed.database'))->table(config('queue.failed.table', 'failed_jobs')), null);
+    if ($table !== null) {
+        $total = $T(fn () => (int) (clone $table)->count(), null);
+        $all = $T(fn () => (clone $table)->orderByDesc('id')->limit($limit)->get()->all(), null);
+    }
+}
+$all ??= $T(fn () => $failer->all(), []);
+$rows = [];
 foreach ((array) $all as $row) {
     if (count($rows) >= $limit) { break; }
     $payload = $T(fn () => json_decode((string) ($row->payload ?? ''), true), null);
@@ -167,7 +203,7 @@ foreach ((array) $all as $row) {
         'failed_at' => (string) ($row->failed_at ?? ''),
     ];
 }
-$done(['driver' => $driver, 'total' => is_countable($all) ? count($all) : count($rows), 'jobs' => $rows]);
+$done(['driver' => $driver, 'total' => $total ?? (is_countable($all) ? count($all) : count($rows)), 'jobs' => $rows]);
 PHP;
     }
 

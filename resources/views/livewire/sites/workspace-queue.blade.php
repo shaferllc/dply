@@ -705,6 +705,10 @@
                         {{ __('Jobs that gave up. Each one is still retryable until you clear it.') }}
                         @if ($failed && $failed['read_at'])
                             <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($failed['read_at'])->diffForHumans()]) }}</span>
+                            {{-- The last list shows at once; a fresh read runs behind it. --}}
+                            @if (isset($reads_started['failed']) && $reads_started['failed'] > \Illuminate\Support\Carbon::parse($failed['read_at'])->getTimestamp() && ! $this->readIsSlow('failed'))
+                                <span wire:poll.2s class="text-brand-mist">· {{ __('refreshing…') }}</span>
+                            @endif
                         @endif
                     </p>
                     <div class="flex shrink-0 items-center gap-2">
@@ -779,15 +783,7 @@
                     @else
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($runningJobs as $job)
-                                <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="running-{{ $loop->index }}">
-                                    <p class="min-w-0 truncate font-mono text-xs font-semibold text-brand-ink">{{ $job['name'] ?? 'job' }}</p>
-                                    <p class="shrink-0 text-2xs text-brand-mist">
-                                        {{ $job['queue'] ?? '?' }}
-                                        @if (($job['age'] ?? null) !== null)
-                                            · {{ __('running for :s s', ['s' => (int) round((float) $job['age'])]) }}
-                                        @endif
-                                    </p>
-                                </li>
+                                @include('livewire.sites.partials._horizon-job-row', ['job' => $job, 'rowKey' => 'running-'.($job['id'] ?? $loop->index)])
                             @endforeach
                         </ul>
                     @endif
@@ -820,17 +816,7 @@
                     </div>
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($hzFinished as $job)
-                            @php($jobFailed = strtolower((string) ($job['status'] ?? '')) === 'failed')
-                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="hz-history-{{ $loop->index }}">
-                                <p class="min-w-0 truncate font-mono text-xs font-semibold {{ $jobFailed ? 'text-rose-700' : 'text-brand-ink' }}">{{ $job['name'] ?? 'job' }}</p>
-                                <p class="shrink-0 text-2xs text-brand-mist">
-                                    <span @class(['rounded-full px-1.5 py-0.5 font-semibold', 'bg-rose-100 text-rose-900' => $jobFailed, 'bg-emerald-50 text-emerald-800' => ! $jobFailed])>{{ $jobFailed ? __('failed') : __('completed') }}</span>
-                                    · {{ $job['queue'] ?? '?' }}
-                                    @if (($job['age'] ?? null) !== null)
-                                        · {{ __(':s s ago', ['s' => (int) round((float) $job['age'])]) }}
-                                    @endif
-                                </p>
-                            </li>
+                            @include('livewire.sites.partials._horizon-job-row', ['job' => $job, 'rowKey' => 'hz-history-'.($job['id'] ?? $loop->index)])
                         @endforeach
                     </ul>
                 @endif

@@ -181,9 +181,30 @@ $out['running_config'] = $T(function () use ($sr, $g) {
 $out['queue_throughput'] = $T(fn () => collect($mr->measuredQueues())->mapWithKeys(fn ($q) => [(string) $q => collect($mr->snapshotsForQueue($q))->map(fn ($s) => round((float) $g($s, 'throughput', 0), 2))->values()->all()])->all(), []);
 // `age` (seconds) computed on the box against $boxNow — the UI renders it as
 // "Ns ago" anchored to collected_at, never doing cross-machine clock math.
+// The detail a person needs to understand one job — attempts, timeout, how long
+// it waited for a worker and how long it ran, and its tags (which models it is
+// about) — read from the payload's envelope only. `data.command` is the
+// customer's serialized arguments and never leaves the box here; "Show payload"
+// fetches it for one job on request.
 $jobRow = function ($j) use ($g, $boxNow) {
-    $at = (float) $g($j, 'reserved_at', $g($j, 'completed_at', 0));
-    return ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'age' => $at > 0 ? max(0, round($boxNow - $at, 1)) : null];
+    $reserved = (float) $g($j, 'reserved_at', 0);
+    $completed = (float) $g($j, 'completed_at', 0);
+    $at = $reserved ?: $completed;
+    $p = json_decode((string) $g($j, 'payload', ''), true) ?: [];
+    $pushed = (float) ($p['pushedAt'] ?? 0);
+    return [
+        'id' => $g($j, 'id'),
+        'name' => $g($j, 'name') ?: 'job',
+        'queue' => $g($j, 'queue', '?'),
+        'status' => $g($j, 'status', '?'),
+        'age' => $at > 0 ? max(0, round($boxNow - $at, 1)) : null,
+        'waited' => $pushed > 0 && $reserved > 0 ? max(0, round($reserved - $pushed, 1)) : null,
+        'ran' => $reserved > 0 && $completed > 0 ? max(0, round($completed - $reserved, 1)) : null,
+        'tags' => array_values(array_slice((array) ($p['tags'] ?? []), 0, 8)),
+        'attempts' => $p['attempts'] ?? null,
+        'max_tries' => $p['maxTries'] ?? null,
+        'timeout' => $p['timeout'] ?? null,
+    ];
 };
 $out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
 $out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);
