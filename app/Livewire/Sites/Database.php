@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Jobs\CreateSiteDatabaseJob;
 use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
@@ -31,6 +32,7 @@ use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Sites\SiteDatabaseWorkspace;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -59,6 +61,7 @@ class Database extends Component
 {
     use AuthorizesRequests;
     use CreatesNotificationChannelInline;
+    use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
     use ManagesDatabaseNotifications;
     use WatchesConsoleActionOutcomes;
@@ -926,6 +929,12 @@ class Database extends Component
     {
         $this->dbTab = 'notifications';
         $this->notif_channel_id = $channelId;
+    }
+
+    /** Scopes the console banner's Dismiss/Stop buttons to this site's runs. */
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
     }
 
     public function render(): View

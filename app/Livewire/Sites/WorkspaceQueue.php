@@ -14,6 +14,7 @@ use App\Jobs\DispatchSiteTestJobJob;
 use App\Jobs\ReadSiteQueueJobPayloadJob;
 use App\Jobs\RunSiteQueueCanaryJob;
 use App\Jobs\SetUpSiteQueueingJob;
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\SeedsSiteConsoleActions;
 use App\Models\ConsoleAction;
@@ -50,6 +51,7 @@ use App\Support\Sites\SiteQueueAlertRules;
 use App\Support\Sites\SiteQueueConfiguration;
 use App\Support\Sites\SiteQueueReadiness;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -72,6 +74,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceQueue extends Component
 {
+    use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
     use SeedsSiteConsoleActions;
 
@@ -2004,6 +2007,16 @@ class WorkspaceQueue extends Component
         }
 
         return $byQueue;
+    }
+
+    /**
+     * The console banner's Dismiss button calls dismissConsoleActionRun; this
+     * page renders that banner, so it has to answer it — without the trait the
+     * click hit a missing method and a 500.
+     */
+    protected function consoleActionSubject(): Model
+    {
+        return $this->site;
     }
 
     public function render(): View
