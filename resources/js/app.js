@@ -7,6 +7,7 @@ import {
 import { registerDplyThemeListeners } from './theme.js';
 import { registerDeployPipelineWorkspace } from './deploy-pipeline-dnd.js';
 import { registerConsoleDrawer } from './console-drawer.js';
+import { registerSshKeypairReveal } from './ssh-keypair-reveal.js';
 import { registerRealtimeConsole } from './realtime-console.js';
 import {
     installFeedbackConsoleBuffer,
@@ -106,6 +107,8 @@ document.addEventListener('alpine:init', () => {
 
     registerDeployPipelineWorkspace(window.Alpine);
     registerConsoleDrawer(window.Alpine);
+    // The private-key dialog: bundled so it exists on lazy pages too.
+    registerSshKeypairReveal(window.Alpine);
     registerFeedbackSidebar(window.Alpine);
     registerRealtimeConsole(window.Alpine);
     // Toolbar/shortcuts for Markdown textareas (server notes today). Pure DOM
