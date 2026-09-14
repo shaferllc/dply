@@ -66,6 +66,23 @@ test('get SSH access generates a key, installs it for the deploy user, and hands
     Queue::assertPushed(SyncAuthorizedKeysJob::class);
 });
 
+test('the private-key dialog does not depend on an inline script the lazy page never runs', function () {
+    // The SSH keys page is #[Lazy]: its HTML arrives after load, and Livewire
+    // does not execute plain <script> tags that arrive that way. The dialog's
+    // factory lived in one, so x-data referenced an undefined function and the
+    // dialog never opened — keys were generated and installed, never shown.
+    [$user, $server] = actingOwnerWithServer();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceSshKeys::class, ['server' => $server])
+        ->assertSee('x-data="dplySshKeypairReveal()"', false)
+        ->assertDontSee('window.dplySshKeypairReveal', false);
+
+    // Registered once in the bundled JS instead, before Alpine starts.
+    expect(file_get_contents(resource_path('js/app.js')))->toContain('registerSshKeypairReveal(window.Alpine)')
+        ->and(file_get_contents(resource_path('js/ssh-keypair-reveal.js')))->toContain("Alpine.data('dplySshKeypairReveal'");
+});
+
 test('add key writes audit event', function () {
     [$user, $server] = actingOwnerWithServer();
 
