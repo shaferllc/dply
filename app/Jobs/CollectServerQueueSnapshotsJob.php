@@ -87,6 +87,26 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
 
         $this->store($payloads, $targets, $this->liveness($buffer, $targets));
         $this->recordReads($targets, array_map(static fn (array $payload): string => (string) ($payload['site_id'] ?? ''), $payloads), __('The app did not answer — it failed to boot, or its directory is missing.'));
+        $this->storeHorizon($buffer, $targets);
+    }
+
+    /**
+     * @param  array<string, mixed>  $targets
+     */
+    private function storeHorizon(string $buffer, array $targets): void
+    {
+        if (preg_match_all('/DPLY_HZSITE_START:(\S+)\s(.*?)DPLY_HZSITE_END/s', $buffer, $blocks, PREG_SET_ORDER) === 0) {
+            return;
+        }
+
+        foreach ($blocks as $block) {
+            // Only sites this sweep asked about: the id comes back off the box.
+            $site = isset($targets[$block[1]]) ? Site::query()->find($block[1]) : null;
+
+            if ($site instanceof Site) {
+                CollectSiteHorizonSnapshotJob::record($site, $block[2]);
+            }
+        }
     }
 
     /**
@@ -255,6 +275,18 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
                 escapeshellarg($payload),
                 $php,
             );
+
+            // Horizon's detail — running jobs, recent history, throughput — rides
+            // this same session, so it stays fresh with nobody on the page. In a
+            // subshell: that script `exit`s when the app directory is missing,
+            // which would end the sweep for every site after this one.
+            // ponytail: one tinker boot per Horizon site inside the 120s exec
+            // timeout; split the session if a box ever hosts dozens of them.
+            if (collect($target['workers'])->contains(fn (array $worker): bool => $worker['horizon'])) {
+                $lines[] = 'echo DPLY_HZSITE_START:'.$siteId;
+                $lines[] = '( '.CollectWorkerPoolHorizonSnapshotJob::script($target['dir']).' ) || true';
+                $lines[] = 'echo; echo DPLY_HZSITE_END';
+            }
         }
 
         return implode("\n", $lines);

@@ -329,6 +329,36 @@ test('clearing failed jobs is not news, and a blank threshold switches the rule 
     sweep($quiet, "DPLY_SV_START\nDPLY_SV_END", [['queue' => 'default', 'source' => 'artisan', 'pending' => 0, 'failed' => 500]]);
 });
 
+test('the sweep refreshes Horizon detail in the same session, page open or not', function () {
+    $site = queueSite();
+    worker($site, 'php artisan horizon');
+
+    $job = new CollectServerQueueSnapshotsJob((string) $site->server_id);
+    $script = (new ReflectionMethod($job, 'script'))->invoke($job, targetsFor($site));
+
+    // A subshell, because the Horizon script exits when the app dir is gone.
+    expect($script)->toContain('DPLY_HZSITE_START:'.$site->id)->toContain('( cd ');
+
+    $horizon = json_encode(['status' => 'running', 'recent_jobs' => [['name' => 'App\\Jobs\\ChargeCard', 'status' => 'reserved']]]);
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END\nDPLY_HZSITE_START:{$site->id}\nDPLY_HZ_START{$horizon}DPLY_HZ_END\nDPLY_HZSITE_END", [
+        ['queue' => 'default', 'source' => 'horizon', 'pending' => 0, 'worker_processes' => 4],
+    ]);
+
+    $meta = $site->fresh()->meta;
+    expect(data_get($meta, 'horizon.status'))->toBe('running')
+        ->and(data_get($meta, 'horizon.recent_jobs.0.name'))->toBe('App\\Jobs\\ChargeCard')
+        ->and(data_get($meta, 'horizon.collected_at'))->not->toBeNull();
+});
+
+test('a site without Horizon does not pay for a Horizon read', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work');
+
+    $job = new CollectServerQueueSnapshotsJob((string) $site->server_id);
+
+    expect((new ReflectionMethod($job, 'script'))->invoke($job, targetsFor($site)))->not->toContain('DPLY_HZSITE_START');
+});
+
 test('putMeta writes one key without reverting what a stale copy never saw', function () {
     $site = queueSite();
     $site->forceFill(['meta' => null])->save();

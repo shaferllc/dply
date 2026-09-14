@@ -524,29 +524,44 @@ class Site extends Model
     }
 
     /**
-     * Write ONE top-level `meta` key in the database, leaving every other key
-     * as it is there — not as it is on this (possibly minutes-old) instance.
+     * Save `meta` as the keys this instance changed, never as the whole column.
      *
-     * `forceFill(['meta' => …])->save()` writes the whole column back, so a
-     * Livewire page open for twenty minutes, or a job that loaded the site
-     * before a long SSH round trip, silently reverts whatever other writers
-     * stored meanwhile. Null removes the key. `$key` must be a code constant.
+     * Eloquent writes a dirty JSON column back in full, so a Livewire page open
+     * for twenty minutes, or a job that loaded the site before a long SSH round
+     * trip, silently reverted every key other writers stored meanwhile. Diffing
+     * against what this instance loaded fixes it for every `->save()` in the
+     * app at once. `meta` stays dirty, so getChanges() still reports it.
+     *
+     * @return array<string, mixed>
+     */
+    protected function getDirtyForUpdate(): array
+    {
+        $dirty = parent::getDirtyForUpdate();
+
+        if (! array_key_exists('meta', $dirty)) {
+            return $dirty;
+        }
+
+        $before = is_array($this->getOriginal('meta')) ? $this->getOriginal('meta') : [];
+        $after = is_array($this->meta) ? $this->meta : [];
+
+        $set = array_filter($after, fn (mixed $value, string|int $key): bool => ! array_key_exists($key, $before) || $before[$key] !== $value, ARRAY_FILTER_USE_BOTH);
+        $remove = array_keys(array_diff_key($before, $after));
+
+        $this->writeMetaKeys($set, array_map('strval', $remove));
+
+        unset($dirty['meta']);
+
+        return $dirty;
+    }
+
+    /**
+     * Write ONE top-level `meta` key in the database, leaving every other key
+     * as it is there — not as it is on this instance. Null removes the key.
      */
     public function putMeta(string $key, mixed $value): void
     {
-        if ($value === null) {
-            DB::update(
-                "update {$this->getTable()} set meta = (coalesce(meta::jsonb, '{}'::jsonb) - ?)::json where id = ?",
-                [$key, $this->getKey()],
-            );
-        } else {
-            // coalesce: jsonb_set on a NULL column returns NULL, which would
-            // quietly write nothing at all.
-            DB::update(
-                "update {$this->getTable()} set meta = jsonb_set(coalesce(meta::jsonb, '{}'::jsonb), ?::text[], ?::jsonb)::json where id = ?",
-                ['{'.$key.'}', json_encode($value, JSON_THROW_ON_ERROR), $this->getKey()],
-            );
-        }
+        $value === null ? $this->writeMetaKeys([], [$key]) : $this->writeMetaKeys([$key => $value], []);
 
         $meta = is_array($this->meta) ? $this->meta : [];
 
@@ -558,5 +573,41 @@ class Site extends Model
 
         $this->meta = $meta;
         $this->syncOriginalAttribute('meta');
+    }
+
+    /**
+     * One statement, so a save's keys land together. Keys go in as bound
+     * array elements (`ARRAY[?]`), never spliced into a `'{…}'` path literal,
+     * so no key can change what the path means.
+     *
+     * @param  array<string|int, mixed>  $set
+     * @param  list<string>  $remove
+     */
+    private function writeMetaKeys(array $set, array $remove): void
+    {
+        if ($set === [] && $remove === []) {
+            return;
+        }
+
+        // coalesce: jsonb_set on a NULL column returns NULL, which would
+        // quietly write nothing at all.
+        $expression = "coalesce(meta::jsonb, '{}'::jsonb)";
+        $bindings = [];
+
+        foreach ($set as $key => $value) {
+            $expression = "jsonb_set({$expression}, ARRAY[?]::text[], ?::jsonb)";
+            $bindings[] = (string) $key;
+            $bindings[] = json_encode($value, JSON_THROW_ON_ERROR);
+        }
+
+        foreach ($remove as $key) {
+            $expression = "({$expression} - ?)";
+            $bindings[] = $key;
+        }
+
+        DB::update(
+            "update {$this->getTable()} set meta = ({$expression})::json where id = ?",
+            [...$bindings, $this->getKey()],
+        );
     }
 }
