@@ -589,9 +589,11 @@ class Site extends Model
             return;
         }
 
-        // coalesce: jsonb_set on a NULL column returns NULL, which would
-        // quietly write nothing at all.
-        $expression = "coalesce(meta::jsonb, '{}'::jsonb)";
+        // Start from an object, whatever is stored: PHP encodes an empty
+        // array as `[]`, and jsonb_set on a JSON array demands integer paths —
+        // so every site whose meta was ever saved empty threw on its next
+        // write. NULL falls through to '{}' too; jsonb_set on NULL is NULL.
+        $expression = "(case when jsonb_typeof(meta::jsonb) = 'object' then meta::jsonb else '{}'::jsonb end)";
         $bindings = [];
 
         foreach ($set as $key => $value) {

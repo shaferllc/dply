@@ -30,6 +30,22 @@ test('saving a stale copy writes only the meta keys it changed', function () {
         ->and($stale->wasChanged('meta'))->toBeTrue();
 });
 
+test('a site whose meta was saved empty — [] in JSON — can still be written', function () {
+    // PHP encodes an empty array as `[]`; jsonb_set on a JSON array wants
+    // integer paths and threw on every save that touched such a site.
+    $site = Site::factory()->create();
+    Site::query()->whereKey($site->id)->toBase()->update(['meta' => '[]']);
+
+    $fresh = Site::query()->findOrFail($site->id);
+    $fresh->forceFill(['meta' => ['container' => ['source' => 'acme/api']]])->save();
+    $fresh->putMeta('horizon', ['status' => 'running']);
+
+    expect($site->fresh()->meta)->toEqualCanonicalizing([
+        'container' => ['source' => 'acme/api'],
+        'horizon' => ['status' => 'running'],
+    ]);
+});
+
 test('a meta-only save on a NULL column still lands', function () {
     $site = Site::factory()->create();
     Site::query()->whereKey($site->id)->toBase()->update(['meta' => null]);
