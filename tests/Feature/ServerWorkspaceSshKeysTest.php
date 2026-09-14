@@ -43,15 +43,9 @@ test('get SSH access generates a key, installs it for the deploy user, and hands
     [$user, $server] = actingOwnerWithServer();
     Queue::fake();
 
-    // A key already targets root (dply's connection user), so the guarded
-    // sync goes straight to the queue rather than asking to confirm a lockout.
-    ServerAuthorizedKey::query()->create([
-        'server_id' => $server->id,
-        'name' => 'control',
-        'public_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI'.str_repeat('c', 43).' control',
-        'target_linux_user' => '',
-    ]);
-
+    // No key on the page targets root (dply's connection user) — the case that
+    // used to stop at a confirm hidden behind the private-key dialog, so the
+    // key was saved but never synced and no banner appeared.
     $deployUser = config('server_provision.deploy_ssh_user', 'dply');
 
     Livewire::actingAs($user)
@@ -65,7 +59,7 @@ test('get SSH access generates a key, installs it for the deploy user, and hands
                 && str_starts_with((string) ($params['access']['alias'] ?? ''), 'dply');
         });
 
-    $issued = ServerAuthorizedKey::query()->where('server_id', $server->id)->where('name', '!=', 'control')->sole();
+    $issued = ServerAuthorizedKey::query()->where('server_id', $server->id)->sole();
     expect($issued->target_linux_user)->toBe($deployUser)
         ->and($issued->public_key)->toStartWith('ssh-ed25519 ');
 
