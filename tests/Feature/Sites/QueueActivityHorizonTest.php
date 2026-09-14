@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Sites\QueueActivityHorizonTest;
 
+use App\Jobs\CollectSiteFailedJobsJob;
 use App\Livewire\Sites\WorkspaceQueue;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteQueueJobRun;
 use App\Models\SiteQueueSnapshot;
 use App\Models\SupervisorProgram;
 use App\Models\User;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
@@ -116,6 +119,46 @@ test('the Horizon row warns when another app shares this app’s Horizon keys', 
         ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site->fresh()])
         ->assertSee('it runs dply-control, dply-provision')
         ->assertSee('Set a unique HORIZON_PREFIX');
+});
+
+test('History shows Horizon’s finished jobs next to the agent’s runs, not only instead of them', function () {
+    // A single canary in History used to hide every job the app itself ran.
+    [$user, $server, $site] = horizonSite();
+    SiteQueueJobRun::query()->create([
+        'site_id' => $site->id,
+        'name' => 'App\\Jobs\\CanaryProbe',
+        'queue' => 'default',
+        'status' => 'processed',
+        'source' => 'canary',
+        'ran_at' => now(),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->call('showActivity', 'history')
+        ->assertSee('App\\Jobs\\CanaryProbe')
+        ->assertSee('App\\Jobs\\SendReceipt');
+});
+
+test('a read that never answers stops spinning after 90 seconds and says so', function () {
+    [$user, $server, $site] = horizonSite();
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->call('showActivity', 'failed')
+        ->assertSee('Reading failed jobs…')
+        ->set('reads_started', ['failed' => now()->subSeconds(120)->getTimestamp()])
+        ->assertSee('No answer from the server yet')
+        ->assertDontSee('Reading failed jobs…');
+});
+
+test('a read job answers with the reason when it cannot reach the site, instead of saying nothing', function () {
+    [, $server, $site] = horizonSite();
+    $server->forceFill(['status' => 'provisioning'])->save();
+
+    (new CollectSiteFailedJobsJob((string) $site->id))->handle(app(ExecuteRemoteTaskOnServer::class));
+
+    expect(CollectSiteFailedJobsJob::cached((string) $site->id)['error'] ?? null)->toContain('isn’t ready');
 });
 
 test('a queue the latest sweep no longer reports drops off the page', function () {

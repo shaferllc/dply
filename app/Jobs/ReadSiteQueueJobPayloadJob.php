@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Sites\SiteAppRead;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -71,16 +72,15 @@ class ReadSiteQueueJobPayloadJob implements ShouldQueue
     public function handle(ExecuteRemoteTaskOnServer $exec): void
     {
         $site = Site::query()->with('server')->find($this->siteId);
+        $blocker = $site === null ? __('This site no longer exists.') : SiteAppRead::blocker($site);
 
-        if ($site === null || $site->server === null || ! $site->server->isReady()) {
+        if ($site === null || $blocker !== null) {
+            $this->store(['error' => (string) $blocker]);
+
             return;
         }
 
         $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
-
-        if ($dir === '') {
-            return;
-        }
 
         $payload = base64_encode((string) json_encode([
             'queue' => $this->queueName,
@@ -108,6 +108,16 @@ class ReadSiteQueueJobPayloadJob implements ShouldQueue
 
         $result ??= $this->extract((string) $out->buffer);
 
+        $this->store($result);
+    }
+
+    /**
+     * Every exit lands here: the page polls until something is cached.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function store(array $result): void
+    {
         Cache::put(
             self::cacheKey($this->siteId, $this->userId, $this->jobUuid),
             ['payload' => $result['payload'] ?? null, 'error' => $result['error'] ?? null],
