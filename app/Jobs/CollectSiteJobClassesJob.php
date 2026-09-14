@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Sites\SiteAppRead;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -43,7 +44,9 @@ class CollectSiteJobClassesJob implements ShouldQueue
 
     public function __construct(public string $siteId)
     {
-        $this->onQueue('dply-control');
+        // Someone clicked and is watching a spinner: not behind the five-minute
+        // sweeps on dply-control.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public static function cacheKey(string $siteId): string
@@ -64,16 +67,15 @@ class CollectSiteJobClassesJob implements ShouldQueue
     public function handle(ExecuteRemoteTaskOnServer $exec): void
     {
         $site = Site::query()->with('server')->find($this->siteId);
+        $blocker = $site === null ? __('This site no longer exists.') : SiteAppRead::blocker($site);
 
-        if ($site === null || $site->server === null || ! $site->server->isReady()) {
+        if ($site === null || $blocker !== null) {
+            $this->store(['error' => (string) $blocker]);
+
             return;
         }
 
         $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
-
-        if ($dir === '') {
-            return;
-        }
 
         $payload = base64_encode((string) json_encode(['limit' => self::LIMIT]));
         $php = base64_encode($this->remotePhp());
@@ -96,8 +98,17 @@ class CollectSiteJobClassesJob implements ShouldQueue
 
         $result ??= $this->extract((string) $out->buffer);
 
-        // Cache the failure too: the page has to stop saying "reading" whether
-        // or not the box had anything to say.
+        $this->store($result);
+    }
+
+    /**
+     * Cache the failure too: the page polls until something is cached, so
+     * every exit lands here whether or not the box had anything to say.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function store(array $result): void
+    {
         Cache::put(self::cacheKey($this->siteId), [
             'jobs' => array_values((array) ($result['jobs'] ?? [])),
             'truncated' => (bool) ($result['truncated'] ?? false),

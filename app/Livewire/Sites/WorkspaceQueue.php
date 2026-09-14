@@ -124,6 +124,14 @@ class WorkspaceQueue extends Component
     /** Job whose payload was explicitly requested, by envelope uuid. */
     public string $payload_uuid = '';
 
+    /**
+     * When each on-demand read was last asked for, by kind, so its spinner
+     * can give up rather than spin forever.
+     *
+     * @var array<string, int>
+     */
+    public array $reads_started = [];
+
     /** Queue whose alert rules are open, or '' for the site defaults. */
     public string $alert_queue = '';
 
@@ -659,6 +667,7 @@ class WorkspaceQueue extends Component
             $this->activity_view = 'waiting';
         }
 
+        $this->startedRead('jobs');
         CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $queue, $this->activity_view);
     }
 
@@ -727,6 +736,7 @@ class WorkspaceQueue extends Component
 
         $this->payload_uuid = $uuid;
 
+        $this->startedRead('payload');
         ReadSiteQueueJobPayloadJob::dispatch(
             (string) $this->site->id,
             $this->inspect_queue,
@@ -734,6 +744,26 @@ class WorkspaceQueue extends Component
             (string) auth()->id(),
             $this->activity_view === 'delayed' ? 'delayed' : 'waiting',
         );
+    }
+
+    /**
+     * One Horizon job's full payload, for a Running or History row. The job is
+     * no longer on the queue, so it is read from Horizon's own record.
+     */
+    public function revealHorizonPayload(string $id): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->payload_uuid === $id) {
+            $this->payload_uuid = '';
+
+            return;
+        }
+
+        $this->payload_uuid = $id;
+        $this->startedRead('payload');
+
+        ReadSiteQueueJobPayloadJob::dispatch((string) $this->site->id, '', $id, (string) auth()->id(), 'horizon');
     }
 
     /**
@@ -759,13 +789,16 @@ class WorkspaceQueue extends Component
         // Each view pays its own way: the reads happen when their view is
         // opened, so landing on Activity does not fire SSH reads for panels
         // nobody looked at.
-        if ($this->activity_view === 'failed' && CollectSiteFailedJobsJob::cached((string) $this->site->id) === null) {
+        // Failed always re-reads on open, but renders the last list straight
+        // away (kept a day, labelled with its age) instead of a spinner.
+        if ($this->activity_view === 'failed' && $this->managedFailedJobs() === null) {
             $this->refreshFailedJobs();
         }
 
         // Delayed is read per queue, like waiting is, so it needs a queue chosen
         // before there is anything to fetch.
         if ($this->activity_view === 'delayed' && $this->inspect_queue !== '') {
+            $this->startedRead('jobs');
             CollectSiteQueueJobsJob::dispatch((string) $this->site->id, $this->inspect_queue, 'delayed');
         }
     }
@@ -774,7 +807,23 @@ class WorkspaceQueue extends Component
     {
         $this->authorize('view', $this->site);
 
+        $this->startedRead('failed');
         CollectSiteFailedJobsJob::dispatch((string) $this->site->id);
+    }
+
+    private function startedRead(string $kind): void
+    {
+        $this->reads_started[$kind] = now()->getTimestamp();
+    }
+
+    /**
+     * True once an on-demand read has gone 90s unanswered — queued behind
+     * other work, or the server is not responding. Its spinner then stops
+     * polling and says so, instead of spinning forever.
+     */
+    public function readIsSlow(string $kind): bool
+    {
+        return isset($this->reads_started[$kind]) && now()->getTimestamp() - $this->reads_started[$kind] > 90;
     }
 
     /**
@@ -878,6 +927,7 @@ class WorkspaceQueue extends Component
     {
         $this->authorize('view', $this->site);
 
+        $this->startedRead('catalog');
         CollectSiteJobClassesJob::dispatch((string) $this->site->id);
     }
 

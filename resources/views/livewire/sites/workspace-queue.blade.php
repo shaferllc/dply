@@ -705,6 +705,10 @@
                         {{ __('Jobs that gave up. Each one is still retryable until you clear it.') }}
                         @if ($failed && $failed['read_at'])
                             <span class="text-brand-mist">· {{ __('read :when', ['when' => \Illuminate\Support\Carbon::parse($failed['read_at'])->diffForHumans()]) }}</span>
+                            {{-- The last list shows at once; a fresh read runs behind it. --}}
+                            @if (isset($reads_started['failed']) && $reads_started['failed'] > \Illuminate\Support\Carbon::parse($failed['read_at'])->getTimestamp() && ! $this->readIsSlow('failed'))
+                                <span wire:poll.2s class="text-brand-mist">· {{ __('refreshing…') }}</span>
+                            @endif
                         @endif
                     </p>
                     <div class="flex shrink-0 items-center gap-2">
@@ -719,9 +723,7 @@
                 </div>
 
                 @if ($failed === null)
-                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
-                        <x-spinner size="sm" /> {{ __('Reading failed jobs…') }}
-                    </div>
+                    @include('livewire.sites.partials._queue-read-pending', ['kind' => 'failed', 'label' => __('Reading failed jobs…')])
                 @elseif ($failed['error'])
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list failed jobs.') }}</p>
@@ -781,15 +783,7 @@
                     @else
                         <ul class="divide-y divide-brand-ink/10">
                             @foreach ($runningJobs as $job)
-                                <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="running-{{ $loop->index }}">
-                                    <p class="min-w-0 truncate font-mono text-xs font-semibold text-brand-ink">{{ $job['name'] ?? 'job' }}</p>
-                                    <p class="shrink-0 text-2xs text-brand-mist">
-                                        {{ $job['queue'] ?? '?' }}
-                                        @if (($job['age'] ?? null) !== null)
-                                            · {{ __('running for :s s', ['s' => (int) round((float) $job['age'])]) }}
-                                        @endif
-                                    </p>
-                                </li>
+                                @include('livewire.sites.partials._horizon-job-row', ['job' => $job, 'rowKey' => 'running-'.($job['id'] ?? $loop->index)])
                             @endforeach
                         </ul>
                     @endif
@@ -813,26 +807,20 @@
                      dply — but Horizon keeps its recent finished jobs, so show those
                      rather than an empty panel. --}}
                 @php($hzFinished = $runsHorizon ? collect(is_array($site->meta['horizon']['recent_jobs'] ?? null) ? $site->meta['horizon']['recent_jobs'] : [])->filter(fn ($job): bool => in_array(strtolower((string) ($job['status'] ?? '')), ['completed', 'failed'], true) && $queues->has((string) ($job['queue'] ?? '')))->values() : collect())
-                @if ($jobRuns->isEmpty() && $hzFinished->isNotEmpty())
+                {{-- Horizon's finished jobs show whenever there are any, not only
+                     when the agent has recorded nothing: a canary or a manual run
+                     in History used to hide the app's own traffic entirely. --}}
+                @if ($hzFinished->isNotEmpty())
                     <div wire:init="pollHorizon" wire:poll.30s="pollHorizon" class="border-b border-brand-ink/10 px-4 py-2.5 text-xs text-brand-moss sm:px-5">
                         {{ __('From Horizon’s recent jobs. The queue agent records every run with timings and errors.') }}
                     </div>
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($hzFinished as $job)
-                            @php($jobFailed = strtolower((string) ($job['status'] ?? '')) === 'failed')
-                            <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-5" wire:key="hz-history-{{ $loop->index }}">
-                                <p class="min-w-0 truncate font-mono text-xs font-semibold {{ $jobFailed ? 'text-rose-700' : 'text-brand-ink' }}">{{ $job['name'] ?? 'job' }}</p>
-                                <p class="shrink-0 text-2xs text-brand-mist">
-                                    <span @class(['rounded-full px-1.5 py-0.5 font-semibold', 'bg-rose-100 text-rose-900' => $jobFailed, 'bg-emerald-50 text-emerald-800' => ! $jobFailed])>{{ $jobFailed ? __('failed') : __('completed') }}</span>
-                                    · {{ $job['queue'] ?? '?' }}
-                                    @if (($job['age'] ?? null) !== null)
-                                        · {{ __(':s s ago', ['s' => (int) round((float) $job['age'])]) }}
-                                    @endif
-                                </p>
-                            </li>
+                            @include('livewire.sites.partials._horizon-job-row', ['job' => $job, 'rowKey' => 'hz-history-'.($job['id'] ?? $loop->index)])
                         @endforeach
                     </ul>
-                @elseif ($jobRuns->isEmpty())
+                @endif
+                @if ($jobRuns->isEmpty() && $hzFinished->isEmpty())
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('No job history yet.') }}</p>
                         <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">
@@ -844,7 +832,7 @@
                             @endif
                         </p>
                     </div>
-                @else
+                @elseif ($jobRuns->isNotEmpty())
                     <ul class="divide-y divide-brand-ink/10">
                         @foreach ($jobRuns as $run)
                             <li wire:key="run-{{ $run->id }}">
@@ -960,9 +948,7 @@
                 @elseif ($inspected === null)
                     {{-- Dispatched but nothing cached yet: this is a queued SSH read,
                          so "reading" is the honest state rather than "empty". --}}
-                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
-                        <x-spinner size="sm" /> {{ __('Reading the queue…') }}
-                    </div>
+                    @include('livewire.sites.partials._queue-read-pending', ['kind' => 'jobs', 'label' => __('Reading the queue…')])
                 @elseif ($inspected['error'])
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('Cannot list jobs on this driver.') }}</p>
@@ -1015,8 +1001,10 @@
                                 @if ($payload_uuid === $job->uuid)
                                     @php($revealed = $this->revealedPayload())
                                     <div class="mt-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
-                                        @if ($revealed === null)
-                                            <p class="flex items-center gap-2 text-2xs text-brand-moss"><x-spinner size="sm" /> {{ __('Reading this job from the server…') }}</p>
+                                        @if ($revealed === null && $this->readIsSlow('payload'))
+                                            <p class="text-2xs text-brand-moss">{{ __('No answer from the server yet. Close this and open it again to retry.') }}</p>
+                                        @elseif ($revealed === null)
+                                            <p wire:poll.2s class="flex items-center gap-2 text-2xs text-brand-moss"><x-spinner size="sm" /> {{ __('Reading this job from the server…') }}</p>
                                         @elseif ($revealed['error'])
                                             <p class="text-2xs text-brand-moss">{{ $revealed['error'] }}</p>
                                         @else
@@ -1056,9 +1044,7 @@
 
                 @if ($catalog === null)
                     {{-- A queued SSH read: "scanning" is the honest state, not "empty". --}}
-                    <div class="flex items-center justify-center gap-2 px-4 py-5 text-xs text-brand-moss sm:px-5">
-                        <x-spinner size="sm" /> {{ __('Reading the application…') }}
-                    </div>
+                    @include('livewire.sites.partials._queue-read-pending', ['kind' => 'catalog', 'label' => __('Reading the application…')])
                 @elseif ($catalog['error'])
                     <div class="px-4 py-5 text-center sm:px-5">
                         <p class="text-sm font-medium text-brand-ink">{{ __('Could not read the application.') }}</p>

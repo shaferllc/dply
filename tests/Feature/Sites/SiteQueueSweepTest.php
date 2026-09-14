@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Sites\SiteQueueSweepTest;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Jobs\CollectSiteFailedJobsJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\Site;
@@ -15,6 +16,7 @@ use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Horizon\Contracts\SupervisorRepository;
 use Laravel\Horizon\Contracts\WorkloadRepository;
@@ -424,6 +426,41 @@ test('another app sharing Horizon keys is remembered, and forgotten once it is g
 
     $sweepWith([]);
     expect($site->fresh()->meta)->not->toHaveKey('queue_horizon_shared');
+});
+
+test('the failed-jobs read takes the newest few with a LIMIT, and still reports the full total', function () {
+    // all() loaded every failed job ever kept to show fifty; a table-backed
+    // failer is now read newest-first with a LIMIT plus a count.
+    config(['queue.failed.driver' => 'database-uuids', 'queue.failed.table' => 'failed_jobs', 'queue.failed.database' => config('database.default')]);
+
+    foreach (['First', 'Second', 'Third'] as $i => $name) {
+        DB::table('failed_jobs')->insert([
+            'uuid' => (string) Str::uuid(),
+            'connection' => 'redis',
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => 'App\\Jobs\\'.$name, 'attempts' => 1]),
+            'exception' => "RuntimeException: {$name} broke\n#0 /app/trace.php(1)",
+            'failed_at' => now()->subMinutes(10 - $i),
+        ]);
+    }
+
+    $job = new CollectSiteFailedJobsJob('01hzzzzzzzzzzzzzzzzzzzzzzz');
+    $php = fn (string $method): string => (new ReflectionMethod($job, $method))->invoke($job);
+
+    putenv('DPLY_FJ_IN='.base64_encode((string) json_encode(['limit' => 2])));
+    ob_start();
+    $app = app();
+    eval($php('preludePhp').$php('readPhp'));
+    $out = (string) ob_get_clean();
+    putenv('DPLY_FJ_IN');
+
+    preg_match('/DPLY_FJ_START(.*?)DPLY_FJ_END/s', $out, $m);
+    $result = json_decode($m[1] ?? '{}', true);
+
+    expect($result['total'] ?? null)->toBe(3)
+        ->and(array_column($result['jobs'] ?? [], 'name'))->toBe(['App\\Jobs\\Third', 'App\\Jobs\\Second'])
+        // First line only: the trace beneath it can quote arguments.
+        ->and($result['jobs'][0]['exception'] ?? null)->toBe('RuntimeException: Third broke');
 });
 
 test('putMeta writes one key without reverting what a stale copy never saw', function () {

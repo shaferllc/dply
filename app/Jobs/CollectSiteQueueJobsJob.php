@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Sites\SiteAppRead;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -45,7 +46,9 @@ class CollectSiteQueueJobsJob implements ShouldQueue
         /** 'waiting' for the ready backlog, 'delayed' for jobs scheduled ahead. */
         public string $scope = 'waiting',
     ) {
-        $this->onQueue('dply-control');
+        // Someone clicked and is watching a spinner: not behind the five-minute
+        // sweeps on dply-control.
+        $this->onQueue(config('dply.queues.interactive', 'dply'));
     }
 
     public static function cacheKey(string $siteId, string $queue, string $scope = 'waiting'): string
@@ -56,16 +59,15 @@ class CollectSiteQueueJobsJob implements ShouldQueue
     public function handle(ExecuteRemoteTaskOnServer $exec): void
     {
         $site = Site::query()->with('server')->find($this->siteId);
+        $blocker = $site === null ? __('This site no longer exists.') : SiteAppRead::blocker($site);
 
-        if ($site === null || $site->server === null || ! $site->server->isReady()) {
+        if ($site === null || $blocker !== null) {
+            $this->store(['error' => (string) $blocker]);
+
             return;
         }
 
         $dir = rtrim((string) $site->effectiveEnvDirectory(), '/');
-
-        if ($dir === '') {
-            return;
-        }
 
         $payload = base64_encode((string) json_encode([
             'queue' => $this->queueName,
@@ -81,18 +83,28 @@ class CollectSiteQueueJobsJob implements ShouldQueue
             $php,
         );
 
+        $result = null;
+
         try {
             $out = $exec->runInlineBash($site->server, 'site:queue-jobs', $bash, timeoutSeconds: 60, asRoot: false);
         } catch (\Throwable $e) {
             Log::info('queue jobs: exec failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
-
-            return;
+            $result = ['error' => 'Could not read the queue: '.$e->getMessage()];
         }
 
-        $result = $this->extract((string) $out->buffer);
+        $result ??= $this->extract((string) $out->buffer);
 
-        // Cache even an empty/failed read: the page needs to stop saying
-        // "loading" whether or not the box had anything to say.
+        $this->store($result);
+    }
+
+    /**
+     * Cache even an empty/failed read: the page polls until something is
+     * cached, so every exit — including a failed SSH call — lands here.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function store(array $result): void
+    {
         Cache::put(self::cacheKey($this->siteId, $this->queueName, $this->scope), [
             'jobs' => $result['jobs'] ?? [],
             'driver' => $result['driver'] ?? null,
