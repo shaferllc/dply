@@ -1178,6 +1178,13 @@ DPLY_QUEUE_TOKEN=•••</pre>
                 </div>
 
                 <div>
+                    <x-input-label for="alert_failures_at_least" :value="__('Alert when this many jobs fail within those minutes')" />
+                    <x-text-input id="alert_failures_at_least" type="number" min="1" wire:model="alert_failures_at_least" class="mt-1 block w-full text-sm sm:max-w-xs" :placeholder="__('off')" />
+                    <p class="mt-1 text-2xs text-brand-mist">{{ __('Catches a deploy that breaks every job. Retrying or clearing failed jobs never counts. Blank turns it off.') }}</p>
+                    <x-input-error :messages="$errors->get('alert_failures_at_least')" class="mt-1" />
+                </div>
+
+                <div>
                     <x-input-label for="alert_oldest_over_s" :value="__('Alert when the oldest job waits longer than (seconds)')" />
                     <x-text-input id="alert_oldest_over_s" type="number" min="1" wire:model="alert_oldest_over_s" class="mt-1 block w-full text-sm sm:max-w-xs" :placeholder="__('off')" />
                     <p class="mt-1 text-2xs text-brand-mist">{{ __('Catches a poison job or a worker stuck on one item while the queue keeps moving.') }}</p>

@@ -79,7 +79,7 @@ final class SiteQueueAlertEvaluator
 
             foreach ($this->rulesFor($rules, $samples, $window, $isPaused) as $rule => $fired) {
                 if ($this->step($state, $queue.'|'.$rule, $fired, $changed)) {
-                    $this->publish($site, (string) $queue, $rule, $samples->first(), $rules);
+                    $this->publish($site, (string) $queue, $rule, $samples, $window, $rules);
                 }
             }
         }
@@ -161,11 +161,15 @@ final class SiteQueueAlertEvaluator
             return [];
         }
 
-        $sustained = $samples
-            ->filter(fn (SiteQueueSnapshot $s): bool => $s->captured_at >= now()->subMinutes($window))
-            ->values();
+        $sustained = $this->within($samples, $window);
 
         return [
+            // A burst of failures — the shape of a deploy that broke every
+            // job. Counted from the failer's own total, so retrying or
+            // clearing failed jobs reads as zero new failures, never as news.
+            'failures' => $rules->failuresAtLeast !== null
+                && $this->newFailures($sustained) >= $rules->failuresAtLeast,
+
             // Jobs waiting and nothing draining them: the one failure that is
             // wrong at any depth, any hour, on any site. Null processes means
             // the count could not be read — unknown is not zero, and paging on
@@ -192,6 +196,35 @@ final class SiteQueueAlertEvaluator
         ];
     }
 
+    /**
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     * @return Collection<int, SiteQueueSnapshot>
+     */
+    private function within(Collection $samples, int $window): Collection
+    {
+        return $samples
+            ->filter(fn (SiteQueueSnapshot $s): bool => $s->captured_at >= now()->subMinutes($window))
+            ->values();
+    }
+
+    /**
+     * Failures added between the oldest and newest sample in the window. A
+     * total that went down was retried or cleared, which is zero new ones.
+     *
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     */
+    private function newFailures(Collection $samples): int
+    {
+        $newest = $samples->first()?->failed_total;
+        $oldest = $samples->last()?->failed_total;
+
+        if ($samples->count() < 2 || $newest === null || $oldest === null) {
+            return 0;
+        }
+
+        return max(0, $newest - $oldest);
+    }
+
     private function cooledDown(string $firedAt): bool
     {
         $minutes = max(5, (int) config('dply.queue_alerts.cooldown_minutes', 60));
@@ -199,15 +232,26 @@ final class SiteQueueAlertEvaluator
         return strtotime($firedAt) < now()->subMinutes($minutes)->getTimestamp();
     }
 
-    private function publish(Site $site, string $queue, string $rule, ?SiteQueueSnapshot $latest, SiteQueueAlertRules $rules): void
+    /**
+     * @param  Collection<int, SiteQueueSnapshot>  $samples  newest first
+     */
+    private function publish(Site $site, string $queue, string $rule, Collection $samples, int $window, SiteQueueAlertRules $rules): void
     {
         if ($site->organization === null) {
             return;
         }
 
+        $latest = $samples->first();
         $pending = (int) ($latest->pending ?? 0);
 
         [$title, $body] = match ($rule) {
+            'failures' => [
+                __('Jobs are failing on :q on :site', ['q' => $queue, 'site' => $site->name]),
+                trim(__(':n job(s) failed in the last :m minutes.', [
+                    'n' => $this->newFailures($this->within($samples, $window)),
+                    'm' => $window,
+                ]).' '.($latest?->last_failure !== null ? __('Latest: :e', ['e' => $latest->last_failure]) : '')),
+            ],
             'no_worker' => [
                 __('Queue :q on :site has no worker', ['q' => $queue, 'site' => $site->name]),
                 __(':n job(s) are waiting and nothing is draining them. A worker is stopped, crashed, or was never created.', ['n' => $pending]),
@@ -227,11 +271,17 @@ final class SiteQueueAlertEvaluator
         };
 
         $this->publisher->publish(
-            eventKey: $rule === 'no_worker' ? 'site.queue.no_worker' : 'site.queue.backlog',
+            eventKey: match ($rule) {
+                'no_worker' => 'site.queue.no_worker',
+                'failures' => 'site.queue.failures',
+                default => 'site.queue.backlog',
+            },
             subject: $site,
             title: '['.config('app.name').'] '.$title,
             body: $body,
-            url: $this->queueUrl($site),
+            // Straight to the failed list: the exception is the first thing
+            // anyone opens the page to read.
+            url: $this->queueUrl($site).($rule === 'failures' ? '?activity=failed' : ''),
             metadata: [
                 'site_id' => $site->id,
                 'site_name' => $site->name,

@@ -356,6 +356,10 @@ $rows = [];
 foreach (array_values(array_unique([...(array) $in['queues'], ...array_keys($workload)])) as $queue) {
     $w = $workload[$queue] ?? null;
     $oldest = $ask('creationTimeOfOldestPendingJob', $queue);
+    $failed = $perQueueFailed ? $T(fn () => $failer->count(null, $queue)) : null;
+    // The newest failure's first line, for the alert. Only table-backed
+    // failers have one to query, and only when there is a failure at all.
+    $lastFailure = $failed ? $T(fn () => strtok((string) \Illuminate\Support\Facades\DB::connection(config('queue.failed.database'))->table(config('queue.failed.table', 'failed_jobs'))->where('queue', $queue)->orderByDesc('failed_at')->value('exception'), "\n")) : null;
     $rows[] = [
         'queue' => $queue,
         'source' => $w !== null ? 'horizon' : 'artisan',
@@ -366,7 +370,8 @@ foreach (array_values(array_unique([...(array) $in['queues'], ...array_keys($wor
         'oldest_pending_age_s' => is_numeric($oldest) ? max(0, time() - (int) $oldest) : null,
         'time_to_clear_s' => $w['wait'] ?? null,
         'worker_processes' => $w['processes'] ?? null,
-        'failed' => $perQueueFailed ? $T(fn () => $failer->count(null, $queue)) : null,
+        'failed' => $failed,
+        'last_failure' => is_string($lastFailure) ? mb_substr($lastFailure, 0, 250) : null,
     ];
 }
 echo 'DPLY_Q_START'.json_encode(['site_id' => $in['site_id'], 'queues' => $rows])."DPLY_Q_END\n";
@@ -504,6 +509,9 @@ PHP;
                     'time_to_clear_s' => $this->int($row['time_to_clear_s'] ?? null),
                     'worker_processes' => $processes,
                     'failed_total' => $this->int($row['failed'] ?? null),
+                    'last_failure' => is_string($row['last_failure'] ?? null) && trim($row['last_failure']) !== ''
+                        ? mb_substr(trim($row['last_failure']), 0, 255)
+                        : null,
                     'captured_at' => $capturedAt,
                 ]);
             }

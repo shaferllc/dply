@@ -135,6 +135,9 @@ class WorkspaceQueue extends Component
 
     public bool $alert_no_worker = true;
 
+    /** New failures within the window that page. Blank disables the rule. */
+    public string $alert_failures_at_least = '10';
+
     /** Queue the purge modal is asking about. */
     public string $purge_queue = '';
 
@@ -193,6 +196,11 @@ class WorkspaceQueue extends Component
 
         $this->server = $server;
         $this->site = $site;
+
+        // A "jobs are failing" alert links here; land on the list it is about.
+        if (request()->query('activity') === 'failed') {
+            $this->showActivity('failed');
+        }
     }
 
     /**
@@ -1710,6 +1718,7 @@ class WorkspaceQueue extends Component
         $this->alert_sustained_minutes = $rules->sustainedMinutes;
         $this->alert_oldest_over_s = $rules->oldestOverSeconds === null ? '' : (string) $rules->oldestOverSeconds;
         $this->alert_no_worker = $rules->noWorker;
+        $this->alert_failures_at_least = $rules->failuresAtLeast === null ? '' : (string) $rules->failuresAtLeast;
 
         $this->dispatch('open-modal', 'queue-alerts');
     }
@@ -1721,6 +1730,7 @@ class WorkspaceQueue extends Component
         $this->validate([
             'alert_pending_over' => ['nullable', 'integer', 'min:1', 'max:10000000'],
             'alert_oldest_over_s' => ['nullable', 'integer', 'min:1', 'max:604800'],
+            'alert_failures_at_least' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'alert_sustained_minutes' => ['required', 'integer', 'min:'.SiteQueueAlertRules::MIN_SUSTAINED_MINUTES, 'max:1440'],
         ]);
 
@@ -1730,6 +1740,7 @@ class WorkspaceQueue extends Component
             'sustained_minutes' => $this->alert_sustained_minutes,
             'oldest_over_s' => $this->alert_oldest_over_s === '' ? null : (int) $this->alert_oldest_over_s,
             'no_worker' => $this->alert_no_worker,
+            'failures_at_least' => $this->alert_failures_at_least === '' ? null : (int) $this->alert_failures_at_least,
         ];
 
         if ($this->alert_queue === '') {

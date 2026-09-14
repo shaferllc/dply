@@ -283,6 +283,52 @@ test('a site that stays unreadable pages once, and a good read clears it', funct
         ->and(data_get($meta, 'queue_alerts.state', []))->not->toHaveKey('*|unreadable');
 });
 
+function priorFailedCount(Site $site, string $queue, int $failed): void
+{
+    SiteQueueSnapshot::query()->create([
+        'site_id' => $site->id,
+        'queue' => $queue,
+        'source' => 'artisan',
+        'pending' => 0,
+        'failed_total' => $failed,
+        'captured_at' => now()->subMinutes(5),
+    ]);
+}
+
+test('a burst of failures pages once, quoting the newest exception and linking to them', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work');
+    priorFailedCount($site, 'default', 2);
+
+    $publisher = Mockery::mock(NotificationPublisher::class);
+    $publisher->shouldReceive('publish')->once()->withArgs(fn (string $key, $subject, string $title, string $body, string $url): bool => $key === 'site.queue.failures'
+        && str_contains($body, '12 job(s) failed')
+        && str_contains($body, 'RuntimeException: Stripe is down')
+        && str_ends_with($url, '?activity=failed'));
+    app()->instance(NotificationPublisher::class, $publisher);
+
+    $row = ['queue' => 'default', 'source' => 'artisan', 'pending' => 0, 'failed' => 14, 'last_failure' => 'RuntimeException: Stripe is down in /app/Jobs/Charge.php:40'];
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [$row]);
+    // Still failing on the next sweep: one problem, not a second page.
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [['failed' => 30] + $row]);
+});
+
+test('clearing failed jobs is not news, and a blank threshold switches the rule off', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work');
+    publisherExpecting(null);
+
+    // Someone ran queue:flush: the total dropped 40 → 0.
+    priorFailedCount($site, 'default', 40);
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [['queue' => 'default', 'source' => 'artisan', 'pending' => 0, 'failed' => 0]]);
+
+    $quiet = queueSite();
+    worker($quiet, 'php artisan queue:work');
+    $quiet->putMeta('queue_alerts', ['defaults' => ['failures_at_least' => null]]);
+    priorFailedCount($quiet, 'default', 0);
+    sweep($quiet, "DPLY_SV_START\nDPLY_SV_END", [['queue' => 'default', 'source' => 'artisan', 'pending' => 0, 'failed' => 500]]);
+});
+
 test('putMeta writes one key without reverting what a stale copy never saw', function () {
     $site = queueSite();
     $site->forceFill(['meta' => null])->save();

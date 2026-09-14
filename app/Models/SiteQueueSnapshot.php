@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property ?int $delayed
  * @property ?int $reserved
  * @property ?int $failed_total
+ * @property ?string $last_failure
  * @property ?int $oldest_pending_age_s
  * @property ?int $time_to_clear_s
  * @property ?int $worker_processes
@@ -45,6 +46,7 @@ class SiteQueueSnapshot extends Model
         'delayed',
         'reserved',
         'failed_total',
+        'last_failure',
         'oldest_pending_age_s',
         'time_to_clear_s',
         'worker_processes',
