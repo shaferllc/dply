@@ -10,6 +10,7 @@ use App\Models\SiteQueueSnapshot;
 use App\Modules\Notifications\Services\NotificationPublisher;
 use App\Support\Sites\SiteQueueAlertRules;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Turn the five-minute depth sweep into "somebody should look at this".
@@ -26,6 +27,14 @@ use Illuminate\Support\Collection;
  */
 final class SiteQueueAlertEvaluator
 {
+    /**
+     * Consecutive failed reads before anyone is paged. One dropped SSH
+     * connection is noise; two sweeps in a row is ten minutes of blindness.
+     */
+    public const UNREADABLE_AFTER_FAILURES = 2;
+
+    private const UNREADABLE_KEY = '*|unreadable';
+
     public function __construct(private readonly NotificationPublisher $publisher) {}
 
     public function evaluate(Site $site): void
@@ -51,8 +60,13 @@ final class SiteQueueAlertEvaluator
             ->get()
             ->groupBy('queue');
 
+        $paused = array_keys((array) data_get($site->meta, 'queue_paused', []));
         $state = (array) ($stored['state'] ?? []);
         $changed = false;
+
+        // Being here means the sweep just read this site: that is the
+        // recovery for an unreadable alert.
+        $this->step($state, self::UNREADABLE_KEY, false, $changed);
 
         foreach ($rows as $queue => $samples) {
             $rules = SiteQueueAlertRules::for($site, (string) $queue);
@@ -61,29 +75,12 @@ final class SiteQueueAlertEvaluator
                 continue;
             }
 
-            foreach ($this->rulesFor($rules, $samples, $window) as $rule => $fired) {
-                $key = $queue.'|'.$rule;
-                $active = isset($state[$key]);
+            $isPaused = in_array((string) $queue, $paused, true);
 
-                if (! $fired) {
-                    if ($active) {
-                        // Recovered. Clearing the marker is what makes the NEXT
-                        // occurrence a fresh alert rather than a silent repeat.
-                        unset($state[$key]);
-                        $changed = true;
-                    }
-
-                    continue;
+            foreach ($this->rulesFor($rules, $samples, $window, $isPaused) as $rule => $fired) {
+                if ($this->step($state, $queue.'|'.$rule, $fired, $changed)) {
+                    $this->publish($site, (string) $queue, $rule, $samples->first(), $rules);
                 }
-
-                if ($active && ! $this->cooledDown((string) $state[$key])) {
-                    continue;
-                }
-
-                $state[$key] = now()->toIso8601String();
-                $changed = true;
-
-                $this->publish($site, (string) $queue, $rule, $samples->first(), $rules);
             }
         }
 
@@ -94,10 +91,69 @@ final class SiteQueueAlertEvaluator
     }
 
     /**
+     * The sweep could not read this site — SSH failed, or the app did not
+     * answer. Silence used to read as health; after enough misses in a row it
+     * pages instead.
+     */
+    public function evaluateUnreadable(Site $site): void
+    {
+        $stored = (array) data_get($site->meta, 'queue_alerts', []);
+
+        if (($stored['enabled'] ?? true) === false) {
+            return;
+        }
+
+        $error = (array) data_get($site->meta, 'queue_read_error', []);
+        $state = (array) ($stored['state'] ?? []);
+        $changed = false;
+
+        $fired = (int) ($error['failures'] ?? 0) >= self::UNREADABLE_AFTER_FAILURES;
+
+        if ($this->step($state, self::UNREADABLE_KEY, $fired, $changed)) {
+            $this->publishUnreadable($site, (string) ($error['error'] ?? ''));
+        }
+
+        if ($changed) {
+            $stored['state'] = $state;
+            $site->putMeta('queue_alerts', $stored);
+        }
+    }
+
+    /**
+     * Advance one rule's state; true when it should notify now.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function step(array &$state, string $key, bool $fired, bool &$changed): bool
+    {
+        $active = isset($state[$key]);
+
+        if (! $fired) {
+            if ($active) {
+                // Recovered. Clearing the marker is what makes the NEXT
+                // occurrence a fresh alert rather than a silent repeat.
+                unset($state[$key]);
+                $changed = true;
+            }
+
+            return false;
+        }
+
+        if ($active && ! $this->cooledDown((string) $state[$key])) {
+            return false;
+        }
+
+        $state[$key] = now()->toIso8601String();
+        $changed = true;
+
+        return true;
+    }
+
+    /**
      * @param  Collection<int, SiteQueueSnapshot>  $samples
      * @return array<string, bool>
      */
-    private function rulesFor(SiteQueueAlertRules $rules, Collection $samples, int $window): array
+    private function rulesFor(SiteQueueAlertRules $rules, Collection $samples, int $window, bool $isPaused): array
     {
         $latest = $samples->first();
 
@@ -113,8 +169,10 @@ final class SiteQueueAlertEvaluator
             // Jobs waiting and nothing draining them: the one failure that is
             // wrong at any depth, any hour, on any site. Null processes means
             // the count could not be read — unknown is not zero, and paging on
-            // it told every healthy queue:work site it had no worker.
+            // it told every healthy queue:work site it had no worker. A paused
+            // queue has no worker because someone stopped it on purpose.
             'no_worker' => $rules->noWorker
+                && ! $isPaused
                 && (int) ($latest->pending ?? 0) > 0
                 && $latest->worker_processes !== null
                 && (int) $latest->worker_processes === 0,
@@ -122,6 +180,7 @@ final class SiteQueueAlertEvaluator
             // Deep AND staying deep. Requiring every sample in the window to be
             // over the line means a burst that drains does not page anyone;
             // two samples minimum, so a single reading cannot look sustained.
+            // Still applies while paused: a pause that keeps filling is news.
             'backlog' => $rules->pendingOver !== null
                 && $sustained->count() >= 2
                 && $sustained->every(fn (SiteQueueSnapshot $s): bool => (int) ($s->pending ?? 0) > $rules->pendingOver),
@@ -172,7 +231,7 @@ final class SiteQueueAlertEvaluator
             subject: $site,
             title: '['.config('app.name').'] '.$title,
             body: $body,
-            url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'queue'], absolute: true),
+            url: $this->queueUrl($site),
             metadata: [
                 'site_id' => $site->id,
                 'site_name' => $site->name,
@@ -183,5 +242,34 @@ final class SiteQueueAlertEvaluator
                 'worker_processes' => $latest->worker_processes ?? null,
             ],
         );
+    }
+
+    private function publishUnreadable(Site $site, string $error): void
+    {
+        if ($site->organization === null) {
+            return;
+        }
+
+        $this->publisher->publish(
+            eventKey: 'site.queue.unreadable',
+            subject: $site,
+            title: '['.config('app.name').'] '.__('Can’t read the queues on :site', ['site' => $site->name]),
+            body: __('The last :n queue checks failed, so nothing on this site is being watched. :e', [
+                'n' => self::UNREADABLE_AFTER_FAILURES,
+                'e' => Str::limit($error, 300),
+            ]),
+            url: $this->queueUrl($site),
+            metadata: [
+                'site_id' => $site->id,
+                'site_name' => $site->name,
+                'rule' => 'unreadable',
+                'error' => Str::limit($error, 300),
+            ],
+        );
+    }
+
+    private function queueUrl(Site $site): string
+    {
+        return route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'queue'], absolute: true);
     }
 }

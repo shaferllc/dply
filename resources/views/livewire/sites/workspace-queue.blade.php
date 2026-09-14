@@ -302,11 +302,27 @@
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 px-4 py-2.5 sm:px-5">
                 <p class="text-xs text-brand-moss">
                     {{ __('Alerts fire from the five-minute sweep.') }}
-                    <span class="text-brand-mist">{{ __('By default: jobs waiting with nothing draining them.') }}</span>
+                    <span class="text-brand-mist">{{ __('By default: jobs waiting with nothing draining them, or queues dply cannot read.') }}</span>
                 </p>
                 <x-secondary-button size="xs" type="button" wire:click="editAlerts">{{ __('Alert rules') }}</x-secondary-button>
             </div>
         @endcan
+
+        {{-- The sweep could not read this site. Without this the cards below keep
+             showing the last good numbers as if they were current. --}}
+        @php($readError = is_array($site->meta['queue_read_error'] ?? null) ? $site->meta['queue_read_error'] : null)
+        @if ($readError)
+            <div class="flex items-start gap-2 border-b border-amber-200/70 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 sm:px-5" role="status">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <p class="min-w-0">
+                    <span class="font-semibold">{{ __('Couldn’t read this site’s queues.') }}</span>
+                    {{ \Illuminate\Support\Str::limit((string) ($readError['error'] ?? ''), 200) }}
+                    @if ($lastCapturedAt)
+                        <span class="text-amber-800">· {{ __('Numbers below are from the last good sample, :when.', ['when' => $lastCapturedAt->diffForHumans()]) }}</span>
+                    @endif
+                </p>
+            </div>
+        @endif
 
         @if ($queues->isEmpty())
             <div class="px-4 py-5 text-center sm:px-5">

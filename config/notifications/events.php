@@ -230,6 +230,7 @@ return [
             'events' => [
                 'site.queue.no_worker' => 'Jobs waiting with no worker',
                 'site.queue.backlog' => 'Backlog and stale jobs',
+                'site.queue.unreadable' => 'Queues dply cannot read',
             ],
         ],
         'site_errors' => [

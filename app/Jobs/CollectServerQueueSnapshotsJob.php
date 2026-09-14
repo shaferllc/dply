@@ -22,6 +22,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Snapshot every queue-bearing site on ONE server, in ONE SSH session.
@@ -72,16 +73,20 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
                 asRoot: false,
             );
         } catch (\Throwable $e) {
-            // A server that is down or mid-reboot is not a snapshot failure
-            // worth surfacing — the next tick is five minutes away.
+            // One miss is noise — the next tick is five minutes away — but it is
+            // recorded, because a server that stays down used to be silence
+            // indistinguishable from health.
             Log::info('queue snapshot: exec failed', ['server_id' => $server->id, 'error' => $e->getMessage()]);
+            $this->recordReads($targets, [], __('Could not reach the server over SSH: :e', ['e' => Str::limit($e->getMessage(), 200)]));
 
             return;
         }
 
         $buffer = (string) $out->buffer;
+        $payloads = $this->extract($buffer);
 
-        $this->store($this->extract($buffer), $targets, $this->liveness($buffer, $targets));
+        $this->store($payloads, $targets, $this->liveness($buffer, $targets));
+        $this->recordReads($targets, array_map(static fn (array $payload): string => (string) ($payload['site_id'] ?? ''), $payloads), __('The app did not answer — it failed to boot, or its directory is missing.'));
     }
 
     /**
@@ -93,22 +98,28 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
      * the app can resolve — 'default' is the right guess for every framework
      * dply supports, and a wrong guess costs one row of zeroes, not a failure.
      *
-     * @return array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>
+     * @return array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>
      */
     private function targets(Server $server): array
     {
         $targets = [];
 
+        // Stopped workers too: a site whose last worker was switched off still
+        // has jobs arriving, and dropping it from the sweep meant nobody was
+        // told. A stopped program simply reports zero processes.
         $programs = SupervisorProgram::query()
             ->where('server_id', $server->id)
             ->whereNotNull('site_id')
-            ->where('is_active', true)
             ->with('site')
             ->get();
 
         foreach ($programs as $program) {
             if (QueueWorkerClassifier::isQueueWorker($program->command)) {
-                $this->addWorker($targets, $program->site, 'supervisor', 'dply-sv-'.$program->id, (string) $program->command);
+                $this->addQueues($targets, $program->site, $this->queuesFrom((string) $program->command), [
+                    'kind' => 'supervisor',
+                    'name' => 'dply-sv-'.$program->id,
+                    'horizon' => $this->isHorizon((string) $program->command),
+                ]);
             }
         }
 
@@ -119,8 +130,8 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
 
         $sites = Site::query()
             ->where('server_id', $server->id)
-            ->whereHas('processes', fn ($query) => $query->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB))
-            ->with(['processes' => fn ($query) => $query->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB)])
+            ->whereHas('processes', fn ($query) => $query->where('type', '!=', SiteProcess::TYPE_WEB))
+            ->with(['processes' => fn ($query) => $query->where('type', '!=', SiteProcess::TYPE_WEB)])
             ->get();
 
         foreach ($sites as $site) {
@@ -130,20 +141,62 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
 
             foreach ($site->processes as $process) {
                 if (QueueWorkerClassifier::isQueueWorker($process->command)) {
-                    $this->addWorker($targets, $site, 'systemd', $units->processUnitName($site, $process), (string) $process->command);
+                    $this->addQueues($targets, $site, $this->queuesFrom((string) $process->command), [
+                        'kind' => 'systemd',
+                        'name' => $units->processUnitName($site, $process),
+                        'horizon' => $this->isHorizon((string) $process->command),
+                    ]);
                 }
             }
+        }
+
+        // Pausing takes a queue out of its worker's `--queue=`, so no worker
+        // declares it any more — yet a backlog building behind a pause is
+        // exactly what someone needs to hear about.
+        $pausedSites = Site::query()
+            ->where('server_id', $server->id)
+            ->whereNotNull('meta->queue_paused')
+            ->get();
+
+        foreach ($pausedSites as $site) {
+            $this->addQueues($targets, $site, array_map('strval', array_keys((array) data_get($site->meta, 'queue_paused', []))), null);
         }
 
         return $targets;
     }
 
     /**
-     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>  $targets
+     * `--queue=high,default` is one process draining both in priority order;
+     * each is its own row because each has its own depth.
+     *
+     * @return list<string>
      */
-    private function addWorker(array &$targets, ?Site $site, string $kind, string $name, string $command): void
+    private function queuesFrom(string $command): array
     {
-        if (! $site instanceof Site) {
+        return array_values(array_filter(
+            array_map('trim', explode(',', QueueWorkerClassifier::queueNameFrom($command) ?? 'default')),
+            static fn (string $queue): bool => $queue !== '',
+        ));
+    }
+
+    /**
+     * A Horizon master is alive whether or not it drains a given queue, so its
+     * process-manager status never counts as a worker for one — Horizon's own
+     * workload answers that. Counting it let a wedged Horizon read as healthy.
+     */
+    private function isHorizon(string $command): bool
+    {
+        return str_contains(strtolower($command), 'horizon');
+    }
+
+    /**
+     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>  $targets
+     * @param  list<string>  $queues
+     * @param  array{kind: string, name: string, horizon: bool}|null  $worker
+     */
+    private function addQueues(array &$targets, ?Site $site, array $queues, ?array $worker): void
+    {
+        if (! $site instanceof Site || $queues === []) {
             return;
         }
 
@@ -153,22 +206,18 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
             return;
         }
 
-        // `--queue=high,default` is one process draining both in priority
-        // order; each is its own row because each has its own depth.
-        $queues = array_values(array_filter(
-            array_map('trim', explode(',', QueueWorkerClassifier::queueNameFrom($command) ?? 'default')),
-            static fn (string $queue): bool => $queue !== '',
-        ));
-
         $target = $targets[$site->id] ?? ['dir' => $dir, 'queues' => [], 'workers' => []];
         $target['queues'] = array_values(array_unique([...$target['queues'], ...$queues]));
-        $target['workers'][] = ['kind' => $kind, 'name' => $name, 'queues' => $queues];
+
+        if ($worker !== null) {
+            $target['workers'][] = $worker + ['queues' => $queues];
+        }
 
         $targets[$site->id] = $target;
     }
 
     /**
-     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>  $targets
+     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>  $targets
      */
     private function script(array $targets): string
     {
@@ -212,7 +261,7 @@ class CollectServerQueueSnapshotsJob implements ShouldQueue
     }
 
     /**
-     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>  $targets
+     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>  $targets
      * @return list<string>
      */
     private function systemdUnits(array $targets): array
@@ -344,7 +393,7 @@ PHP;
      * process count, systemd unit => active. Null for a manager that could not
      * be read — unknown, which must never be mistaken for "nothing running".
      *
-     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>  $targets
+     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>  $targets
      * @return array{supervisor: ?array<string, int>, systemd: ?array<string, bool>}
      */
     private function liveness(string $buffer, array $targets): array
@@ -384,7 +433,7 @@ PHP;
      * Null when any of those workers could not be read: a partial sum would
      * report fewer workers than exist, and zero is what pages someone.
      *
-     * @param  array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}  $target
+     * @param  array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}  $target
      * @param  array{supervisor: ?array<string, int>, systemd: ?array<string, bool>}  $liveness
      */
     private function workerProcesses(array $target, string $queue, array $liveness): ?int
@@ -392,7 +441,7 @@ PHP;
         $total = 0;
 
         foreach ($target['workers'] as $worker) {
-            if (! in_array($queue, $worker['queues'], true)) {
+            if (! in_array($queue, $worker['queues'], true) || $worker['horizon']) {
                 continue;
             }
 
@@ -412,7 +461,7 @@ PHP;
 
     /**
      * @param  list<array<string, mixed>>  $payloads
-     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>}>}>  $targets
+     * @param  array<string, array{dir: string, queues: list<string>, workers: list<array{kind: string, name: string, queues: list<string>, horizon: bool}>}>  $targets
      * @param  array{supervisor: ?array<string, int>, systemd: ?array<string, bool>}  $liveness
      */
     private function store(array $payloads, array $targets, array $liveness): void
@@ -482,13 +531,54 @@ PHP;
         $evaluator = app(SiteQueueAlertEvaluator::class);
 
         foreach (Site::query()->whereIn('id', array_unique($siteIds))->get() as $site) {
-            try {
-                // A manual refresh can land on top of the scheduled sweep; the
-                // lock stops both reading the same unfired state and paging twice.
-                Cache::lock('site-queue-alerts:'.$site->id, 60)->get(fn () => $evaluator->evaluate($site));
-            } catch (\Throwable $e) {
-                Log::info('queue alerts: evaluation failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
+            $this->judge($site, fn () => $evaluator->evaluate($site));
+        }
+    }
+
+    /**
+     * Remember which sites could not be read, so the page says so instead of
+     * showing stale numbers as current, and page once a site stays unreadable.
+     * A site that answered clears its record.
+     *
+     * @param  array<string, mixed>  $targets
+     * @param  list<string>  $answered
+     */
+    private function recordReads(array $targets, array $answered, string $error): void
+    {
+        $evaluator = app(SiteQueueAlertEvaluator::class);
+
+        foreach (Site::query()->whereIn('id', array_keys($targets))->get() as $site) {
+            $previous = data_get($site->meta, 'queue_read_error');
+
+            if (in_array((string) $site->id, $answered, true)) {
+                if ($previous !== null) {
+                    $site->putMeta('queue_read_error', null);
+                }
+
+                continue;
             }
+
+            $site->putMeta('queue_read_error', [
+                'error' => $error,
+                'failures' => (int) data_get($previous, 'failures', 0) + 1,
+                'since' => data_get($previous, 'since') ?? now()->toIso8601String(),
+            ]);
+
+            $this->judge($site, fn () => $evaluator->evaluateUnreadable($site));
+        }
+    }
+
+    /**
+     * A manual refresh can land on top of the scheduled sweep; the lock stops
+     * both reading the same unfired state and paging twice. An alert failure
+     * never takes the sweep down with it.
+     */
+    private function judge(Site $site, \Closure $check): void
+    {
+        try {
+            Cache::lock('site-queue-alerts:'.$site->id, 60)->get($check);
+        } catch (\Throwable $e) {
+            Log::info('queue alerts: evaluation failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
         }
     }
 

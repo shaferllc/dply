@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Jobs\CollectServerQueueSnapshotsJob;
+use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
 use App\Support\Sites\QueueWorkerClassifier;
@@ -28,9 +29,10 @@ class DispatchSiteQueueSnapshotsCommand extends Command
         // box in one SSH session, so cost scales with servers rather than sites.
         // The classifier runs here so a server whose only daemons are non-queue
         // never gets connected to at all.
+        // Stopped workers and paused queues included: a site whose only worker
+        // was switched off still receives jobs, and used to go unwatched.
         $supervisorServerIds = SupervisorProgram::query()
             ->whereNotNull('site_id')
-            ->where('is_active', true)
             ->get(['server_id', 'command'])
             ->filter(fn (SupervisorProgram $program): bool => QueueWorkerClassifier::isQueueWorker($program->command))
             ->pluck('server_id');
@@ -38,14 +40,15 @@ class DispatchSiteQueueSnapshotsCommand extends Command
         // systemd units are how VM sites run workers until moved to Supervisor;
         // leaving them out meant those servers were never swept at all.
         $systemdServerIds = SiteProcess::query()
-            ->where('is_active', true)
             ->where('type', '!=', SiteProcess::TYPE_WEB)
             ->with('site:id,server_id')
             ->get(['site_id', 'command'])
             ->filter(fn (SiteProcess $process): bool => QueueWorkerClassifier::isQueueWorker($process->command))
             ->map(fn (SiteProcess $process): ?string => $process->site?->server_id);
 
-        $serverIds = $supervisorServerIds->concat($systemdServerIds)
+        $pausedServerIds = Site::query()->whereNotNull('meta->queue_paused')->pluck('server_id');
+
+        $serverIds = $supervisorServerIds->concat($systemdServerIds)->concat($pausedServerIds)
             ->filter()
             ->unique()
             ->values();

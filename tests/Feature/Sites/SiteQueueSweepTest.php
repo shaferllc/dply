@@ -184,6 +184,105 @@ test('systemd worker units are swept and counted', function () {
     expect(processesFor($site, 'default'))->toBe(1);
 });
 
+/** @return array<string, array<string, mixed>> */
+function targetsFor(Site $site): array
+{
+    $job = new CollectServerQueueSnapshotsJob((string) $site->server_id);
+
+    return (new ReflectionMethod($job, 'targets'))->invoke($job, $site->server);
+}
+
+function publisherExpecting(?string $eventKey): void
+{
+    $publisher = Mockery::mock(NotificationPublisher::class);
+
+    if ($eventKey === null) {
+        $publisher->shouldNotReceive('publish');
+    } else {
+        $publisher->shouldReceive('publish')->once()->withArgs(fn (string $key): bool => $key === $eventKey);
+    }
+
+    app()->instance(NotificationPublisher::class, $publisher);
+}
+
+test('stopped workers and paused queues stay in the sweep', function () {
+    // Pausing drops the queue from its worker's --queue=, and pausing a worker's
+    // last queue switches the worker off — both used to fall out of the sweep.
+    $site = queueSite();
+    worker($site, 'php artisan queue:work --queue=reports')->update(['is_active' => false]);
+    $site->putMeta('queue_paused', ['emails' => ['1' => 'php artisan queue:work --queue=emails']]);
+
+    expect(targetsFor($site)[$site->id]['queues'])->toContain('reports', 'emails');
+});
+
+test('a paused queue is sampled but never pages no_worker', function () {
+    $site = queueSite();
+    $site->putMeta('queue_paused', ['emails' => ['1' => 'php artisan queue:work --queue=emails']]);
+    publisherExpecting(null);
+
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [
+        ['queue' => 'emails', 'source' => 'artisan', 'pending' => 6],
+    ]);
+
+    expect(processesFor($site, 'emails'))->toBe(0);
+});
+
+test('a running Horizon master that is not draining a queue is not its worker', function () {
+    // Horizon's workload did not list `default` (wedged, or the queue is missing
+    // from config/horizon.php), yet supervisord says the master is RUNNING.
+    // Crediting that process kept no_worker silent while jobs sat.
+    $site = queueSite();
+    $program = worker($site, 'php artisan horizon');
+    publisherExpecting('site.queue.no_worker');
+
+    sweep($site, "DPLY_SV_START\ndply-sv-{$program->id}   RUNNING   pid 7, uptime 2:00:00\nDPLY_SV_END", [
+        ['queue' => 'default', 'source' => 'artisan', 'pending' => 3],
+    ]);
+
+    expect(processesFor($site, 'default'))->toBe(0);
+});
+
+test('an app that does not answer is recorded as unreadable', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work');
+
+    $exec = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $exec->shouldReceive('runInlineBash')->andReturn(new ProcessOutput("DPLY_SV_START\nDPLY_SV_END\n"));
+    (new CollectServerQueueSnapshotsJob((string) $site->server_id))->handle($exec);
+
+    expect(data_get($site->fresh()->meta, 'queue_read_error'))
+        ->toMatchArray(['failures' => 1])
+        ->and(data_get($site->fresh()->meta, 'queue_read_error.error'))->toContain('did not answer');
+});
+
+test('a site that stays unreadable pages once, and a good read clears it', function () {
+    $site = queueSite();
+    worker($site, 'php artisan queue:work');
+    publisherExpecting('site.queue.unreadable');
+
+    $exec = Mockery::mock(ExecuteRemoteTaskOnServer::class);
+    $exec->shouldReceive('runInlineBash')->andThrow(new \RuntimeException('Connection refused'));
+    $job = new CollectServerQueueSnapshotsJob((string) $site->server_id);
+
+    // One miss is noise: recorded, not paged.
+    $job->handle($exec);
+    expect(data_get($site->fresh()->meta, 'queue_read_error.failures'))->toBe(1)
+        ->and(data_get($site->fresh()->meta, 'queue_alerts.state', []))->not->toHaveKey('*|unreadable');
+
+    // The second pages; the third is inside the cooldown, so still one page.
+    $job->handle($exec);
+    $job->handle($exec);
+    expect(data_get($site->fresh()->meta, 'queue_alerts.state'))->toHaveKey('*|unreadable');
+
+    sweep($site, "DPLY_SV_START\nDPLY_SV_END", [
+        ['queue' => 'default', 'source' => 'artisan', 'pending' => 0],
+    ]);
+
+    $meta = $site->fresh()->meta;
+    expect($meta)->not->toHaveKey('queue_read_error')
+        ->and(data_get($meta, 'queue_alerts.state', []))->not->toHaveKey('*|unreadable');
+});
+
 test('putMeta writes one key without reverting what a stale copy never saw', function () {
     $site = queueSite();
     $site->forceFill(['meta' => null])->save();
