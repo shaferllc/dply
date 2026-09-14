@@ -24,8 +24,6 @@ use Illuminate\Validation\Rule;
  */
 trait ManagesAuthorizedKeys
 {
-
-
     /**
      * Submit-time gate for {@see saveAdvancedSettings}. The "Disable authorized_keys sync"
      * toggle is the workspace's break-glass: flipping it on stops every future sync (manual
@@ -215,7 +213,7 @@ trait ManagesAuthorizedKeys
         $this->new_auth_name = '';
         $this->new_auth_key = '';
         $this->new_review_after = null;
-        $this->new_target_linux_user = (string) ($this->server->ssh_user ?: 'root');
+        $this->new_target_linux_user = $this->server->loginUser();
         $this->profile_key_id = null;
         $this->loadReviewDateInputs();
         $this->dispatch('close-modal', 'add-ssh-key-modal');

@@ -107,7 +107,9 @@ class WorkspaceSshKeys extends Component
     {
         $this->bootWorkspace($server);
         $this->system_users = $this->baselineSystemUsers();
-        $this->new_target_linux_user = (string) ($server->ssh_user ?: 'root');
+        // A person's key defaults to the account they will log in as: the
+        // deploy user, not root. See Server::loginUser().
+        $this->new_target_linux_user = $server->loginUser();
         $this->deploy_target_linux_user = $this->new_target_linux_user;
         $this->hydrateAdvancedFromServer();
         $this->loadReviewDateInputs();

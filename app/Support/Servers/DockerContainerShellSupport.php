@@ -24,10 +24,7 @@ final class DockerContainerShellSupport
 
     public static function localInteractiveSshOneLiner(Server $server, string $containerId): string
     {
-        $user = trim((string) ($server->ssh_user ?: 'dply'));
-        if ($user === '') {
-            $user = 'dply';
-        }
+        $user = $server->loginUser();
 
         $host = trim((string) ($server->ip_address ?? ''));
         if ($host === '') {

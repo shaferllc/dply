@@ -18,8 +18,6 @@ use Livewire\Attributes\On;
  */
 trait ManagesSshKeyProfile
 {
-
-
     protected function loadReviewDateInputs(): void
     {
         $this->reviewDates = [];
@@ -42,12 +40,13 @@ trait ManagesSshKeyProfile
      */
     protected function baselineSystemUsers(): array
     {
-        $u = (string) $this->server->ssh_user;
-        if ($u === '') {
-            return [];
-        }
-
-        return [$u];
+        // The login user too: on a server whose record still says root, the
+        // deploy user is where a person's key belongs, and the form only
+        // accepts users on this list until the full list is synced.
+        return array_values(array_unique(array_filter([
+            (string) $this->server->ssh_user,
+            $this->server->loginUser(),
+        ], fn (string $user): bool => $user !== '')));
     }
 
     public function updatedProfileKeyId(?string $value): void

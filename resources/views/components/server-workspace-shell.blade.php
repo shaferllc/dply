@@ -22,7 +22,8 @@
 @endphp
 
 @php
-    $sshUserForUrl = trim((string) ($server->ssh_user ?? '')) !== '' ? trim((string) $server->ssh_user) : 'root';
+    // The deploy user, not root: see Server::loginUser().
+    $sshUserForUrl = $server->loginUser();
     $sshPortForUrl = (int) ($server->ssh_port ?: 22);
     $sshUriHost = $server->ip_address ?? '';
 
@@ -117,7 +118,7 @@
                     </div>
 
                     @php
-                        $sshOneLine = ($server->ssh_user ?: 'root').'@'.$server->ip_address;
+                        $sshOneLine = $server->loginUser().'@'.$server->ip_address;
                         if ((int) ($server->ssh_port ?? 22) !== 22) {
                             $sshOneLine .= ':'.$server->ssh_port;
                         }
