@@ -82,6 +82,39 @@ test('the picker shows where jobs run today', function () {
     expect(Livewire::actingAs($user)->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])->instance()->queueRunMode())->toBe('dply_servers');
 });
 
+test('choosing this server leaves dply, and the picker says so', function () {
+    Bus::fake([SetUpSiteQueueingJob::class]);
+    [$user, $server, $site, $namespace] = siteOnDplyQueue();
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->call('chooseRunMode', 'own');
+
+    // The namespace is kept on purpose — it must not read as still connected.
+    expect(QueueNamespace::query()->whereKey($namespace->id)->exists())->toBeTrue()
+        ->and($component->instance()->queueRunMode())->toBe('own');
+    Bus::assertDispatched(SetUpSiteQueueingJob::class);
+
+    // A second click is a no-op, not a second disconnect of nothing.
+    Bus::fake([SetUpSiteQueueingJob::class]);
+    $component->call('chooseRunMode', 'own');
+    Bus::assertNotDispatched(SetUpSiteQueueingJob::class);
+});
+
+test('coming back to the dply queue rejoins the kept namespace', function () {
+    Bus::fake([SetUpSiteQueueingJob::class]);
+    [$user, $server, $site, $namespace] = siteOnDplyQueue();
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->call('chooseRunMode', 'own')
+        ->call('chooseRunMode', 'dply');
+
+    expect(QueueNamespace::query()->where('site_id', $site->id)->count())->toBe(1)
+        ->and(data_get($site->fresh()->meta, 'managed_queue.namespace_id'))->toBe((string) $namespace->id)
+        ->and($component->instance()->queueRunMode())->toBe('dply');
+});
+
 test('choosing dply servers builds the image first and leaves this server’s workers running', function () {
     Bus::fake([BuildFleetImageJob::class, SetUpSiteQueueingJob::class]);
     [$user, $server, $site, $namespace] = siteOnDplyQueue();

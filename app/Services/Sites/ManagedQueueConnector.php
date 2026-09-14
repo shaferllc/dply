@@ -6,6 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Modules\Queue\Actions\CreateQueueNamespace;
+use App\Modules\Queue\Actions\MintQueueCredential;
 use App\Modules\Queue\Models\QueueNamespace;
 use App\Modules\Queue\Support\QueueEndpoint;
 use App\Support\Sites\SiteQueueConfiguration;
@@ -48,11 +49,16 @@ final class ManagedQueueConnector
             throw new RuntimeException('This site has no organization to bill a queue to.');
         }
 
-        if ($this->namespaceFor($site) !== null) {
-            throw new RuntimeException('This site already has a managed queue.');
+        if ($this->isConnected($site)) {
+            throw new RuntimeException('This site is already on its managed queue.');
         }
 
-        $result = $this->create->handle($organization, $this->nameFor($site), $site, $userId);
+        // Leaving keeps the namespace (and anything still in it), so coming
+        // back rejoins it with a fresh credential rather than creating a second.
+        $existing = $this->namespaceFor($site);
+        $result = $existing !== null
+            ? ['namespace' => $existing, 'plaintext' => (new MintQueueCredential)->handle($existing, __('Site connection'))['plaintext']]
+            : $this->create->handle($organization, $this->nameFor($site), $site, $userId);
         $namespace = $result['namespace'];
 
         // Read BEFORE the write, so the revert path restores what this site
@@ -181,6 +187,25 @@ final class ManagedQueueConnector
         return is_string($previous) && $previous !== ''
             ? $previous
             : (SiteQueueConfiguration::suggestedDriverFor($site) ?? 'sync');
+    }
+
+    /**
+     * Whether this site's jobs go to dply right now.
+     *
+     * Not the same as having a namespace: disconnecting keeps the namespace on
+     * purpose, so its existence says nothing about where jobs go. connect()
+     * records the connection and disconnect() clears it; the env check covers
+     * a site pointed at dply by hand or from the namespace page.
+     */
+    public function isConnected(Site $site): bool
+    {
+        if (filled(data_get($site->meta, 'managed_queue.namespace_id'))) {
+            return true;
+        }
+
+        $variables = $this->parser->parse((string) ($site->env_file_content ?? ''))['variables'];
+
+        return ($variables['QUEUE_CONNECTION'] ?? null) === 'dply';
     }
 
     /** The namespace serving this site, if it has one. */

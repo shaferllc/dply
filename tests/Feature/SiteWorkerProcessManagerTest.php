@@ -147,15 +147,24 @@ test('the managed servers tab embeds the fleet panel once the site is on the dpl
         ->set('queue_workspace_tab', 'fleet')
         ->assertDontSeeLivewire('queue-fleet-panel');
 
-    (new QueueNamespace)->forceFill([
+    $namespace = (new QueueNamespace)->forceFill([
         'organization_id' => $site->organization_id,
         'site_id' => $site->id,
         'name' => 'edge',
         'status' => QueueNamespace::STATUS_ACTIVE,
-    ])->save();
+    ]);
+    $namespace->save();
+
+    // A kept namespace alone is not "on the dply queue" — connect() records it.
+    Livewire::actingAs($user)
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site->fresh()])
+        ->set('queue_workspace_tab', 'fleet')
+        ->assertDontSeeLivewire('queue-fleet-panel');
+
+    $site->forceFill(['meta' => ['managed_queue' => ['namespace_id' => (string) $namespace->id]]])->save();
 
     Livewire::actingAs($user)
-        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site])
+        ->test(WorkspaceQueue::class, ['server' => $server, 'site' => $site->fresh()])
         ->set('queue_workspace_tab', 'fleet')
         ->assertSeeLivewire('queue-fleet-panel');
 });

@@ -1323,7 +1323,7 @@ class WorkspaceQueue extends Component
     {
         $this->authorize('update', $this->site);
 
-        if ($connector->namespaceFor($this->site) === null) {
+        if (! $connector->isConnected($this->site)) {
             $this->toastError(__('This site is not on a managed queue.'));
 
             return;
@@ -1420,7 +1420,7 @@ class WorkspaceQueue extends Component
 
     private function runOnDplyQueue(ManagedQueueConnector $connector): void
     {
-        if ($connector->namespaceFor($this->site) === null) {
+        if (! $connector->isConnected($this->site)) {
             $this->upgradeToManagedQueue($connector);
 
             return;
@@ -1441,7 +1441,7 @@ class WorkspaceQueue extends Component
             return;
         }
 
-        if ($connector->namespaceFor($this->site) === null) {
+        if (! $connector->isConnected($this->site)) {
             $this->upgradeToManagedQueue($connector);
         }
 
@@ -1518,9 +1518,15 @@ class WorkspaceQueue extends Component
         return $total;
     }
 
+    /**
+     * The dply namespace this site's jobs go to — null once it has left dply,
+     * even though the namespace itself is kept.
+     */
     public function managedQueueNamespace(): ?QueueNamespace
     {
-        return app(ManagedQueueConnector::class)->namespaceFor($this->site);
+        $connector = app(ManagedQueueConnector::class);
+
+        return $connector->isConnected($this->site) ? $connector->namespaceFor($this->site) : null;
     }
 
     /**
