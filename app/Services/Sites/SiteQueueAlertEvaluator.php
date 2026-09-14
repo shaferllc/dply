@@ -89,10 +89,8 @@ final class SiteQueueAlertEvaluator
         }
 
         if ($changed) {
-            $meta = is_array($site->meta) ? $site->meta : [];
             $stored['state'] = $state;
-            $meta['queue_alerts'] = $stored;
-            $site->forceFill(['meta' => $meta])->save();
+            $site->putMeta('queue_alerts', $stored);
         }
     }
 
@@ -114,10 +112,13 @@ final class SiteQueueAlertEvaluator
 
         return [
             // Jobs waiting and nothing draining them: the one failure that is
-            // wrong at any depth, any hour, on any site.
+            // wrong at any depth, any hour, on any site. Null processes means
+            // the count could not be read — unknown is not zero, and paging on
+            // it told every healthy queue:work site it had no worker.
             'no_worker' => $rules->noWorker
                 && (int) ($latest->pending ?? 0) > 0
-                && (int) ($latest->worker_processes ?? 0) === 0,
+                && $latest->worker_processes !== null
+                && (int) $latest->worker_processes === 0,
 
             // Deep AND staying deep. Requiring every sample in the window to be
             // over the line means a burst that drains does not page anyone;

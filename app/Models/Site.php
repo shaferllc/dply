@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -520,5 +521,42 @@ class Site extends Model
         }
 
         return $q->exists();
+    }
+
+    /**
+     * Write ONE top-level `meta` key in the database, leaving every other key
+     * as it is there — not as it is on this (possibly minutes-old) instance.
+     *
+     * `forceFill(['meta' => …])->save()` writes the whole column back, so a
+     * Livewire page open for twenty minutes, or a job that loaded the site
+     * before a long SSH round trip, silently reverts whatever other writers
+     * stored meanwhile. Null removes the key. `$key` must be a code constant.
+     */
+    public function putMeta(string $key, mixed $value): void
+    {
+        if ($value === null) {
+            DB::update(
+                "update {$this->getTable()} set meta = (coalesce(meta::jsonb, '{}'::jsonb) - ?)::json where id = ?",
+                [$key, $this->getKey()],
+            );
+        } else {
+            // coalesce: jsonb_set on a NULL column returns NULL, which would
+            // quietly write nothing at all.
+            DB::update(
+                "update {$this->getTable()} set meta = jsonb_set(coalesce(meta::jsonb, '{}'::jsonb), ?::text[], ?::jsonb)::json where id = ?",
+                ['{'.$key.'}', json_encode($value, JSON_THROW_ON_ERROR), $this->getKey()],
+            );
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        if ($value === null) {
+            unset($meta[$key]);
+        } else {
+            $meta[$key] = $value;
+        }
+
+        $this->meta = $meta;
+        $this->syncOriginalAttribute('meta');
     }
 }

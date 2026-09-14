@@ -90,7 +90,6 @@ class CollectSiteHorizonSnapshotJob implements ShouldQueue
             $values['error'] = mb_substr($values['error'], 0, 600);
         }
 
-        $meta['horizon'] = array_merge($current, $values);
-        $site->forceFill(['meta' => $meta])->save();
+        $site->putMeta('horizon', array_merge($current, $values));
     }
 }

@@ -569,9 +569,7 @@ class WorkspaceQueue extends Component
         // any worker still running with the old one, and those keep reporting
         // until the next deploy restarts them.
         $token = (string) data_get($meta, 'queue_insights.token', '') ?: (string) Str::random(48);
-        $meta['queue_insights'] = ['enabled' => $enabled, 'token' => $token];
-
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_insights', ['enabled' => $enabled, 'token' => $token]);
 
         // Without the endpoint and token in the app's env the package installs
         // and then registers no listeners at all — silently, by design. Writing
@@ -1264,15 +1262,7 @@ class WorkspaceQueue extends Component
     /** @param  array<string, mixed>  $value */
     private function writeSiteMeta(string $key, array $value): void
     {
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-
-        if ($value === []) {
-            unset($meta[$key]);
-        } else {
-            $meta[$key] = $value;
-        }
-
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta($key, $value === [] ? null : $value);
     }
 
     /**
@@ -1753,9 +1743,7 @@ class WorkspaceQueue extends Component
         // would keep a queue silent under a rule that no longer describes it.
         unset($stored['state']);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['queue_alerts'] = $stored;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_alerts', $stored);
 
         $this->dispatch('close-modal', 'queue-alerts');
         $this->toastSuccess($this->alert_queue === ''
@@ -1775,9 +1763,7 @@ class WorkspaceQueue extends Component
         $stored = (array) data_get($this->site->meta, 'queue_alerts', []);
         unset($stored['queues'][$this->alert_queue], $stored['state']);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['queue_alerts'] = $stored;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('queue_alerts', $stored);
 
         $this->dispatch('close-modal', 'queue-alerts');
         $this->toastSuccess(__(':q follows the site defaults again.', ['q' => $this->alert_queue]));
@@ -1891,9 +1877,7 @@ class WorkspaceQueue extends Component
     {
         $this->authorize('update', $this->site);
 
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['worker_process_manager'] = WorkerPool::PM_SUPERVISOR;
-        $this->site->forceFill(['meta' => $meta])->save();
+        $this->site->putMeta('worker_process_manager', WorkerPool::PM_SUPERVISOR);
 
         ControlWorkerDaemonJob::dispatch((string) $this->site->id, 'ensure', (string) auth()->id() ?: null);
 
