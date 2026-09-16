@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\ProviderCredential;
 use App\Models\Site;
+use App\Models\SiteDomain;
 use App\Modules\Providers\Cloudflare\CloudflareDnsService;
 use App\Modules\Providers\Cloudflare\CloudflareGuidedMailProvider;
 use Illuminate\Http\Client\Request;
@@ -227,4 +228,17 @@ test('a permission failure when enabling names the missing permission and the zo
 
     expect($error)->toContain('Email Sending edit permission')
         ->and($error)->toContain('enabled on dply.io');
+});
+
+test('the sending domain choices include each hostname\'s parent zone', function () {
+    $site = subdomainSite();
+    $site->setRelation('domains', collect([
+        new SiteDomain(['hostname' => 'edge.dply.io']),
+        new SiteDomain(['hostname' => 'dply.io']),
+        new SiteDomain(['hostname' => 'shop.example.co.uk']),
+    ]));
+    $site->dns_zone = 'example.co.uk';
+
+    expect((new CloudflareGuidedMailProvider)->gate($site)->domains)
+        ->toBe(['edge.dply.io', 'dply.io', 'shop.example.co.uk', 'example.co.uk']);
 });
