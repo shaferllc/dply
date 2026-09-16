@@ -17,7 +17,16 @@ final readonly class GuidedMailRecordStatus
         public bool $dkim,
         public bool $dmarc,
         public ?string $detail = null,
+        /** The zone a subdomain lives in; null when the domain is itself a zone. */
+        public ?string $zone = null,
+        /** Whether the zone has a sending entry covering the subdomain; null when unknown. */
+        public ?bool $sendingEnabled = null,
     ) {}
+
+    public function forSubdomain(string $zone, ?bool $sendingEnabled): self
+    {
+        return new self($this->spf, $this->dkim, $this->dmarc, $this->detail, $zone, $sendingEnabled);
+    }
 
     public function allPresent(): bool
     {

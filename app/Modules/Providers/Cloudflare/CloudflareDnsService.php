@@ -418,6 +418,57 @@ class CloudflareDnsService
     }
 
     /**
+     * Email Sending subdomains configured under a zone (exact names or a leftmost
+     * wildcard like `*.example.com`). Sending on a subdomain is an entry under its
+     * zone, not a domain of its own — the dashboard won't onboard one directly.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listEmailSendingSubdomains(string $zoneName): array
+    {
+        $zoneId = $this->requireZoneId($zoneName);
+        $response = $this->request('get', '/zones/'.$zoneId.'/email/sending/subdomains', ['per_page' => 50]);
+        $this->assertApiSuccess($response, 'list Cloudflare Email Sending subdomains', 'Email Sending edit');
+
+        return array_values(array_filter((array) $response->json('result'), 'is_array'));
+    }
+
+    /**
+     * Create (or re-enable) sending on a subdomain of the zone.
+     *
+     * @return array<string, mixed>
+     */
+    public function createEmailSendingSubdomain(string $zoneName, string $name): array
+    {
+        $zoneId = $this->requireZoneId($zoneName);
+        $response = $this->request('post', '/zones/'.$zoneId.'/email/sending/subdomains', ['name' => strtolower(trim($name))]);
+        $this->assertApiSuccess($response, 'add a Cloudflare Email Sending subdomain', 'Email Sending edit');
+
+        return (array) $response->json('result');
+    }
+
+    /**
+     * The DNS records Cloudflare expects for a sending subdomain — authoritative,
+     * since the DKIM selector and return-path domain are assigned per entry.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function emailSendingSubdomainDnsRecords(string $zoneName, string $tag): array
+    {
+        $zoneId = $this->requireZoneId($zoneName);
+        $response = $this->request('get', '/zones/'.$zoneId.'/email/sending/subdomains/'.rawurlencode($tag).'/dns');
+        $this->assertApiSuccess($response, 'read Cloudflare Email Sending DNS records', 'Email Sending edit');
+
+        return array_values(array_filter((array) $response->json('result'), 'is_array'));
+    }
+
+    private function requireZoneId(string $zoneName): string
+    {
+        return $this->findZoneId($zoneName)
+            ?? throw new \RuntimeException("Zone [{$zoneName}] was not found in this Cloudflare account.");
+    }
+
+    /**
      * Raw diagnostics straight from Cloudflare, for when the permissions LOOK
      * right but the zone list comes back empty.
      *
@@ -465,7 +516,7 @@ class CloudflareDnsService
         return $out;
     }
 
-    private function assertApiSuccess(Response $response, string $action): void
+    private function assertApiSuccess(Response $response, string $action, string $permission = 'Zone:DNS:Edit'): void
     {
         if ($response->successful()) {
             $json = $response->json();
@@ -489,7 +540,7 @@ class CloudflareDnsService
         // "Authentication error" Cloudflare returns.
         $code = (int) ($response->json('errors.0.code') ?? 0);
         if (in_array($code, [10000, 9109], true) || stripos((string) $message, 'authentication') !== false || $response->status() === 403) {
-            $message .= ' — the API token needs the Zone:DNS:Edit permission for this zone.';
+            $message .= " — the API token needs the {$permission} permission for this zone.";
         }
 
         throw new \RuntimeException("Failed to {$action}: {$message}");
