@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Models\MailCredential;
+use App\Models\Site;
 use App\Modules\Providers\Cloudflare\CloudflareGuidedMailProvider;
 use App\Support\Mail\Guided\GuidedMailGate;
 use App\Support\Mail\Guided\GuidedMailStep;
@@ -17,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
  * plane (a real send via Cloudflare's API), so it works even before the site is
  * deployed.
  *
- * @property \App\Models\Site $site
+ * @property Site $site
  */
 trait ManagesSiteBindingCloudflareEmail
 {
@@ -75,11 +76,36 @@ trait ManagesSiteBindingCloudflareEmail
             'dkim' => $status->dkim,
             'dmarc' => $status->dmarc,
             'detail' => $status->detail,
+            'zone' => $status->zone,
+            'sending_enabled' => $status->sendingEnabled,
         ];
 
         if ($status->detail !== null) {
             $this->toastError($status->detail);
         }
+    }
+
+    /** Add the chosen subdomain as an Email Sending entry under its zone, then re-check. */
+    public function enableCloudflareSendingSubdomain(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $domain = $this->selectedCloudflareEmailDomain();
+        if ($domain === '') {
+            $this->toastError(__('Choose a sending domain first.'));
+
+            return;
+        }
+
+        $error = app(CloudflareGuidedMailProvider::class)->enableSendingSubdomain($this->site, $domain);
+        if ($error !== null) {
+            $this->toastError($error);
+
+            return;
+        }
+
+        $this->toastSuccess(__('Email Sending enabled on :domain.', ['domain' => $domain]));
+        $this->pollCloudflareEmailRecords();
     }
 
     /** Prove the setup end-to-end with a real send through Cloudflare's API. */

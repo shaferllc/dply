@@ -173,6 +173,22 @@
                                 </span>
                             @endforeach
                         </div>
+                        @if (($cfEmailRecords['zone'] ?? null) !== null)
+                            @if (($cfEmailRecords['sending_enabled'] ?? null) === true)
+                                <p class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><x-heroicon-s-check-circle class="h-3.5 w-3.5" /> {{ __('Sending is enabled on this subdomain under :zone.', ['zone' => $cfEmailRecords['zone']]) }}</p>
+                            @elseif (($cfEmailRecords['sending_enabled'] ?? null) === false)
+                                <div class="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                    <span class="flex-1">{{ __('This is a subdomain of :zone and has no sending entry yet. Onboard :zone in Cloudflare first, then add this subdomain.', ['zone' => $cfEmailRecords['zone']]) }}</span>
+                                    <button type="button" wire:click="enableCloudflareSendingSubdomain" wire:loading.attr="disabled" wire:target="enableCloudflareSendingSubdomain" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                        <x-heroicon-o-plus class="h-4 w-4" wire:loading.remove wire:target="enableCloudflareSendingSubdomain" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="enableCloudflareSendingSubdomain" />
+                                        {{ __('Enable sending on subdomain') }}
+                                    </button>
+                                </div>
+                            @else
+                                <p class="text-xs text-brand-moss">{{ __('This is a subdomain of :zone. dply couldn\'t read its Email Sending entries — give the DNS token Email Sending edit access, or check under :zone → Email Sending in Cloudflare.', ['zone' => $cfEmailRecords['zone']]) }}</p>
+                            @endif
+                        @endif
                     @endif
                 </div>
 
