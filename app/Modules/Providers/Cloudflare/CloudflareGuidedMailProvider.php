@@ -38,10 +38,21 @@ class CloudflareGuidedMailProvider implements GuidedMailProvider
             );
         }
 
+        // Cloudflare onboards whole zones, so a site on edge.dply.io can send from
+        // dply.io — offer each hostname's zone too (the saved dns_zone when set,
+        // else the apex guess; no API call, this runs on render).
+        $savedZone = strtolower(trim((string) ($site->dns_zone ?? '')));
         $domains = $site->domains
             ->pluck('hostname')
             ->map(static fn ($h): string => strtolower(trim((string) $h)))
             ->filter(static fn (string $h): bool => $h !== '')
+            ->flatMap(static function (string $host) use ($savedZone): array {
+                $zone = $savedZone !== '' && ($host === $savedZone || str_ends_with($host, '.'.$savedZone))
+                    ? $savedZone
+                    : Site::apexGuessForHostname($host);
+
+                return array_filter([$host, $zone]);
+            })
             ->unique()
             ->values()
             ->all();
