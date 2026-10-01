@@ -23,8 +23,6 @@ use App\Support\Sites\VmDockerSiteConfigSupport;
  */
 trait BuildsNginxServerBlocks
 {
-
-
     /**
      * Static-only vhost serving {@see Site::suspendedStaticRoot()} (no PHP, proxy, or redirects).
      */
@@ -242,6 +240,7 @@ NGINX;
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $webRoot);
         $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
         $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
+        $acme = $this->proxyAcmeChallengeBlock($webRoot, $nodeBa['preamble'].$formGate['preamble'].$formGate['gate_locations']);
 
         return <<<NGINX
 # Managed by Dply — {$basename}
@@ -251,7 +250,7 @@ server {
     server_name {$serverNames};
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$managedErrors}{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$nodeBa['prefix_locations']}
+{$managedErrors}{$layerPrefix}{$redirectBlock}{$acme}{$nodeBa['preamble']}{$formGate['preamble']}{$formGate['gate_locations']}{$formGate['error_page']}{$nodeBa['prefix_locations']}
     location / {
 {$nodeBa['location_slash_auth']}{$formGate['location_slash_auth']}{$proxyIntercept}        proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -370,6 +369,7 @@ NGINX;
         $proxyCache = app(SiteCacheDirectivesBuilder::class)->nginxProxyDirectives($site);
         $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
         $proxyIntercept = SiteManagedErrorPageSupport::nginxProxyInterceptErrors();
+        $acme = $this->proxyAcmeChallengeBlock($webRoot, $nodeBa['preamble']);
 
         $config = <<<NGINX
 # Managed by Dply — {$basename} (vm docker)
@@ -379,7 +379,7 @@ server {
     server_name {$names};
     access_log /var/log/nginx/{$basename}-access.log;
     error_log /var/log/nginx/{$basename}-error.log;
-{$managedErrors}{$layerPrefix}{$redirectBlock}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
+{$managedErrors}{$layerPrefix}{$redirectBlock}{$acme}{$nodeBa['preamble']}{$nodeBa['prefix_locations']}
     location / {
 {$nodeBa['location_slash_auth']}{$proxyIntercept}        proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -520,6 +520,28 @@ NGINX;
             $names,
             static fn (string $name): bool => $name !== '' && ! in_array(strtolower($name), $covered, true),
         ));
+    }
+
+    /**
+     * Proxy vhosts have no `root`, so `location /` hands ACME HTTP-01 probes to
+     * the app, which 404s them and fails `certbot certonly --webroot`. Serve the
+     * challenge path from the docroot certbot writes into — unless an auth
+     * fragment already emitted that location (nginx rejects duplicates).
+     */
+    protected function proxyAcmeChallengeBlock(string $webRoot, string $existingLocations): string
+    {
+        if ($webRoot === '' || str_contains($existingLocations, '/.well-known/acme-challenge/')) {
+            return '';
+        }
+
+        return <<<NGINX
+    location ^~ /.well-known/acme-challenge/ {
+        default_type "text/plain";
+        root {$webRoot};
+        try_files \$uri =404;
+    }
+
+NGINX;
     }
 
     /**
