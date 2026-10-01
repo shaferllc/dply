@@ -62,6 +62,56 @@ test('node block falls back to app port when internal port is null', function ()
     $this->assertStringContainsString('proxy_pass http://127.0.0.1:4001;', $nginx);
 });
 
+test('node block serves acme challenges from the docroot instead of proxying them', function () {
+    $site = Site::factory()->create([
+        'slug' => 'acme-node',
+        'type' => SiteType::Node,
+        'app_port' => 3000,
+        'meta' => ['scaffold' => ['framework' => 'express']],
+        'document_root' => '/home/dply/acme-node/public',
+        'repository_path' => '/home/dply/acme-node',
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'acme-node.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+
+    $site->refresh()->load('domains', 'redirects');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    expect($nginx)->toContain("location ^~ /.well-known/acme-challenge/ {\n        default_type \"text/plain\";\n        root ".$site->effectiveDocumentRootForNginx().';');
+});
+
+test('node block with basic auth emits a single acme challenge location', function () {
+    $site = Site::factory()->create([
+        'slug' => 'acme-node-auth',
+        'type' => SiteType::Node,
+        'app_port' => 3000,
+        'meta' => ['scaffold' => ['framework' => 'express']],
+        'document_root' => '/home/dply/acme-node-auth/public',
+        'repository_path' => '/home/dply/acme-node-auth',
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $site->id,
+        'hostname' => 'acme-node-auth.example.test',
+        'is_primary' => true,
+        'www_redirect' => false,
+    ]);
+    SiteBasicAuthUser::factory()->create([
+        'site_id' => $site->id,
+        'username' => 'preview',
+        'password_hash' => Hash::make('secret'),
+        'path' => '/',
+    ]);
+
+    $site->refresh()->load('domains', 'redirects', 'basicAuthUsers');
+    $nginx = app(NginxSiteConfigBuilder::class)->build($site);
+
+    expect(substr_count($nginx, 'location ^~ /.well-known/acme-challenge/'))->toBe(1);
+});
+
 test('per site access and error log paths are included', function () {
     $site = Site::factory()->create([
         'slug' => 'my-app',
